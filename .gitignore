@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
+
+# solver scratch output
+wobbl-out/
+*.frd
+*.dat
+*.sta
+*.cvg
+*.12d
+spooles.out
+*.vtu

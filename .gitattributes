@@ -1,0 +1,7 @@
+# Generated geometry and reports are data, not code
+*.step binary
+*.stp binary
+*.stl binary
+*.png binary
+examples/**/report.html binary
+docs/img/** binary
