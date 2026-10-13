@@ -1,0 +1,27 @@
+MARGINAL. Peak 24.4 MPa on the 3 mm inside fillet (face 3). It survives the load, but the safety factor 2.05 is below the 2.5 target.
+
+Confidence: high. passed mesh convergence, force balance, hand calculation, singularities, bolt bearing, units and sanity
+Max deflection 3.24 mm at (90, 0, 6).
+Material PLA (3D printed), limit 50 MPa; mass 30.35 g.
+Loads: 40 N down @ top and within 12 of 65,12.5,6. Fixtures: bolt holes d=4.5; wall x=min.
+
+Checks:
+  [pass] mesh convergence: max principal stress settled: 24.1 -> 24.1 -> 24.4 MPa over 3 meshes, last change 1.3%
+  [pass] force balance: reactions balance the loads to 8e-05% (forces) and 1.3e-05% (moments)
+  [pass] hand calculation: beam theory through the critical section gives 14.9 MPa nominal; FEA peak is 1.64x that, a stress concentration of about 1.6 from the local shape
+  [pass] singularities: no sharp corner or support artifact is above the reported stress
+  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 10.7 N sideways and 53.9 N along its axis; bearing stress 0.397 MPa, safety factor 125.96 on bearing
+  [pass] units and sanity: part 123 mm across, peak strain 0.007, max deflection 3.24 mm (2.6% of size): all plausible
+
+Assumptions:
+  - Linear elastic material and small deflections (no yielding redistribution, no buckling).
+  - PLA (3D printed): E 3500 MPa, Poisson 0.36, max principal vs tensile strength 50 MPa (Prusament PLA technical data sheet; Ultimaker PLA TDS).
+  - Loads are static and applied all at once; no impact, vibration or fatigue.
+  - Printed part treated as isotropic at 100% infill; across the layers it is roughly 60% as strong. Pass --print-direction to check that.
+  - Brittle failure: judged by the largest tensile principal stress.
+  - Bolted holes are rigidly held over the hole and a washer sized ring (twice the hole radius).
+  - Wall supports push but cannot pull (frictionless contact, solved iteratively).
+  - Contact between separate parts, friction and preload are not modeled.
+
+Images: stress: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/images/stress.png, zoom: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/images/zoom.png, safety: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/images/safety.png, deformed: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/images/deformed.png, convergence: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/images/convergence.png
+Report: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/report.html

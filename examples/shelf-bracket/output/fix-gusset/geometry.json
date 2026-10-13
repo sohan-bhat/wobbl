@@ -1,0 +1,24 @@
+{
+ "source": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/work/geometry/bracket-7b2ed894.step",
+ "path": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-gusset/geometry/gusset_t6.brep",
+ "kind": "cad",
+ "bbox": [
+  [
+   -1.5e-07,
+   -1.5e-07,
+   -1.5e-07
+  ],
+  [
+   90.00000015,
+   25.00000015,
+   80.00000015
+  ]
+ ],
+ "volume": 27061.208898860827,
+ "n_bodies": 1,
+ "n_surfaces": 16,
+ "notes": [
+  "Built from bracket.py with thickness=6, width=25, height=80, depth=90, fillet=0.5, hole=4.5."
+ ],
+ "stl_angle": 30.0
+}

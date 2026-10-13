@@ -1,0 +1,33 @@
+FAILS. Peak 52.7 MPa on the 0.5 mm inside fillet (face 3). The part cracks at about 0.95x this load.
+
+Confidence: high. passed mesh convergence, force balance, hand calculation, singularities, bolt bearing, units and sanity
+Max deflection 3.47 mm at (90, 12.5, 6).
+Material PLA (3D printed), limit 50 MPa; mass 30.29 g.
+Loads: 40 N down @ top and within 12 of 65,12.5,6. Fixtures: bolt holes d=4.5; wall x=min.
+
+Checks:
+  [pass] mesh convergence: max principal stress settled: 43.8 -> 51.5 -> 53.3 -> 52.7 MPa over 4 meshes, last change 1.1%
+  [pass] force balance: reactions balance the loads to 8.8e-05% (forces) and 1.6e-05% (moments)
+  [pass] hand calculation: beam theory through the critical section gives 15.6 MPa nominal; FEA peak is 3.37x that, a stress concentration of about 3.4 from the local shape
+  [pass] singularities: no sharp corner or support artifact is above the reported stress
+  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 6.87 N sideways and 57.8 N along its axis; bearing stress 0.254 MPa, safety factor 196.61 on bearing
+  [pass] units and sanity: part 123 mm across, peak strain 0.015, max deflection 3.47 mm (2.8% of size): all plausible
+
+Assumptions:
+  - Linear elastic material and small deflections (no yielding redistribution, no buckling).
+  - PLA (3D printed): E 3500 MPa, Poisson 0.36, max principal vs tensile strength 50 MPa (Prusament PLA technical data sheet; Ultimaker PLA TDS).
+  - Loads are static and applied all at once; no impact, vibration or fatigue.
+  - Printed part treated as isotropic at 100% infill; across the layers it is roughly 60% as strong. Pass --print-direction to check that.
+  - Brittle failure: judged by the largest tensile principal stress.
+  - Bolted holes are rigidly held over the hole and a washer sized ring (twice the hole radius).
+  - Wall supports push but cannot pull (frictionless contact, solved iteratively).
+  - Contact between separate parts, friction and preload are not modeled.
+
+Suggested fixes:
+  - Stress piles up in the 0.5 mm fillet. A fillet of 3 mm (about half the 6 mm wall) spreads it out. With that radius the peak is usually about 1.4x the 15.6 MPa beam stress, roughly 21.9 MPa (safety factor 2.28).
+  - The wall through the peak is 6 mm. To reach safety factor 2.5 it needs 9.74 mm (+62%), because bending stress falls with thickness squared.
+  - The peak sits where two walls meet and bend. A gusset as thick as the wall, with legs about half as long as the shorter wall, ties them together and usually cuts the corner stress by half or more.
+  - The load acts 58.8 mm from the critical section. Moving a support or the load to within 22.3 mm brings the bending stress to the target.
+
+Images: stress: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/stress.png, zoom: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/zoom.png, safety: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/safety.png, deformed: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/deformed.png, convergence: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/convergence.png, fix_before: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/stress.png, fix_after: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-gusset/images/stress.png
+Report: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/report.html

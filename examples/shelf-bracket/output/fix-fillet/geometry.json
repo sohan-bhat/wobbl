@@ -1,0 +1,24 @@
+{
+ "source": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/work/geometry/bracket-fa0629c0.step",
+ "path": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/work/geometry/prepared.brep",
+ "kind": "cad",
+ "bbox": [
+  [
+   -1e-07,
+   -1e-07,
+   -1e-07
+  ],
+  [
+   90.0000001,
+   25.0000001,
+   80.0000001
+  ]
+ ],
+ "volume": 24457.43365952989,
+ "n_bodies": 1,
+ "n_surfaces": 11,
+ "notes": [
+  "Built from bracket.py with thickness=6, width=25, height=80, depth=90, fillet=3, hole=4.5."
+ ],
+ "stl_angle": 30.0
+}

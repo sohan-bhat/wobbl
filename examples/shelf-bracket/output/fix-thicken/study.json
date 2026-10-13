@@ -1,0 +1,48 @@
+{
+ "part": "/Users/sohanb/code/wobbl/examples/shelf-bracket/bracket.py",
+ "material": "pla",
+ "loads": [
+  {
+   "kind": "force",
+   "faces": "top and within 12 of 65,12.5,6",
+   "magnitude": 40.0,
+   "direction": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "point": null,
+   "coupling": "distributed",
+   "text": "40 N down @ top and within 12 of 65,12.5,6",
+   "imperial": false
+  }
+ ],
+ "fixtures": [
+  {
+   "kind": "bolt",
+   "faces": "holes d=4.5",
+   "text": "bolt holes d=4.5",
+   "dofs": "xyz"
+  },
+  {
+   "kind": "wall",
+   "faces": "x=min",
+   "text": "wall x=min",
+   "dofs": "xyz"
+  }
+ ],
+ "target_sf": null,
+ "quality": "normal",
+ "budget": 240.0,
+ "max_levels": 4,
+ "question": "Will this printed PLA shelf bracket hold its share of an 8 kg shelf?",
+ "imperial": false,
+ "scale": 1.0,
+ "body": null,
+ "mesh_size": null,
+ "print_direction": null,
+ "assumptions": [],
+ "params": {
+  "thickness": "10.0"
+ }
+}

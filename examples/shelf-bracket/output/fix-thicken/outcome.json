@@ -1,0 +1,983 @@
+{
+ "domain": "strength",
+ "part": "/Users/sohanb/code/wobbl/examples/shelf-bracket/bracket.py",
+ "material": "PLA (3D printed)",
+ "question": "Will this printed PLA shelf bracket hold its share of an 8 kg shelf?",
+ "measure": "max principal stress",
+ "governing_MPa": 22.20521,
+ "governing_xyz": [
+  10.230032,
+  12.488175,
+  10.079147
+ ],
+ "governing_where": "on the 0.5 mm inside fillet (face 3)",
+ "allowable_MPa": 50,
+ "safety_factor": 2.251724,
+ "target_sf": 2.5,
+ "verdict": "marginal",
+ "headline": "Peak 22.2 MPa on the 0.5 mm inside fillet (face 3). It survives the load, but the safety factor 2.25 is below the 2.5 target. Confidence is medium.",
+ "max_disp_mm": 0.677089,
+ "max_disp_xyz": [
+  90.0,
+  0.0,
+  10.0
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "hand calculation: beam theory through the critical section gives 5.2 MPa nominal; FEA peak is 4.27x that; that is far from beam theory, so check the loads, units and fixtures"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "max principal stress settled: 13.1 -> 19.9 -> 22.2 -> 22.2 MPa over 4 meshes, last change 0.1%",
+   "detail": {
+    "values": [
+     13.065509,
+     19.941146,
+     22.187717,
+     22.20521
+    ],
+    "last_change": 0.000788,
+    "tolerance": 0.03,
+    "stopped_by": "converged",
+    "max_displacement": [
+     0.662076,
+     0.675783,
+     0.674763,
+     0.677089
+    ]
+   }
+  },
+  {
+   "name": "force balance",
+   "status": "pass",
+   "summary": "reactions balance the loads to 5.6e-05% (forces) and 8.6e-06% (moments)",
+   "detail": {
+    "applied_N": [
+     0.0,
+     0.0,
+     -40.0
+    ],
+    "reaction_N": [
+     -2e-05,
+     -0.0,
+     39.999991
+    ],
+    "force_error": 1e-06,
+    "moment_error": 0.0
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "warn",
+   "summary": "beam theory through the critical section gives 5.2 MPa nominal; FEA peak is 4.27x that; that is far from beam theory, so check the loads, units and fixtures",
+   "detail": {
+    "section_point": [
+     10.230032,
+     12.488175,
+     10.079147
+    ],
+    "axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "area_mm2": 252.319937,
+    "centroid": [
+     10.230032,
+     12.500754,
+     5.046404
+    ],
+    "axial_N": 0.0,
+    "bending_Nmm": 2187.036034,
+    "torsion_Nmm": 1.234191,
+    "nominal_peak_MPa": 5.198125,
+    "nominal_at_point_MPa": 5.138836,
+    "shear_from_torsion_MPa": 0.001089,
+    "I_principal_mm4": [
+     2141.884206,
+     13140.784544
+    ],
+    "ratio": 4.271773
+   }
+  },
+  {
+   "name": "singularities",
+   "status": "pass",
+   "summary": "no sharp corner or support artifact is above the reported stress",
+   "detail": {}
+  },
+  {
+   "name": "bolt bearing",
+   "status": "pass",
+   "summary": "worst hole of fix1 (d 4.5 mm) carries 21.3 N sideways and 77.4 N along its axis; bearing stress 0.474 MPa, safety factor 105.40 on bearing",
+   "detail": {
+    "fixture": "fix1",
+    "bearing_MPa": 0.47438,
+    "shear_N": 21.349059,
+    "axial_N": 77.41968,
+    "sf": 105.400699
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "part 123 mm across, peak strain 0.0063, max deflection 0.677 mm (0.55% of size): all plausible",
+   "detail": {
+    "diag_mm": 122.983739,
+    "strain": 0.006344,
+    "deflection_ratio": 0.005506
+   }
+  }
+ ],
+ "assumptions": [
+  "Linear elastic material and small deflections (no yielding redistribution, no buckling).",
+  "PLA (3D printed): E 3500 MPa, Poisson 0.36, max principal vs tensile strength 50 MPa (Prusament PLA technical data sheet; Ultimaker PLA TDS).",
+  "Loads are static and applied all at once; no impact, vibration or fatigue.",
+  "Printed part treated as isotropic at 100% infill; across the layers it is roughly 60% as strong. Pass --print-direction to check that.",
+  "Brittle failure: judged by the largest tensile principal stress.",
+  "Bolted holes are rigidly held over the hole and a washer sized ring (twice the hole radius).",
+  "Wall supports push but cannot pull (frictionless contact, solved iteratively).",
+  "Contact between separate parts, friction and preload are not modeled."
+ ],
+ "hotspots": [
+  {
+   "id": 1,
+   "xyz": [
+    10.323,
+    1.786,
+    10.073
+   ],
+   "kind": "feature",
+   "zone": null,
+   "detail": "on the 0.5 mm inside fillet (face 3)",
+   "face": 3,
+   "radius": 3.51801,
+   "values": [
+    13.0655,
+    18.0453,
+    19.0411,
+    18.9283
+   ],
+   "sizes": [
+    2.27,
+    0.485,
+    0.1586,
+    0.1207
+   ],
+   "singular": false,
+   "converged": true,
+   "change": -0.005922,
+   "excluded": false
+  },
+  {
+   "id": 2,
+   "xyz": [
+    10.323,
+    23.214,
+    10.073
+   ],
+   "kind": "feature",
+   "zone": null,
+   "detail": "on the 0.5 mm inside fillet (face 3)",
+   "face": 3,
+   "radius": 3.51801,
+   "values": [
+    12.6137,
+    15.8786,
+    18.0494,
+    18.7557
+   ],
+   "sizes": [
+    2.27,
+    0.485,
+    0.171,
+    0.1219
+   ],
+   "singular": false,
+   "converged": false,
+   "change": 0.039132,
+   "excluded": false
+  },
+  {
+   "id": 3,
+   "xyz": [
+    10.5,
+    12.5,
+    10.0
+   ],
+   "kind": "feature",
+   "zone": null,
+   "detail": "on the 0.5 mm inside fillet (face 3)",
+   "face": 3,
+   "radius": 5.001394,
+   "values": [
+    12.4667,
+    19.9411,
+    22.1877,
+    22.2052
+   ],
+   "sizes": [
+    3.2304,
+    0.689,
+    0.2256,
+    0.2364
+   ],
+   "singular": false,
+   "converged": true,
+   "change": 0.000788,
+   "excluded": false
+  }
+ ],
+ "levels": [
+  {
+   "level": 0,
+   "n_nodes": 7230,
+   "n_elems": 3920,
+   "h_global": 5.59017,
+   "h_min": 1.801902,
+   "t_mesh": 1.553758,
+   "t_solve": 2.157766,
+   "governing": 13.065509,
+   "governing_xyz": [
+    10.323223,
+    1.785714,
+    10.073223
+   ],
+   "raw_max": 13.065509,
+   "raw_max_xyz": [
+    10.323223,
+    1.785714,
+    10.073223
+   ],
+   "max_disp": 0.662076,
+   "max_disp_xyz": [
+    90.0,
+    25.0,
+    10.0
+   ],
+   "reaction": [
+    1.5e-05,
+    -2.3e-05,
+    39.999976
+   ],
+   "applied": [
+    0.0,
+    0.0,
+    -40.0
+   ],
+   "reaction_moment": [
+    504.177781,
+    -2591.167439,
+    -0.000707
+   ],
+   "applied_moment": [
+    -504.177546,
+    2591.168209,
+    0.0
+   ],
+   "wall_iterations": 4
+  },
+  {
+   "level": 1,
+   "n_nodes": 14017,
+   "n_elems": 7993,
+   "h_global": 4.751644,
+   "h_min": 0.485045,
+   "t_mesh": 1.802065,
+   "t_solve": 5.763103,
+   "governing": 19.941146,
+   "governing_xyz": [
+    10.145728,
+    14.13374,
+    10.147167
+   ],
+   "raw_max": 19.941146,
+   "raw_max_xyz": [
+    10.145728,
+    14.13374,
+    10.147167
+   ],
+   "max_disp": 0.675783,
+   "max_disp_xyz": [
+    90.0,
+    0.0,
+    10.0
+   ],
+   "reaction": [
+    -1.6e-05,
+    1.6e-05,
+    39.999979
+   ],
+   "applied": [
+    0.0,
+    0.0,
+    -40.0
+   ],
+   "reaction_moment": [
+    494.453019,
+    -2590.912445,
+    0.000323
+   ],
+   "applied_moment": [
+    -494.453619,
+    2590.912592,
+    0.0
+   ],
+   "wall_iterations": 1
+  },
+  {
+   "level": 2,
+   "n_nodes": 27425,
+   "n_elems": 16156,
+   "h_global": 4.038898,
+   "h_min": 0.158554,
+   "t_mesh": 2.769167,
+   "t_solve": 45.784867,
+   "governing": 22.187717,
+   "governing_xyz": [
+    10.182637,
+    11.31119,
+    10.122935
+   ],
+   "raw_max": 22.187717,
+   "raw_max_xyz": [
+    10.182637,
+    11.31119,
+    10.122935
+   ],
+   "max_disp": 0.674763,
+   "max_disp_xyz": [
+    90.0,
+    19.642857,
+    10.0
+   ],
+   "reaction": [
+    -3.1e-05,
+    -3e-06,
+    40.000008
+   ],
+   "applied": [
+    0.0,
+    0.0,
+    -40.0
+   ],
+   "reaction_moment": [
+    502.882005,
+    -2591.57795,
+    0.000466
+   ],
+   "applied_moment": [
+    -502.881819,
+    2591.577405,
+    0.0
+   ],
+   "wall_iterations": 1
+  },
+  {
+   "level": 3,
+   "n_nodes": 28678,
+   "n_elems": 17129,
+   "h_global": 3.433063,
+   "h_min": 0.120659,
+   "t_mesh": 4.480211,
+   "t_solve": 29.920874,
+   "governing": 22.20521,
+   "governing_xyz": [
+    10.230032,
+    12.488175,
+    10.079147
+   ],
+   "raw_max": 22.20521,
+   "raw_max_xyz": [
+    10.230032,
+    12.488175,
+    10.079147
+   ],
+   "max_disp": 0.677089,
+   "max_disp_xyz": [
+    90.0,
+    0.0,
+    10.0
+   ],
+   "reaction": [
+    -2e-05,
+    -0.0,
+    39.999991
+   ],
+   "applied": [
+    0.0,
+    0.0,
+    -40.0
+   ],
+   "reaction_moment": [
+    498.7958,
+    -2596.237348,
+    0.000389
+   ],
+   "applied_moment": [
+    -498.795964,
+    2596.237319,
+    0.0
+   ],
+   "wall_iterations": 1
+  }
+ ],
+ "loads": [
+  "40 N down @ top and within 12 of 65,12.5,6"
+ ],
+ "fixtures": [
+  "bolt holes d=4.5",
+  "wall x=min"
+ ],
+ "selections": {
+  "load1": {
+   "selector": "top and within 12 of 65,12.5,6",
+   "faces": [
+    5
+   ],
+   "patch": [
+    [
+     "sphere",
+     [
+      65.0,
+      12.5,
+      6.0
+     ],
+     12.0
+    ]
+   ]
+  },
+  "fix1": {
+   "selector": "holes d=4.5",
+   "faces": [
+    10,
+    11
+   ],
+   "patch": []
+  },
+  "fix2": {
+   "selector": "x=min",
+   "faces": [
+    6
+   ],
+   "patch": []
+  }
+ },
+ "features": {
+  "bbox": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    90.0,
+    25.0,
+    80.0
+   ]
+  ],
+  "volume_mm3": 39705.286,
+  "surface_area_mm2": 11914.956,
+  "thickness_typical_mm": 10.0,
+  "thickness_min_mm": 10.0,
+  "n_faces": 11,
+  "holes": [
+   {
+    "face": 10,
+    "diameter": 4.5,
+    "center": [
+     5.0,
+     12.5,
+     25.0
+    ],
+    "axis": [
+     1.0,
+     0.0,
+     -0.0
+    ],
+    "length": 10.001
+   },
+   {
+    "face": 11,
+    "diameter": 4.5,
+    "center": [
+     5.0,
+     12.5,
+     65.0
+    ],
+    "axis": [
+     1.0,
+     -0.0,
+     -0.0
+    ],
+    "length": 10.001
+   }
+  ],
+  "fillets": [
+   {
+    "face": 3,
+    "radius": 0.5
+   }
+  ],
+  "sharp_inside_corners": [],
+  "faces": [
+   {
+    "id": 8,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 2250.0,
+    "centroid": [
+     45.0,
+     12.5,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      90.0,
+      25.0,
+      0.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 5,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1987.5,
+    "centroid": [
+     50.25,
+     12.5,
+     10.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "bbox": [
+     [
+      10.5,
+      0.0,
+      10.0
+     ],
+     [
+      90.0,
+      25.0,
+      10.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 6,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1971.3622,
+    "centroid": [
+     0.0,
+     12.5,
+     39.9274
+    ],
+    "normal": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      25.0,
+      80.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 2,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1708.8622,
+    "centroid": [
+     10.0,
+     12.5,
+     45.2542
+    ],
+    "normal": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      10.0,
+      0.0,
+      10.5
+     ],
+     [
+      10.0,
+      25.0,
+      80.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 1,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1600.0732,
+    "centroid": [
+     27.4992,
+     0.0,
+     22.4994
+    ],
+    "normal": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      90.0,
+      0.0,
+      80.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 9,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1600.0732,
+    "centroid": [
+     27.4992,
+     25.0,
+     22.4994
+    ],
+    "normal": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      0.0,
+      25.0,
+      0.0
+     ],
+     [
+      90.0,
+      25.0,
+      80.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 4,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 250.0,
+    "centroid": [
+     5.0,
+     12.5,
+     80.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "bbox": [
+     [
+      0.0,
+      0.0,
+      80.0
+     ],
+     [
+      10.0,
+      25.0,
+      80.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 7,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 250.0,
+    "centroid": [
+     90.0,
+     12.5,
+     5.0
+    ],
+    "normal": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      90.0,
+      0.0,
+      0.0
+     ],
+     [
+      90.0,
+      25.0,
+      10.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 11,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 138.9888,
+    "centroid": [
+     4.9992,
+     12.5051,
+     65.0039
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      0.0,
+      10.25,
+      62.75
+     ],
+     [
+      10.0,
+      14.75,
+      67.25
+     ]
+    ],
+    "radius": 2.25,
+    "axis": [
+     1.0,
+     -0.0002,
+     -0.0002
+    ],
+    "axis_point": [
+     5.0,
+     12.5,
+     65.0
+    ],
+    "concave": true,
+    "length": 10.0014,
+    "role": "hole",
+    "sweep": 5.91913,
+    "group": null
+   },
+   {
+    "id": 10,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 138.9623,
+    "centroid": [
+     4.9999,
+     12.5045,
+     25.0044
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      0.0,
+      10.25,
+      22.75
+     ],
+     [
+      10.0,
+      14.75,
+      27.25
+     ]
+    ],
+    "radius": 2.25,
+    "axis": [
+     1.0,
+     0.0001,
+     -0.0002
+    ],
+    "axis_point": [
+     5.0,
+     12.5,
+     25.0
+    ],
+    "concave": true,
+    "length": 10.0009,
+    "role": "hole",
+    "sweep": 5.919246,
+    "group": null
+   },
+   {
+    "id": 3,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 19.1337,
+    "centroid": [
+     10.1985,
+     12.5,
+     10.198
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      10.0,
+      0.0,
+      10.0
+     ],
+     [
+      10.5,
+      25.0,
+      10.5
+     ]
+    ],
+    "radius": 0.5,
+    "axis": [
+     0.0,
+     -1.0,
+     -0.0
+    ],
+    "axis_point": [
+     10.5,
+     12.5,
+     10.5
+    ],
+    "concave": true,
+    "length": 25.0,
+    "role": "fillet",
+    "sweep": 1.106893,
+    "group": null
+   }
+  ]
+ },
+ "notes": [
+  "Built from bracket.py with thickness=10, width=25, height=80, depth=90, fillet=0.5, hole=4.5.",
+  "1 curved elements folded on thin walls, so this mesh uses straight sided second order elements."
+ ],
+ "imperial": false,
+ "mass_kg": 0.049254,
+ "beam": {
+  "section_point": [
+   10.230032,
+   12.488175,
+   10.079147
+  ],
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "area_mm2": 252.319937,
+  "centroid": [
+   10.230032,
+   12.500754,
+   5.046404
+  ],
+  "axial_N": 0.0,
+  "bending_Nmm": 2187.036034,
+  "torsion_Nmm": 1.234191,
+  "nominal_peak_MPa": 5.198125,
+  "nominal_at_point_MPa": 5.138836,
+  "shear_from_torsion_MPa": 0.001089,
+  "I_principal_mm4": [
+   2141.884206,
+   13140.784544
+  ],
+  "ratio": 4.271773
+ },
+ "fixes": [],
+ "images": {
+  "stress": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/stress.png",
+  "zoom": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/zoom.png",
+  "safety": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/safety.png",
+  "deformed": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/deformed.png",
+  "convergence": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/convergence.png"
+ },
+ "report": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/report.html",
+ "workdir": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken",
+ "t_total": 120.69967,
+ "solver": "CalculiX 2.23"
+}
