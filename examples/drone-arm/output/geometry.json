@@ -1,0 +1,24 @@
+{
+ "source": "work/geometry/arm-51cfe4ca.step",
+ "path": "work/geometry/prepared.brep",
+ "kind": "cad",
+ "bbox": [
+  [
+   -20.0000001,
+   -15.0000001,
+   -1.000000006105189e-07
+  ],
+  [
+   165.0000001,
+   15.0000001,
+   20.0000001
+  ]
+ ],
+ "volume": 40015.35617247949,
+ "n_bodies": 1,
+ "n_surfaces": 27,
+ "notes": [
+  "Built from arm.py with length=150, width=16, root_height=20, tip_height=12, window=3, pad=30."
+ ],
+ "stl_angle": 30.0
+}
