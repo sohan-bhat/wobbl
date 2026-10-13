@@ -1,0 +1,3199 @@
+{
+ "domain": "strength",
+ "part": "/Users/sohanb/code/wobbl/examples/enclosure/enclosure.py",
+ "material": "Polycarbonate",
+ "question": "Does the PC shell survive a 120 N thumb press, and how far does the top dent?",
+ "measure": "von Mises stress",
+ "governing_MPa": 8.853327,
+ "governing_xyz": [
+  23.828179,
+  12.952927,
+  25.0
+ ],
+ "governing_where": "on face 29 at (23.8, 13, 25)",
+ "allowable_MPa": 62,
+ "safety_factor": 7.003017,
+ "target_sf": 2.0,
+ "verdict": "holds",
+ "headline": "Peak 8.85 MPa on face 29 at (23.8, 13, 25), safety factor 7.00 against yield (target 2). Confidence is medium.",
+ "max_disp_mm": 0.217887,
+ "max_disp_xyz": [
+  21.342101,
+  9.714771,
+  26.455255
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "singularities: excluded from the answer: 18.6 MPa at a sharp inside corner (the 7 mm boss (face 35)) (singular, keeps rising with refinement: 14.9 -> 18.2 -> 18.6 MPa); 18.6 MPa at a sharp inside corner (face 2) (singular, keeps rising with refinement: 14.9 -> 18.2 -> 18.6 MPa); 13.6 MPa at a sharp inside corner (face 21) (singular, keeps rising with refinement: 9.89 -> 13.6 MPa). Wobbl reports the stress 1.34 mm or more away from these spots"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "von Mises stress settled: 8.57 -> 8.82 -> 8.85 MPa over 3 meshes, last change 0.4%",
+   "detail": {
+    "values": [
+     8.572544,
+     8.817691,
+     8.853327
+    ],
+    "last_change": 0.004025,
+    "tolerance": 0.03,
+    "stopped_by": "converged",
+    "max_displacement": [
+     0.208933,
+     0.216696,
+     0.217887
+    ]
+   }
+  },
+  {
+   "name": "force balance",
+   "status": "pass",
+   "summary": "reactions balance the loads to 2.6e-05% (forces) and 7e-06% (moments)",
+   "detail": {
+    "applied_N": [
+     0.0,
+     0.0,
+     -120.0
+    ],
+    "reaction_N": [
+     -6e-06,
+     -2.1e-05,
+     119.999977
+    ],
+    "force_error": 0.0,
+    "moment_error": 0.0
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "skip",
+   "summary": "no simple beam model applies (the governing point is not between the fixtures and the load, so no single section carries it)",
+   "detail": {}
+  },
+  {
+   "name": "singularities",
+   "status": "warn",
+   "summary": "excluded from the answer: 18.6 MPa at a sharp inside corner (the 7 mm boss (face 35)) (singular, keeps rising with refinement: 14.9 -> 18.2 -> 18.6 MPa); 18.6 MPa at a sharp inside corner (face 2) (singular, keeps rising with refinement: 14.9 -> 18.2 -> 18.6 MPa); 13.6 MPa at a sharp inside corner (face 21) (singular, keeps rising with refinement: 9.89 -> 13.6 MPa). Wobbl reports the stress 1.34 mm or more away from these spots",
+   "detail": {
+    "spots": [
+     {
+      "id": 1,
+      "xyz": [
+       35.577,
+       21.59,
+       24.585
+      ],
+      "kind": "corner",
+      "zone": null,
+      "detail": "at a sharp inside corner (the 7 mm boss (face 35))",
+      "face": 35,
+      "radius": 1.706843,
+      "values": [
+       14.9062,
+       18.2218,
+       18.6178
+      ],
+      "sizes": [
+       1.097,
+       0.5052,
+       0.5397
+      ],
+      "singular": true,
+      "converged": true,
+      "change": 0.021729,
+      "excluded": true
+     },
+     {
+      "id": 5,
+      "xyz": [
+       35.596,
+       22.144,
+       28.0
+      ],
+      "kind": "corner",
+      "zone": null,
+      "detail": "at a sharp inside corner (face 2)",
+      "face": 2,
+      "radius": 3.399899,
+      "values": [
+       14.8891,
+       18.2218,
+       18.6178
+      ],
+      "sizes": [
+       1.1379,
+       0.5848,
+       0.5634
+      ],
+      "singular": true,
+      "converged": true,
+      "change": 0.021729,
+      "excluded": true
+     },
+     {
+      "id": 6,
+      "xyz": [
+       20.824,
+       27.0,
+       24.647
+      ],
+      "kind": "corner",
+      "zone": null,
+      "detail": "at a sharp inside corner (face 21)",
+      "face": 21,
+      "radius": 1.945544,
+      "values": [
+       NaN,
+       9.8932,
+       13.646
+      ],
+      "sizes": [
+       NaN,
+       1.1783,
+       1.2593
+      ],
+      "singular": true,
+      "converged": false,
+      "change": 0.379332,
+      "excluded": true
+     },
+     {
+      "id": 7,
+      "xyz": [
+       24.94,
+       27.0,
+       24.693
+      ],
+      "kind": "corner",
+      "zone": null,
+      "detail": "at a sharp inside corner (face 21)",
+      "face": 21,
+      "radius": 2.034272,
+      "values": [
+       NaN,
+       8.9104,
+       11.3825
+      ],
+      "sizes": [
+       NaN,
+       1.2068,
+       1.073
+      ],
+      "singular": true,
+      "converged": false,
+      "change": 0.277434,
+      "excluded": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "part 112 mm across, peak strain 0.0038, max deflection 0.218 mm (0.2% of size): all plausible",
+   "detail": {
+    "diag_mm": 111.731822,
+    "strain": 0.003767,
+    "deflection_ratio": 0.00195
+   }
+  }
+ ],
+ "assumptions": [
+  "Linear elastic material and small deflections (no yielding redistribution, no buckling).",
+  "Polycarbonate: E 2350 MPa, Poisson 0.37, von Mises vs yield 62 MPa (Covestro Makrolon 2405 datasheet).",
+  "Loads are static and applied all at once; no impact, vibration or fatigue.",
+  "Fixed faces are perfectly rigid; real mounts flex a little, which lowers peak stress next to them.",
+  "Contact between separate parts, friction and preload are not modeled."
+ ],
+ "hotspots": [
+  {
+   "id": 1,
+   "xyz": [
+    35.577,
+    21.59,
+    24.585
+   ],
+   "kind": "corner",
+   "zone": null,
+   "detail": "at a sharp inside corner (the 7 mm boss (face 35))",
+   "face": 35,
+   "radius": 1.706843,
+   "values": [
+    14.9062,
+    18.2218,
+    18.6178
+   ],
+   "sizes": [
+    1.097,
+    0.5052,
+    0.5397
+   ],
+   "singular": true,
+   "converged": true,
+   "change": 0.021729,
+   "excluded": true
+  },
+  {
+   "id": 2,
+   "xyz": [
+    24.009,
+    13.321,
+    25.0
+   ],
+   "kind": "feature",
+   "zone": null,
+   "detail": "on face 29",
+   "face": 29,
+   "radius": 2.061351,
+   "values": [
+    8.5725,
+    8.8177,
+    8.8533
+   ],
+   "sizes": [
+    1.1792,
+    0.5414,
+    0.5554
+   ],
+   "singular": false,
+   "converged": true,
+   "change": 0.004041,
+   "excluded": false
+  },
+  {
+   "id": 3,
+   "xyz": [
+    23.404,
+    10.226,
+    28.0
+   ],
+   "kind": "feature",
+   "zone": null,
+   "detail": "on face 2",
+   "face": 2,
+   "radius": 3.012192,
+   "values": [
+    8.5329,
+    8.789,
+    8.834
+   ],
+   "sizes": [
+    1.1792,
+    0.5512,
+    0.2574
+   ],
+   "singular": false,
+   "converged": true,
+   "change": 0.005125,
+   "excluded": false
+  },
+  {
+   "id": 4,
+   "xyz": [
+    24.746,
+    16.132,
+    28.0
+   ],
+   "kind": "feature",
+   "zone": null,
+   "detail": "on face 2",
+   "face": 2,
+   "radius": 2.923344,
+   "values": [
+    8.4743,
+    8.7765,
+    8.825
+   ],
+   "sizes": [
+    1.2329,
+    0.6309,
+    0.5998
+   ],
+   "singular": false,
+   "converged": true,
+   "change": 0.005535,
+   "excluded": false
+  },
+  {
+   "id": 5,
+   "xyz": [
+    35.596,
+    22.144,
+    28.0
+   ],
+   "kind": "corner",
+   "zone": null,
+   "detail": "at a sharp inside corner (face 2)",
+   "face": 2,
+   "radius": 3.399899,
+   "values": [
+    14.8891,
+    18.2218,
+    18.6178
+   ],
+   "sizes": [
+    1.1379,
+    0.5848,
+    0.5634
+   ],
+   "singular": true,
+   "converged": true,
+   "change": 0.021729,
+   "excluded": true
+  },
+  {
+   "id": 6,
+   "xyz": [
+    20.824,
+    27.0,
+    24.647
+   ],
+   "kind": "corner",
+   "zone": null,
+   "detail": "at a sharp inside corner (face 21)",
+   "face": 21,
+   "radius": 1.945544,
+   "values": [
+    NaN,
+    9.8932,
+    13.646
+   ],
+   "sizes": [
+    NaN,
+    1.1783,
+    1.2593
+   ],
+   "singular": true,
+   "converged": false,
+   "change": 0.379332,
+   "excluded": true
+  },
+  {
+   "id": 7,
+   "xyz": [
+    24.94,
+    27.0,
+    24.693
+   ],
+   "kind": "corner",
+   "zone": null,
+   "detail": "at a sharp inside corner (face 21)",
+   "face": 21,
+   "radius": 2.034272,
+   "values": [
+    NaN,
+    8.9104,
+    11.3825
+   ],
+   "sizes": [
+    NaN,
+    1.2068,
+    1.073
+   ],
+   "singular": true,
+   "converged": false,
+   "change": 0.277434,
+   "excluded": true
+  }
+ ],
+ "levels": [
+  {
+   "level": 0,
+   "n_nodes": 73302,
+   "n_elems": 36215,
+   "h_global": 3.999077,
+   "h_min": 0.735417,
+   "t_mesh": 8.694915,
+   "t_solve": 33.376972,
+   "governing": 8.572544,
+   "governing_xyz": [
+    24.009292,
+    13.321159,
+    25.0
+   ],
+   "raw_max": 14.906197,
+   "raw_max_xyz": [
+    35.577256,
+    21.589656,
+    24.585015
+   ],
+   "max_disp": 0.208933,
+   "max_disp_xyz": [
+    21.505721,
+    9.889073,
+    26.5
+   ],
+   "reaction": [
+    -5e-06,
+    8e-06,
+    119.999991
+   ],
+   "applied": [
+    0.0,
+    0.0,
+    -120.0
+   ],
+   "reaction_moment": [
+    1800.927933,
+    -3041.808678,
+    0.00034
+   ],
+   "applied_moment": [
+    -1800.928496,
+    3041.808652,
+    0.0
+   ],
+   "wall_iterations": 0
+  },
+  {
+   "level": 1,
+   "n_nodes": 110622,
+   "n_elems": 61116,
+   "h_global": 3.399215,
+   "h_min": 0.505215,
+   "t_mesh": 9.94138,
+   "t_solve": 62.393791,
+   "governing": 8.817691,
+   "governing_xyz": [
+    23.533384,
+    13.020093,
+    25.0
+   ],
+   "raw_max": 18.221844,
+   "raw_max_xyz": [
+    35.374853,
+    21.464813,
+    25.0
+   ],
+   "max_disp": 0.216696,
+   "max_disp_xyz": [
+    21.326764,
+    10.043248,
+    26.599592
+   ],
+   "reaction": [
+    8e-06,
+    2.5e-05,
+    119.999943
+   ],
+   "applied": [
+    0.0,
+    0.0,
+    -120.0
+   ],
+   "reaction_moment": [
+    1807.71148,
+    -2998.53071,
+    0.000277
+   ],
+   "applied_moment": [
+    -1807.712546,
+    2998.531882,
+    0.0
+   ],
+   "wall_iterations": 0
+  },
+  {
+   "level": 2,
+   "n_nodes": 102392,
+   "n_elems": 54410,
+   "h_global": 2.889333,
+   "h_min": 0.257354,
+   "t_mesh": 7.088089,
+   "t_solve": 48.601055,
+   "governing": 8.853327,
+   "governing_xyz": [
+    23.828179,
+    12.952927,
+    25.0
+   ],
+   "raw_max": 18.617786,
+   "raw_max_xyz": [
+    36.185615,
+    20.887763,
+    25.0
+   ],
+   "max_disp": 0.217887,
+   "max_disp_xyz": [
+    21.342101,
+    9.714771,
+    26.455255
+   ],
+   "reaction": [
+    -6e-06,
+    -2.1e-05,
+    119.999977
+   ],
+   "applied": [
+    0.0,
+    0.0,
+    -120.0
+   ],
+   "reaction_moment": [
+    1791.489187,
+    -2995.608069,
+    -0.000181
+   ],
+   "applied_moment": [
+    -1791.488965,
+    2995.60896,
+    0.0
+   ],
+   "wall_iterations": 0
+  }
+ ],
+ "loads": [
+  "120 N down @ top and within 8 of 25,15,28"
+ ],
+ "fixtures": [
+  "fixed z=min"
+ ],
+ "selections": {
+  "load1": {
+   "selector": "top and within 8 of 25,15,28",
+   "faces": [
+    2
+   ],
+   "patch": [
+    [
+     "sphere",
+     [
+      25.0,
+      15.0,
+      28.0
+     ],
+     8.0
+    ]
+   ]
+  },
+  "fix1": {
+   "selector": "z=min",
+   "faces": [
+    5,
+    40,
+    41,
+    42,
+    43
+   ],
+   "patch": []
+  }
+ },
+ "features": {
+  "bbox": [
+   [
+    -45.0,
+    -30.0,
+    0.0
+   ],
+   [
+    45.0,
+    30.0,
+    28.0
+   ]
+  ],
+  "volume_mm3": 50345.753,
+  "surface_area_mm2": 28497.16,
+  "thickness_typical_mm": 3.0,
+  "thickness_min_mm": 2.222,
+  "n_faces": 51,
+  "holes": [
+   {
+    "face": 44,
+    "diameter": 2.5,
+    "center": [
+     -38.5,
+     -23.5,
+     12.0
+    ],
+    "axis": [
+     -0.0,
+     -0.0,
+     1.0
+    ],
+    "length": 24.0
+   },
+   {
+    "face": 45,
+    "diameter": 2.5,
+    "center": [
+     38.5,
+     -23.5,
+     12.0
+    ],
+    "axis": [
+     -0.0,
+     0.0,
+     1.0
+    ],
+    "length": 24.0
+   },
+   {
+    "face": 46,
+    "diameter": 2.5,
+    "center": [
+     -38.5,
+     23.5,
+     12.0
+    ],
+    "axis": [
+     -0.0,
+     0.0,
+     1.0
+    ],
+    "length": 24.0
+   },
+   {
+    "face": 47,
+    "diameter": 2.5,
+    "center": [
+     38.5,
+     23.5,
+     12.0
+    ],
+    "axis": [
+     -0.0,
+     -0.0,
+     1.0
+    ],
+    "length": 24.0
+   }
+  ],
+  "fillets": [
+   {
+    "face": 19,
+    "radius": 3.0
+   }
+  ],
+  "sharp_inside_corners": [
+   {
+    "faces": [
+     13,
+     29
+    ],
+    "angle_deg": 90.0,
+    "length": 77.0,
+    "midpoint": [
+     0.0,
+     -27.0,
+     25.0
+    ],
+    "curves": [
+     48
+    ]
+   },
+   {
+    "faces": [
+     21,
+     29
+    ],
+    "angle_deg": 90.0,
+    "length": 77.0,
+    "midpoint": [
+     0.0,
+     27.0,
+     25.0
+    ],
+    "curves": [
+     63
+    ]
+   },
+   {
+    "faces": [
+     17,
+     29
+    ],
+    "angle_deg": 90.0,
+    "length": 47.0,
+    "midpoint": [
+     42.0,
+     0.0,
+     25.0
+    ],
+    "curves": [
+     54
+    ]
+   },
+   {
+    "faces": [
+     25,
+     29
+    ],
+    "angle_deg": 90.0,
+    "length": 47.0,
+    "midpoint": [
+     -42.0,
+     0.0,
+     25.0
+    ],
+    "curves": [
+     70
+    ]
+   },
+   {
+    "faces": [
+     11,
+     14
+    ],
+    "angle_deg": 180.0,
+    "length": 22.727,
+    "midpoint": [
+     -39.0,
+     -27.0,
+     12.5
+    ],
+    "curves": [
+     42
+    ]
+   },
+   {
+    "faces": [
+     15,
+     16
+    ],
+    "angle_deg": 179.8,
+    "length": 18.182,
+    "midpoint": [
+     42.0,
+     -24.0,
+     10.227
+    ],
+    "curves": [
+     51
+    ]
+   },
+   {
+    "faces": [
+     29,
+     37
+    ],
+    "angle_deg": 90.0,
+    "length": 16.073,
+    "midpoint": [
+     -37.263,
+     -20.513,
+     25.0
+    ],
+    "curves": [
+     75
+    ]
+   },
+   {
+    "faces": [
+     29,
+     34
+    ],
+    "angle_deg": 90.0,
+    "length": 16.073,
+    "midpoint": [
+     -37.263,
+     20.513,
+     25.0
+    ],
+    "curves": [
+     78
+    ]
+   },
+   {
+    "faces": [
+     29,
+     35
+    ],
+    "angle_deg": 90.0,
+    "length": 16.073,
+    "midpoint": [
+     37.263,
+     20.513,
+     25.0
+    ],
+    "curves": [
+     77
+    ]
+   },
+   {
+    "faces": [
+     29,
+     36
+    ],
+    "angle_deg": 90.0,
+    "length": 16.073,
+    "midpoint": [
+     37.263,
+     -20.513,
+     25.0
+    ],
+    "curves": [
+     76
+    ]
+   },
+   {
+    "faces": [
+     23,
+     26
+    ],
+    "angle_deg": 180.0,
+    "length": 11.364,
+    "midpoint": [
+     -42.0,
+     24.0,
+     5.682
+    ],
+    "curves": [
+     67
+    ]
+   },
+   {
+    "faces": [
+     44,
+     48
+    ],
+    "angle_deg": 90.0,
+    "length": 7.654,
+    "midpoint": [
+     -38.058,
+     -24.567,
+     24.0
+    ],
+    "curves": [
+     94
+    ]
+   },
+   {
+    "faces": [
+     45,
+     49
+    ],
+    "angle_deg": 90.0,
+    "length": 7.654,
+    "midpoint": [
+     38.942,
+     -24.567,
+     24.0
+    ],
+    "curves": [
+     96
+    ]
+   },
+   {
+    "faces": [
+     46,
+     50
+    ],
+    "angle_deg": 90.0,
+    "length": 7.654,
+    "midpoint": [
+     -38.058,
+     22.433,
+     24.0
+    ],
+    "curves": [
+     98
+    ]
+   },
+   {
+    "faces": [
+     47,
+     51
+    ],
+    "angle_deg": 90.0,
+    "length": 7.654,
+    "midpoint": [
+     38.942,
+     22.433,
+     24.0
+    ],
+    "curves": [
+     100
+    ]
+   },
+   {
+    "faces": [
+     30,
+     38
+    ],
+    "angle_deg": 90.0,
+    "length": 5.358,
+    "midpoint": [
+     41.487,
+     24.737,
+     25.0
+    ],
+    "curves": [
+     79
+    ]
+   },
+   {
+    "faces": [
+     31,
+     39
+    ],
+    "angle_deg": 90.0,
+    "length": 5.358,
+    "midpoint": [
+     -39.737,
+     26.487,
+     25.0
+    ],
+    "curves": [
+     80
+    ]
+   },
+   {
+    "faces": [
+     27,
+     32
+    ],
+    "angle_deg": 90.0,
+    "length": 5.358,
+    "midpoint": [
+     -39.737,
+     -26.487,
+     25.0
+    ],
+    "curves": [
+     73
+    ]
+   },
+   {
+    "faces": [
+     28,
+     33
+    ],
+    "angle_deg": 90.0,
+    "length": 5.358,
+    "midpoint": [
+     39.737,
+     -26.487,
+     25.0
+    ],
+    "curves": [
+     74
+    ]
+   },
+   {
+    "faces": [
+     5,
+     15
+    ],
+    "angle_deg": 90.0,
+    "length": 4.592,
+    "midpoint": [
+     41.561,
+     -25.061,
+     0.0
+    ],
+    "curves": [
+     33
+    ]
+   },
+   {
+    "faces": [
+     5,
+     23
+    ],
+    "angle_deg": 90.0,
+    "length": 4.592,
+    "midpoint": [
+     -41.561,
+     25.061,
+     0.0
+    ],
+    "curves": [
+     25
+    ]
+   },
+   {
+    "faces": [
+     5,
+     11
+    ],
+    "angle_deg": 90.0,
+    "length": 4.592,
+    "midpoint": [
+     -41.561,
+     -25.061,
+     0.0
+    ],
+    "curves": [
+     21
+    ]
+   },
+   {
+    "faces": [
+     19,
+     30
+    ],
+    "angle_deg": 90.0,
+    "length": 4.592,
+    "midpoint": [
+     41.561,
+     25.061,
+     25.0
+    ],
+    "curves": [
+     59
+    ]
+   },
+   {
+    "faces": [
+     23,
+     31
+    ],
+    "angle_deg": 90.0,
+    "length": 4.592,
+    "midpoint": [
+     -40.061,
+     26.561,
+     25.0
+    ],
+    "curves": [
+     66
+    ]
+   },
+   {
+    "faces": [
+     11,
+     27
+    ],
+    "angle_deg": 90.0,
+    "length": 2.296,
+    "midpoint": [
+     -40.061,
+     -26.561,
+     25.0
+    ],
+    "curves": [
+     43
+    ]
+   },
+   {
+    "faces": [
+     15,
+     28
+    ],
+    "angle_deg": 90.0,
+    "length": 2.296,
+    "midpoint": [
+     40.061,
+     -26.561,
+     25.0
+    ],
+    "curves": [
+     50
+    ]
+   },
+   {
+    "faces": [
+     11,
+     24
+    ],
+    "angle_deg": 180.0,
+    "length": 2.273,
+    "midpoint": [
+     -42.0,
+     -24.0,
+     3.409
+    ],
+    "curves": [
+     41
+    ]
+   },
+   {
+    "faces": [
+     12,
+     28
+    ],
+    "angle_deg": 90.0,
+    "length": 0.5,
+    "midpoint": [
+     38.75,
+     -27.0,
+     25.0
+    ],
+    "curves": [
+     46
+    ]
+   },
+   {
+    "faces": [
+     14,
+     27
+    ],
+    "angle_deg": 90.0,
+    "length": 0.5,
+    "midpoint": [
+     -38.75,
+     -27.0,
+     25.0
+    ],
+    "curves": [
+     49
+    ]
+   },
+   {
+    "faces": [
+     16,
+     28
+    ],
+    "angle_deg": 90.0,
+    "length": 0.5,
+    "midpoint": [
+     42.0,
+     -23.75,
+     25.0
+    ],
+    "curves": [
+     52
+    ]
+   },
+   {
+    "faces": [
+     18,
+     30
+    ],
+    "angle_deg": 90.0,
+    "length": 0.5,
+    "midpoint": [
+     42.0,
+     23.75,
+     25.0
+    ],
+    "curves": [
+     56
+    ]
+   },
+   {
+    "faces": [
+     20,
+     30
+    ],
+    "angle_deg": 90.0,
+    "length": 0.5,
+    "midpoint": [
+     38.75,
+     27.0,
+     25.0
+    ],
+    "curves": [
+     61
+    ]
+   },
+   {
+    "faces": [
+     22,
+     31
+    ],
+    "angle_deg": 90.0,
+    "length": 0.5,
+    "midpoint": [
+     -38.75,
+     27.0,
+     25.0
+    ],
+    "curves": [
+     65
+    ]
+   },
+   {
+    "faces": [
+     24,
+     27
+    ],
+    "angle_deg": 90.0,
+    "length": 0.5,
+    "midpoint": [
+     -42.0,
+     -23.75,
+     25.0
+    ],
+    "curves": [
+     68
+    ]
+   },
+   {
+    "faces": [
+     26,
+     31
+    ],
+    "angle_deg": 90.0,
+    "length": 0.5,
+    "midpoint": [
+     -42.0,
+     23.75,
+     25.0
+    ],
+    "curves": [
+     72
+    ]
+   }
+  ],
+  "faces": [
+   {
+    "id": 2,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 5364.0,
+    "centroid": [
+     0.0,
+     0.0,
+     28.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "bbox": [
+     [
+      -45.0,
+      -30.0,
+      28.0
+     ],
+     [
+      45.0,
+      30.0,
+      28.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 29,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 4383.0553,
+    "centroid": [
+     0.0,
+     0.0,
+     25.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      -42.0,
+      -27.0,
+      25.0
+     ],
+     [
+      42.0,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 6,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 2184.0,
+    "centroid": [
+     -0.0,
+     -30.0,
+     14.0
+    ],
+    "normal": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -39.0,
+      -30.0,
+      0.0
+     ],
+     [
+      39.0,
+      -30.0,
+      28.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 7,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 2184.0,
+    "centroid": [
+     -0.0,
+     30.0,
+     14.0
+    ],
+    "normal": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -39.0,
+      30.0,
+      0.0
+     ],
+     [
+      39.0,
+      30.0,
+      28.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 21,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1925.0,
+    "centroid": [
+     0.0,
+     27.0,
+     12.5
+    ],
+    "normal": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -38.5,
+      27.0,
+      0.0
+     ],
+     [
+      38.5,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 13,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1925.0,
+    "centroid": [
+     -0.0,
+     -27.0,
+     12.5
+    ],
+    "normal": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -38.5,
+      -27.0,
+      0.0
+     ],
+     [
+      38.5,
+      -27.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 1,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1344.0,
+    "centroid": [
+     -45.0,
+     0.0,
+     14.0
+    ],
+    "normal": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -45.0,
+      -24.0,
+      0.0
+     ],
+     [
+      -45.0,
+      24.0,
+      28.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 10,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1344.0,
+    "centroid": [
+     45.0,
+     0.0,
+     14.0
+    ],
+    "normal": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      45.0,
+      -24.0,
+      0.0
+     ],
+     [
+      45.0,
+      24.0,
+      28.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 25,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1175.0,
+    "centroid": [
+     -42.0,
+     0.0,
+     12.5
+    ],
+    "normal": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -42.0,
+      -23.5,
+      0.0
+     ],
+     [
+      -42.0,
+      23.5,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 17,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 1175.0,
+    "centroid": [
+     42.0,
+     0.0,
+     12.5
+    ],
+    "normal": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      42.0,
+      -23.5,
+      0.0
+     ],
+     [
+      42.0,
+      23.5,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 5,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 838.5442,
+    "centroid": [
+     0.0,
+     -0.0,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      -45.0,
+      -30.0,
+      0.0
+     ],
+     [
+      45.0,
+      30.0,
+      0.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 35,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 406.018,
+    "centroid": [
+     37.7747,
+     22.7904,
+     12.4999
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      35.0,
+      20.0,
+      0.0
+     ],
+     [
+      42.0,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": 3.5,
+    "axis": [
+     -0.0001,
+     0.0001,
+     1.0
+    ],
+    "axis_point": [
+     38.5,
+     23.5,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.0007,
+    "role": "boss",
+    "sweep": 4.35779,
+    "group": 35
+   },
+   {
+    "id": 37,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 406.0059,
+    "centroid": [
+     -37.7816,
+     -22.7826,
+     12.4994
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -42.0,
+      -27.0,
+      0.0
+     ],
+     [
+      -35.0,
+      -20.0,
+      25.0
+     ]
+    ],
+    "radius": 3.5,
+    "axis": [
+     -0.0002,
+     0.0,
+     1.0
+    ],
+    "axis_point": [
+     -38.5,
+     -23.5,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.0016,
+    "role": "boss",
+    "sweep": 4.360037,
+    "group": 32
+   },
+   {
+    "id": 34,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 405.9025,
+    "centroid": [
+     -37.7756,
+     22.7901,
+     12.5027
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -42.0,
+      20.0,
+      0.0
+     ],
+     [
+      -35.0,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": 3.5,
+    "axis": [
+     0.0004,
+     0.0006,
+     1.0
+    ],
+    "axis_point": [
+     -38.5,
+     23.4999,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.0047,
+    "role": "boss",
+    "sweep": 4.359809,
+    "group": 34
+   },
+   {
+    "id": 36,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 405.6794,
+    "centroid": [
+     37.7906,
+     -22.7783,
+     12.5057
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      35.0,
+      -27.0,
+      0.0
+     ],
+     [
+      42.0,
+      -20.0,
+      25.0
+     ]
+    ],
+    "radius": 3.5,
+    "axis": [
+     0.0003,
+     0.0002,
+     1.0
+    ],
+    "axis_point": [
+     38.5,
+     -23.5,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.0022,
+    "role": "boss",
+    "sweep": 4.359787,
+    "group": 33
+   },
+   {
+    "id": 9,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 261.2494,
+    "centroid": [
+     42.7426,
+     27.7423,
+     13.9998
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      39.0,
+      24.0,
+      0.0
+     ],
+     [
+      45.0,
+      30.0,
+      28.0
+     ]
+    ],
+    "radius": 5.9999,
+    "axis": [
+     -0.0004,
+     0.0004,
+     1.0
+    ],
+    "axis_point": [
+     39.0,
+     24.0,
+     14.0
+    ],
+    "concave": false,
+    "length": 28.0051,
+    "role": "curved",
+    "sweep": 1.32489,
+    "group": null
+   },
+   {
+    "id": 3,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 261.2494,
+    "centroid": [
+     -42.7426,
+     -27.7423,
+     13.9998
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -45.0,
+      -30.0,
+      0.0
+     ],
+     [
+      -39.0,
+      -24.0,
+      28.0
+     ]
+    ],
+    "radius": 5.9999,
+    "axis": [
+     0.0004,
+     -0.0004,
+     1.0
+    ],
+    "axis_point": [
+     -39.0,
+     -24.0,
+     14.0
+    ],
+    "concave": false,
+    "length": 28.0051,
+    "role": "curved",
+    "sweep": 1.32489,
+    "group": null
+   },
+   {
+    "id": 8,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 261.2484,
+    "centroid": [
+     42.7432,
+     -27.7416,
+     13.9998
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      39.0,
+      -30.0,
+      0.0
+     ],
+     [
+      45.0,
+      -24.0,
+      28.0
+     ]
+    ],
+    "radius": 6.0,
+    "axis": [
+     -0.0001,
+     -0.0001,
+     1.0
+    ],
+    "axis_point": [
+     39.0,
+     -24.0,
+     14.0
+    ],
+    "concave": false,
+    "length": 28.0008,
+    "role": "curved",
+    "sweep": 1.317707,
+    "group": null
+   },
+   {
+    "id": 4,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 261.2458,
+    "centroid": [
+     -42.7428,
+     27.7422,
+     13.9997
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -45.0,
+      24.0,
+      0.0
+     ],
+     [
+      -39.0,
+      30.0,
+      28.0
+     ]
+    ],
+    "radius": 6.0,
+    "axis": [
+     0.0003,
+     0.0003,
+     1.0
+    ],
+    "axis_point": [
+     -39.0,
+     24.0,
+     14.0
+    ],
+    "concave": false,
+    "length": 28.0033,
+    "role": "curved",
+    "sweep": 1.315043,
+    "group": null
+   },
+   {
+    "id": 44,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 185.2027,
+    "centroid": [
+     -38.5,
+     -23.495,
+     12.0
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -39.75,
+      -24.75,
+      0.0
+     ],
+     [
+      -37.25,
+      -22.25,
+      24.0
+     ]
+    ],
+    "radius": 1.25,
+    "axis": [
+     -0.0001,
+     -0.0,
+     1.0
+    ],
+    "axis_point": [
+     -38.5,
+     -23.5,
+     12.0
+    ],
+    "concave": true,
+    "length": 24.0001,
+    "role": "hole",
+    "sweep": 5.912946,
+    "group": null
+   },
+   {
+    "id": 47,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 185.1823,
+    "centroid": [
+     38.4996,
+     23.5048,
+     12.0012
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      37.25,
+      22.25,
+      0.0
+     ],
+     [
+      39.75,
+      24.75,
+      24.0
+     ]
+    ],
+    "radius": 1.25,
+    "axis": [
+     -0.0,
+     -0.0,
+     1.0
+    ],
+    "axis_point": [
+     38.5,
+     23.5,
+     12.0
+    ],
+    "concave": true,
+    "length": 24.0001,
+    "role": "hole",
+    "sweep": 5.912915,
+    "group": null
+   },
+   {
+    "id": 45,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 185.1747,
+    "centroid": [
+     38.4998,
+     -23.4946,
+     12.0019
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      37.25,
+      -24.75,
+      0.0
+     ],
+     [
+      39.75,
+      -22.25,
+      24.0
+     ]
+    ],
+    "radius": 1.25,
+    "axis": [
+     -0.0001,
+     0.0,
+     1.0
+    ],
+    "axis_point": [
+     38.5,
+     -23.5,
+     12.0
+    ],
+    "concave": true,
+    "length": 24.0002,
+    "role": "hole",
+    "sweep": 5.912703,
+    "group": null
+   },
+   {
+    "id": 46,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 185.1747,
+    "centroid": [
+     -38.5002,
+     23.5054,
+     12.0019
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -39.75,
+      22.25,
+      0.0
+     ],
+     [
+      -37.25,
+      24.75,
+      24.0
+     ]
+    ],
+    "radius": 1.25,
+    "axis": [
+     -0.0001,
+     0.0,
+     1.0
+    ],
+    "axis_point": [
+     -38.5,
+     23.5,
+     12.0
+    ],
+    "concave": true,
+    "length": 24.0002,
+    "role": "hole",
+    "sweep": 5.912703,
+    "group": null
+   },
+   {
+    "id": 32,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 135.8115,
+    "centroid": [
+     -40.6724,
+     -25.6769,
+     12.5009
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -42.0,
+      -27.0,
+      0.0
+     ],
+     [
+      -38.5,
+      -23.5,
+      25.0
+     ]
+    ],
+    "radius": 3.5,
+    "axis": [
+     0.0004,
+     -0.0004,
+     1.0
+    ],
+    "axis_point": [
+     -38.5,
+     -23.5,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.0031,
+    "role": "boss",
+    "sweep": 1.299378,
+    "group": 32
+   },
+   {
+    "id": 33,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 135.7972,
+    "centroid": [
+     40.6746,
+     -25.6737,
+     12.5008
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      38.5,
+      -27.0,
+      0.0
+     ],
+     [
+      42.0,
+      -23.5,
+      25.0
+     ]
+    ],
+    "radius": 3.5001,
+    "axis": [
+     0.001,
+     0.001,
+     1.0
+    ],
+    "axis_point": [
+     38.4999,
+     -23.4999,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.0067,
+    "role": "boss",
+    "sweep": 1.300741,
+    "group": 33
+   },
+   {
+    "id": 38,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 135.7969,
+    "centroid": [
+     40.6744,
+     25.6742,
+     12.5
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      38.5,
+      23.5,
+      0.0
+     ],
+     [
+      42.0,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": 3.4999,
+    "axis": [
+     -0.0011,
+     0.0011,
+     1.0
+    ],
+    "axis_point": [
+     38.5002,
+     23.5002,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.0076,
+    "role": "boss",
+    "sweep": 1.303569,
+    "group": 35
+   },
+   {
+    "id": 39,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 135.7958,
+    "centroid": [
+     -40.6742,
+     25.6744,
+     12.5
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -42.0,
+      23.5,
+      0.0
+     ],
+     [
+      -38.5,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": 3.5,
+    "axis": [
+     -0.0011,
+     -0.0011,
+     1.0
+    ],
+    "axis_point": [
+     -38.5,
+     23.5,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.008,
+    "role": "boss",
+    "sweep": 1.303742,
+    "group": 34
+   },
+   {
+    "id": 15,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 115.1592,
+    "centroid": [
+     40.819,
+     -25.818,
+     12.4999
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      39.0,
+      -27.0,
+      0.0
+     ],
+     [
+      42.0,
+      -24.0,
+      25.0
+     ]
+    ],
+    "radius": 3.001,
+    "axis": [
+     0.0012,
+     0.0012,
+     1.0
+    ],
+    "axis_point": [
+     38.999,
+     -23.999,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.0074,
+    "role": "curved",
+    "sweep": 1.241315,
+    "group": null
+   },
+   {
+    "id": 11,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 115.1562,
+    "centroid": [
+     -40.8204,
+     -25.8165,
+     12.4996
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -42.0,
+      -27.0,
+      0.0
+     ],
+     [
+      -39.0,
+      -24.0,
+      25.0
+     ]
+    ],
+    "radius": 3.0,
+    "axis": [
+     0.0001,
+     -0.0001,
+     1.0
+    ],
+    "axis_point": [
+     -39.0,
+     -24.0,
+     12.5
+    ],
+    "concave": false,
+    "length": 25.0006,
+    "role": "curved",
+    "sweep": 1.214519,
+    "group": null
+   },
+   {
+    "id": 19,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 115.1554,
+    "centroid": [
+     40.8201,
+     25.8169,
+     12.4995
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      39.0,
+      24.0,
+      0.0
+     ],
+     [
+      42.0,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": 3.0,
+    "axis": [
+     -0.0001,
+     0.0001,
+     1.0
+    ],
+    "axis_point": [
+     39.0,
+     24.0,
+     12.5
+    ],
+    "concave": true,
+    "length": 25.0005,
+    "role": "fillet",
+    "sweep": 1.21468,
+    "group": null
+   },
+   {
+    "id": 23,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 115.1551,
+    "centroid": [
+     -40.822,
+     25.8152,
+     12.5006
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -42.0,
+      24.0,
+      0.0
+     ],
+     [
+      -39.0,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": 3.0,
+    "axis": [
+     -0.0001,
+     -0.0001,
+     1.0
+    ],
+    "axis_point": [
+     -39.0,
+     24.0,
+     12.4999
+    ],
+    "concave": false,
+    "length": 25.0004,
+    "role": "curved",
+    "sweep": 1.214729,
+    "group": null
+   },
+   {
+    "id": 41,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 30.2288,
+    "centroid": [
+     38.5,
+     -23.5,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      35.0,
+      -27.0,
+      0.0
+     ],
+     [
+      42.0,
+      -20.0,
+      0.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 40,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 30.2288,
+    "centroid": [
+     -38.5,
+     -23.5,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      -42.0,
+      -27.0,
+      0.0
+     ],
+     [
+      -35.0,
+      -20.0,
+      0.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 42,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 30.2288,
+    "centroid": [
+     -38.5,
+     23.5,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      -42.0,
+      20.0,
+      0.0
+     ],
+     [
+      -35.0,
+      27.0,
+      0.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 43,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 30.2288,
+    "centroid": [
+     38.5,
+     23.5,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      35.0,
+      20.0,
+      0.0
+     ],
+     [
+      42.0,
+      27.0,
+      0.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 12,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 12.5,
+    "centroid": [
+     38.75,
+     -27.0,
+     12.5
+    ],
+    "normal": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      38.5,
+      -27.0,
+      0.0
+     ],
+     [
+      39.0,
+      -27.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 14,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 12.5,
+    "centroid": [
+     -38.75,
+     -27.0,
+     12.5
+    ],
+    "normal": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -39.0,
+      -27.0,
+      0.0
+     ],
+     [
+      -38.5,
+      -27.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 22,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 12.5,
+    "centroid": [
+     -38.75,
+     27.0,
+     12.5
+    ],
+    "normal": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -39.0,
+      27.0,
+      0.0
+     ],
+     [
+      -38.5,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 16,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 12.5,
+    "centroid": [
+     42.0,
+     -23.75,
+     12.5
+    ],
+    "normal": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      42.0,
+      -24.0,
+      0.0
+     ],
+     [
+      42.0,
+      -23.5,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 18,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 12.5,
+    "centroid": [
+     42.0,
+     23.75,
+     12.5
+    ],
+    "normal": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      42.0,
+      23.5,
+      0.0
+     ],
+     [
+      42.0,
+      24.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 24,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 12.5,
+    "centroid": [
+     -42.0,
+     -23.75,
+     12.5
+    ],
+    "normal": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -42.0,
+      -24.0,
+      0.0
+     ],
+     [
+      -42.0,
+      -23.5,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 20,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 12.5,
+    "centroid": [
+     38.75,
+     27.0,
+     12.5
+    ],
+    "normal": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      38.5,
+      27.0,
+      0.0
+     ],
+     [
+      39.0,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 26,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 12.5,
+    "centroid": [
+     -42.0,
+     23.75,
+     12.5
+    ],
+    "normal": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "bbox": [
+     [
+      -42.0,
+      23.5,
+      0.0
+     ],
+     [
+      -42.0,
+      24.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 48,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 4.4194,
+    "centroid": [
+     -38.5,
+     -23.5,
+     24.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      -39.75,
+      -24.75,
+      24.0
+     ],
+     [
+      -37.25,
+      -22.25,
+      24.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 49,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 4.4194,
+    "centroid": [
+     38.5,
+     -23.5,
+     24.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      37.25,
+      -24.75,
+      24.0
+     ],
+     [
+      39.75,
+      -22.25,
+      24.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 50,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 4.4194,
+    "centroid": [
+     -38.5,
+     23.5,
+     24.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      -39.75,
+      22.25,
+      24.0
+     ],
+     [
+      -37.25,
+      24.75,
+      24.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 51,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 4.4194,
+    "centroid": [
+     38.5,
+     23.5,
+     24.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      37.25,
+      22.25,
+      24.0
+     ],
+     [
+      39.75,
+      24.75,
+      24.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 27,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 0.9519,
+    "centroid": [
+     -40.709,
+     -25.709,
+     25.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      -42.0,
+      -27.0,
+      25.0
+     ],
+     [
+      -38.5,
+      -23.5,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 28,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 0.9519,
+    "centroid": [
+     40.709,
+     -25.709,
+     25.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      38.5,
+      -27.0,
+      25.0
+     ],
+     [
+      42.0,
+      -23.5,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 31,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 0.9519,
+    "centroid": [
+     -40.709,
+     25.709,
+     25.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      -42.0,
+      23.5,
+      25.0
+     ],
+     [
+      -38.5,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   },
+   {
+    "id": 30,
+    "kind": "plane",
+    "cad_type": "Plane",
+    "area": 0.9519,
+    "centroid": [
+     40.709,
+     25.709,
+     25.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "bbox": [
+     [
+      38.5,
+      23.5,
+      25.0
+     ],
+     [
+      42.0,
+      27.0,
+      25.0
+     ]
+    ],
+    "radius": null,
+    "axis": null,
+    "axis_point": null,
+    "concave": false,
+    "length": null,
+    "role": "flat",
+    "sweep": 0.0,
+    "group": null
+   }
+  ]
+ },
+ "notes": [
+  "Built from enclosure.py with wall=3, length=90, width=60, height=28, corner=6, boss=7.",
+  "Thin walls need a large first mesh (73,302 nodes), so this study takes longer than usual.",
+  "12 curved elements folded on thin walls, so this mesh uses straight sided second order elements.",
+  "23 curved elements folded on thin walls, so this mesh uses straight sided second order elements.",
+  "Meshing needed a fallback strategy.",
+  "7 curved elements folded on thin walls, so this mesh uses straight sided second order elements."
+ ],
+ "imperial": false,
+ "mass_kg": 0.048541,
+ "beam": null,
+ "fixes": [
+  {
+   "kind": "fillet",
+   "title": "Round the sharp inside corner to a 1.5 mm radius",
+   "summary": "Stress piles up in the sharp inside corner. A fillet of 1.5 mm (about half the 3 mm wall) spreads it out.",
+   "params": {
+    "radius": 1.499999,
+    "point": [
+     35.577256,
+     21.589656,
+     24.585015
+    ],
+    "face": null
+   },
+   "auto": true
+  },
+  {
+   "kind": "material",
+   "title": "Switch to PLA (3D printed)",
+   "summary": "Stress stays about the same for the same shape and load, so PLA (3D printed) (50 MPa) gives safety factor 5.65. It is 1.5x as stiff, so deflection scales by 0.67. Other options: PETG (3D printed) (5.31), ABS (3D printed) (3.73).",
+   "params": {
+    "material": "pla",
+    "safety_factor": 5.647594
+   },
+   "auto": true
+  }
+ ],
+ "images": {
+  "stress": "images/stress.png",
+  "zoom": "images/zoom.png",
+  "safety": "images/safety.png",
+  "deformed": "images/deformed.png",
+  "convergence": "images/convergence.png"
+ },
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 224.724588,
+ "solver": "CalculiX 2.23"
+}

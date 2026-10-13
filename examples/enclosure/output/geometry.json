@@ -1,0 +1,24 @@
+{
+ "source": "/Users/sohanb/code/wobbl/examples/enclosure/output/work/geometry/enclosure-c8b03b2a.step",
+ "path": "/Users/sohanb/code/wobbl/examples/enclosure/output/work/geometry/prepared.brep",
+ "kind": "cad",
+ "bbox": [
+  [
+   -45.0000001,
+   -30.0000001,
+   -1e-07
+  ],
+  [
+   45.0000001,
+   30.0000001,
+   28.0000001
+  ]
+ ],
+ "volume": 40505.079150370264,
+ "n_bodies": 1,
+ "n_surfaces": 51,
+ "notes": [
+  "Built from enclosure.py with wall=3, length=90, width=60, height=28, corner=6, boss=7."
+ ],
+ "stl_angle": 30.0
+}

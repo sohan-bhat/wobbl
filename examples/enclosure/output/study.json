@@ -1,0 +1,40 @@
+{
+ "part": "/Users/sohanb/code/wobbl/examples/enclosure/enclosure.py",
+ "material": "pc",
+ "loads": [
+  {
+   "kind": "force",
+   "faces": "top and within 8 of 25,15,28",
+   "magnitude": 120.0,
+   "direction": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "point": null,
+   "coupling": "distributed",
+   "text": "120 N down @ top and within 8 of 25,15,28",
+   "imperial": false
+  }
+ ],
+ "fixtures": [
+  {
+   "kind": "fixed",
+   "faces": "z=min",
+   "text": "fixed z=min",
+   "dofs": "xyz"
+  }
+ ],
+ "target_sf": null,
+ "quality": "normal",
+ "budget": 600.0,
+ "max_levels": 4,
+ "question": "Does the PC shell survive a 120 N thumb press, and how far does the top dent?",
+ "imperial": false,
+ "scale": 1.0,
+ "body": null,
+ "mesh_size": null,
+ "print_direction": null,
+ "assumptions": [],
+ "params": {}
+}
