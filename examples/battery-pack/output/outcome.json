@@ -1,0 +1,143 @@
+{
+ "domain": "thermal",
+ "part": "../pack.py",
+ "question": "Will this battery pack overheat in a sealed box during a one hour discharge?",
+ "verdict": "hot",
+ "headline": "Hottest point reaches 74.5 C (limit 60 C) at (19, 19.3, 31.5) mm after 60 min. It passes 60 C after about 22.5 min.",
+ "metrics": [
+  [
+   "max temperature",
+   "74.5 C"
+  ],
+  [
+   "limit",
+   "60 C"
+  ],
+  [
+   "power",
+   "6 W"
+  ],
+  [
+   "mesh nodes",
+   "9,593"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed mesh convergence, hand calculation, units and sanity"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "temperature rise at the hottest point settled: 39.5 -> 39.5 C over 2 meshes, last change 0.0%",
+   "detail": {
+    "values": [
+     39.4562,
+     39.4508
+    ],
+    "last_change": 0.000137,
+    "tolerance": 0.02,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "lumped model with convection and radiation (Biot 0.012) gives a mean of 72.2 C at the end; FEA mean is 72.8 C (1.6% of the rise)",
+   "detail": {
+    "tau_s": 3420.284431,
+    "biot": 0.012001,
+    "lumped_C": 72.182464
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "temperatures between 69.5 and 74.5 C",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Li-ion cell (lumped, effective): conductivity 3 W/(m K), specific heat 950 J/(kg K), density 2500 kg/m3.",
+  "Heat is generated evenly through the part.",
+  "Convection uses a fixed film coefficient; real coefficients vary with temperature and airflow.",
+  "Surrounding air or coolant at 35 C does not heat up.",
+  "Radiation with emissivity 0.9.",
+  "Contact resistance between parts and internal airflow are not modeled."
+ ],
+ "values": {
+  "t_max_C": 74.4508,
+  "hot_xyz": [
+   18.974076,
+   19.273764,
+   31.496162
+  ],
+  "limit_C": 60.0,
+  "levels": [
+   {
+    "level": 0,
+    "n_nodes": 4682,
+    "h": 5.894035,
+    "t_max": 74.4562,
+    "t_min": 69.5344,
+    "xyz": [
+     18.616107,
+     18.5,
+     32.456956
+    ],
+    "t_solve": 35.690123
+   },
+   {
+    "level": 1,
+    "n_nodes": 9593,
+    "h": 4.125825,
+    "t_max": 74.4508,
+    "t_min": 69.5344,
+    "xyz": [
+     18.974076,
+     19.273764,
+     31.496162
+    ],
+    "t_solve": 107.983134
+   }
+  ],
+  "lumped_C": 72.182464,
+  "time_over_limit_s": 1350.0,
+  "_figures": [
+   [
+    "temperature",
+    "Temperature with the hottest point marked"
+   ],
+   [
+    "history",
+    "Temperature over time"
+   ]
+  ]
+ },
+ "images": {
+  "temperature": "images/temperature.png",
+  "history": "images/history.png"
+ },
+ "fixes": [
+  {
+   "kind": "cooling",
+   "title": "Raise heat transfer about 2x",
+   "summary": "The temperature rise scales with 1/(h A). A small fan takes h from about 5 to 25 W/(m2 K); fins or a larger case add area. Either way you need about 2x the current 5 W/(m2 K) times area.",
+   "auto": false
+  },
+  {
+   "kind": "power",
+   "title": "Cut the power to 3.04 W",
+   "summary": "Lower current or duty cycle; the rise is proportional to the heat made.",
+   "auto": false
+  }
+ ],
+ "notes": [
+  "Built from pack.py with size=37, length=65."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 163.499695,
+ "solver": "CalculiX 2.23"
+}

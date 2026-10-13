@@ -1,0 +1,24 @@
+OK. Hottest point reaches 70.3 C (limit 85 C) at (30, 29.9, 0) mm at steady state.
+
+Confidence: high. passed mesh convergence, energy balance, hand calculation, units and sanity
+max temperature: 70.3 C
+limit: 85 C
+power: 15 W
+mesh nodes: 136,757
+
+Checks:
+  [pass] mesh convergence: temperature rise at the hottest point settled: 30.3 -> 30.2 -> 30.3 C over 3 meshes, last change 0.2%
+  [pass] energy balance: heat in 15 W, heat out through the surfaces 15 W (7.8e-07% apart)
+  [pass] hand calculation: heat balance on a uniform skin gives 68.1 C; the FEA skin averages 68.1 C (0.0029% of the rise). Biot 3.1e-05: the part is nearly isothermal
+  [pass] units and sanity: temperatures between 67.1 and 70.3 C
+
+Assumptions:
+  - Aluminum 6063-T5: conductivity 209 W/(m K), specific heat 900 J/(kg K), density 2700 kg/m3.
+  - Heat enters through bottom and box 17.5,17.5,-1,42.5,42.5,0.5.
+  - Convection uses a fixed film coefficient; real coefficients vary with temperature and airflow.
+  - Surrounding air or coolant at 40 C does not heat up.
+  - Radiation with emissivity 0.85.
+  - Contact resistance between parts and internal airflow are not modeled.
+
+Images: temperature: images/temperature.png
+Report: report.html

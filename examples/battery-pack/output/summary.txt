@@ -1,0 +1,27 @@
+HOT. Hottest point reaches 74.5 C (limit 60 C) at (19, 19.3, 31.5) mm after 60 min. It passes 60 C after about 22.5 min.
+
+Confidence: high. passed mesh convergence, hand calculation, units and sanity
+max temperature: 74.5 C
+limit: 60 C
+power: 6 W
+mesh nodes: 9,593
+
+Checks:
+  [pass] mesh convergence: temperature rise at the hottest point settled: 39.5 -> 39.5 C over 2 meshes, last change 0.0%
+  [pass] hand calculation: lumped model with convection and radiation (Biot 0.012) gives a mean of 72.2 C at the end; FEA mean is 72.8 C (1.6% of the rise)
+  [pass] units and sanity: temperatures between 69.5 and 74.5 C
+
+Assumptions:
+  - Li-ion cell (lumped, effective): conductivity 3 W/(m K), specific heat 950 J/(kg K), density 2500 kg/m3.
+  - Heat is generated evenly through the part.
+  - Convection uses a fixed film coefficient; real coefficients vary with temperature and airflow.
+  - Surrounding air or coolant at 35 C does not heat up.
+  - Radiation with emissivity 0.9.
+  - Contact resistance between parts and internal airflow are not modeled.
+
+Suggested fixes:
+  - Raise heat transfer about 2x: The temperature rise scales with 1/(h A). A small fan takes h from about 5 to 25 W/(m2 K); fins or a larger case add area. Either way you need about 2x the current 5 W/(m2 K) times area.
+  - Cut the power to 3.04 W: Lower current or duty cycle; the rise is proportional to the heat made.
+
+Images: temperature: images/temperature.png, history: images/history.png
+Report: report.html

@@ -1,0 +1,66 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "WOBBL heatsink.py" [level=1] [ref=e5]:
+        - generic [ref=e6]: WOBBL
+        - text: heatsink.py
+      - paragraph [ref=e7]: Will a 15 W chip stay under 85 C on this heat sink without a fan?
+    - generic [ref=e8]: Heat report2026-10-13 04:03
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - generic [ref=e11]: OK
+      - paragraph [ref=e12]: Hottest point reaches 70.3 C (limit 85 C) at (30, 29.9, 0) mm at steady state.
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]: max temperature
+          - generic [ref=e17]: 70.3 C
+        - generic [ref=e18]:
+          - generic [ref=e19]: limit
+          - generic [ref=e20]: 85 C
+        - generic [ref=e21]:
+          - generic [ref=e22]: power
+          - generic [ref=e23]: 15 W
+        - generic [ref=e24]:
+          - generic [ref=e25]: mesh nodes
+          - generic [ref=e26]: 136,757
+      - paragraph [ref=e27]:
+        - text: Confidence
+        - generic [ref=e28]: high
+      - list [ref=e29]:
+        - listitem [ref=e30]: passed mesh convergence, energy balance, hand calculation, units and sanity
+  - figure "Temperature with the hottest point marked" [ref=e31]:
+    - img "Temperature with the hottest point marked" [ref=e32]
+  - heading "Checks" [level=2] [ref=e34]
+  - table [ref=e35]:
+    - rowgroup [ref=e36]:
+      - row [ref=e37]:
+        - columnheader "status" [ref=e38]
+        - columnheader "check" [ref=e39]
+        - columnheader "result" [ref=e40]
+    - rowgroup [ref=e41]:
+      - row [ref=e42]:
+        - cell "pass" [ref=e43]
+        - cell "mesh convergence" [ref=e45]
+        - 'cell "temperature rise at the hottest point settled: 30.3 -> 30.2 -> 30.3 C over 3 meshes, last change 0.2%" [ref=e46]'
+      - row [ref=e47]:
+        - cell "pass" [ref=e48]
+        - cell "energy balance" [ref=e50]
+        - cell "heat in 15 W, heat out through the surfaces 15 W (7.8e-07% apart)" [ref=e51]
+      - row [ref=e52]:
+        - cell "pass" [ref=e53]
+        - cell "hand calculation" [ref=e55]
+        - 'cell "heat balance on a uniform skin gives 68.1 C; the FEA skin averages 68.1 C (0.0029% of the rise). Biot 3.1e-05: the part is nearly isothermal" [ref=e56]'
+      - row [ref=e57]:
+        - cell "pass" [ref=e58]
+        - cell "units and sanity" [ref=e60]
+        - cell "temperatures between 67.1 and 70.3 C" [ref=e61]
+  - heading "Assumptions" [level=2] [ref=e62]
+  - list [ref=e63]:
+    - listitem [ref=e64]: "Aluminum 6063-T5: conductivity 209 W/(m K), specific heat 900 J/(kg K), density 2700 kg/m3."
+    - listitem [ref=e65]: Heat enters through bottom and box 17.5,17.5,-1,42.5,42.5,0.5.
+    - listitem [ref=e66]: Convection uses a fixed film coefficient; real coefficients vary with temperature and airflow.
+    - listitem [ref=e67]: Surrounding air or coolant at 40 C does not heat up.
+    - listitem [ref=e68]: Radiation with emissivity 0.85.
+    - listitem [ref=e69]: Contact resistance between parts and internal airflow are not modeled.
+  - generic [ref=e70]: Made with Wobbl 0.1.0. Solver CalculiX 2.23. Total time 129 s.

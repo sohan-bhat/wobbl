@@ -1,0 +1,152 @@
+{
+ "domain": "thermal",
+ "part": "../heatsink.py",
+ "question": "Will a 15 W chip stay under 85 C on this heat sink without a fan?",
+ "verdict": "ok",
+ "headline": "Hottest point reaches 70.3 C (limit 85 C) at (30, 29.9, 0) mm at steady state.",
+ "metrics": [
+  [
+   "max temperature",
+   "70.3 C"
+  ],
+  [
+   "limit",
+   "85 C"
+  ],
+  [
+   "power",
+   "15 W"
+  ],
+  [
+   "mesh nodes",
+   "136,757"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed mesh convergence, energy balance, hand calculation, units and sanity"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "temperature rise at the hottest point settled: 30.3 -> 30.2 -> 30.3 C over 3 meshes, last change 0.2%",
+   "detail": {
+    "values": [
+     30.2722,
+     30.1956,
+     30.2609
+    ],
+    "last_change": 0.002158,
+    "tolerance": 0.02,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "heat in 15 W, heat out through the surfaces 15 W (7.8e-07% apart)",
+   "detail": {
+    "in_W": 15.0,
+    "out_W": 15.0
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "heat balance on a uniform skin gives 68.1 C; the FEA skin averages 68.1 C (0.0029% of the rise). Biot 3.1e-05: the part is nearly isothermal",
+   "detail": {
+    "lumped_surface_C": 68.077964,
+    "fea_surface_C": 68.077158,
+    "biot": 3.1e-05
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "temperatures between 67.1 and 70.3 C",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Aluminum 6063-T5: conductivity 209 W/(m K), specific heat 900 J/(kg K), density 2700 kg/m3.",
+  "Heat enters through bottom and box 17.5,17.5,-1,42.5,42.5,0.5.",
+  "Convection uses a fixed film coefficient; real coefficients vary with temperature and airflow.",
+  "Surrounding air or coolant at 40 C does not heat up.",
+  "Radiation with emissivity 0.85.",
+  "Contact resistance between parts and internal airflow are not modeled."
+ ],
+ "values": {
+  "t_max_C": 70.2609,
+  "hot_xyz": [
+   30.0,
+   29.917012,
+   0.0
+  ],
+  "limit_C": 85.0,
+  "levels": [
+   {
+    "level": 0,
+    "n_nodes": 34672,
+    "h": 3.233166,
+    "t_max": 70.2722,
+    "t_min": 67.1179,
+    "xyz": [
+     30.000006,
+     30.082991,
+     0.0
+    ],
+    "t_solve": 12.173661
+   },
+   {
+    "level": 1,
+    "n_nodes": 69067,
+    "h": 2.263216,
+    "t_max": 70.1956,
+    "t_min": 67.1111,
+    "xyz": [
+     29.829764,
+     29.444444,
+     0.0
+    ],
+    "t_solve": 23.528295
+   },
+   {
+    "level": 2,
+    "n_nodes": 136757,
+    "h": 1.616583,
+    "t_max": 70.2609,
+    "t_min": 67.1216,
+    "xyz": [
+     30.0,
+     29.917012,
+     0.0
+    ],
+    "t_solve": 62.459148
+   }
+  ],
+  "lumped_C": 68.077964,
+  "time_over_limit_s": null,
+  "_figures": [
+   [
+    "temperature",
+    "Temperature with the hottest point marked"
+   ],
+   [
+    "history",
+    "Temperature over time"
+   ]
+  ]
+ },
+ "images": {
+  "temperature": "images/temperature.png"
+ },
+ "fixes": [],
+ "notes": [
+  "Built from heatsink.py with base=6, size=60, fins=9, fin=1.5, fin_height=30."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 128.688078,
+ "solver": "CalculiX 2.23"
+}
