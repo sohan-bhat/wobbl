@@ -66,4 +66,7 @@ fix with the best safety factor, and the terminal prints the table.
 
 `suggest_fix(result_dir)` returns the suggestions, and `suggest_fix(result_dir, apply=true)`
 does the same as `--apply` and returns the before and after numbers, with `which` to pick the
-kinds. [MCP tools](/guides/agents/mcp-tools/) has the details.
+kinds. It also takes a heat or circuit result and returns its fixes, such as more airflow or a
+larger resistor, with a note to call `solve_thermal` or `solve_circuit` again with the new value,
+since those fixes change an input rather than the part. [MCP tools](/guides/agents/mcp-tools/)
+has the details.

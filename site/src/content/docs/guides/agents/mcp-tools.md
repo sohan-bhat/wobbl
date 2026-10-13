@@ -25,7 +25,7 @@ often with a `hint` that says what to change, instead of failing the call.
 | `solve_structural` | `study_id`, or `path` with `material`, `loads` and `fixtures`, plus `target_sf`, `quality`, `budget`, `question` and `print_direction` | the verified strength result |
 | `verify` | `result_dir` | the confidence and its reasons, every check, the assumptions and the peaks that were excluded |
 | `render` | `result_dir` | the paths of the heatmaps and the report |
-| `suggest_fix` | `result_dir`, `apply`, `which` | the fixes with numbers, or with `apply=true` the before and after of each one |
+| `suggest_fix` | `result_dir`, `apply`, `which` | the fixes with numbers, or for a strength result with `apply=true` the before and after of each one, while heat and circuit fixes come back with a note to solve again with the new value |
 | `solve_thermal` | `path`, `material`, `power`, `heat_faces`, `film`, `ambient`, `fixed_temp`, `duration`, `limit`, `radiation` | the steady or transient heat result |
 | `solve_circuit` | `template` or `netlist`, and `params` | the circuit result |
 | `list_materials` | none | every material with its stiffness, limit, criterion, density, conductivity and service temperature |

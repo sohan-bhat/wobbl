@@ -234,17 +234,44 @@ def render(result_dir: str) -> dict:
     return {"images": o.images, "report": o.report}
 
 
+_RERUN_TOOL = {"thermal": "solve_thermal", "circuit": "solve_circuit"}
+_DOMAIN_WORD = {"thermal": "heat", "circuit": "circuit"}
+
+
 def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = None) -> dict:
-    """Fix suggestions with numbers; with apply=True, re-run the automatic ones and compare."""
+    """Fix suggestions with numbers for any finished study. For a strength result, apply=True builds the automatic
+    fixes, solves each one again and compares. Heat and circuit fixes change the inputs rather than the part, so
+    they come back as suggestions with a note on which tool to call again."""
     try:
         o = _outcome(result_dir)
-        if apply:
-            from ..fix.apply import apply_fixes
-            res = apply_fixes(result_dir, which)
-            return res
     except Exception as e:  # noqa: BLE001
         return _err(e)
-    return {"verdict": o.verdict, "safety_factor": round(o.safety_factor, 3), "fixes": o.fixes}
+    if isinstance(o, dict):
+        return _input_fixes(o, apply)
+    if apply:
+        try:
+            from ..fix.apply import apply_fixes
+            return apply_fixes(result_dir, which)
+        except Exception as e:  # noqa: BLE001
+            return _err(e)
+    return {"domain": "strength", "verdict": o.verdict, "safety_factor": round(o.safety_factor, 3),
+            "fixes": o.fixes}
+
+
+def _input_fixes(d: dict, apply: bool) -> dict:
+    """The fixes of a heat or circuit result. They change the cooling, the power or a part value, which only a new
+    solve with those inputs can check."""
+    dom = d.get("domain", "")
+    tool = _RERUN_TOOL.get(dom, "the solve tool")
+    fixes = [{"kind": f.get("kind", ""), "title": f.get("title", ""), "summary": f.get("summary", ""),
+              "auto": False} for f in d.get("fixes") or []]
+    out = {"domain": dom, "verdict": d.get("verdict", ""), "headline": d.get("headline", ""), "fixes": fixes}
+    out["note"] = (f"Each {_DOMAIN_WORD.get(dom, dom)} fix changes an input, so check it by calling {tool} again "
+                   "with the new value." if fixes else "This result has no fixes to suggest.")
+    if apply:
+        out["applied"] = False
+        out["note"] = "Wobbl builds and solves fixes by itself only for strength results. " + out["note"]
+    return out
 
 
 def list_materials() -> dict:

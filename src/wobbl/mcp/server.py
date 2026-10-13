@@ -78,7 +78,7 @@ def build_server():
         """Run the verified static strength study (mesh convergence, equilibrium, beam theory check,
         singularity detection). Returns verdict, governing stress and location, safety factor, deflection,
         confidence with reasons, checks, assumptions, fixes, image paths and the HTML report path.
-        Takes one to four minutes."""
+        Simple shapes finish in under a minute, and real parts take one to seven minutes on a 2018 laptop."""
         return tools.solve_structural(study_id, path, material, loads, fixtures, target_sf, quality, budget,
                                       question, print_direction)
 
@@ -95,8 +95,11 @@ def build_server():
 
     @srv.tool()
     def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = None) -> dict:
-        """Concrete fixes with numbers (fillet radius, wall thickness, gusset, material). With apply=True,
-        Wobbl edits the geometry or material, re-runs the study and returns before and after."""
+        """Concrete fixes with numbers for a finished study. For a strength result they cover fillet radius, wall
+        thickness, gussets and material, and with apply=True Wobbl builds the automatic ones, solves each again
+        and returns before and after. Pass which to pick kinds from fillet, thicken, gusset and material.
+        Heat and circuit results return their fixes with a note to call solve_thermal or solve_circuit again
+        with the new value."""
         return tools.suggest_fix(result_dir, apply, which)
 
     @srv.tool()
