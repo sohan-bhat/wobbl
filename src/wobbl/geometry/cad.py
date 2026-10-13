@@ -109,7 +109,30 @@ def load_into_session(gmsh, prep: PreparedGeometry):
 
 def prepare(source: str | os.PathLike, workdir: str | os.PathLike, heal: bool = True,
             defeature: bool = True, stl_angle: float = 30.0, body: int | None = None) -> PreparedGeometry:
-    """Import, heal, unify bodies and defeature. Returns a PreparedGeometry saved in workdir."""
+    """Import, heal, unify bodies and defeature. Returns a PreparedGeometry saved in workdir.
+
+    Runs in a child process so a pathological file cannot hang or crash the caller.
+    """
+    from ..mesh.isolate import IsolatedCrash, IsolatedTimeout, run_isolated
+
+    try:
+        return run_isolated(_prepare, source, workdir, heal, defeature, stl_angle, body, timeout=180.0)
+    except IsolatedTimeout:
+        if heal:
+            try:
+                prep = run_isolated(_prepare, source, workdir, False, False, stl_angle, body, timeout=180.0)
+                prep.notes.append("Healing the CAD timed out, so Wobbl used it as is.")
+                return prep
+            except (IsolatedTimeout, IsolatedCrash):
+                pass
+        raise GeometryError(f"reading {Path(source).name} took more than 3 minutes; the file may be corrupt "
+                            "or far more detailed than needed. Try exporting a simplified STEP.") from None
+    except IsolatedCrash as e:
+        raise GeometryError(f"the CAD kernel crashed reading {Path(source).name} ({e}). Re-export the file, "
+                            "preferably as STEP AP214 or AP242, and try again.") from None
+
+
+def _prepare(source, workdir, heal, defeature, stl_angle, body) -> PreparedGeometry:
     src = Path(source).expanduser().resolve()
     if not src.exists():
         raise GeometryError(f"file not found: {src}")
@@ -137,33 +160,36 @@ def prepare(source: str | os.PathLike, workdir: str | os.PathLike, heal: bool = 
                                     len(gmsh.model.getEntities(2)), notes, stl_angle)
             _check_size(prep)
             return prep
-        _set_import_options(gmsh, heal)
+        _set_import_options(gmsh, False)
         try:
             ents = gmsh.model.occ.importShapes(str(src), highestDimOnly=True)
         except Exception as e:  # noqa: BLE001
             raise GeometryError(f"OpenCASCADE could not read {src.name}: {e}") from e
         gmsh.model.occ.synchronize()
-        vols = [t for d, t in gmsh.model.getEntities(3)]
-        if not vols:
-            surfs = gmsh.model.getEntities(2)
-            if surfs:
+        if not _valid_solids(gmsh) and heal:
+            # only repair what is broken: the import time fixes can damage good solids
+            gmsh.model.remove()
+            gmsh.model.add("wobbl")
+            _set_import_options(gmsh, True)
+            ents = gmsh.model.occ.importShapes(str(src), highestDimOnly=True)
+            gmsh.model.occ.synchronize()
+            if not gmsh.model.getEntities(3) and gmsh.model.getEntities(2):
                 try:
-                    loop = gmsh.model.occ.addSurfaceLoop([s for _, s in surfs], sewing=True)
+                    loop = gmsh.model.occ.addSurfaceLoop([t for _, t in gmsh.model.getEntities(2)], sewing=True)
                     gmsh.model.occ.addVolume([loop])
                     gmsh.model.occ.synchronize()
-                    vols = [t for d, t in gmsh.model.getEntities(3)]
                     notes.append("The file held surfaces only; Wobbl sewed them into a solid.")
                 except Exception:  # noqa: BLE001
-                    vols = []
-            if not vols:
-                raise GeometryError(f"{src.name} has no solid bodies (only {len(ents)} surfaces or curves). "
-                                    "Export a closed solid from your CAD tool.")
-        if heal:
+                    pass
             try:
                 gmsh.model.occ.healShapes()
                 gmsh.model.occ.synchronize()
+                notes.append("The CAD had defects (open or invalid solids); Wobbl repaired them.")
             except Exception:  # noqa: BLE001
                 notes.append("Shape healing failed; continuing with the original geometry.")
+        if not _valid_solids(gmsh):
+            raise GeometryError(f"{src.name} has no valid closed solid (found {len(ents)} entities). "
+                                "Export a closed solid body from your CAD tool, not surfaces.")
         vols = [t for d, t in gmsh.model.getEntities(3)]
         if body is not None:
             if body < 1 or body > len(vols):
@@ -186,6 +212,13 @@ def prepare(source: str | os.PathLike, workdir: str | os.PathLike, heal: bool = 
                                 len(gmsh.model.getEntities(2)), notes, stl_angle)
     _check_size(prep)
     return prep
+
+
+def _valid_solids(gmsh) -> bool:
+    vols = gmsh.model.getEntities(3)
+    if not vols:
+        return False
+    return all(gmsh.model.occ.getMass(3, v) > 0 for _, v in vols)
 
 
 def _stl_volume(gmsh) -> float:
