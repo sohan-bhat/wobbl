@@ -28,19 +28,20 @@
  ],
  "variants": {
   "distributed": {
-   "file": "cast-motor-mount-distributed.bin.gz",
-   "bytes_gzip": 895487,
-   "bytes_raw": 1698800,
-   "vertices": 55578,
-   "triangles": 107136,
+   "file": "cast-motor-mount-distributed.bin.gz?v=0c2350e50e",
+   "bytes_gzip": 884495,
+   "bytes_raw": 1651840,
+   "vertices": 54229,
+   "triangles": 103580,
+   "decimated": 0.05,
    "index_type": "uint16",
    "layout": {
     "position": 0,
-    "normal": 333468,
-    "disp": 555780,
-    "stress": 889248,
-    "excluded": 1000404,
-    "index": 1055984
+    "normal": 325376,
+    "disp": 542292,
+    "stress": 867668,
+    "excluded": 976128,
+    "index": 1030360
    },
    "bounds_min": [
     -70.0,
@@ -52,21 +53,21 @@
     95.0,
     112.0
    ],
-   "disp_max_mm": 0.257915,
-   "stress_max_MPa": 123.59333515312386,
-   "surface_peak_MPa": 123.593,
+   "disp_max_mm": 0.257555,
+   "stress_max_MPa": 123.69544918224922,
+   "surface_peak_MPa": 123.695,
    "surface_peak_xyz": [
-    43.821,
-    8.815,
-    79.836
+    43.858,
+    8.965,
+    79.648
    ],
-   "governing_MPa": 123.593,
+   "governing_MPa": 123.695,
    "governing_xyz": [
-    43.821,
-    8.815,
-    79.836
+    43.858,
+    8.965,
+    79.648
    ],
-   "max_disp_mm": 0.2652,
+   "max_disp_mm": 0.2649,
    "verdict": "marginal",
    "confidence": "medium",
    "source": "examples/cast-motor-mount/output"
