@@ -17,6 +17,9 @@ from ..fe import HeatModel, HeatResult, StaticModel, StaticResult
 from .base import SolverAdapter, SolverError, register
 from .locate import find_tool, tool_env
 
+# large deflection load ramp: first increment, total, smallest increment, largest increment. Two steps, cut back
+# automatically when a step does not converge; elastic results do not depend on the path
+NLGEOM_STATIC = "0.5,1.,1e-5,1."
 CCX_NAMES = ["ccx", "ccx_2.23", "ccx2.23", "ccx_2.22", "ccx_2.21", "ccx_static", "calculix"]
 
 
@@ -191,7 +194,7 @@ def write_static_inp(path: Path, model: StaticModel, nlgeom: bool = False) -> di
         if nlgeom:
             # results only at the end of the load ramp, so the .frd stays small
             f.write("*TIME POINTS, NAME=TEND\n1.\n")
-            f.write("*STEP, NLGEOM, INC=200\n*STATIC\n0.1,1.,1e-5,0.25\n*BOUNDARY\n")
+            f.write(f"*STEP, NLGEOM, INC=200\n*STATIC\n{NLGEOM_STATIC}\n*BOUNDARY\n")
         else:
             f.write("*STEP\n*STATIC\n*BOUNDARY\n")
         for c in model.constraints:

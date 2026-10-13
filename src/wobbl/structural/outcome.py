@@ -205,13 +205,14 @@ def evaluate(run: StructuralRun) -> Outcome:
     # 6. sanity: units, size, deflection
     checks.append(_sanity(run, gov, allow))
 
-    # 7. large deflection: compare a geometrically nonlinear solve on the first mesh
+    # 7. large deflection: compare a geometrically nonlinear solve with a linear one on the same mesh
     nl = run.nonlinear
     if nl and "error" not in nl and nl["linear_peak"] > 0:
         ps = nl["nonlinear_peak"] / nl["linear_peak"] - 1
         ds = nl["nonlinear_disp"] / max(nl["linear_disp"], 1e-12) - 1
-        s = (f"deflection is large next to the wall thickness, so Wobbl re-solved the first mesh with large "
-             f"deflection theory: the peak moves {100 * ps:+.0f}% and the deflection {100 * ds:+.0f}%")
+        which = (f"a coarser {nl['nodes'] // 1000}k node mesh" if nl.get("own_mesh") else "the first mesh")
+        s = (f"deflection is large next to the wall thickness, so Wobbl solved {which} with large deflection "
+             f"theory too: the peak moves {100 * ps:+.0f}% and the deflection {100 * ds:+.0f}%")
         if abs(ps) <= 0.10:
             checks.append(Check("large deflection", "pass", s + "; linear theory holds", nl))
         else:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 
@@ -79,6 +79,7 @@ class StructuralRun:
     notes: list[str] = field(default_factory=list)
     nonlinear: dict | None = None
     load_path: dict | None = None
+    budget: dict = field(default_factory=dict)   # the budget, the modeled seconds spent and the clock
 
 
 def _say(progress: Progress | None, stage: str, detail: str = ""):
@@ -284,7 +285,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         budget.charge_level(mesh.n_nodes, wall_iters)
         last = (mesh, res, built, measure, mname, excluded)
         if lv == 0:
-            first = (built, levels[0].governing, levels[0].max_disp, excluded)
+            first = (built, levels[0].governing, levels[0].max_disp, excluded, sizing)
         classify(spots, tol)
         _say(progress, "check", f"level {lv}: governing {levels[-1].governing:.4g} MPa"
                                 + (f" ({_pct(levels)} change)" if lv else ""))
@@ -298,13 +299,14 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
                      "slower than the budget's cost model, so here the level reached depends on the machine. A "
                      "longer --budget reaches a finer mesh.")
     nonlinear = _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work,
-                                        progress, budget)
+                                        progress, budget, loads, fixtures, r_ex)
     load_path = _load_path_check(adapter, study, q, prep, sizing, mesh, loads, fixtures, material, features,
                                  print_axis, r_ex, tol, work, progress, levels[-1],
                                  _governing_spot(spots, levels[-1].governing_xyz), budget)
     run = StructuralRun(study, material, prep, features, sel_info, levels, spots, mesh, res, built, mname,
                         measure, excluded, r_ex, work, tol, stopped_by, time.time() - t_start, notes, nonlinear,
-                        load_path)
+                        load_path, {"seconds": budget.seconds, "spent": round(budget.spent, 1),
+                                    "clock": round(budget.clock(), 1)})
     _save_fields(run)
     return run
 
@@ -473,37 +475,58 @@ def _peak_refinement(mesh: Mesh, spots: list[Hotspot], xyz) -> list[Refinement]:
     return [Refinement(0.5 * h, points=[tuple(xyz)], radius=2.5 * h, grow=3 * h, label="governing point")]
 
 
-NLGEOM_SOLVES = 20   # modeled linear solves in a large deflection re-solve (load increments times iterations)
+NLGEOM_SOLVES = 16     # modeled linear solves in a large deflection re-solve (two load steps of a few iterations)
+NLGEOM_NODES = 20000   # the re-solve runs on a mesh about this size: it measures a ratio, not the answer
 
 
 def _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work, progress,
-                            budget: Budget):
+                            budget: Budget, loads, fixtures, r_ex: float):
     """When the part deflects a good fraction of its wall thickness, linear theory misses membrane
-    stiffening and changing geometry. Re-solve the first mesh with geometric nonlinearity and report
-    how much the peak and the deflection move.
+    stiffening and changing geometry. Solve one mesh both ways and report how much the peak and the
+    deflection move; the converged answer is scaled by that ratio.
 
-    Whether it runs is decided from the modeled cost, never by a timeout, which would make the check pass on
-    one run and go missing on the next. The wall clock limit is only a backstop for a stalled solve.
+    The first mesh is used when it is small. A large one is coarsened to about NLGEOM_NODES first: every
+    load step of a nonlinear solve costs a few linear solves, and on an 80,000 node drone arm the first mesh
+    took over half an hour. Whether the check runs is decided from the modeled cost, never by a timeout,
+    which would make it pass on one run and go missing on the next.
     """
-    built, lin_peak, lin_disp, excluded = first
+    built, lin_peak, lin_disp, excluded, sizing0 = first
     d = levels[-1].max_disp
     if built.walls or (d < 0.3 * features.thickness_min and d < 0.03 * prep.diag):
         return None
-    cost = NLGEOM_SOLVES * solve_cost(levels[0].n_nodes)
+    n0 = levels[0].n_nodes
+    coarse = n0 > 1.3 * NLGEOM_NODES
+    n = NLGEOM_NODES if coarse else n0
+    cost = NLGEOM_SOLVES * solve_cost(n) + (mesh_cost(n) + solve_cost(n) if coarse else 0.0)
     if budget.spent + cost > 1.5 * budget.seconds:
         return {"error": "time budget used up"}
     _say(progress, "check", f"deflection {d:.3g} mm is large next to the {features.thickness_min:.3g} mm wall; "
                             "re-solving with large deflection theory")
     budget.charge(cost)
+    timeout = max(budget.timeout(), 4 * cost)
     try:
-        res = adapter.solve_static(built.model, work / "nlgeom", nlgeom=True,
-                                   timeout=max(budget.timeout(), 4 * cost))
+        if coarse:
+            # refinement sizes are floored by the walls, so the node count falls slower than the size cubed
+            k = (n0 / NLGEOM_NODES) ** 0.5
+            mesh = build_mesh(prep, Sizing(h=sizing0.h * k, order=sizing0.order, curvature=sizing0.curvature,
+                                           refinements=[replace(r, size=r.size * k, grow=(r.grow or 6 * r.size) * k)
+                                                        for r in sizing0.refinements]))
+            built = build_static(mesh, loads, fixtures, material, features.faces)
+            lin = adapter.solve_static(built.model, work / "nlgeom-linear", timeout=timeout)
+            m, _ = failure_measure(lin, material, print_axis)
+            zmap = ZoneMap(mesh, built.zones, built.zone_kind,
+                           find_sharp_corners(mesh, faces=features.faces, tangent=features.tangent_pairs))
+            excluded = zmap.excluded_mask(mesh.X, r_ex)
+            valid = ~excluded if (~excluded).any() else np.ones(len(m), bool)
+            lin_peak, lin_disp = float(m[valid].max()), float(lin.displacement_magnitude().max())
+        res = adapter.solve_static(built.model, work / "nlgeom", nlgeom=True, timeout=timeout)
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)[:200]}
     m, _ = failure_measure(res, material, print_axis)
     valid = ~excluded if (~excluded).any() else np.ones(len(m), bool)
     return {"linear_peak": lin_peak, "nonlinear_peak": float(m[valid].max()), "linear_disp": lin_disp,
-            "nonlinear_disp": float(res.displacement_magnitude().max()), "nodes": built.model.mesh.n_nodes}
+            "nonlinear_disp": float(res.displacement_magnitude().max()), "nodes": built.model.mesh.n_nodes,
+            "own_mesh": coarse}
 
 
 def variant_needs_refinement(primary: Level, variant: Level, primary_spot: Hotspot | None, allowable: float,
@@ -678,3 +701,4 @@ def _save_fields(run: StructuralRun):
                         measure=run.measure, excluded=run.excluded, tris=run.mesh.tris, tri_surf=run.mesh.tri_surf)
     lv = [asdict(x) for x in run.levels]
     (out / "levels.json").write_text(json.dumps(lv, indent=1))
+    (out / "budget.json").write_text(json.dumps(run.budget, indent=1))
