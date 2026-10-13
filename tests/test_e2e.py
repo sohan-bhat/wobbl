@@ -85,3 +85,15 @@ def test_validation_subset(tmp_path):
     for r in rows:
         assert r["pass"], r
         assert r["confidence"] == "high", r
+
+
+@needs_ccx
+def test_remote_load_reports_attachment_spread(parts, tmp_path):
+    from wobbl.structural.pipeline import analyze_strength
+    from wobbl.structural.spec import StructuralStudy, parse_fixture, parse_load
+
+    st = StructuralStudy(parts["mount"], "6061-t6", [parse_load("200 N -z at 30,20,40 @ holes d=4.5")],
+                         [parse_fixture("bottom")], quality="fast", budget=120)
+    o = analyze_strength(st, tmp_path / "out", render=False, fixes=False)
+    lp = next(c for c in o.checks if c.name == "load introduction")
+    assert lp.status in ("pass", "info", "warn") and "rigid attachment" in lp.summary
