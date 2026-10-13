@@ -25,3 +25,6 @@ examples/**/*.npz
 examples/**/*.brep
 examples/**/geometry/*.json
 examples/**/fix-*/report.html
+
+# browser automation scratch
+.playwright-cli/
