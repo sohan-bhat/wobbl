@@ -1,6 +1,7 @@
 """End to end runs with the real solvers (installed by 'wobbl setup')."""
 import json
 
+import numpy as np
 import pytest
 from click.testing import CliRunner
 
@@ -155,6 +156,76 @@ def test_transient_energy_balance_with_a_held_face(tmp_path):
     assert bal.status == "pass", bal.summary
     assert bal.detail["held_J"] == pytest.approx(-5 * 300, rel=0.01)
     assert "through held temperature faces" in bal.summary
+
+
+def _aluminum_diffusivity():
+    from wobbl.materials import get_material
+
+    m = get_material("6061-t6")
+    return m.conductivity / (m.density * m.specific_heat) * 1e6     # mm2/s
+
+
+def _at(fields, t):
+    i = int(np.argmin(np.abs(fields["hist_t"] - t)))
+    assert fields["hist_t"][i] == pytest.approx(t, rel=1e-4)
+    return fields["hist_T"][i]
+
+
+@needs_ccx
+def test_sudden_face_temperature_follows_the_erfc_solution(tmp_path):
+    """A part at 20 C set on a surface held at 120 C, the case that used to stop CalculiX. A 60 mm aluminum bar
+    whose end jumps to 120 C is a semi infinite solid for the first 2 s, so every node follows
+    T = 20 + 100 erfc(x / (2 sqrt(alpha t))) within 1.5 C, and the heat its end lets in is the heat it stores."""
+    from scipy.special import erf
+
+    from wobbl.thermal.study import run_thermal
+    from wobbl.thermal.tools import study_from
+    from wobbl.validation import geometry as G
+
+    part = G.box(tmp_path / "bar.step", 60, 10, 10)
+    st = study_from(str(part), "6061-t6", films=["10 W/m2K @ x=max"], fixed=["120 C @ x=min"], ambient="20 C",
+                    duration="2 s")
+    o = run_thermal(st, tmp_path / "heat")
+    f = np.load(tmp_path / "heat" / "fields.npz")
+    alpha, x = _aluminum_diffusivity(), f["X"][:, 0]
+    for t in (0.25, 0.5, 1.0, 2.0):
+        exact = 120 - 100 * erf(x / (2 * np.sqrt(alpha * t)))
+        assert np.abs(_at(f, t) - exact).max() < 1.5, t
+    bal = _balance(o)
+    assert bal.status == "pass", bal.summary
+    assert bal.detail["held_J"] == pytest.approx(bal.detail["stored_J"], rel=0.02) and bal.detail["held_J"] > 0
+    assert any("ramps from 20 C to 120 C in a straight line" in a for a in o.assumptions)
+
+
+@needs_ccx
+def test_two_held_faces_and_a_third_starting_temperature(tmp_path):
+    """A 50 mm insulated aluminum bar at 40 C whose ends jump to 100 C and 0 C. It follows the Fourier series for a
+    slab between two held temperatures within 1.5 C, the hot end lets heat in while the cold end lets it out, and
+    the two together match what the bar stores."""
+    from wobbl.thermal.study import run_thermal
+    from wobbl.thermal.tools import study_from
+    from wobbl.validation import geometry as G
+
+    L = 50.0
+    part = G.box(tmp_path / "bar.step", L, 10, 10)
+    st = study_from(str(part), "6061-t6", films=["0 W/m2K @ all"], fixed=["100 C @ x=min", "0 C @ x=max"],
+                    ambient="20 C", duration="4 s")
+    st.initial = 40.0
+    o = run_thermal(st, tmp_path / "heat")
+    f = np.load(tmp_path / "heat" / "fields.npz")
+    alpha, x = _aluminum_diffusivity(), f["X"][:, 0]
+    n = np.arange(1, 400)
+    b = 2 / (n * np.pi) * ((40 - 100) * (1 - (-1.0) ** n) + (0 - 100) * (-1.0) ** n)
+    for t in (0.5, 1.0, 2.0, 4.0):
+        decay = b * np.exp(-alpha * (n * np.pi / L) ** 2 * t)
+        exact = 100 - 100 * x / L + np.sin(np.outer(x, n) * np.pi / L) @ decay
+        assert np.abs(_at(f, t) - exact).max() < 1.5, t
+    bal = _balance(o)
+    assert bal.status == "pass", bal.summary
+    hot, cold = bal.detail["held_faces_J"]
+    assert hot > 0 > cold and "in and" in bal.summary
+    assert hot + cold == pytest.approx(bal.detail["stored_J"], rel=0.02)
+    assert any("x=min (100 C) and x=max (0 C) ramp to their targets" in a for a in o.assumptions)
 
 
 @needs_spice
