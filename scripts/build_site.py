@@ -25,7 +25,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from sitegen import PAGES_SRC, ROOT, SITE_SRC, cfg, url
-from sitegen import docs
+from sitegen import docs, examples
 from sitegen.layout import asset, page
 
 PORT = 8040
@@ -82,8 +82,9 @@ def build(out: Path) -> list[str]:
         shutil.rmtree(out)
     out.mkdir(parents=True)
     copy_static(out)
+    found = examples.load_all()  # first, so links to the examples from the docs stay on the site
     docs.register_routes()
-    routes = []
+    routes = examples.build(out, found)
     for p in docs.PAGES:
         write(out, p.path, docs.doc_page(p))
         routes.append(p.path)

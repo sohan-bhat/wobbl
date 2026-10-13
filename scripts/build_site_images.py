@@ -5,9 +5,11 @@ script trims the empty background around each one and writes two widths so
 the page can pick the right one with ``srcset``.
 
     python scripts/build_site_images.py            # writes site/img/*.webp
+    python scripts/build_site_images.py enclosure-stress   # only the images named
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +29,10 @@ IMAGES = {
     "bracket-gusset": (EX / "shelf-bracket/output/fix-gusset/images/stress.png", True, (900, 560)),
     "bracket-convergence": (EX / "shelf-bracket/output/images/convergence.png", False, (1200, 800)),
     "motor-mount-noribs": (EX / "motor-mount/output-noribs/images/stress.png", True, (1200, 800)),
+    "motor-mount-ribs": (EX / "motor-mount/output/images/stress.png", True, (1200, 800)),
+    "enclosure-stress": (EX / "enclosure/output/images/stress.png", True, (1200, 800)),
+    "drone-arm-stress": (EX / "drone-arm/output/images/stress.png", True, (1200, 800)),
+    "battery-temperature": (EX / "battery-pack/output/images/temperature.png", True, (1200, 800)),
     "heat-sink-temperature": (EX / "heat-sink/output/images/temperature.png", True, (1200, 800)),
     "battery-history": (EX / "battery-pack/output/images/history.png", False, (1200, 800)),
     "buck-waveform": (EX / "circuits/buck/images/waveform.png", False, (1200, 800)),
@@ -42,9 +48,11 @@ def trim(img: Image.Image, pad: int = 28) -> Image.Image:
     return img.crop((x0, y0, x1, y1))
 
 
-def main() -> None:
+def main(only: list[str]) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     for name, (src, do_trim, widths) in IMAGES.items():
+        if only and name not in only:
+            continue
         img = Image.open(src).convert("RGB")
         if do_trim:
             img = trim(img)
@@ -57,4 +65,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

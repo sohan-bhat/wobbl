@@ -112,7 +112,7 @@ def _img(src: str, alt: str, src_dir: Path, caption: str = "") -> str:
     """An image with real dimensions when it is a site image, wrapped in a figure."""
     href = site_link(src, src_dir)
     dims = ""
-    local = (src_dir / src).resolve()
+    local = SITE_SRC / href[len(url()):] if href.startswith(url("img/")) else (src_dir / src).resolve()
     if local.is_file() and SITE_SRC in local.parents:
         w, h = image_size(local)
         dims = f' width="{w}" height="{h}"'
@@ -172,11 +172,14 @@ def _text(inline: Token) -> str:
     return "".join(c.content for c in inline.children or [] if c.type in ("text", "code_inline"))
 
 
-def render(path: Path, *, demote: int = 0, used: set[str] | None = None, top_id: str | None = None) -> Doc:
+def render(path: Path, *, demote: int = 0, used: set[str] | None = None, top_id: str | None = None,
+           keep_lead: bool = False, drop_code: set[str] = frozenset()) -> Doc:
     """Render one Markdown file. The H1 becomes the title and the paragraph after it the lead.
 
     ``demote`` shifts headings down a level for a file shown as a section of a
     longer page; its H1 then stays in the body as a heading with ``top_id``.
+    ``keep_lead`` leaves the first paragraph in the body, and code blocks whose
+    text is in ``drop_code`` are left out.
     """
     used = set() if used is None else used
     src_dir = path.parent
@@ -187,7 +190,7 @@ def render(path: Path, *, demote: int = 0, used: set[str] | None = None, top_id:
     if tokens and tokens[0].type == "heading_open" and tokens[0].tag == "h1" and not demote:
         title = _text(tokens[1])
         tokens = tokens[3:]
-        if tokens and tokens[0].type == "paragraph_open":
+        if tokens and tokens[0].type == "paragraph_open" and not keep_lead:
             lead = MD.renderer.renderInline(tokens[1].children, MD.options, {})
             tokens = tokens[3:]
 
@@ -196,6 +199,9 @@ def render(path: Path, *, demote: int = 0, used: set[str] | None = None, top_id:
     i = 0
     while i < len(tokens):
         tok = tokens[i]
+        if tok.type == "fence" and tok.content.strip() in drop_code:
+            i += 1
+            continue
         if tok.type in ("heading_open", "heading_close"):
             level = min(int(tok.tag[1]) + demote, 6)
             tok.tag = f"h{level}"
