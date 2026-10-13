@@ -149,7 +149,17 @@ def initial_sizing(prep: PreparedGeometry, features: PartFeatures, study: Struct
     return s
 
 
-def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progress | None = None) -> StructuralRun:
+def describe_part(path: str, workdir: str | Path, scale: float = 1.0, body: int | None = None):
+    """Prepare the CAD and analyze its faces. Returns (prepared geometry, features)."""
+    work = Path(workdir)
+    prep = prepare(path, work / "geometry", body=body)
+    if scale and scale != 1.0:
+        prep = scale_geometry(prep, scale, work / "geometry")
+    return prep, analyze(build_surface_mesh(prep))
+
+
+def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progress | None = None,
+                   pre: tuple | None = None) -> StructuralRun:
     t_start = time.time()
     work = Path(workdir)
     work.mkdir(parents=True, exist_ok=True)
@@ -160,13 +170,11 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
     adapter = solvers.for_domain("structural")
     adapter.require()
 
-    _say(progress, "geometry", f"reading {Path(study.part).name}")
-    prep = prepare(study.part, work / "geometry", body=study.body)
-    if study.scale and study.scale != 1.0:
-        prep = scale_geometry(prep, study.scale, work / "geometry")
-    _say(progress, "geometry", "finding faces, holes, fillets and wall thickness")
-    surf = build_surface_mesh(prep)
-    features = analyze(surf)
+    if pre is not None:
+        prep, features = pre
+    else:
+        _say(progress, "geometry", f"reading {Path(study.part).name}, finding faces, holes and fillets")
+        prep, features = describe_part(study.part, work, study.scale, study.body)
     loads, fixtures, sel_info = resolve_selections(study, features)
     print_axis = None
     if study.print_direction:
@@ -323,14 +331,15 @@ def _solve(adapter, built: BuiltModel, workdir: Path, warm):
     res = None
     it = 0
     solved = dict(active)
-    for it in range(1, 16):
+    for it in range(1, 9):
         model.normal_constraints = base_normals + [NormalConstraint(w.name, active[w.name], w.normal)
                                                    for w in built.walls if len(active[w.name])]
         res = adapter.solve_static(model, workdir)
         solved = {k: v.copy() for k, v in active.items()}
-        changed = False
-        rf_tol = 1e-5 * (1.0 + float(np.abs(res.RF).max()))
-        u_tol = 1e-5 * (1e-12 + float(np.abs(res.U).max()))
+        changed = 0
+        total = sum(len(w.nodes) for w in built.walls)
+        rf_tol = 1e-4 * (1.0 + float(np.abs(res.RF).max()))
+        u_tol = 1e-4 * (1e-12 + float(np.abs(res.U).max()))
         for w in built.walls:
             act = active[w.name]
             pull = (res.RF[act] @ w.normal) > rf_tol
@@ -338,8 +347,9 @@ def _solve(adapter, built: BuiltModel, workdir: Path, warm):
             pen = inactive[(res.U[inactive] @ w.normal) > u_tol]
             if pull.any() or len(pen):
                 active[w.name] = np.union1d(act[~pull], pen)
-                changed = True
-        if not changed:
+                changed += int(pull.sum()) + len(pen)
+        # a handful of nodes flipping at the rim of the contact patch does not move the answer
+        if changed <= max(2, 0.02 * total):
             break
     model.normal_constraints = base_normals + [NormalConstraint(w.name, solved[w.name], w.normal)
                                                for w in built.walls if len(solved[w.name])]

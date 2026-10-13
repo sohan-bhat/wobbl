@@ -1,0 +1,331 @@
+"""The wobbl command line.
+
+    wobbl part.step "will it crack under 200 N?"      ask in plain words
+    wobbl run part.step --material pla --fix "holes" --load "200 N down @ top"
+    wobbl inspect part.step                           faces, holes, fillets, thickness
+    wobbl check  wobbl-out/part                       re-read the checks of a finished run
+    wobbl report wobbl-out/part --open                rebuild and open the HTML report
+    wobbl fix    wobbl-out/part --apply               apply suggested fixes and compare
+    wobbl doctor | setup | uninstall | materials | mcp | validate
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+import click
+
+from .. import __version__
+from . import ui
+
+
+class AskGroup(click.Group):
+    """Lets 'wobbl part.step "question"' work next to the subcommands."""
+
+    def resolve_command(self, ctx, args):
+        if args and args[0] not in self.commands and (os.path.exists(args[0]) or "." in Path(args[0]).name):
+            return "ask", self.commands["ask"], args
+        return super().resolve_command(ctx, args)
+
+
+def _out_dir(part: str, out: str | None) -> Path:
+    if out:
+        return Path(out)
+    base = Path("wobbl-out") / Path(part).stem
+    p, k = base, 2
+    while p.exists():
+        p = Path(f"{base}-{k}")
+        k += 1
+    return p
+
+
+def _strength_options(f):
+    opts = [
+        click.option("--material", "-m", default=None, help="Material name or custom:E=..,nu=..,yield=.."),
+        click.option("--load", "-l", "loads", multiple=True, help="Load, e.g. '200 N down @ top' (repeatable)."),
+        click.option("--fix", "-f", "fixes", multiple=True,
+                     help="Support, e.g. 'holes d=4.5', 'bolt holes', 'wall x=min' (repeatable)."),
+        click.option("--target-sf", type=float, default=None, help="Required safety factor."),
+        click.option("--quality", type=click.Choice(["fast", "normal", "fine"]), default="normal"),
+        click.option("--budget", type=float, default=240.0, show_default=True, help="Seconds for the study."),
+        click.option("--mesh-size", type=float, default=None, help="Global element size in mm."),
+        click.option("--print-direction", default=None, help="Axis the print layers stack along, e.g. z."),
+        click.option("--scale", type=float, default=1.0, help="Scale the geometry (1000 for files in meters)."),
+        click.option("--body", type=int, default=None, help="Pick one body from a multi body file."),
+        click.option("--out", "-o", default=None, help="Output folder (default wobbl-out/<part>)."),
+        click.option("--json", "as_json", is_flag=True, help="Print the result as JSON."),
+        click.option("--no-images", is_flag=True, help="Skip heatmap rendering."),
+        click.option("--quiet", "-q", is_flag=True, help="No progress lines."),
+    ]
+    for o in reversed(opts):
+        f = o(f)
+    return f
+
+
+@click.group(cls=AskGroup, context_settings={"help_option_names": ["-h", "--help"]})
+@click.version_option(__version__, "-V", "--version", prog_name="wobbl")
+def cli():
+    """Wobbl: simulate anything before you build it.
+
+    Ask in plain words (wobbl part.step "will it hold 200 N?") or use the subcommands.
+    """
+
+
+@cli.command(hidden=True)
+@click.argument("part")
+@click.argument("question", required=False, default="")
+@_strength_options
+@click.pass_context
+def ask(ctx, part, question, **kw):
+    """Answer a plain English question about a part."""
+    from ..ask import detect_domain
+
+    dom = detect_domain(question, part)
+    if dom == "circuit":
+        from .circuits import circuit_ask
+        return circuit_ask(part, question, kw)
+    if dom == "thermal":
+        from .thermal import thermal_ask
+        return thermal_ask(part, question, kw)
+    _strength(part, question, kw, interpret=True)
+
+
+@cli.command()
+@click.argument("part")
+@_strength_options
+@click.option("--question", default="", help="The question this run answers (shown in the report).")
+def run(part, question, **kw):
+    """Static strength study with explicit loads and supports."""
+    if not kw["loads"] or not kw["fixes"]:
+        ui.fail("wobbl run needs at least one --load and one --fix",
+                "Example: wobbl run bracket.step -m pla --fix 'holes d=4.5' --load '60 N down @ top'")
+    _strength(part, question, kw, interpret=False)
+
+
+def _study_from(part, question, kw):
+    from ..structural.spec import StructuralStudy, parse_fixture, parse_load
+
+    st = StructuralStudy(part=str(Path(part).resolve()), material=kw.get("material") or "auto",
+                         target_sf=kw.get("target_sf"), quality=kw.get("quality", "normal"),
+                         budget=kw.get("budget", 240.0), question=question, scale=kw.get("scale", 1.0),
+                         body=kw.get("body"), mesh_size=kw.get("mesh_size"),
+                         print_direction=kw.get("print_direction"))
+    st.loads = [parse_load(x) for x in kw.get("loads", ())]
+    st.fixtures = [parse_fixture(x) for x in kw.get("fixes", ())]
+    return st
+
+
+def _strength(part, question, kw, interpret: bool):
+    from ..ask import read_question
+    from ..geometry.cad import GeometryError
+    from ..geometry.select import SelectionError
+    from ..materials import resolve_material
+    from ..mesh.mesher import MeshError
+    from ..solvers.base import SolverError
+    from ..structural.pipeline import analyze_strength
+    from ..structural.run import describe_part
+    from ..structural.spec import SpecError
+
+    if not Path(part).exists():
+        ui.fail(f"file not found: {part}")
+    out = _out_dir(part, kw.get("out"))
+    try:
+        st = _study_from(part, question, kw)
+        if st.material != "auto":
+            resolve_material(st.material)
+        with ui.progress(not kw.get("quiet") and not kw.get("as_json")) as cb:
+            cb("geometry", f"reading {Path(part).name}")
+            pre = describe_part(st.part, out / "work", st.scale, st.body)
+            guesses = []
+            if interpret or st.material == "auto" or not st.loads or not st.fixtures:
+                reading = read_question(question, pre[1], st)
+                guesses = reading.guesses
+                for g in guesses:
+                    cb("assume", g)
+            o = analyze_strength(st, out, cb, render=not kw.get("no_images"), pre=pre)
+    except (SpecError, SelectionError, GeometryError, MeshError, SolverError, KeyError, ValueError) as e:
+        hint = getattr(e, "hint", "")
+        ui.fail(str(e).strip("'\""), hint if hint and hint not in str(e) else "")
+    if guesses:
+        o.assumptions = [f"Wobbl guessed: {g}." for g in guesses] + o.assumptions
+        from ..structural.report import write_outputs
+        write_outputs(o, out)
+    if kw.get("as_json"):
+        click.echo(json.dumps(o.to_dict(), indent=1))
+        return
+    show_strength(o)
+
+
+def show_strength(o):
+    from ..units import fmt_length, fmt_stress
+
+    imp = o.imperial
+    word = {"holds": "HOLDS", "marginal": "MARGINAL", "fails": "FAILS"}[o.verdict]
+    ui.console.print()
+    ui.verdict_panel(word, o.verdict, o.headline,
+                     [("peak stress", fmt_stress(o.governing_MPa, imp)), ("safety factor", f"{o.safety_factor:.2f}"),
+                      ("target", f"{o.target_sf:g}"), ("max deflection", fmt_length(o.max_disp_mm, imp))],
+                     o.confidence, o.confidence_reasons)
+    ui.section("checks")
+    ui.checks_table(o.checks)
+    if o.fixes:
+        ui.section("how to fix it" if o.verdict != "holds" else "worth knowing")
+        for f in o.fixes:
+            ui.console.print(f"  [bold]{f['title']}[/bold]" + ("  [dim](auto)[/dim]" if f.get("auto") else ""))
+            ui.console.print(f"  [dim]{f['summary']}[/dim]")
+    ui.section("assumptions")
+    ui.bullets(o.assumptions[:8])
+    ui.section("files")
+    if o.images.get("stress"):
+        ui.console.print(f"  heatmap  {o.images['stress']}")
+    ui.console.print(f"  report   {o.report}")
+    ui.console.print(f"  summary  {Path(o.workdir) / 'summary.txt'}")
+    ui.console.print()
+
+
+@cli.command()
+@click.argument("part")
+@click.option("--json", "as_json", is_flag=True)
+@click.option("--scale", type=float, default=1.0)
+@click.option("--body", type=int, default=None)
+def inspect(part, as_json, scale, body):
+    """List faces, holes, fillets, sharp corners and wall thickness, with ids for --load and --fix."""
+    import tempfile
+
+    from ..geometry.cad import GeometryError
+    from ..structural.run import describe_part
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            prep, feat = describe_part(part, tmp, scale, body)
+    except GeometryError as e:
+        ui.fail(str(e))
+    d = feat.to_dict()
+    d["notes"] = prep.notes
+    d["file"] = str(Path(part).resolve())
+    if as_json:
+        click.echo(json.dumps(d, indent=1))
+        return
+    from rich.table import Table
+
+    lo, hi = feat.bbox
+    size = [h - l for l, h in zip(lo, hi)]
+    ui.console.print(f"\n[bold]{Path(part).name}[/bold]  {size[0]:.4g} x {size[1]:.4g} x {size[2]:.4g} mm, "
+                     f"volume {feat.volume / 1000:.4g} cm3, walls about {feat.thickness_typical:.3g} mm "
+                     f"(thinnest {feat.thickness_min:.3g} mm)")
+    for n in prep.notes:
+        ui.console.print(f"[dim]  {n}[/dim]")
+    if feat.holes():
+        ui.section("holes")
+        for h in feat.holes():
+            ui.console.print(f"  d {2 * h.radius:.4g} mm at ({', '.join(f'{v:.4g}' for v in h.axis_point)})  "
+                             f"[dim]select with 'hole d={2 * h.radius:.3g}' or 'face {h.id}'[/dim]")
+    if feat.fillets():
+        ui.section("inside fillets")
+        rs = []
+        for r in sorted(f.radius for f in feat.fillets()):
+            if not rs or r > rs[-1] * 1.03:
+                rs.append(r)
+        ui.console.print("  radii " + ", ".join(f"{r:.3g} mm" for r in rs))
+    if feat.corners:
+        ui.section("sharp inside corners (stress raisers)")
+        for c in feat.corners[:8]:
+            ui.console.print(f"  {c.length:.3g} mm long between faces {c.faces[0]} and {c.faces[1]} near "
+                             f"({', '.join(f'{v:.3g}' for v in c.midpoint)})")
+    ui.section("faces")
+    tb = Table(box=None, header_style="dim", padding=(0, 1))
+    for col in ("id", "kind", "area mm2", "center", "normal or size"):
+        tb.add_column(col)
+    for f in sorted(feat.faces.values(), key=lambda f: -f.area)[:40]:
+        extra = (", ".join(f"{v:+.2f}" for v in f.normal) if f.normal else
+                 (f"r {f.radius:.3g} ({f.role})" if f.radius else f.role))
+        tb.add_row(str(f.id), f.kind, f"{f.area:.4g}", ", ".join(f"{v:.3g}" for v in f.centroid), extra)
+    ui.console.print(tb)
+    if len(feat.faces) > 40:
+        ui.console.print(f"[dim]  ... {len(feat.faces) - 40} more (use --json)[/dim]")
+    ui.console.print()
+
+
+@cli.command()
+@click.argument("result_dir", default="")
+@click.option("--json", "as_json", is_flag=True)
+def check(result_dir, as_json):
+    """Show the verification checks and confidence of a finished run."""
+    o = _load_outcome(result_dir)
+    if as_json:
+        click.echo(json.dumps({"confidence": o.confidence, "reasons": o.confidence_reasons,
+                               "checks": [c.to_dict() for c in o.checks]}, indent=1))
+        return
+    ui.console.print(f"\n[bold]{Path(o.part).name}[/bold]  confidence "
+                     f"[{ui.CONF_STYLE.get(o.confidence, 'bold')}]{o.confidence}[/]")
+    ui.checks_table(o.checks)
+    ui.section("why")
+    ui.bullets(o.confidence_reasons)
+    ui.console.print()
+
+
+@cli.command()
+@click.argument("result_dir", default="")
+@click.option("--open", "open_it", is_flag=True, help="Open the report in a browser.")
+def report(result_dir, open_it):
+    """Rebuild the self contained HTML report of a finished run."""
+    o = _load_outcome(result_dir)
+    if o.domain == "strength":
+        from ..structural.report import write_report
+        path = write_report(o, Path(o.workdir))
+    else:
+        path = o.report
+    ui.console.print(f"report {path}")
+    if open_it:
+        import webbrowser
+        webbrowser.open(Path(path).resolve().as_uri())
+
+
+def _latest_dir() -> Path | None:
+    root = Path("wobbl-out")
+    if not root.exists():
+        return None
+    cands = [p for p in root.iterdir() if (p / "outcome.json").exists()]
+    return max(cands, key=lambda p: (p / "outcome.json").stat().st_mtime) if cands else None
+
+
+def _load_outcome(result_dir: str):
+    d = Path(result_dir) if result_dir else _latest_dir()
+    if d is None or not (d / "outcome.json").exists():
+        ui.fail(f"no Wobbl results in '{result_dir or 'wobbl-out'}'", "Pass the folder a run printed.")
+    data = json.loads((d / "outcome.json").read_text())
+    if data.get("domain") == "strength":
+        from ..structural.outcome import Outcome
+        return Outcome.load(d / "outcome.json")
+    from ..outcome_generic import GenericOutcome
+    return GenericOutcome.load(d / "outcome.json")
+
+
+@cli.command()
+def materials():
+    """List the built in materials and their properties."""
+    from rich.table import Table
+
+    from ..materials import all_materials
+
+    tb = Table(box=None, header_style="dim", padding=(0, 1))
+    for c in ("key", "name", "E MPa", "limit MPa", "criterion", "density", "k W/mK", "max C"):
+        tb.add_column(c)
+    for m in all_materials():
+        tb.add_row(m.key, m.name, f"{m.E:g}", f"{m.allowable:g}", "yield" if m.ductile else "tensile",
+                   f"{m.density:g}", f"{m.conductivity:g}", f"{m.max_service_temp:g}")
+    ui.console.print(tb)
+
+
+def main():
+    try:
+        cli(prog_name="wobbl")
+    except KeyboardInterrupt:
+        ui.err.print("interrupted")
+        sys.exit(130)
+
+
+if __name__ == "__main__":
+    main()
