@@ -397,6 +397,7 @@ class SurfaceMesh:
     surface_curves: dict[int, list[int]] = field(default_factory=dict)
     t_mesh: float = 0.0
     tangent_pairs: set = field(default_factory=set)   # surface pairs that meet smoothly (a fillet and its wall)
+    samples: dict | None = None   # points on the CAD faces for wall thickness: pts, normals, weights, faces
 
     tri_geometry = Mesh.tri_geometry
     surface_mask = Mesh.surface_mask
@@ -440,8 +441,94 @@ def _surface(prep: PreparedGeometry, h: float | None, curvature: int, alg: int) 
     with gmsh_session() as gmsh:
         load_into_session(gmsh, prep)
         sm = _surface_from_session(gmsh, h, curvature, alg, prep.diag, prep.kind == "stl")
+        if prep.kind != "stl":
+            sm.samples = cad_samples(gmsh, sm)
     sm.t_mesh = time.time() - t0
     return sm
+
+
+# Roberts' R2 sequence: a quasi random walk that covers a square evenly, with no random numbers involved
+_R2 = np.array([0.7548776662466927, 0.5698402909980532])
+
+
+def cad_samples(gmsh, sm: SurfaceMesh, target: int = 800) -> dict | None:
+    """Points spread over every CAD face in proportion to its area, with exact outward normals.
+
+    Wall thickness is measured by casting rays inward from these points. They come from each face's own
+    parametrization rather than from the triangles, so the estimate depends on the geometry and stays put when
+    the surface mesh changes. Each point carries the area it stands for.
+    """
+    faces = [int(t) for _, t in gmsh.model.getEntities(2)]
+    try:
+        areas = np.array([gmsh.model.occ.getMass(2, t) for t in faces], float)
+    except Exception:  # noqa: BLE001  not an OpenCASCADE model
+        return None
+    total = float(areas.sum())
+    if total <= 0:
+        return None
+    from scipy.spatial import cKDTree
+
+    n_tri, a_tri, c_tri = sm.tri_geometry()
+    out = {"pts": [], "normals": [], "weights": [], "faces": []}
+    for tag, area in zip(faces, areas):
+        own = np.nonzero(sm.tri_surf == tag)[0]
+        if area <= 0 or not len(own):
+            continue
+        want = max(1, int(round(target * area / total)))
+        got = _face_samples(gmsh, tag, want)
+        if got is None:  # a face gmsh cannot evaluate: its triangles stand in, picked the same way every time
+            pick, count = systematic_pick(a_tri[own], want)
+            pts, nrm, jac = c_tri[own[pick]], n_tri[own[pick]].copy(), count.astype(float)
+        else:
+            pts, nrm, jac = got
+            # the parametrization fixes the sign of a CAD normal; the oriented surface mesh knows which side is out
+            _, j = cKDTree(c_tri[own]).query(pts)
+            flip = np.einsum("ij,ij->i", nrm, n_tri[own[j]]) < 0
+            nrm[flip] *= -1.0
+        out["pts"].append(pts)
+        out["normals"].append(nrm)
+        out["weights"].append(area * jac / jac.sum())
+        out["faces"].append(np.full(len(pts), tag))
+    if not out["pts"]:
+        return None
+    return {k: np.concatenate(v) for k, v in out.items()}
+
+
+def systematic_pick(weights: np.ndarray, n: int) -> tuple[np.ndarray, np.ndarray]:
+    """Pick about ``n`` items in proportion to their weights, evenly and without randomness.
+
+    Returns the picked indices and how many of the ``n`` evenly spaced marks fell in each.
+    """
+    cw = np.cumsum(weights)
+    marks = (np.arange(n) + 0.5) * cw[-1] / n
+    idx = np.minimum(np.searchsorted(cw, marks), len(weights) - 1)
+    return np.unique(idx, return_counts=True)
+
+
+def _face_samples(gmsh, tag: int, want: int):
+    """``want`` points inside one trimmed CAD face, their unit normals and area scale (|dX/du x dX/dv|)."""
+    try:
+        lo, hi = (np.asarray(b, float) for b in gmsh.model.getParametrizationBounds(2, tag))
+        uv, k = [], 0
+        while len(uv) < want and k < 20 * want + 50:
+            k += 1
+            q = lo + (hi - lo) * np.mod(0.5 + _R2 * k, 1.0)
+            if gmsh.model.isInside(2, tag, q.tolist(), parametric=True):
+                uv.append(q)
+        if not uv:
+            return None
+        flat = np.asarray(uv).ravel().tolist()
+        pts = np.asarray(gmsh.model.getValue(2, tag, flat), float).reshape(-1, 3)
+        nrm = np.asarray(gmsh.model.getNormal(tag, flat), float).reshape(-1, 3)
+        der = np.asarray(gmsh.model.getDerivative(2, tag, flat), float).reshape(-1, 6)
+    except Exception:  # noqa: BLE001  an entity gmsh cannot evaluate: the triangles stand in for it
+        return None
+    jac = np.linalg.norm(np.cross(der[:, :3], der[:, 3:]), axis=1)
+    nlen = np.linalg.norm(nrm, axis=1)
+    ok = (nlen > 0) & np.isfinite(jac) & (jac > 0)
+    if not ok.any():
+        return None
+    return pts[ok], nrm[ok] / nlen[ok, None], jac[ok]
 
 
 def _surface_from_session(gmsh, h: float, curvature: int = 8, alg: int = 6, diag: float | None = None,

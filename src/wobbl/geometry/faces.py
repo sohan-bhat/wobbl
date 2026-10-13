@@ -1,7 +1,8 @@
 """Describe a part the way an engineer would: faces, holes, fillets, sharp inside corners, wall thickness.
 
-Everything is computed from the boundary of a tet mesh, so STEP and STL parts
-get the same treatment and normals are always outward.
+Faces and corners come from the boundary of a mesh, so STEP and STL parts get
+the same treatment and normals are always outward. Wall thickness is sampled on
+the CAD faces themselves when the part has any, so it does not move with the mesh.
 """
 from __future__ import annotations
 
@@ -307,8 +308,13 @@ def find_sharp_corners(mesh: Mesh, min_angle_deg: float = 30.0, faces: dict | No
 
 
 def ray_hits(orig: np.ndarray, dirs: np.ndarray, V0: np.ndarray, V1: np.ndarray, V2: np.ndarray,
-             skip: np.ndarray | None = None, chunk: int = 4_000_000) -> np.ndarray:
-    """Distance to the first triangle hit along each ray (Moller-Trumbore, vectorized). inf when nothing is hit."""
+             skip: np.ndarray | None = None, chunk: int = 4_000_000,
+             exit_normals: np.ndarray | None = None) -> np.ndarray:
+    """Distance to the first triangle hit along each ray (Moller-Trumbore, vectorized). inf when nothing is hit.
+
+    With ``exit_normals`` (outward triangle normals) only hits where the ray leaves the solid count, so a ray
+    starting a hair outside a curved face skips the facet it starts behind and finds the far wall.
+    """
     R, T = len(orig), len(V0)
     e1, e2 = V1 - V0, V2 - V0
     best = np.full(R, np.inf)
@@ -326,6 +332,8 @@ def ray_hits(orig: np.ndarray, dirs: np.ndarray, V0: np.ndarray, V1: np.ndarray,
         v = np.einsum("rk,rtk->rt", dirs[r0:r0 + step], q) * inv
         t = np.einsum("tk,rtk->rt", e2, q) * inv
         hit = ok & (u >= -1e-9) & (v >= -1e-9) & (u + v <= 1 + 1e-9) & (t > 1e-9)
+        if exit_normals is not None:
+            hit &= np.einsum("rk,tk->rt", dirs[r0:r0 + step], exit_normals) > 0
         if skip is not None:
             hit[np.arange(hit.shape[0]), skip[r0:r0 + step]] = False
         t = np.where(hit, t, np.inf)
@@ -333,17 +341,72 @@ def ray_hits(orig: np.ndarray, dirs: np.ndarray, V0: np.ndarray, V1: np.ndarray,
     return best
 
 
-def wall_thickness(mesh: Mesh, samples: int = 500, seed: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Cast rays inward from boundary faces; return (face ids, thickness, weights) per sampled triangle."""
-    n, a, c = mesh.tri_geometry()
+def triangle_samples(mesh, n: int = 800) -> dict:
+    """Thickness sample points from the triangles themselves, for parts with no CAD faces (STL): triangle
+    centroids picked in proportion to area, evenly and the same way every time."""
+    from ..mesh.mesher import systematic_pick
+
+    nrm, a, c = mesh.tri_geometry()
+    pick, count = systematic_pick(a, n)
+    return {"pts": c[pick], "normals": nrm[pick], "weights": count * a.sum() / n, "faces": mesh.tri_surf[pick]}
+
+
+def wall_thickness(mesh: Mesh, samples: int = 800) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Cast rays inward from points spread over the surface; return (face ids, thickness, area weights).
+
+    The points come from the CAD faces when the surface mesh carries them, so the answer depends on the
+    geometry and not on how the triangles happened to fall.
+    """
+    smp = getattr(mesh, "samples", None) or triangle_samples(mesh, samples)
+    n, _, _ = mesh.tri_geometry()
     tri = mesh.tris[:, :3]
-    rng = np.random.default_rng(seed)
-    k = len(tri)
-    pick = rng.choice(k, size=min(samples, k), replace=False, p=a / a.sum())
-    V0, V1, V2 = mesh.X[tri[:, 0]], mesh.X[tri[:, 1]], mesh.X[tri[:, 2]]
-    t = ray_hits(c[pick], -n[pick], V0, V1, V2, skip=pick)
+    t = exit_distances(smp["pts"], -smp["normals"], mesh.X[tri[:, 0]], mesh.X[tri[:, 1]], mesh.X[tri[:, 2]], n)
     ok = np.isfinite(t)
-    return mesh.tri_surf[pick][ok], t[ok], a[pick][ok]
+    return smp["faces"][ok], t[ok], smp["weights"][ok]
+
+
+def exit_distances(orig, dirs, V0, V1, V2, nrm) -> np.ndarray:
+    """Distance along each ray to where it leaves the solid, the same as ``ray_hits`` with exit normals.
+
+    Most walls are thin next to the part, so each ray first tests only the triangles that could lie within a
+    short reach of its start (a hit at distance t lies within t of the start, so nothing closer is missed).
+    Rays that find nothing that close try a longer reach and then every triangle.
+    """
+    from scipy.spatial import cKDTree
+
+    cen = (V0 + V1 + V2) / 3.0
+    rad = float(max(np.linalg.norm(V - cen, axis=1).max() for V in (V0, V1, V2)))
+    diag = float(np.linalg.norm(np.ptp(np.vstack([V0, V1, V2]), axis=0)))
+    tree = cKDTree(cen)
+    out = np.full(len(orig), np.inf)
+    todo = np.arange(len(orig))
+    for reach in (0.08 * diag, 0.25 * diag):
+        for i, cand in zip(todo, tree.query_ball_point(orig[todo], reach + rad)):
+            if cand:
+                c = np.asarray(cand)
+                t = ray_hits(orig[i:i + 1], dirs[i:i + 1], V0[c], V1[c], V2[c], exit_normals=nrm[c])[0]
+                if t <= reach:
+                    out[i] = t
+        todo = todo[~np.isfinite(out[todo])]
+        if not len(todo):
+            return out
+    out[todo] = ray_hits(orig[todo], dirs[todo], V0, V1, V2, exit_normals=nrm)
+    return out
+
+
+def thickness_stats(th: np.ndarray, w: np.ndarray, thin: float = 0.05) -> tuple[float, float]:
+    """(typical, thinnest) wall from weighted thickness samples.
+
+    Typical is the area weighted median. Thinnest is the area weighted mean of the thinnest ``thin`` share of
+    the surface rather than a quantile: a quantile jumps between two wall sizes when the thin share sits near
+    the cut (3 mm or 5.5 mm on the cast motor mount), while the mean of the tail moves smoothly.
+    """
+    order = np.argsort(th, kind="stable")
+    th, w = th[order], w[order]
+    cw = np.cumsum(w) / w.sum()
+    typical = float(th[min(np.searchsorted(cw, 0.5), len(th) - 1)])
+    share = np.minimum(w, np.maximum(thin * w.sum() - (np.cumsum(w) - w), 0.0))
+    return typical, float((share * th).sum() / share.sum())
 
 
 def analyze(mesh: Mesh) -> PartFeatures:
@@ -355,10 +418,7 @@ def analyze(mesh: Mesh) -> PartFeatures:
     for s in np.unique(fs):
         by_face[int(s)] = float(np.median(th[fs == s]))
     if len(th):
-        order = np.argsort(th)
-        cw = np.cumsum(w[order]) / w.sum()
-        typical = float(th[order][np.searchsorted(cw, 0.5)])
-        tmin = float(th[order][np.searchsorted(cw, 0.05)])
+        typical, tmin = thickness_stats(th, w)
     else:
         typical = tmin = float(np.min(mesh.X.max(0) - mesh.X.min(0)))
     _, a, _ = mesh.tri_geometry()

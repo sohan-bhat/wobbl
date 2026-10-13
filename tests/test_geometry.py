@@ -84,3 +84,26 @@ def test_flat_elements_are_found():
 def test_missing_file(tmp_path):
     with pytest.raises(GeometryError):
         prepare(tmp_path / "nope.step", tmp_path)
+
+
+def test_thickness_comes_from_the_cad_and_repeats(parts, tmp_path):
+    prep = prepare(parts["lbracket"], tmp_path)
+    a, b = build_surface_mesh(prep), build_surface_mesh(prep)
+    assert a.samples is not None
+    # every sample stands for a share of the CAD surface: two boxes, less the faces hidden where they overlap
+    area = 2 * (80 * 6 + 80 * 20 + 6 * 20) + 2 * (6 * 70 + 70 * 20 + 6 * 20) - 2 * 6 * 6 - 4 * 6 * 20
+    assert a.samples["weights"].sum() == pytest.approx(area, rel=1e-6)
+    fa, fb = analyze(a), analyze(b)
+    assert (fa.thickness_typical, fa.thickness_min) == (fb.thickness_typical, fb.thickness_min)
+    assert fa.thickness_typical == pytest.approx(6.0, rel=0.02)
+
+
+def test_thin_wall_estimate_moves_smoothly():
+    from wobbl.geometry.faces import thickness_stats
+
+    th = np.array([3.0, 6.0])
+    # a 3 mm wall on 4% of the surface: the thinnest 5% is 4 parts at 3 mm and 1 part at 6 mm
+    typical, thin = thickness_stats(th, np.array([4.0, 96.0]))
+    assert typical == 6.0 and thin == pytest.approx(3.6)
+    _, thin = thickness_stats(th, np.array([6.0, 94.0]))
+    assert thin == pytest.approx(3.0)
