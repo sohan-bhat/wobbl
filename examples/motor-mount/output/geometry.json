@@ -1,0 +1,24 @@
+{
+ "source": "work/geometry/mount-0b7be21c.step",
+ "path": "work/geometry/prepared.brep",
+ "kind": "cad",
+ "bbox": [
+  [
+   -35.0000001,
+   -1e-07,
+   -1e-07
+  ],
+  [
+   35.0000001,
+   50.0000001,
+   55.0000001
+  ]
+ ],
+ "volume": 30936.330448903074,
+ "n_bodies": 1,
+ "n_surfaces": 24,
+ "notes": [
+  "Built from mount.py with thickness=5, rib=4, fillet=3, height=55."
+ ],
+ "stl_angle": 30.0
+}

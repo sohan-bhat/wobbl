@@ -1,0 +1,27 @@
+HOLDS. Peak 10.7 MPa on face 12 at (-25, 7.88, 6.82), safety factor 4.38 against yield (target 2.5). Confidence is medium.
+
+Confidence: medium. mesh convergence: von Mises stress (layer pull scaled by layer strength) still moving: 9.83 -> 10.1 -> 11.7 -> 10.7 MPa, last change 8.6% (stopped by level limit); expect about that much error. Even the highest value on any mesh plus that swing (12.7 MPa) leaves safety factor 3.71, so the verdict holds either way; singularities: excluded from the answer: 51.9 MPa at the edge of support fix1 (face 1) (keeps rising with refinement: 31.1 -> 38.8 -> 44.2 -> 51.9 MPa); 23.9 MPa at the edge of support fix1 (face 12) (set by the idealized support: 23.2 -> 23 -> 24.6 -> 23.9 MPa); 20 MPa where the rigid attachment load1 grabs the part (face 9) (set by the idealized support: 19.4 -> 15.8 -> 18.2 -> 20 MPa). Wobbl reports the stress 1.83 mm or more away from these spots; load introduction: the off part loads enter through a rigid attachment (the attached part does not flex). With a distributing coupling (the attached part adds no stiffness) instead, the governing stress is 19.5 MPa (1.8x, safety factor 2.41). The verdict depends on this assumption: check how the attached part really carries the load; the verdict depends on how the load enters the part (rigid attachment versus distributed); the answer assumes rigid
+Max deflection 0.395 mm at (25, 0, 55).
+Material PETG (3D printed), limit 47 MPa; mass 39.36 g.
+Loads: 250 N down at 0,-15,31 @ normal +y and box -21,4,10,21,6,52 rigid. Fixtures: bolt holes d=5.5.
+
+Checks:
+  [warn] mesh convergence: von Mises stress (layer pull scaled by layer strength) still moving: 9.83 -> 10.1 -> 11.7 -> 10.7 MPa, last change 8.6% (stopped by level limit); expect about that much error. Even the highest value on any mesh plus that swing (12.7 MPa) leaves safety factor 3.71, so the verdict holds either way
+  [pass] force balance: reactions balance the loads to 2.3e-05% (forces) and 8.2e-06% (moments)
+  [skip] hand calculation: no simple beam model applies (the governing point is not between the fixtures and the load, so no single section carries it)
+  [warn] singularities: excluded from the answer: 51.9 MPa at the edge of support fix1 (face 1) (keeps rising with refinement: 31.1 -> 38.8 -> 44.2 -> 51.9 MPa); 23.9 MPa at the edge of support fix1 (face 12) (set by the idealized support: 23.2 -> 23 -> 24.6 -> 23.9 MPa); 20 MPa where the rigid attachment load1 grabs the part (face 9) (set by the idealized support: 19.4 -> 15.8 -> 18.2 -> 20 MPa). Wobbl reports the stress 1.83 mm or more away from these spots
+  [pass] bolt bearing: worst hole of fix1 (d 5.5 mm) carries 78.4 N sideways and 179 N along its axis; bearing stress 2.83 MPa, safety factor 16.59 on bearing
+  [pass] units and sanity: part 102 mm across, peak strain 0.0051, max deflection 0.395 mm (0.39% of size): all plausible
+  [warn] load introduction: the off part loads enter through a rigid attachment (the attached part does not flex). With a distributing coupling (the attached part adds no stiffness) instead, the governing stress is 19.5 MPa (1.8x, safety factor 2.41). The verdict depends on this assumption: check how the attached part really carries the load
+
+Assumptions:
+  - Linear elastic material and small deflections (no yielding redistribution, no buckling).
+  - PETG (3D printed): E 2100 MPa, Poisson 0.38, von Mises vs yield 47 MPa (Prusament PETG technical data sheet).
+  - Loads are static and applied all at once; no impact, vibration or fatigue.
+  - Printed layers stack along z; pull across layers is judged against 70% of the in-plane strength.
+  - Bolted holes are rigidly held over the hole and a washer sized ring (twice the hole radius).
+  - Remote loads reach the part through a rigid attachment (the attached part does not flex).
+  - Contact between separate parts, friction and preload are not modeled.
+
+Images: stress: images/stress.png, zoom: images/zoom.png, safety: images/safety.png, deformed: images/deformed.png, convergence: images/convergence.png
+Report: report.html

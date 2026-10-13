@@ -1,0 +1,44 @@
+{
+ "part": "../mount.py",
+ "material": "petg",
+ "loads": [
+  {
+   "kind": "remote",
+   "faces": "normal +y and box -21,4,10,21,6,52",
+   "magnitude": 250.0,
+   "direction": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "point": [
+    0.0,
+    -15.0,
+    31.0
+   ],
+   "coupling": "rigid",
+   "text": "250 N down at 0,-15,31 @ normal +y and box -21,4,10,21,6,52 rigid",
+   "imperial": false
+  }
+ ],
+ "fixtures": [
+  {
+   "kind": "bolt",
+   "faces": "holes d=5.5",
+   "text": "bolt holes d=5.5",
+   "dofs": "xyz"
+  }
+ ],
+ "target_sf": null,
+ "quality": "normal",
+ "budget": 300.0,
+ "max_levels": 4,
+ "question": "Will this printed PETG motor mount survive a 250 N belt pull?",
+ "imperial": false,
+ "scale": 1.0,
+ "body": null,
+ "mesh_size": null,
+ "print_direction": "z",
+ "assumptions": [],
+ "params": {}
+}
