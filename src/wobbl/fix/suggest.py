@@ -84,7 +84,8 @@ def suggest_fixes(run, o) -> list[dict]:
             "kind": "thicken", "title": f"Thicken the wall at the peak from {fmt(t_loc)} to {fmt(t_new)} mm",
             "summary": f"The wall through the peak is {fmt(t_loc)} mm. To reach safety factor {target:g} it needs "
                        f"{fmt(t_new)} mm (+{100 * (factor - 1):.0f}%), because {mode}.",
-            "params": {"thickness": t_new, "from": t_loc, "point": o.governing_xyz}, "auto": False})
+            "params": {"thickness": t_new, "from": t_loc, "point": o.governing_xyz},
+            "auto": _parametric_has(run, "thickness")})
 
     # 3. a gusset or rib across an inside corner carrying bending
     corner_like = corner_spots or (face is not None and face.role == "fillet")
@@ -117,6 +118,15 @@ def suggest_fixes(run, o) -> list[dict]:
                                f"to within {fmt(new_arm)} mm brings the bending stress to the target.",
                     "params": {"arm": arm, "new_arm": new_arm}, "auto": False})
     return [f for f in fixes if f]
+
+
+def _parametric_has(run, what: str) -> bool:
+    from ..geometry.parametric import is_parametric, load_params, radius_param, thickness_param
+
+    if not is_parametric(run.study.part):
+        return False
+    params = load_params(run.study.part)
+    return (thickness_param(params) if what == "thickness" else radius_param(params)) is not None
 
 
 def _corner_faces(run, corner_spots) -> list[int] | None:

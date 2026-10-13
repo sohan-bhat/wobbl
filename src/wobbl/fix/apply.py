@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -70,6 +71,45 @@ def _corners(bbox):
     return [[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
 
 
+def _after(o2, extra: dict) -> dict:
+    return {"governing_MPa": o2.governing_MPa, "safety_factor": o2.safety_factor, "verdict": o2.verdict,
+            "confidence": o2.confidence, "report": o2.report, "stress_image": o2.images.get("stress", ""),
+            "max_disp_mm": o2.max_disp_mm, **extra}
+
+
+def _parametric_change(study, fix) -> dict | None:
+    """For a parametric .py part, the parameter edit that implements a fix (or None)."""
+    from ..geometry.parametric import is_parametric, load_params, radius_param, thickness_param
+
+    if not is_parametric(study.part):
+        return None
+    params = {**load_params(study.part), **study.params}
+    if fix["kind"] == "thicken":
+        k = thickness_param(params)
+        if k:
+            return {k: math.ceil(float(fix["params"]["thickness"]) * 2) / 2}
+    if fix["kind"] == "fillet":
+        k = radius_param(params)
+        if k:
+            return {k: math.ceil(float(fix["params"]["radius"]) * 2) / 2}
+    return None
+
+
+def _rerun_parametric(study, change: dict, old_feats, out: Path, progress):
+    from ..structural.pipeline import analyze_strength
+    from ..structural.run import describe_part
+
+    st2 = copy.deepcopy(study)
+    st2.params = {**study.params, **{k: str(v) for k, v in change.items()}}
+    pre = describe_part(st2.part, out / "work", st2.scale, st2.body, st2.params)
+    for ld in st2.loads:
+        if ld.faces:
+            ld.faces = remap_selector(ld.faces, old_feats.faces, pre[1].faces, old_feats.bbox)
+    for fx in st2.fixtures:
+        fx.faces = remap_selector(fx.faces, old_feats.faces, pre[1].faces, old_feats.bbox)
+    return analyze_strength(st2, out, progress, fixes=False, pre=pre)
+
+
 def apply_fixes(result_dir: str | Path, which: list[str] | None = None, progress=None) -> dict:
     from ..structural.pipeline import analyze_strength
     from ..structural.report import write_outputs
@@ -94,6 +134,12 @@ def apply_fixes(result_dir: str | Path, which: list[str] | None = None, progress
                 continue
             new_prep = None
             out_geo = rd / f"fix-{fix['kind']}" / "geometry"
+            param_change = _parametric_change(study, fix)
+            if param_change:
+                o2 = _rerun_parametric(study, param_change, feats, rd / f"fix-{fix['kind']}", progress)
+                fix["after"] = _after(o2, extra={"params": param_change})
+                results.append({"fix": fix["title"], **fix["after"]})
+                continue
             if fix["kind"] == "fillet":
                 p = fix["params"]
                 face = p.get("face")
@@ -121,10 +167,7 @@ def apply_fixes(result_dir: str | Path, which: list[str] | None = None, progress
             for fx in st2.fixtures:
                 fx.faces = remap_selector(fx.faces, feats.faces, new_feats.faces, feats.bbox)
             o2 = analyze_strength(st2, rd / f"fix-{fix['kind']}", progress, fixes=False, pre=(new_prep, new_feats))
-            fix["after"] = {"governing_MPa": o2.governing_MPa, "safety_factor": o2.safety_factor,
-                            "verdict": o2.verdict, "confidence": o2.confidence, "report": o2.report,
-                            "stress_image": o2.images.get("stress", ""), "step": st2.part,
-                            "max_disp_mm": o2.max_disp_mm}
+            fix["after"] = _after(o2, extra={"step": st2.part})
             results.append({"fix": fix["title"], **fix["after"]})
         except Exception as e:  # noqa: BLE001  one failed edit should not stop the others
             fix["after"] = {"error": str(e)}

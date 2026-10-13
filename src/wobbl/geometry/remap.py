@@ -41,7 +41,13 @@ def same_surface(f: FaceInfo, g: FaceInfo, tol: float) -> bool:
 
 
 def remap_selector(text: str, old: dict[int, FaceInfo], new: dict[int, FaceInfo], bbox_old=None) -> str:
-    """Rewrite a selector so it picks the same physical faces on the edited part."""
+    """Rewrite a selector so it picks the same physical faces on the edited part.
+
+    Selectors by meaning (x=max, holes d=4.5, top and within ...) already survive edits and are kept as
+    written; only selectors that name face ids are translated by geometry.
+    """
+    if not re.search(r"\b(faces?|ids?)\b|^\s*\d", text, re.I):
+        return text
     s = Selector(old, bbox_old)
     sel = s.select(text)
     tol = 1e-4 * float(np.linalg.norm(s.hi - s.lo)) + 1e-6
