@@ -44,11 +44,18 @@ thrust and torque on a motor) reach it either through a rigid attachment or
 spread over the faces without stiffening them (a distributing coupling, like
 an RBE3). The two idealizations can give very different peaks: on a cast motor
 mount with a belt pull shared by four flange bolts, the spread load puts 124 MPa
-on a rib tip while a rigid servo body moves the peak into the bolt holes and
-leaves the rib at 36 MPa. Wobbl solves the other idealization on the final mesh,
-reports both, and lowers confidence when the verdict depends on the choice.
-Peaks where a load is pushed into holes are reported separately, like support
-artifacts.
+on a rib tip, while a rigid servo body moves the peak to the face the servo
+bolts against, about 2 mm outside a lower bolt hole, where it converges to 55.5
+MPa. Wobbl first solves the other idealization on the final mesh. That mesh was
+refined for the main answer, so when the verdict flips or the other peak sits
+somewhere else, Wobbl refines around the other peak too, with the same
+convergence rule and time budget as the main study, and reports its trend over
+the meshes. If the budget runs out first, the best mesh reached is reported and
+labeled as not converged. Confidence drops when the verdict depends on the
+choice. A rigid attachment peak this close to the hole it grabs leans on the
+idealization, so treat the verdict flip as the finding and the figure as
+approximate. Peaks where a load is pushed into holes are reported separately,
+like support artifacts.
 
 **Bolt bearing.** At bolted and fixed holes, where the stress is set by the
 support idealization, Wobbl reports the honest number instead: the reaction

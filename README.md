@@ -209,7 +209,7 @@ never reported as high confidence.
 - **Force and moment balance**: reactions must cancel the loads to 0.5%.
 - **Hand calculation**: beam theory through the critical section, and a check that the stress concentration is physical.
 - **Singularities**: sharp inside corners found from exact CAD normals; peaks there and at idealized supports are excluded, named and tracked.
-- **Load introduction**: off part loads are solved both rigid and distributed, and the spread is reported.
+- **Load introduction**: off part loads are solved both rigid and distributed, each converged at its own peak, and the spread is reported.
 - **Bolt bearing** at bolted holes, in place of the idealized peak.
 - **Units and sanity**: part size, peak strain and deflection.
 - **Large deflection**: a nonlinear re-solve when the part bends a good fraction of its wall.

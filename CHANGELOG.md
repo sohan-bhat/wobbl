@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+**Fixed**
+- The load introduction check converges the other attachment idealization at
+  its own peak. It used to solve it only on the mesh refined for the main
+  answer, so a peak somewhere else came from a coarse mesh. When the verdict
+  flips or the peak moves, Wobbl now refines around that peak with the main
+  study's convergence rule and time budget and reports the trend; if the budget
+  runs out first, the best mesh reached is labeled as not converged. On the cast
+  motor mount the rigid servo case now converges to 55.5 MPa (54.6, 56.8, 55.5
+  MPa over three meshes, safety factor 2.97); before, it read 47.2 MPa on the
+  mesh refined for the distributed case.
+- Meshes with flat sliver elements (all four corners in one plane) are rejected
+  and remeshed with the next strategy instead of failing in CalculiX.
+
 ## 0.1.0
 
 First release.

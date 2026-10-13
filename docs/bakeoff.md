@@ -52,7 +52,9 @@ the motor mount and enclosure in 15 minutes.
 | gmsh curved quadratic elements fold on thin curved walls, and its optimizer runs for minutes or crashes | folded elements are detected and that mesh switches to straight sided quadratic elements at once; every mesh attempt runs in a child process with a timeout and falls back to other algorithms and finer sizes |
 | Bonded bolt bores and fixed face edges look like the peak | zones next to supports, rigid attachments and loads pushed into holes are excluded from the reported value, listed with their trend, and bolted holes get a bearing stress check instead |
 | A belt pull at a pulley or thrust and torque on a motor have no face to sit on | remote loads go in through an RBE3 style distributing coupling or a CalculiX rigid body, and both force and moment balance are checked |
-| Rigid servo versus bolt group load share flipped the motor mount's verdict (36 versus 124 MPa) | Wobbl re-solves with the other attachment idealization, reports the spread, and lowers confidence when the verdict depends on it |
+| Rigid servo versus bolt group load share flipped the motor mount's verdict (36 versus 124 MPa) | Wobbl re-solves with the other attachment idealization, refines it around its own peak until it converges, reports the spread, and lowers confidence when the verdict depends on it |
 | Sharp re-entrant CAD edges never converge | sharp inside corners are found from exact CAD normals (fillets and blends are recognized as smooth), peaks there are labeled singular with their trend, and the fix list gives a fillet radius |
 | Uniform refinement went to 3.5 million nodes and swapped | a coarse first mesh, then refinement only around the peaks that matter, with node and time limits |
 | Wall contact did not settle on the coarsest mesh | a coarse linear pre solve finds the contact patch and every level starts from the previous one |
+
+The 36 MPa above comes from the bake off's reference model, which held the servo rigid with bonded bolts, a different idealization, while Wobbl's own rigid variant converges to 55.5 MPa.
