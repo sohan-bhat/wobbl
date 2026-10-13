@@ -14,9 +14,9 @@ The rule for printed parts that vibrate here is a safety factor of 3.
 
 | Result | Value |
 |---|---|
-| Peak stress | 10.1 MPa at the top edge of the first window, safety factor 4.8 against 48 MPa (meets the rule of 3) |
+| Peak stress | 10.0 MPa at the top edge of the first window, safety factor 4.8 against 48 MPa (meets the rule of 3) |
 | Tip deflection | 4.2 mm |
-| Mesh convergence | 10.3, 10.0, 10.1 MPa over three meshes |
+| Mesh convergence | 10.3, 10.1, 10.0 MPa over three meshes |
 | Hand calculation | beam theory through the critical section gives 7.1 MPa; the window corner concentrates it 1.4x |
 | Equilibrium | force and moment balance to 0.0001% |
 
