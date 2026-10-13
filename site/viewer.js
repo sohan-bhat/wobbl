@@ -110,7 +110,7 @@ function arrow(color) {
 
 export async function start(root, ui) {
   const status = root.querySelector('.viewer-status');
-  status.textContent = 'Loading the 3D part (540 KB)';
+  status.textContent = 'Loading the 3D part (540 KB)…';
   const P = await loadPart(root.dataset.part || 'data/cast-motor-mount');
   const { man, v } = P;
   const n = v.vertices;
@@ -121,7 +121,8 @@ export async function start(root, ui) {
   renderer.setPixelRatio(px);
   const canvas = renderer.domElement;
   canvas.setAttribute('role', 'img');
-  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag to orbit, scroll or pinch to zoom. The sliders change the load and the shape exaggeration.');
+  canvas.tabIndex = 0;
+  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag or use the arrow keys to orbit; scroll, pinch or press plus and minus to zoom. The sliders change the load and the shape exaggeration.');
   root.prepend(canvas);
 
   const scene = new THREE.Scene();
@@ -235,8 +236,9 @@ export async function start(root, ui) {
     if (vis) el.style.translate = `${((tmp.x + 1) / 2) * w}px ${((1 - tmp.y) / 2) * h}px`;
   }
 
+  let vw = 1, vh = 1;
   function overlays() {
-    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const w = vw, h = vh;
     place(peakTag, new THREE.Vector3(live[peakIdx * 3], live[peakIdx * 3 + 1], live[peakIdx * 3 + 2]), w, h);
     if (pull.visible) place(loadTag, pAt, w, h); else loadTag.hidden = true;
   }
@@ -257,6 +259,8 @@ export async function start(root, ui) {
   function resize() {
     const w = root.clientWidth, h = root.clientHeight;
     if (!w || !h) return;
+    vw = w;
+    vh = h;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -301,6 +305,30 @@ export async function start(root, ui) {
   canvas.addEventListener('pointerup', (e) => {
     if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) probeAt(e.clientX, e.clientY, true);
     down = null;
+  });
+
+  // Keyboard orbit: arrows rotate about the part, plus and minus zoom.
+  const Z = new THREE.Vector3(0, 0, 1), off = new THREE.Vector3(), side = new THREE.Vector3();
+  canvas.addEventListener('keydown', (e) => {
+    const step = e.shiftKey ? 0.3 : 0.1;
+    off.subVectors(camera.position, controls.target);
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      off.applyAxisAngle(Z, e.key === 'ArrowLeft' ? -step : step);
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      side.crossVectors(off, Z).normalize();
+      const next = off.clone().applyAxisAngle(side, e.key === 'ArrowUp' ? step : -step);
+      if (Math.abs(next.clone().normalize().z) < 0.97) off.copy(next);
+    } else if (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') {
+      const len = off.length() * (e.key === '-' || e.key === '_' ? 1.12 : 1 / 1.12);
+      off.setLength(Math.min(controls.maxDistance, Math.max(controls.minDistance, len)));
+    } else {
+      return;
+    }
+    e.preventDefault();
+    camera.position.copy(controls.target).add(off);
+    camera.lookAt(controls.target);
+    controls.update();
+    requestRender();
   });
 
   ui.onChange((s) => { Object.assign(state, s); apply(); });
