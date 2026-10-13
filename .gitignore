@@ -31,3 +31,8 @@ examples/**/fix-*/report.html
 
 # website build output (scripts/build_site.py)
 _site/
+
+# the website (Astro) builds into site/dist
+site/node_modules/
+site/dist/
+site/.astro/
