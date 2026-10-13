@@ -4,11 +4,11 @@ Confidence: high. passed mesh convergence, energy balance, hand calculation, uni
 max temperature: 70.3 C
 limit: 85 C
 power: 15 W
-mesh nodes: 136,757
+mesh nodes: 137,258
 
 Checks:
   [pass] mesh convergence: temperature rise at the hottest point settled: 30.3 -> 30.2 -> 30.3 C over 3 meshes, last change 0.2%
-  [pass] energy balance: heat in 15 W, heat out through the surfaces 15 W (7.8e-07% apart)
+  [pass] energy balance: heat in 15 W, heat out through the surfaces 15 W (3.1e-07% apart)
   [pass] hand calculation: heat balance on a uniform skin gives 68.1 C; the FEA skin averages 68.1 C (0.0029% of the rise). Biot 3.1e-05: the part is nearly isothermal
   [pass] units and sanity: temperatures between 67.1 and 70.3 C
 

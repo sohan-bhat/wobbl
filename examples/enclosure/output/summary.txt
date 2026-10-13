@@ -1,27 +1,28 @@
-HOLDS. Peak 8.68 MPa on face 2 at (24.1, 12.8, 28), safety factor 7.14 against yield (target 2). Confidence is medium.
+HOLDS. Peak 8.77 MPa on face 29 at (23.8, 12.8, 25), safety factor 7.07 against yield (target 2). Confidence is medium.
 
-Confidence: medium. singularities: excluded from the answer: 23.1 MPa at a sharp inside corner (the 7 mm boss (face 35)) (singular, keeps rising with refinement: 14.8 -> 20.5 -> 23.1 MPa); 17.4 MPa at a sharp inside corner (the 7 mm boss (face 35)) (a sharp corner: singular in theory, so the value depends on the mesh: 12 -> 18 -> 17.4 MPa); 9.98 MPa at a sharp inside corner (face 29) (singular, keeps rising with refinement: 8.13 -> 9.59 -> 9.98 MPa). Wobbl reports the stress 1.25 mm or more away from these spots
-Max deflection 0.215 mm at (21.5, 9.96, 26.9).
-Material Polycarbonate, limit 62 MPa; mass 48.52 g.
+Confidence: medium. singularities: excluded from the answer: 20.6 MPa at a sharp inside corner (the 7 mm boss (face 35)) (a sharp corner: singular in theory, so the value depends on the mesh: 15.2 -> 20.8 -> 20.6 MPa); 18.2 MPa at a sharp inside corner (face 29) (a sharp corner: singular in theory, so the value depends on the mesh: 13.1 -> 18 -> 18.2 MPa); 9.85 MPa at a sharp inside corner (face 21) (a sharp corner: singular in theory, so the value depends on the mesh: 9.33 -> 9.55 -> 9.85 MPa). Wobbl reports the stress 2 mm or more away from these spots
+Max deflection 0.217 mm at (21.4, 10.1, 26.8).
+Material Polycarbonate, limit 62 MPa; mass 48.55 g.
 Loads: 120 N down @ top and within 8 of 25,15,28. Fixtures: fixed z=min.
 
 Checks:
-  [pass] mesh convergence: von Mises stress settled: 8.59 -> 8.7 -> 8.68 MPa over 3 meshes, last change 0.2%
-  [pass] force balance: reactions balance the loads to 1.4e-05% (forces) and 7.4e-06% (moments)
+  [pass] mesh convergence: von Mises stress settled: 8.67 -> 8.82 -> 8.77 MPa over 3 meshes, last change 0.6%
+  [pass] force balance: reactions balance the loads to 1.7e-05% (forces) and 3.6e-06% (moments)
   [skip] hand calculation: no simple beam model applies (the governing point is not between the fixtures and the load, so no single section carries it)
-  [warn] singularities: excluded from the answer: 23.1 MPa at a sharp inside corner (the 7 mm boss (face 35)) (singular, keeps rising with refinement: 14.8 -> 20.5 -> 23.1 MPa); 17.4 MPa at a sharp inside corner (the 7 mm boss (face 35)) (a sharp corner: singular in theory, so the value depends on the mesh: 12 -> 18 -> 17.4 MPa); 9.98 MPa at a sharp inside corner (face 29) (singular, keeps rising with refinement: 8.13 -> 9.59 -> 9.98 MPa). Wobbl reports the stress 1.25 mm or more away from these spots
-  [pass] units and sanity: part 112 mm across, peak strain 0.0037, max deflection 0.215 mm (0.19% of size): all plausible
+  [warn] singularities: excluded from the answer: 20.6 MPa at a sharp inside corner (the 7 mm boss (face 35)) (a sharp corner: singular in theory, so the value depends on the mesh: 15.2 -> 20.8 -> 20.6 MPa); 18.2 MPa at a sharp inside corner (face 29) (a sharp corner: singular in theory, so the value depends on the mesh: 13.1 -> 18 -> 18.2 MPa); 9.85 MPa at a sharp inside corner (face 21) (a sharp corner: singular in theory, so the value depends on the mesh: 9.33 -> 9.55 -> 9.85 MPa). Wobbl reports the stress 2 mm or more away from these spots
+  [pass] units and sanity: part 112 mm across, peak strain 0.0037, max deflection 0.217 mm (0.19% of size): all plausible
 
 Assumptions:
   - Linear elastic material and small deflections (no yielding redistribution, no buckling).
   - Polycarbonate: E 2350 MPa, Poisson 0.37, von Mises vs yield 62 MPa (Covestro Makrolon 2405 datasheet).
   - Loads are static and applied all at once; no impact, vibration or fatigue.
+  - Molded part treated as isotropic and uniform; weld lines and the area near the gate can be weaker than the datasheet.
   - Fixed faces are perfectly rigid; real mounts flex a little, which lowers peak stress next to them.
   - Contact between separate parts, friction and preload are not modeled.
 
 Suggested fixes:
   - Stress piles up in the sharp inside corner. A fillet of 1.5 mm (about half the 3 mm wall) spreads it out.
-  - Stress stays about the same for the same shape and load, so PLA (3D printed) (50 MPa) gives safety factor 5.76. It is 1.5x as stiff, so deflection scales by 0.67. Other options: PETG (3D printed) (5.41), ABS (3D printed) (3.80).
+  - Stress stays about the same for the same shape and load, so PLA (3D printed) (50 MPa) gives safety factor 5.70. It is 1.5x as stiff, so deflection scales by 0.671. Other options: PETG (3D printed) (5.36), ABS (3D printed) (3.76).
 
 Images: stress: images/stress.png, zoom: images/zoom.png, safety: images/safety.png, deformed: images/deformed.png, convergence: images/convergence.png
 Report: report.html

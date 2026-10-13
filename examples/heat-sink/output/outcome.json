@@ -19,7 +19,7 @@
   ],
   [
    "mesh nodes",
-   "136,757"
+   "137,258"
   ]
  ],
  "confidence": "high",
@@ -33,11 +33,11 @@
    "summary": "temperature rise at the hottest point settled: 30.3 -> 30.2 -> 30.3 C over 3 meshes, last change 0.2%",
    "detail": {
     "values": [
-     30.2722,
-     30.1956,
+     30.2716,
+     30.1957,
      30.2609
     ],
-    "last_change": 0.002158,
+    "last_change": 0.002155,
     "tolerance": 0.02,
     "stopped_by": ""
    }
@@ -45,7 +45,7 @@
   {
    "name": "energy balance",
    "status": "pass",
-   "summary": "heat in 15 W, heat out through the surfaces 15 W (7.8e-07% apart)",
+   "summary": "heat in 15 W, heat out through the surfaces 15 W (3.1e-07% apart)",
    "detail": {
     "in_W": 15.0,
     "out_W": 15.0
@@ -87,42 +87,42 @@
   "levels": [
    {
     "level": 0,
-    "n_nodes": 34672,
+    "n_nodes": 34756,
     "h": 3.233166,
-    "t_max": 70.2722,
-    "t_min": 67.1179,
+    "t_max": 70.2716,
+    "t_min": 67.1199,
     "xyz": [
-     30.000006,
-     30.082991,
+     30.082988,
+     30.0,
      0.0
     ],
-    "t_solve": 12.173661
+    "t_solve": 6.929396
    },
    {
     "level": 1,
-    "n_nodes": 69067,
+    "n_nodes": 69076,
     "h": 2.263216,
-    "t_max": 70.1956,
-    "t_min": 67.1111,
+    "t_max": 70.1957,
+    "t_min": 67.1117,
     "xyz": [
      29.829764,
      29.444444,
      0.0
     ],
-    "t_solve": 23.528295
+    "t_solve": 20.215646
    },
    {
     "level": 2,
-    "n_nodes": 136757,
+    "n_nodes": 137258,
     "h": 1.616583,
     "t_max": 70.2609,
-    "t_min": 67.1216,
+    "t_min": 67.1215,
     "xyz": [
      30.0,
      29.917012,
      0.0
     ],
-    "t_solve": 62.459148
+    "t_solve": 46.999602
    }
   ],
   "lumped_C": 68.077964,
@@ -147,6 +147,6 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 128.688078,
+ "t_total": 101.157439,
  "solver": "CalculiX 2.23"
 }

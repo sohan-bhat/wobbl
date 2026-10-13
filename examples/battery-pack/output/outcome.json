@@ -3,7 +3,7 @@
  "part": "../pack.py",
  "question": "Will this battery pack overheat in a sealed box during a one hour discharge?",
  "verdict": "hot",
- "headline": "Hottest point reaches 74.5 C (limit 60 C) at (18.2, 18.6, 34.2) mm after 60 min. It passes 60 C after about 21.1 min.",
+ "headline": "Hottest point reaches 74.5 C (limit 60 C) at (18.5, 18.5, 31.8) mm after 60 min. It passes 60 C after about 21.1 min.",
  "metrics": [
   [
    "max temperature",
@@ -19,7 +19,7 @@
   ],
   [
    "mesh nodes",
-   "9,833"
+   "9,610"
   ]
  ],
  "confidence": "high",
@@ -34,9 +34,9 @@
    "detail": {
     "values": [
      39.4562,
-     39.45
+     39.4553
     ],
-    "last_change": 0.000157,
+    "last_change": 2.3e-05,
     "tolerance": 0.02,
     "stopped_by": ""
    }
@@ -67,17 +67,17 @@
   "Contact resistance between parts and internal airflow are not modeled."
  ],
  "values": {
-  "t_max_C": 74.45,
+  "t_max_C": 74.4553,
   "hot_xyz": [
-   18.158859,
-   18.622323,
-   34.152336
+   18.49275,
+   18.493078,
+   31.823386
   ],
   "limit_C": 60.0,
   "levels": [
    {
     "level": 0,
-    "n_nodes": 4537,
+    "n_nodes": 4607,
     "h": 5.894035,
     "t_max": 74.4562,
     "t_min": 69.5344,
@@ -86,24 +86,24 @@
      18.616107,
      32.456956
     ],
-    "t_solve": 26.503979
+    "t_solve": 35.76331
    },
    {
     "level": 1,
-    "n_nodes": 9833,
+    "n_nodes": 9610,
     "h": 4.125825,
-    "t_max": 74.45,
+    "t_max": 74.4553,
     "t_min": 69.5344,
     "xyz": [
-     18.158859,
-     18.622323,
-     34.152336
+     18.49275,
+     18.493078,
+     31.823386
     ],
-    "t_solve": 75.584042
+    "t_solve": 69.810636
    }
   ],
   "lumped_C": 72.182464,
-  "time_over_limit_s": 1264.534252,
+  "time_over_limit_s": 1264.28882,
   "_figures": [
    [
     "temperature",
@@ -138,6 +138,6 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 119.347939,
+ "t_total": 122.712054,
  "solver": "CalculiX 2.23"
 }
