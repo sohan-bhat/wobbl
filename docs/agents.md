@@ -34,6 +34,11 @@ find it even when their PATH does not include pipx's bin folder.
 | `solve_circuit(template or netlist, params)` | LED, RC, buck, MOSFET, or any netlist |
 | `list_materials()` | the materials table |
 
+Strength studies take one to five minutes. Wobbl registers Codex with a 900 s
+tool timeout and Gemini CLI with 900000 ms; if your Claude Code setup cuts long
+tool calls short, raise `MCP_TOOL_TIMEOUT` (milliseconds) in its environment, or
+pass `quality="fast"` for a first look.
+
 Results are compact JSON: numbers, statuses, one line summaries and file
 paths. Agents open the PNG heatmaps or the HTML report when they need to see
 the part.
