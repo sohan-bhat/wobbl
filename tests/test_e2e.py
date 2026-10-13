@@ -54,6 +54,33 @@ def test_bearing_load_from_the_cli(parts, tmp_path):
 
 
 @needs_ccx
+def test_material_swap_says_whether_it_scaled_or_solved_again(parts, tmp_path):
+    from wobbl.fix.apply import SCALED, apply_fixes
+    from wobbl.structural.pipeline import analyze_strength
+    from wobbl.structural.report import write_outputs
+    from wobbl.structural.spec import StructuralStudy, parse_fixture, parse_load
+
+    st = StructuralStudy(parts["cantilever"], "6061-t6", [parse_load("100 N -z @ x=max")], [parse_fixture("x=min")],
+                         quality="fast", budget=120)
+    out = tmp_path / "out"
+    o = analyze_strength(st, out, render=False, fixes=False)
+    swap = {"kind": "material", "summary": "", "auto": True}
+    o.fixes = [{**swap, "title": "steel", "params": {"material": "mild-steel"}},
+               {**swap, "title": "low Poisson", "params": {"material": "6061-t6:nu=0.2"}}]
+    write_outputs(o, out)
+    res = apply_fixes(out, ["material"])
+    steel, low_nu = res["after"]
+    assert steel["method"] == SCALED
+    assert steel["governing_MPa"] == pytest.approx(o.governing_MPa, rel=1e-6)
+    assert steel["max_disp_mm"] == pytest.approx(o.max_disp_mm * 68900 / 200000, rel=1e-6)
+    assert low_nu["method"].startswith("solved again, because its Poisson's ratio of 0.2")
+    assert low_nu["stress_image"] and (out / "fix-material" / "outcome.json").exists()
+    # same stiffness and a beam in bending: the new solve lands close to the old one, but it is a new solve
+    assert low_nu["governing_MPa"] == pytest.approx(o.governing_MPa, rel=0.1)
+    assert low_nu["max_disp_mm"] == pytest.approx(o.max_disp_mm, rel=0.05)
+
+
+@needs_ccx
 def test_unheld_part_is_refused(parts, tmp_path):
     r = CliRunner().invoke(cli, ["run", parts["cantilever"], "-m", "pla", "--fix", "roller z=min",
                                  "--load", "10 N down @ top", "--quality", "fast", "-o", str(tmp_path / "x")])

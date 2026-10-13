@@ -313,10 +313,28 @@ def _load_outcome(result_dir: str):
 
 @cli.command()
 @click.argument("result_dir", default="")
-@click.option("--apply", "do_apply", is_flag=True, help="Edit the geometry or material and re-run.")
-@click.option("--only", default=None, help="Comma list of fix kinds to apply: fillet, gusset, material.")
+@click.option("--apply", "do_apply", is_flag=True,
+              help="Build each automatic fix, solve it again and compare it with the original.")
+@click.option("--only", default=None,
+              help="Comma list of fix kinds to apply, from fillet, thicken, gusset and material. Thicken works on "
+                   "parametric .py parts.")
 def fix(result_dir, do_apply, only):
-    """Show fixes for a failing part; with --apply, re-run them and compare before and after."""
+    """Show the fixes for a failing part, and with --apply build them and compare before and after.
+
+    \b
+    --apply adds fillets and gussets to any part, changes the thickness and
+    fillet parameters of a parametric .py part and leaves its other parameters
+    alone, and swaps the material. A material swap reuses the first solve when
+    only the stiffness changes, and is solved again when Poisson's ratio moves
+    by more than about 0.05, the load depends on the material, or the new
+    material is judged by a different stress. The output says which it did.
+    """
+    from ..fix.apply import check_kinds
+
+    try:
+        kinds = check_kinds(only.split(",")) if only else None
+    except ValueError as e:
+        ui.fail(str(e))
     o = _load_outcome(result_dir)
     if not o.fixes:
         ui.console.print("  no fixes needed: the part meets its target")
@@ -330,7 +348,7 @@ def fix(result_dir, do_apply, only):
     from ..fix.apply import apply_fixes
 
     with ui.progress() as cb:
-        res = apply_fixes(o.workdir, only.split(",") if only else None, cb)
+        res = apply_fixes(o.workdir, kinds, cb)
     from rich.table import Table
 
     tb = Table(box=None, header_style="dim", padding=(0, 2))
@@ -345,6 +363,9 @@ def fix(result_dir, do_apply, only):
             tb.add_row(r["fix"], f"{r['governing_MPa']:.3g}", f"{r['safety_factor']:.2f}", r["verdict"])
     ui.console.print()
     ui.console.print(tb)
+    for r in res["after"]:
+        if r.get("method"):
+            ui.console.print(f"  [dim]{r['fix']} was {r['method']}.[/dim]")
     ui.console.print(f"\n  report {res['report']}\n")
 
 

@@ -1,4 +1,10 @@
-"""Apply suggested fixes and re-run the study, so the user sees before and after numbers."""
+"""Apply suggested fixes and re-run the study, so the user sees before and after numbers.
+
+Fillets and gussets are built into any part through OpenCASCADE. On a parametric .py part, a thicker wall
+or a larger fillet changes its thickness or fillet parameter and rebuilds it, and no other parameter is
+touched. A material swap reuses the first solve when that is exact and solves again when it is not, as
+``material_swap_resolve`` explains. Every result says which way it was found.
+"""
 from __future__ import annotations
 
 import copy
@@ -16,6 +22,43 @@ from ..mesh.mesher import build_surface_mesh
 from ..structural.outcome import Outcome
 from ..structural.spec import StructuralStudy
 from . import cad_edit
+
+FIX_KINDS = ("fillet", "thicken", "gusset", "material")   # the kinds --apply can build and check
+FORCE_LOADS = {"force", "pressure", "bolt", "remote", "moment"}
+SCALED = "scaled from the first solve, since only the stiffness changes and the stress field stays the same"
+
+
+def material_swap_resolve(study: StructuralStudy, old, new) -> str:
+    """Why swapping old for new needs a new solve, or an empty string when the first solve can be scaled.
+
+    One linear elastic material, held at zero displacement by its supports and loaded by forces, has a stress field
+    that depends on Poisson's ratio and not on stiffness, so the stresses stay and the deflection scales by the
+    stiffness ratio. That stops being true when Poisson's ratio moves by more than about 0.05, when a load depends
+    on the material (self weight grows with density) or a displacement is prescribed, and when the new material is
+    judged by a different stress (brittle against ductile, or another strength across print layers).
+    """
+    if abs(new.nu - old.nu) > 0.05:
+        return f"its Poisson's ratio of {new.nu:g} differs from {old.nu:g} by more than 0.05"
+    kinds = {ld.kind for ld in study.loads} - FORCE_LOADS
+    if "gravity" in kinds:
+        return "self weight grows with density"
+    if kinds:
+        return f"the study has {' and '.join(sorted(kinds))} loads, which do not scale with stiffness"
+    if old.ductile != new.ductile:
+        return f"it is judged by {new.criterion} instead of {old.criterion}"
+    if study.print_direction and new.layer_factor != old.layer_factor:
+        return "its strength across print layers is a different share of its strength along them"
+    return ""
+
+
+def check_kinds(which: list[str] | None) -> list[str] | None:
+    if not which:
+        return None
+    kinds = [k.strip().lower() for k in which if k.strip()]
+    bad = [k for k in kinds if k not in FIX_KINDS]
+    if bad:
+        raise ValueError(f"cannot apply {', '.join(bad)}, pick from {', '.join(FIX_KINDS)}")
+    return kinds
 
 
 def _load(result_dir: Path):
@@ -99,6 +142,24 @@ def _parametric_change(study, fix) -> dict | None:
     return None
 
 
+def _swap_material(o, study, key: str, pre, out: Path, progress) -> dict:
+    """The result with another material, scaled from the first solve when that is exact, else solved again."""
+    from ..structural.outcome import _verdict
+    from ..structural.pipeline import analyze_strength
+
+    old, new = resolve_material(study.material), resolve_material(key)
+    why = material_swap_resolve(study, old, new)
+    if why:
+        st2 = copy.deepcopy(study)
+        st2.material = key
+        return _after(analyze_strength(st2, out, progress, fixes=False, pre=pre),
+                      extra={"material": new.key, "method": f"solved again, because {why}"})
+    sf = new.allowable / o.governing_MPa
+    return {"governing_MPa": o.governing_MPa, "safety_factor": sf,
+            "verdict": _verdict(sf, study.target_sf or new.recommended_sf),
+            "max_disp_mm": o.max_disp_mm * old.E / new.E, "material": new.key, "method": SCALED}
+
+
 def _rerun_parametric(study, change: dict, old_feats, out: Path, progress):
     from ..structural.pipeline import analyze_strength
     from ..structural.run import describe_part
@@ -118,6 +179,7 @@ def apply_fixes(result_dir: str | Path, which: list[str] | None = None, progress
     from ..structural.pipeline import analyze_strength
     from ..structural.report import write_outputs
 
+    which = check_kinds(which)
     rd = Path(result_dir)
     o, study, prep = _load(rd)
     sm = build_surface_mesh(prep)
@@ -129,11 +191,8 @@ def apply_fixes(result_dir: str | Path, which: list[str] | None = None, progress
             continue
         try:
             if fix["kind"] == "material":
-                m = resolve_material(fix["params"]["material"])
-                old = resolve_material(study.material)
-                fix["after"] = {"governing_MPa": o.governing_MPa, "safety_factor": m.allowable / o.governing_MPa,
-                                "verdict": "holds" if m.allowable / o.governing_MPa >= o.target_sf else "marginal",
-                                "max_disp_mm": o.max_disp_mm * old.E / m.E, "method": "same stress field, new limit"}
+                fix["after"] = _swap_material(o, study, fix["params"]["material"], (prep, feats),
+                                              rd / "fix-material", progress)
                 results.append({"fix": fix["title"], **fix["after"]})
                 continue
             new_prep = None

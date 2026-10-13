@@ -54,10 +54,19 @@ fillet and its 10 mm legs, while its gusset went in through OpenCASCADE.
 The loads and supports are carried over to the new faces by themselves, and each version is a
 full result in `fix-<kind>/` with its own report and checks.
 
-A material swap is not solved again, since the stress stays the same for the same shape and
-load. Wobbl divides the new limit by the same stress and scales the deflection by the change in
-stiffness. A thicker wall on a STEP file, a shorter lever and a lighter part stay as numbers
-for you to apply in CAD. `--only` takes `fillet`, `thicken`, `gusset` and `material`.
+On a parametric part only those two parameters change, and every other parameter keeps the
+value the first run used. A thicker wall on a STEP file, a shorter lever and a lighter part stay
+as numbers for you to apply in CAD. `--only` takes `fillet`, `thicken`, `gusset` and `material`,
+and `thicken` applies to parametric parts with a thickness parameter.
+
+A material swap often needs no new solve. For one linear elastic material held by its supports
+and loaded by forces, the stress field depends on Poisson's ratio but not on stiffness, so
+Wobbl divides the new limit by the same stress and scales the deflection by the change in
+stiffness. It solves the part again instead when Poisson's ratio differs by more than about
+0.05, when a load depends on the material, as self weight does through density, and when the
+new material is judged by a different stress, such as printed PLA by its largest principal
+stress against PETG by von Mises, or a different strength across print layers. The terminal
+prints which way each swap was found, and the JSON has it under `method`.
 
 When the fixes are done, the original report gains a before and after pair of heatmaps for the
 fix with the best safety factor, and the terminal prints the table.

@@ -1,11 +1,16 @@
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 from wobbl.circuits.tools import read_circuit_question
+from wobbl.cli.main import cli
+from wobbl.fix.apply import FIX_KINDS, check_kinds, material_swap_resolve
 from wobbl.geometry.parametric import build_step, load_params, radius_param, thickness_param
 from wobbl.geometry.remap import remap_selector, same_surface
+from wobbl.materials import resolve_material
 from wobbl.structural.run import describe_part
+from wobbl.structural.spec import Load, StructuralStudy, parse_fixture, parse_load
 from wobbl.thermal.tools import read_thermal_question
 
 PART = '''
@@ -46,6 +51,49 @@ def test_remap_keeps_meaningful_selectors(part, tmp_path):
     out = remap_selector(f"face {top_a.id}", a.faces, a.faces, a.bbox)
     assert out == f"faces {top_a.id}"
     assert same_surface(top_a, top_a, 1e-6)
+
+
+def test_fix_help_names_every_kind_it_applies():
+    text = " ".join(CliRunner().invoke(cli, ["fix", "--help"]).output.split())
+    assert "fillet, thicken, gusset and material" in text
+    assert "thickness and fillet parameters" in text and "any parameter" not in text
+    assert check_kinds(["Thicken ", "fillet"]) == ["thicken", "fillet"] and check_kinds(None) is None
+    assert set(FIX_KINDS) == {"fillet", "thicken", "gusset", "material"}
+
+
+def test_fix_refuses_an_unknown_kind(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(cli, ["fix", "--apply", "--only", "fillet,bogus"])
+    assert r.exit_code != 0
+    assert "cannot apply bogus, pick from fillet, thicken, gusset, material" in " ".join(r.output.split())
+
+
+def _study(*loads, print_direction=None):
+    return StructuralStudy("p.step", "6061-t6", [parse_load(x) for x in loads], [parse_fixture("x=min")],
+                           print_direction=print_direction)
+
+
+@pytest.mark.parametrize("old,new,loads,layers,why", [
+    ("6061-t6", "7075-t6", ["200 N down @ top"], None, ""),
+    ("6061-t6", "mild-steel", ["0.2 MPa @ top", "300 N -x bearing @ hole d=6", "2 kN -z at 0,0,50 @ top",
+                               "1 N*m +z @ top"], None, ""),          # Poisson 0.33 against 0.29 is close enough
+    ("petg", "abs", ["20 N down @ top"], None, ""),
+    ("6061-t6", "6061-t6:nu=0.2", ["200 N down @ top"], None, "Poisson's ratio of 0.2 differs from 0.33"),
+    ("6061-t6", "7075-t6", ["200 N down @ top", "3 g down"], None, "self weight grows with density"),
+    ("pla", "petg", ["20 N down @ top"], None, "judged by von Mises vs yield instead of max principal"),
+    ("petg", "abs", ["20 N down @ top"], "z", "across print layers"),
+])
+def test_material_swap_scales_only_when_exact(old, new, loads, layers, why):
+    reason = material_swap_resolve(_study(*loads, print_direction=layers), resolve_material(old),
+                                   resolve_material(new))
+    assert (reason == "") if not why else (why in reason), reason
+
+
+def test_material_swap_solves_again_with_a_prescribed_displacement():
+    st = _study("200 N down @ top")
+    st.loads.append(Load("displacement", "top", 0.1, [0, 0, -1]))
+    reason = material_swap_resolve(st, resolve_material("6061-t6"), resolve_material("7075-t6"))
+    assert "displacement loads" in reason
 
 
 def test_question_readers():

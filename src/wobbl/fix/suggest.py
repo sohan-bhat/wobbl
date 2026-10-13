@@ -1,9 +1,11 @@
 """Concrete fixes with numbers: thicken, fillet, add a gusset, swap material, shorten the lever.
 
-Each suggestion carries the reasoning and a number. Fixes Wobbl can apply to
-the geometry by itself (fillets and gussets on STEP files, any parameter of a
-parametric part, material swaps) are marked ``auto`` and can be re-run with
-``wobbl fix --apply`` to show before and after.
+Each suggestion carries the reasoning and a number. Fixes Wobbl can apply by
+itself are marked ``auto`` and can be re-run with ``wobbl fix --apply`` to show
+before and after. Those are fillets and gussets on any part, a thicker wall on a
+parametric part with a thickness parameter, and material swaps. On a parametric
+part only the thickness and fillet parameters change, and a thicker wall on a
+STEP file stays a number for you to apply in CAD.
 """
 from __future__ import annotations
 
