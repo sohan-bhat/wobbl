@@ -212,7 +212,7 @@ def evaluate(run: StructuralRun) -> Outcome:
         ds = nl["nonlinear_disp"] / max(nl["linear_disp"], 1e-12) - 1
         which = (f"a coarser {nl['nodes'] // 1000}k node mesh" if nl.get("own_mesh") else "the first mesh")
         s = (f"deflection is large next to the wall thickness, so Wobbl solved {which} with large deflection "
-             f"theory too: the peak moves {100 * ps:+.0f}% and the deflection {100 * ds:+.0f}%")
+             f"theory too: the peak moves {_pct_change(ps)} and the deflection {_pct_change(ds)}")
         if abs(ps) <= 0.10:
             checks.append(Check("large deflection", "pass", s + "; linear theory holds", nl))
         else:
@@ -251,6 +251,14 @@ def evaluate(run: StructuralRun) -> Outcome:
         run.features.to_dict(max_faces=60), run.notes, imperial, mass, beam, workdir=str(run.workdir),
         t_total=run.t_total, solver=res.solver)
     return out
+
+
+def _pct_change(x: float) -> str:
+    """+12%, -6.4%, +0.3%: whole percent once the change is large, a decimal below 10%."""
+    p = 100 * x
+    if abs(p) < 0.05:
+        return "less than 0.1%"
+    return f"{p:+.0f}%" if abs(p) >= 10 else f"{p:+.1f}%"
 
 
 HOW = {"rigid": "a rigid attachment (the attached part does not flex)",

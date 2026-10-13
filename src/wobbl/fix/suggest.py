@@ -101,7 +101,7 @@ def suggest_fixes(run, o) -> list[dict]:
             "auto": True})
 
     # 4. a stronger material
-    swap = _material_swap(mat, gov, target)
+    swap = _material_swap(mat, gov, target, explicit=run.study.target_sf is not None)
     if swap:
         fixes.append(swap)
 
@@ -137,7 +137,10 @@ def _corner_faces(run, corner_spots) -> list[int] | None:
     return list(best.faces) if best is not None else None
 
 
-def _material_swap(mat, gov, target) -> dict | None:
+def _material_swap(mat, gov, target, explicit: bool = False) -> dict | None:
+    """A stronger material for the same shape. Without a target of the user's own, each candidate only has to
+    meet its own recommended safety factor (steel needs less margin than a print); a target the user set, like
+    a house rule of 2 for castings, applies to every candidate."""
     family = PRINTABLE if mat.key in PRINTABLE else None
     options = []
     for key in SWAP_ORDER:
@@ -146,7 +149,7 @@ def _material_swap(mat, gov, target) -> dict | None:
                 (family is None and m.category != mat.category):
             continue
         sf = m.allowable / gov
-        if sf >= min(target, m.recommended_sf if family is None else target):
+        if sf >= (target if explicit or family is not None else min(target, m.recommended_sf)):
             options.append((m, sf))
     if not options:
         return None
@@ -157,7 +160,7 @@ def _material_swap(mat, gov, target) -> dict | None:
         "kind": "material", "title": f"Switch to {best[0].name}",
         "summary": f"Stress stays about the same for the same shape and load, so {best[0].name} "
                    f"({fmt(best[0].allowable)} MPa) gives safety factor {best[1]:.2f}. It is {stiff:.2g}x as stiff, "
-                   f"so deflection scales by {1 / stiff:.2g}." + (f" Other options: {others}." if others else ""),
+                   f"so deflection scales by {fmt(1 / stiff)}." + (f" Other options: {others}." if others else ""),
         "params": {"material": best[0].key, "safety_factor": best[1]}, "auto": True}
 
 

@@ -8,7 +8,7 @@ heat boundary conditions are all built from that boundary.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -177,11 +177,12 @@ def build_mesh(prep: PreparedGeometry, sizing: Sizing, verbose: bool = False, ti
                 dict(alg2d=1, alg3d=1, curved=False)]
     errors = []
     # a size that is coarse next to a thin curved wall can make the surface mesh fold through itself; when
-    # every strategy fails, a finer global size usually meshes cleanly
+    # every strategy fails, a finer size usually meshes cleanly (the refinements too, since a coarse feature
+    # refinement can be the size that folds)
     for scale in (1.0, 0.75, 0.55):
-        trial = sizing if scale == 1.0 else Sizing(h=sizing.h * scale, refinements=sizing.refinements,
-                                                    order=sizing.order, curvature=sizing.curvature,
-                                                    h_min=sizing.h_min)
+        trial = sizing if scale == 1.0 else Sizing(
+            h=sizing.h * scale, refinements=[replace(r, size=r.size * scale) for r in sizing.refinements],
+            order=sizing.order, curvature=sizing.curvature, h_min=sizing.h_min)
         for i, att in enumerate(attempts if scale == 1.0 else attempts[1:]):
             try:
                 mesh = run_isolated(_build, prep, trial, verbose, timeout=timeout, **att)

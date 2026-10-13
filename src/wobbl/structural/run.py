@@ -251,13 +251,28 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
             if lv == 0 and mesh.n_nodes > 1.6 * q["nodes"] and not study.mesh_size and sizing.h < cap:
                 # small features made the first mesh too big to solve quickly: coarsen once, by the right amount
                 factor = min((mesh.n_nodes / q["nodes"]) ** (1 / 3), cap / sizing.h)
+                kept = (sizing.h, [r.size for r in sizing.refinements])
                 sizing.h *= factor
                 for r in sizing.refinements:
                     if r.corners_only:
                         r.size *= factor
                 _say(progress, "mesh", f"level 0 had {mesh.n_nodes:,} nodes; coarsening to {sizing.h:.3g} mm")
                 budget.charge(mesh_cost(mesh.n_nodes))
-                mesh = build_mesh(prep, sizing)
+                try:
+                    coarse = build_mesh(prep, sizing)
+                except MeshError:
+                    coarse = None
+                if coarse is not None and coarse.n_nodes < mesh.n_nodes:
+                    mesh = coarse
+                else:
+                    # the coarser size folded a thin curved wall and only meshed finer than before, if at all;
+                    # the first mesh worked, so keep it
+                    budget.charge(mesh_cost(coarse.n_nodes) if coarse is not None else 0.0)
+                    sizing.h = kept[0]
+                    for r, size in zip(sizing.refinements, kept[1]):
+                        r.size = size
+                    notes.append(f"A coarser first mesh folded on the thin walls, so the study starts from the finer "
+                                 f"one ({mesh.n_nodes:,} nodes).")
             if lv == 0 and mesh.n_nodes > 2 * q["nodes"]:
                 notes.append(f"Thin walls need a large first mesh ({mesh.n_nodes:,} nodes), so this study takes longer "
                              "than usual.")
