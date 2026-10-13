@@ -1,61 +1,10 @@
-# Bake off: a coding agent on its own versus Wobbl
+# Bake-off
 
-Before building Wobbl we asked a plain question: if you give a capable coding
-agent a CAD file and a strength question, does it answer as well as a careful,
-converged simulation? Six parts were tested, two trials each, with a 15 minute
-limit, against reference answers from hand built gmsh plus CalculiX models
-converged over four to six meshes (up to 400,000 nodes, one to twenty minutes of
-solving per mesh).
+The bake-off now lives on the website, at
+[sohan-bhat.github.io/wobbl/validation/bakeoff](https://sohan-bhat.github.io/wobbl/validation/bakeoff/).
 
-## What the agent did on its own
-
-- It delivered an answer in **1 of 10** standard trials. That answer was a hand
-  calculation on the simplest part (a flat bar arm), 2% from the reference, in 75 s.
-- In the other 9 trials it started writing its own finite element code (mesher,
-  element kernel, solver, validation test) and was stopped at 15 minutes with
-  nothing to show the user. Twice it already held a correct number internally.
-- With "hand calculations only", it was within 1 to 5% on beam like parts, 29%
-  low on a bracket with a sharp inside corner, and still gave **no answer in 15
-  minutes** on the ribbed cast motor mount and the thin walled enclosure, the
-  two parts that actually fail.
-- It hit the same traps every time: gmsh's high order optimizer running for
-  minutes or crashing on thin curved walls, singular peaks at bonded bolt holes,
-  and load idealizations that flip the verdict.
-
-So the physics knowledge is there. What is missing is a fast, reliable way to
-turn it into a checked number. That is what Wobbl is for.
-
-## What Wobbl does on the same parts
-
-Each part runs through Wobbl with the loads and supports from the prompt, on a
-shared 2018 laptop (6 core i7, 16 GB). The first five rows are cases of
-`wobbl validate`, the bar arm a `wobbl run`. Times are wall clock for the whole
-study, every check included.
-
-| Part | Reference | Wobbl | Difference | Wobbl's confidence | Time |
-|---|---|---|---|---|---|
-| Cast motor mount, 2 kN belt pull through four bolts | 124.3 MPa at the +X rib tip | 123.7 MPa at the same spot | 0.5% | medium: the verdict flips if the servo is rigid (named in the result) | about 6.6 min, the rigid servo case converged too |
-| ABS enclosure shell, 250 N near a corner | 93 MPa at the corner boss fillet, 1.93 mm deflection | 93.0 MPa at the same fillet, 1.92 mm | 0.02%, 0.6% | medium: large deflection theory lowers the peak 11% (named in the result) | about 6 min (thin walls, 166k nodes) |
-| PA12 truss drone arm, 40 N thrust and 0.8 N m | 11.5 MPa at the first window corner, motor rises 4.09 mm | 11.49 MPa at the same corner, 4.08 mm | 0.1%, 0.3% | high | about 7 min |
-| PLA bracket, 0.5 mm inside corner, wall contact | about 78 MPa (77.5, still moving 5%) | 80.5 MPa | 3.2% | high | 38 s |
-| PLA bracket, 6 mm fillet, wall contact | 25.3 MPa | 26.4 MPa | 4.3% | medium: the bonded screw bore reads 48.9 MPa, excluded and named | 24 s |
-| 6061 bar arm with root fillet and hole | 165.1 MPa (23,949 psi) | 164.2 MPa (23.8 ksi) | 0.5% | high | 52 s |
-
-The references took one to ten minutes of solving per mesh on their finest
-meshes, plus hours of setup by hand; the agent on its own produced nothing on
-the motor mount and enclosure in 15 minutes.
-
-## The traps, and what Wobbl does about each
-
-| Trap found in the bake off | What Wobbl does by default |
-|---|---|
-| A run that hits a time limit returns nothing | every study has a budget; when it runs out, the last finished mesh level comes back with its checks, confidence and heatmap |
-| gmsh curved quadratic elements fold on thin curved walls, and its optimizer runs for minutes or crashes | folded elements are detected and that mesh switches to straight sided quadratic elements at once; every mesh attempt runs in a child process with a timeout and falls back to other algorithms and finer sizes |
-| Bonded bolt bores and fixed face edges look like the peak | zones next to supports, rigid attachments and loads pushed into holes are excluded from the reported value, listed with their trend, and bolted holes get a bearing stress check instead |
-| A belt pull at a pulley or thrust and torque on a motor have no face to sit on | remote loads go in through an RBE3 style distributing coupling or a CalculiX rigid body, and both force and moment balance are checked |
-| Rigid servo versus bolt group load share flipped the motor mount's verdict (36 versus 124 MPa) | Wobbl re-solves with the other attachment idealization, refines it around its own peak until it converges, reports the spread, and lowers confidence when the verdict depends on it |
-| Sharp re-entrant CAD edges never converge | sharp inside corners are found from exact CAD normals (fillets and blends are recognized as smooth), peaks there are labeled singular with their trend, and the fix list gives a fillet radius |
-| Uniform refinement went to 3.5 million nodes and swapped | a coarse first mesh, then refinement only around the peaks that matter, with node and time limits |
-| Wall contact did not settle on the coarsest mesh | a coarse linear pre solve finds the contact patch and every level starts from the previous one |
-
-The 36 MPa above comes from the bake off's reference model, which held the servo rigid with bonded bolts, a different idealization, while Wobbl's own rigid variant converges to 55.0 MPa.
+A coding agent got six parts to check, each with a CAD file, a strength question and 15 minutes,
+and answered only once in ten tries on its own, because every other time it started writing its
+own simulation code and ran out of time. Wobbl ran the same parts on a 2018 laptop in 24 seconds
+to about 7 minutes each, within 0.02 to 4.3% of converged reference models, and named what each
+answer leans on.
