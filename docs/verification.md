@@ -39,6 +39,17 @@ peaks are listed with their trend, for example `20.5 -> 27.3 -> 29.7 MPa,
 singular`. In a brittle material a sharp corner lowers confidence and the fix
 list asks for a fillet.
 
+**Load introduction.** Loads that act off the part (a belt pull at a pulley,
+thrust and torque on a motor) reach it either through a rigid attachment or
+spread over the faces without stiffening them (a distributing coupling, like
+an RBE3). The two idealizations can give very different peaks: on a cast motor
+mount with a belt pull shared by four flange bolts, the spread load puts 124 MPa
+on a rib tip while a rigid servo body moves the peak into the bolt holes and
+leaves the rib at 36 MPa. Wobbl solves the other idealization on the final mesh,
+reports both, and lowers confidence when the verdict depends on the choice.
+Peaks where a load is pushed into holes are reported separately, like support
+artifacts.
+
 **Bolt bearing.** At bolted and fixed holes, where the stress is set by the
 support idealization, Wobbl reports the honest number instead: the reaction
 force through each hole divided by its projected area (diameter times length),
@@ -48,6 +59,12 @@ against the bearing limit.
 mistake), peak strain, stress far above or below the material limit, and
 deflection: over 6% of the part size is a warning (linear theory gets less
 accurate), over 20% is a failure.
+
+**Bounded runtime.** Every study has a time budget (`--budget`, 240 s by
+default). If a refinement level runs out of time, fails to mesh or the solver
+fails, Wobbl stops and returns the last finished level with its checks and
+heatmaps; the convergence check says how far it got. An agent always gets an
+answer back, with a confidence that matches it.
 
 **Contact.** Wall supports are solved by an active set loop: a coarse linear
 pre solve finds the contact patch, each mesh level starts from it, and the loop
