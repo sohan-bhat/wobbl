@@ -56,6 +56,7 @@ def _strength_options(f):
         click.option("--print-direction", default=None, help="Axis the print layers stack along, e.g. z."),
         click.option("--scale", type=float, default=1.0, help="Scale the geometry (1000 for files in meters)."),
         click.option("--body", type=int, default=None, help="Pick one body from a multi body file."),
+        click.option("--param", "params", multiple=True, help="Parameter of a .py part, e.g. thickness=6."),
         click.option("--out", "-o", default=None, help="Output folder (default wobbl-out/<part>)."),
         click.option("--json", "as_json", is_flag=True, help="Print the result as JSON."),
         click.option("--no-images", is_flag=True, help="Skip heatmap rendering."),
@@ -116,6 +117,7 @@ def _study_from(part, question, kw):
                          budget=kw.get("budget", 240.0), question=question, scale=kw.get("scale", 1.0),
                          body=kw.get("body"), mesh_size=kw.get("mesh_size"),
                          print_direction=kw.get("print_direction"))
+    st.params = dict(p.split("=", 1) for p in kw.get("params", ()) if "=" in p)
     st.loads = [parse_load(x) for x in kw.get("loads", ())]
     st.fixtures = [parse_fixture(x) for x in kw.get("fixes", ())]
     return st
@@ -141,7 +143,7 @@ def _strength(part, question, kw, interpret: bool):
             resolve_material(st.material)
         with ui.progress(not kw.get("quiet") and not kw.get("as_json")) as cb:
             cb("geometry", f"reading {Path(part).name}")
-            pre = describe_part(st.part, out / "work", st.scale, st.body)
+            pre = describe_part(st.part, out / "work", st.scale, st.body, st.params)
             guesses = []
             if interpret or st.material == "auto" or not st.loads or not st.fixtures:
                 reading = read_question(question, pre[1], st)

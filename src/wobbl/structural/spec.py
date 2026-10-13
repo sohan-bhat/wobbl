@@ -81,6 +81,7 @@ class StructuralStudy:
     mesh_size: float | None = None
     print_direction: str | None = None    # layer stacking axis for printed parts, e.g. "z"
     assumptions: list[str] = field(default_factory=list)
+    params: dict = field(default_factory=dict)   # parameter overrides for a parametric .py part
 
     def to_dict(self) -> dict:
         return asdict(self)

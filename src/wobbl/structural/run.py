@@ -170,10 +170,20 @@ def feature_refinements(features: PartFeatures, h: float) -> list[Refinement]:
             for size, ids in sorted(buckets.items())]
 
 
-def describe_part(path: str, workdir: str | Path, scale: float = 1.0, body: int | None = None):
-    """Prepare the CAD and analyze its faces. Returns (prepared geometry, features)."""
+def describe_part(path: str, workdir: str | Path, scale: float = 1.0, body: int | None = None,
+                  params: dict | None = None):
+    """Prepare the CAD (building parametric .py parts first) and analyze its faces. Returns (prepared, features)."""
+    from ..geometry.parametric import build_step, is_parametric
+
     work = Path(workdir)
-    prep = prepare(path, work / "geometry", body=body)
+    if is_parametric(path):
+        step, used = build_step(path, params, work / "geometry")
+        prep = prepare(step, work / "geometry", body=body)
+        prep.notes.append("Built from " + Path(path).name + " with " +
+                          ", ".join(f"{k}={v:g}" if isinstance(v, (int, float)) else f"{k}={v}"
+                                    for k, v in used.items()) + ".")
+    else:
+        prep = prepare(path, work / "geometry", body=body)
     if scale and scale != 1.0:
         prep = scale_geometry(prep, scale, work / "geometry")
     return prep, analyze(build_surface_mesh(prep))
@@ -195,7 +205,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         prep, features = pre
     else:
         _say(progress, "geometry", f"reading {Path(study.part).name}, finding faces, holes and fillets")
-        prep, features = describe_part(study.part, work, study.scale, study.body)
+        prep, features = describe_part(study.part, work, study.scale, study.body, study.params)
     loads, fixtures, sel_info = resolve_selections(study, features)
     print_axis = None
     if study.print_direction:
