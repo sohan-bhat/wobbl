@@ -48,19 +48,19 @@ wrought metals and up to 3 for wood, and `--target-sf` sets your own.
 
 ## Quality and time
 
-| `--quality` | Settles when the change is under | Meshes needed for a pass | Largest mesh |
-|---|---|---|---|
-| `fast` | 5% | 2 | 80,000 nodes |
-| `normal` | 3% | 3 | 250,000 nodes |
-| `fine` | 2% | 3 | 400,000 nodes |
+| `--quality` | Settles when the change is under | Can stop after | Most meshes | Largest mesh |
+|---|---|---|---|---|
+| `fast` | 5% | 2 meshes | 3 | 80,000 nodes |
+| `normal` | 3% | 3 meshes | 4 | 250,000 nodes |
+| `fine` | 2% | 3 meshes | 4 | 400,000 nodes |
 
-`normal` and `fine` stop after four meshes at most and `fast` after three. `fast` is for a
-quick look and not for an answer you report, since two meshes can agree and both still be too
-coarse. Every study also has a time budget, `--budget`, 300 seconds by
-default. Wobbl spends it by a cost model of each mesh and solve rather than the clock, so the
-same input reaches the same mesh level on every run. When the budget runs out, the last
-finished level comes back with its checks and its heatmaps, and the convergence check says
-how far it got.
+`fast` is for a quick look and not for an answer you report. It can stop as soon as two meshes
+agree, and since two coarse meshes can agree and both still be off, its convergence check
+stays a warning when that happens. Every study also has a time budget, `--budget`, 300
+seconds by default. Wobbl spends it by a cost model of each mesh and solve rather than the
+clock, so the same input reaches the same mesh level on every run. When the budget runs out,
+the last finished level comes back with its checks and its heatmaps, and the convergence check
+says how far it got.
 
 ## Loads that act off the part
 
