@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install the wobbl command from GitHub with pipx or uv on macOS, Linux or Windows."
+description: "Install the wobbl command from PyPI with pipx or uv on macOS, Linux or Windows."
 lead: "Wobbl is a Python package, so one command puts the wobbl command on your path."
 order: 1
 ---
@@ -14,17 +14,17 @@ step, `wobbl setup`, which needs about 340 MB of disk and an internet connection
 
 ## Install
 
-Wobbl is not on PyPI yet, so install it straight from GitHub. pipx and uv both give it an
+Wobbl is on PyPI, and the cleanest way to install it is with pipx or uv. Both give it an
 environment of its own, which keeps its dependencies away from your other Python projects.
 
 ```sh
-pipx install "git+https://github.com/sohan-bhat/wobbl"
+pipx install wobbl
 ```
 
 If you use uv, this does the same thing.
 
 ```sh
-uv tool install "git+https://github.com/sohan-bhat/wobbl"
+uv tool install wobbl
 ```
 
 Check that the command is there.
@@ -37,16 +37,11 @@ It prints `wobbl, version 0.1.0`.
 
 ## Update or remove
 
-The simplest way to update a GitHub install is to remove the package and install it again.
-Removing the package leaves `~/.wobbl` alone, so the solvers and your agent registrations
-keep working and nothing has to be downloaded twice.
+To update, run `pipx upgrade wobbl`, or `uv tool upgrade wobbl` if you installed it with uv.
+Updating leaves `~/.wobbl` alone, so the solvers and your agent registrations keep working
+and nothing has to be downloaded twice.
 
-```sh
-pipx uninstall wobbl
-pipx install "git+https://github.com/sohan-bhat/wobbl"
-```
-
-With uv the commands are `uv tool uninstall wobbl` and the install line above. To remove
+To remove Wobbl, run `pipx uninstall wobbl` or `uv tool uninstall wobbl`. To remove
 everything Wobbl added, including the solvers, run `wobbl uninstall --all` before you
 uninstall the package, which [wobbl uninstall](/guides/cli/uninstall/) covers in full.
 

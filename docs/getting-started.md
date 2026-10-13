@@ -3,8 +3,8 @@
 This guide now lives on the website, at
 [sohan-bhat.github.io/wobbl/get-started](https://sohan-bhat.github.io/wobbl/get-started/).
 
-Wobbl needs Python 3.10 or newer and installs from GitHub with
-`pipx install "git+https://github.com/sohan-bhat/wobbl"`. Then `wobbl setup` puts CalculiX and
+Wobbl needs Python 3.10 or newer and installs from PyPI with
+`pipx install wobbl`. Then `wobbl setup` puts CalculiX and
 ngspice into `~/.wobbl` and connects Claude Code, Codex, Cursor and Gemini CLI, `wobbl doctor`
 checks every piece, and `wobbl "will a blue LED on 5V with a 47 ohm resistor fry?"` gives a
 first answer with no files. The steps have pages of their own for

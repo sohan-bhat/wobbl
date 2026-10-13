@@ -52,11 +52,11 @@ Claude Code, Codex, Cursor and Gemini CLI.
 
 ## Quick start
 
-Wobbl needs Python 3.10 or newer, and until it is on PyPI you install it from GitHub.
+Wobbl needs Python 3.10 or newer and installs from PyPI.
 
 ```sh
-pipx install "git+https://github.com/sohan-bhat/wobbl"
-# or: uv tool install "git+https://github.com/sohan-bhat/wobbl"
+pipx install wobbl
+# or: uv tool install wobbl
 
 wobbl setup     # solvers into ~/.wobbl, MCP server and skill for your agents
 wobbl doctor    # check every piece
