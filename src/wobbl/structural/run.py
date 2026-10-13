@@ -130,10 +130,9 @@ def initial_sizing(prep: PreparedGeometry, features: PartFeatures, study: Struct
     if study.mesh_size:
         s.h = float(study.mesh_size)
     h = s.h
-    fillets = [f for f in features.fillets() if f.radius < 1.5 * h]
-    for f in fillets:
-        size = float(np.clip(f.radius / 2.0, h / 10.0, h / 2.0))
-        s.refinements.append(Refinement(size, surfaces=[f.id], grow=4 * size, label=f"fillet {f.id}"))
+    # fillets and holes get their first refinement from curvature sizing; the hotspot loop does the rest,
+    # so the first mesh stays cheap even on parts with dozens of fillets
+    s.curvature = 10
     curves = sorted({c for cn in features.corners for c in cn.curves})
     if curves:
         s.refinements.append(Refinement(h / 3.0, curves=curves, grow=2 * h, label="sharp corners"))
@@ -196,6 +195,14 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
     for lv in range(levels_max):
         _say(progress, "mesh", f"level {lv}: meshing (element size {sizing.h:.3g} mm)")
         mesh = build_mesh(prep, sizing)
+        tries = 0
+        while lv == 0 and mesh.n_nodes > 1.6 * q["nodes"] and tries < 3 and not study.mesh_size:
+            # small features made the first mesh too big to solve quickly: coarsen and try again
+            tries += 1
+            sizing.h *= 1.3
+            sizing.curvature = max(6, sizing.curvature - 2)
+            _say(progress, "mesh", f"level 0 had {mesh.n_nodes:,} nodes; coarsening to {sizing.h:.3g} mm")
+            mesh = build_mesh(prep, sizing)
         notes += [n for n in mesh.notes if n not in notes]
         built = build_static(mesh, loads, fixtures, material, features.faces)
         _say(progress, "solve", f"level {lv}: solving {mesh.n_nodes:,} nodes with {adapter.name}")

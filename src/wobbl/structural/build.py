@@ -216,6 +216,14 @@ def build_static(mesh: Mesh, loads: list[tuple[Load, Selection | None]], fixture
                 point = (c_ * a_[:, None]).sum(0) / a_.sum()
             if ld.coupling == "rigid":
                 nodes = np.unique(mesh.tris[mask].ravel())
+                same = next((r for r in model.rigid if np.intersect1d(r.nodes, nodes).size > 0), None)
+                if same is not None:
+                    # one rigid attachment carrying several loads: move them to its reference point
+                    same.nodes = np.union1d(same.nodes, nodes)
+                    same.force = same.force + force
+                    same.moment = same.moment + moment + np.cross(point - same.ref_point, force)
+                    built.zones[same.name] = same.nodes
+                    continue
                 model.rigid.append(RigidCoupling(name, nodes, point, force, moment))
                 built.zones[name] = nodes
                 built.zone_kind[name] = "coupling"
