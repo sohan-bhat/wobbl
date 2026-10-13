@@ -1,17 +1,17 @@
-MARGINAL. Peak 23.9 MPa on the 3 mm inside fillet (face 3) at (7.78, 13.5, 6.29). It survives the load, but the safety factor 2.09 is below the 2.5 target.
+MARGINAL. Peak 24.5 MPa on the 3 mm inside fillet (face 3) at (8.04, 11.7, 6.16). It survives the load, but the safety factor 2.04 is below the 2.5 target.
 
 Confidence: high. passed mesh convergence, force balance, hand calculation, singularities, bolt bearing, units and sanity
-Max deflection 3.23 mm at (90, 0, 6).
-Material PLA (3D printed), limit 50 MPa; mass 30.36 g.
+Max deflection 3.26 mm at (90, 25, 6).
+Material PLA (3D printed), limit 50 MPa; mass 30.35 g.
 Loads: 40 N down @ top and within 12 of 65,12.5,6. Fixtures: bolt holes d=4.5; wall x=min.
 
 Checks:
-  [pass] mesh convergence: max principal stress settled: 23.7 -> 24 -> 23.9 MPa over 3 meshes, last change 0.3%
-  [pass] force balance: reactions balance the loads to 4.4e-05% (forces) and 8.4e-06% (moments)
-  [pass] hand calculation: beam theory through the critical section gives 14.5 MPa nominal; FEA peak is 1.65x that, a stress concentration of about 1.6 from the local shape
+  [pass] mesh convergence: max principal stress settled: 23.6 -> 24 -> 24.5 MPa over 3 meshes, last change 2.1%
+  [pass] force balance: reactions balance the loads to 0.00014% (forces) and 2.4e-05% (moments)
+  [pass] hand calculation: beam theory through the critical section gives 15.3 MPa nominal; FEA peak is 1.61x that, a stress concentration of about 1.6 from the local shape
   [pass] singularities: no sharp corner or support artifact is above the reported stress
-  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 21.9 N sideways and 60.5 N along its axis; bearing stress 0.81 MPa, safety factor 61.70 on bearing
-  [pass] units and sanity: part 123 mm across, peak strain 0.0068, max deflection 3.23 mm (2.6% of size): all plausible
+  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 5.25 N sideways and 57.2 N along its axis; bearing stress 0.195 MPa, safety factor 256.96 on bearing
+  [pass] units and sanity: part 123 mm across, peak strain 0.007, max deflection 3.26 mm (2.6% of size): all plausible
 
 Assumptions:
   - Linear elastic material and small deflections (no yielding redistribution, no buckling).

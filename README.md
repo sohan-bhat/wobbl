@@ -19,27 +19,27 @@ Codex, Cursor, Gemini CLI) the same tools.
 $ wobbl run bracket.py -m pla --fix "bolt holes d=4.5" --fix "wall x=min" \
     --load "40 N down @ top and within 12 of 65,12.5,6"
 
- FAILS  Peak 53 MPa on the 0.5 mm inside fillet. The part cracks at about 0.94x this load.
+ FAILS  Peak 52.8 MPa on the 0.5 mm inside fillet. The part cracks at about 0.95x this load.
 
   peak stress   safety factor   target   max deflection
-  53 MPa        0.94            2.5      3.45 mm             confidence high
+  52.8 MPa      0.95            2.5      3.46 mm             confidence high
 
- pass  mesh convergence   max principal stress settled: 43.1 -> 50.1 -> 52.8 -> 53 MPa over 4 meshes
- pass  force balance      reactions balance the loads to 1.5e-05%
- pass  hand calculation   beam theory through the critical section gives 15.3 MPa nominal; FEA peak
+ pass  mesh convergence   max principal stress settled: 44.2 -> 51.1 -> 53.4 -> 52.8 MPa over 4 meshes
+ pass  force balance      reactions balance the loads to 0.00011%
+ pass  hand calculation   beam theory through the critical section gives 15.2 MPa nominal; FEA peak
                           is 3.47x that, a stress concentration of about 3.5 from the local shape
  pass  singularities      no sharp corner or support artifact is above the reported stress
- pass  bolt bearing       worst hole carries 7.03 N sideways; bearing stress 0.26 MPa
- pass  units and sanity   peak strain 0.015, max deflection 3.45 mm (2.8% of size)
+ pass  bolt bearing       worst hole carries 13.1 N sideways; bearing stress 0.485 MPa
+ pass  units and sanity   peak strain 0.015, max deflection 3.46 mm (2.8% of size)
 
  Round the 0.5 mm fillet to a 3 mm radius (auto) ... Add a triangular gusset (auto) ...
 
 $ wobbl fix wobbl-out/bracket --apply
                                     peak MPa   safety factor   verdict
-  before                            53         0.94            fails
-  Round the fillet to 3 mm          23.9       2.09            marginal
-  Thicken the legs to 10 mm         22.1       2.26            marginal
-  Add a gusset across the corner    10.1       4.93            holds
+  before                            52.8       0.95            fails
+  Round the fillet to 3 mm          24.5       2.04            marginal
+  Thicken the legs to 10 mm         21.5       2.32            marginal
+  Add a gusset across the corner    10.3       4.84            holds
 ```
 
 ![Stress in a printed shelf bracket, peak marked at the inside corner](examples/shelf-bracket/output/images/stress.png)

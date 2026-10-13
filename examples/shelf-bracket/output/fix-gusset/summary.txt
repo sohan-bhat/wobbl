@@ -1,17 +1,17 @@
-HOLDS. Peak 10.1 MPa on face 12 at (34.4, 11.1, 7.32), safety factor 4.93 against tensile strength (target 2.5). Confidence is medium.
+HOLDS. Peak 10.3 MPa on face 12 at (34.4, 13.9, 7.29), safety factor 4.84 against tensile strength (target 2.5). Confidence is medium.
 
-Confidence: medium. singularities: excluded from the answer: 26.8 MPa at a sharp inside corner (face 12) (singular, keeps rising with refinement: 18.9 -> 22.8 -> 26.8 MPa). Wobbl reports the stress 1.85 mm or more away from these spots; a sharp inside corner in a brittle material: the real peak depends on the actual corner radius, add a fillet to get a trustworthy number
-Max deflection 0.931 mm at (90, 25, 0).
+Confidence: medium. singularities: excluded from the answer: 30.3 MPa at a sharp inside corner (face 12) (singular, keeps rising with refinement: 18.8 -> 25.6 -> 30.3 MPa). Wobbl reports the stress 1.85 mm or more away from these spots; a sharp inside corner in a brittle material: the real peak depends on the actual corner radius, add a fillet to get a trustworthy number
+Max deflection 0.941 mm at (90, 25, 0).
 Material PLA (3D printed), limit 50 MPa; mass 33.58 g.
 Loads: 40 N down @ top and within 12 of 65,12.5,6. Fixtures: bolt holes d=4.5; wall x=min.
 
 Checks:
-  [pass] mesh convergence: max principal stress settled: 11.5 -> 10.2 -> 10.1 MPa over 3 meshes, last change 0.5%
-  [pass] force balance: reactions balance the loads to 4.6e-05% (forces) and 1.1e-05% (moments)
-  [pass] hand calculation: beam theory through the critical section gives 9.11 MPa nominal; FEA peak is 1.11x that, a plain beam region
-  [warn] singularities: excluded from the answer: 26.8 MPa at a sharp inside corner (face 12) (singular, keeps rising with refinement: 18.9 -> 22.8 -> 26.8 MPa). Wobbl reports the stress 1.85 mm or more away from these spots
-  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 37.9 N sideways and 82.4 N along its axis; bearing stress 1.48 MPa, safety factor 33.87 on bearing
-  [pass] units and sanity: part 123 mm across, peak strain 0.0029, max deflection 0.931 mm (0.76% of size): all plausible
+  [pass] mesh convergence: max principal stress settled: 11 -> 10.3 -> 10.3 MPa over 3 meshes, last change 0.1%
+  [pass] force balance: reactions balance the loads to 1.7e-05% (forces) and 1.9e-06% (moments)
+  [pass] hand calculation: beam theory through the critical section gives 9.16 MPa nominal; FEA peak is 1.13x that, a plain beam region
+  [warn] singularities: excluded from the answer: 30.3 MPa at a sharp inside corner (face 12) (singular, keeps rising with refinement: 18.8 -> 25.6 -> 30.3 MPa). Wobbl reports the stress 1.85 mm or more away from these spots
+  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 38.7 N sideways and 82 N along its axis; bearing stress 1.51 MPa, safety factor 33.18 on bearing
+  [pass] units and sanity: part 123 mm across, peak strain 0.003, max deflection 0.941 mm (0.77% of size): all plausible
 
 Assumptions:
   - Linear elastic material and small deflections (no yielding redistribution, no buckling).

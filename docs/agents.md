@@ -63,10 +63,10 @@ agent: inspect_geometry("bracket.py")
 agent: solve_structural(path="bracket.py", material="pla",
                         fixtures=["bolt holes d=4.5", "wall x=min"],
                         loads=["40 N down @ top and within 12 of 65,12.5,6"])
-       -> verdict fails, 53 MPa on the 0.5 mm inside fillet, safety factor 0.94, confidence high
+       -> verdict fails, 52.8 MPa on the 0.5 mm inside fillet, safety factor 0.95, confidence high
 agent: suggest_fix(result_dir, apply=true)
-       -> 3 mm fillet: 23.9 MPa (2.09); legs at 10 mm: 22.1 MPa (2.26); gusset: 10.1 MPa (4.93)
-agent: "It cracks at the inside corner: 53 MPa against PLA's 50 MPa. A 3 mm fillet halves the
-        stress; a gusset brings it to 10.1 MPa, safety factor 4.9. The gusset toe is a sharp corner
+       -> 3 mm fillet: 24.5 MPa (2.04); legs at 10 mm: 21.5 MPa (2.32); gusset: 10.3 MPa (4.84)
+agent: "It cracks at the inside corner: 52.8 MPa against PLA's 50 MPa. A 3 mm fillet halves the
+        stress; a gusset brings it to 10.3 MPa, safety factor 4.8. The gusset toe is a sharp corner
         Wobbl excluded as a singularity, so round it too. Heatmaps and report: ..."
 ```
