@@ -108,7 +108,7 @@ void main() {
   gl_FragColor = vec4(r / 255.0, g / 255.0, floor(a) / 255.0, vE > 0.5 ? 1.0 : 0.5);
 }`;
 
-/** The belt pull: drawn solid, plus a faint copy that shows through the part when it is behind it. */
+/** The load: drawn solid, plus a faint copy that shows through the part when it is behind it. */
 function arrow(color) {
   const g = new Group();
   const solid = new MeshBasicMaterial({ color });

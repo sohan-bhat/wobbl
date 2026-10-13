@@ -204,13 +204,20 @@ async function build(root, ui, trash) {
     }
     return out;
   }
-  // the load just past the arrow's tip, then to either side of it, then back toward the pulley
+  // the load just past the arrow's tip, then to either side of it, then back toward the pulley, and
+  // the same again a step further out
   function loadSpots(at, u) {
     const { lw, lh } = sizes;
-    return [u, [-u[1], u[0]], [u[1], -u[0]], [-u[0], -u[1]]]
-      .map((d) => [at[0] - lw / 2 + (d[0] * (lw + GAP)) / 2, at[1] - lh / 2 + (d[1] * (lh + GAP)) / 2, lw, lh]);
+    const out = [];
+    for (const k of [1, 2]) {
+      for (const d of [u, [-u[1], u[0]], [u[1], -u[0]], [-u[0], -u[1]]]) {
+        out.push([at[0] - lw / 2 + (k * d[0] * (lw + GAP)) / 2, at[1] - lh / 2 + (k * d[1] * (lh + GAP)) / 2, lw, lh]);
+      }
+    }
+    return out;
   }
-  function labels(pk, hubS, ld, u) {
+  // avoid: a box the labels keep clear of, the hint pointer while it shows
+  function labels(pk, hubS, ld, u, avoid = null) {
     peakTag.hidden = !pk;
     loadTag.hidden = !ld;
     if (!pk && !ld) return;
@@ -220,9 +227,9 @@ async function build(root, ui, trash) {
     const As = pk ? peakSpots(pk, pk[0] < hubS[0]) : [null], Bs = ld ? loadSpots(ld, u) : [null];
     let a = null, b = null;
     search: for (const ca of As) {
-      if (ca && !inside(ca)) continue;
+      if (ca && (!inside(ca) || touch(ca, avoid))) continue;
       for (const cb of Bs) {
-        if (cb && !inside(cb)) continue;
+        if (cb && (!inside(cb) || touch(cb, avoid))) continue;
         if (!touch(ca, cb)) { a = ca; b = cb; break search; }
       }
     }
@@ -256,14 +263,16 @@ async function build(root, ui, trash) {
     grip.style.transform = `translate(${hubS[0] - (pad * dx) / l}px, ${hubS[1] - (pad * dy) / l - pad}px) rotate(${Math.atan2(dy, dx)}rad)`;
     // the hint pointer rests on the arrow's head
     hand.hidden = handOpacity <= 0.01;
+    let handBox = null;
     if (!hand.hidden) {
       const h = toScreen(along(pAt, pDir, reach - 4));
       hand.style.translate = `${h[0]}px ${h[1]}px`;
       hand.style.opacity = String(handOpacity);
+      handBox = [h[0] - 9, h[1] - 8, 30, 32];
     }
     // the load label goes just past the arrow's tip, on the side the arrow points to
     const ldS = toScreen(along(pAt, pDir, reach + 3));
-    labels(pk, hubS, inView(ldS) ? ldS : null, [dx / l, dy / l]);
+    labels(pk, hubS, inView(ldS) ? ldS : null, [dx / l, dy / l], handBox);
   }
 
   // Draw on demand, at most once a frame, and not at all while the part is off screen. While the
