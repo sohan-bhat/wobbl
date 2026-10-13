@@ -57,7 +57,7 @@ Wobbl needs Python 3.10 or newer. Until it is on PyPI, install it from GitHub:
 pipx install "git+https://github.com/sohan-bhat/wobbl"
 # or: uv tool install "git+https://github.com/sohan-bhat/wobbl"
 
-wobbl setup     # CalculiX and ngspice into ~/.wobbl, plus the MCP server and skill for each agent it finds
+wobbl setup     # solvers into ~/.wobbl, MCP server and skill for your agents
 wobbl doctor    # check every piece
 ```
 
@@ -74,10 +74,16 @@ wobbl "will a blue LED on 5V with a 47 ohm resistor fry?"
 Then your own part:
 
 ```sh
-wobbl inspect part.step                                    # holes, fillets, sharp corners, face ids
+# holes, fillets, sharp corners and face ids
+wobbl inspect part.step
+
+# ask in plain words, or give the material, supports and loads yourself
 wobbl part.step "will this 6061 bracket yield under 50 lbf at the tip?"
-wobbl run part.step -m petg --fix "bolt holes d=5.5" --load "250 N down at 0,-15,31 @ holes d=3.4 rigid"
-wobbl fix wobbl-out/part --apply                           # fillets, gussets, thicker walls, re-run
+wobbl run part.step -m petg --fix "bolt holes d=5.5" \
+  --load "250 N down at 0,-15,31 @ holes d=3.4 rigid"
+
+# build the fixes (fillets, gussets, thicker walls) and run each again
+wobbl fix wobbl-out/part --apply
 ```
 
 Or a bundled example, which takes a few minutes:
@@ -140,8 +146,8 @@ Suggested fixes:
 
 ## An agent on its own versus Wobbl
 
-We tested exactly that. Given a CAD file, a strength question and 15 minutes, a
-capable coding agent working alone answered in **1 of 10** trials across six
+Given a CAD file, a strength question and 15 minutes, a capable coding agent
+working alone answered in **1 of 10** trials across six
 parts. Its hand calculations on beam like parts were good, within 1 to 5%. On the
 ribbed cast motor mount and the thin walled enclosure, the two parts that
 actually fail, it delivered nothing in six trials: it kept writing its own finite
