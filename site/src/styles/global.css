@@ -520,7 +520,7 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .run-metric p:first-child { font-stretch: 125%; font-weight: 800; font-size: clamp(3rem, 2rem + 4vw, 5.2rem); line-height: 1; letter-spacing: -0.03em; }
 .run-metric p:last-child { margin-top: 12px; font: 600 13px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
 .run-verdict { margin: 18px 0 0; font-size: 0.95rem; line-height: 1.55; color: var(--fg-2); text-wrap: pretty; }
-.run-said { font: 400 0.86rem/1.6 var(--mono); color: var(--fg-2); }
+.run-said { font: 400 0.86rem/1.6 var(--mono); color: var(--fg-2); } /* Wobbl's own output, quoted as it printed it */
 .vword { display: inline-block; margin-right: 8px; padding: 2px 7px; background: var(--marginal); color: var(--ink); font: 700 12px/1.5 var(--mono); letter-spacing: 0.08em; vertical-align: 1px; }
 .vword[data-verdict="holds"] { background: var(--holds); }
 .vword[data-verdict="fails"] { background: var(--fails); }

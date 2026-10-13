@@ -22,7 +22,7 @@ const sugg = run.fixes.length ? [] : (run.outcome.fixes ?? []).slice(0, 3).map((
   </div>
   <div class="run-result">
     <RunImage run={run} sizes="(min-width: 1000px) 46vw, 100vw" />
-    <p class="run-verdict"><span class="vword" data-verdict={COLOR[run.outcome.verdict] ?? 'marginal'}>{run.outcome.verdict.toUpperCase()}</span><span class="run-said" translate="no">{run.outcome.headline}</span></p>
+    <p class="run-verdict"><span class="vword" data-verdict={COLOR[run.outcome.verdict] ?? 'marginal'}>{run.outcome.verdict.toUpperCase()}</span><samp class="run-said" translate="no">{run.outcome.headline}</samp></p>
     <dl class="readout">{metrics(run).map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
     {sugg.length > 0 && (
       <div class="run-sugg"><p class="run-label">{sugg.length === 1 ? 'Suggested fix' : 'Suggested fixes'}</p>
