@@ -48,7 +48,7 @@ spread over the faces without stiffening them (a distributing coupling, like
 an RBE3). The two idealizations can give very different peaks: on a cast motor
 mount with a belt pull shared by four flange bolts, the spread load puts 124 MPa
 on a rib tip, while a rigid servo body moves the peak to the face the servo
-bolts against, about 2 mm outside a lower bolt hole, where it converges to 55.5
+bolts against, about 2 mm outside a lower bolt hole, where it converges to 55.0
 MPa. Wobbl first solves the other idealization on the final mesh. That mesh was
 refined for the main answer, so when the verdict flips or the other peak sits
 somewhere else, Wobbl refines around the other peak too, with the same

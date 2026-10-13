@@ -27,18 +27,19 @@ turn it into a checked number. That is what Wobbl is for.
 
 ## What Wobbl does on the same parts
 
-Each part runs through `wobbl run` with the loads and supports from the prompt,
-on a shared 2018 laptop (6 core i7, 16 GB). Times are wall clock for the whole
-study, including every check and the heatmaps.
+Each part runs through Wobbl with the loads and supports from the prompt, on a
+shared 2018 laptop (6 core i7, 16 GB). The first five rows are cases of
+`wobbl validate`, the bar arm a `wobbl run`. Times are wall clock for the whole
+study, every check included.
 
 | Part | Reference | Wobbl | Difference | Wobbl's confidence | Time |
 |---|---|---|---|---|---|
-| Cast motor mount, 2 kN belt pull through four bolts | 124.3 MPa at the +X rib tip | 123.9 MPa at the same spot | 0.3% | medium: the verdict flips if the servo is rigid (named in the result) | about 3.5 min |
-| ABS enclosure shell, 250 N near a corner | 93 MPa at the corner boss fillet, 1.93 mm deflection | 89.8 MPa at the same fillet, 1.91 mm | 3.4%, 0.9% | high | about 9 min (thin walls, 154k nodes) |
-| PA12 truss drone arm, 40 N thrust and 0.8 N m | 11.5 MPa at the first window corner, motor rises 4.09 mm | 11.53 MPa at the same corner, 4.08 mm | 0.3%, 0.1% | high | about 12 min |
-| PLA bracket, 0.5 mm inside corner, wall contact | about 78 MPa (77.5, still moving 5%) | 80.0 MPa | 2.6% | high | 65 s |
-| PLA bracket, 6 mm fillet, wall contact | 25.3 MPa | 25.6 MPa | 1.0% | medium: the bonded screw bore reads 64 MPa, excluded and named | 20 s |
-| 6061 bar arm with root fillet and hole | 165.1 MPa (23,949 psi) | 165.0 MPa | 0.1% | high | about 1 to 2 min |
+| Cast motor mount, 2 kN belt pull through four bolts | 124.3 MPa at the +X rib tip | 123.7 MPa at the same spot | 0.5% | medium: the verdict flips if the servo is rigid (named in the result) | about 6.6 min, the rigid servo case converged too |
+| ABS enclosure shell, 250 N near a corner | 93 MPa at the corner boss fillet, 1.93 mm deflection | 93.0 MPa at the same fillet, 1.92 mm | 0.02%, 0.6% | medium: large deflection theory lowers the peak 11% (named in the result) | about 6 min (thin walls, 166k nodes) |
+| PA12 truss drone arm, 40 N thrust and 0.8 N m | 11.5 MPa at the first window corner, motor rises 4.09 mm | 11.49 MPa at the same corner, 4.08 mm | 0.1%, 0.3% | high | about 7 min |
+| PLA bracket, 0.5 mm inside corner, wall contact | about 78 MPa (77.5, still moving 5%) | 80.5 MPa | 3.2% | high | 38 s |
+| PLA bracket, 6 mm fillet, wall contact | 25.3 MPa | 26.4 MPa | 4.3% | medium: the bonded screw bore reads 48.9 MPa, excluded and named | 24 s |
+| 6061 bar arm with root fillet and hole | 165.1 MPa (23,949 psi) | 164.2 MPa (23.8 ksi) | 0.5% | high | 52 s |
 
 The references took one to ten minutes of solving per mesh on their finest
 meshes, plus hours of setup by hand; the agent on its own produced nothing on
@@ -57,4 +58,4 @@ the motor mount and enclosure in 15 minutes.
 | Uniform refinement went to 3.5 million nodes and swapped | a coarse first mesh, then refinement only around the peaks that matter, with node and time limits |
 | Wall contact did not settle on the coarsest mesh | a coarse linear pre solve finds the contact patch and every level starts from the previous one |
 
-The 36 MPa above comes from the bake off's reference model, which held the servo rigid with bonded bolts, a different idealization, while Wobbl's own rigid variant converges to 55.5 MPa.
+The 36 MPa above comes from the bake off's reference model, which held the servo rigid with bonded bolts, a different idealization, while Wobbl's own rigid variant converges to 55.0 MPa.

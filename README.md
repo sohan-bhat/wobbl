@@ -27,7 +27,7 @@
 
 ![Stress heatmap of a cast aluminum motor mount under a 2 kN belt pull, peak 124 MPa marked where the rib tip meets the upright](examples/cast-motor-mount/output/images/stress.png)
 
-<p align="center"><sub>A real Wobbl output: a sand cast motor mount under a 2 kN belt pull. Peak 124 MPa at the rib tip, safety factor 1.34 against a target of 2.</sub></p>
+<p align="center"><sub>A real Wobbl output: a sand cast motor mount under a 2 kN belt pull. Peak 124 MPa at the rib tip, safety factor 1.33 against a target of 2.</sub></p>
 
 ## What it is
 
@@ -112,18 +112,18 @@ $ cd examples/shelf-bracket
 $ wobbl run bracket.py -m pla --fix "bolt holes d=4.5" --fix "wall x=min" \
     --load "40 N down @ top and within 12 of 65,12.5,6" -o output
 $ cat output/summary.txt
-FAILS. Peak 52.8 MPa on the 0.5 mm inside fillet (face 3) at (6.2, 12.2, 6.1). The part cracks at about 0.95x this load.
+FAILS. Peak 52.3 MPa on the 0.5 mm inside fillet (face 3) at (6.19, 12.6, 6.11). The part cracks at about 0.96x this load.
 
 Confidence: high. passed mesh convergence, force balance, hand calculation, singularities, bolt bearing, units and sanity
-Max deflection 3.46 mm at (90, 18.8, 6).
+Max deflection 3.47 mm at (90, 0, 6).
 
 Checks:
-  [pass] mesh convergence: max principal stress settled: 44.2 -> 51.1 -> 53.4 -> 52.8 MPa over 4 meshes, last change 1.2%
-  [pass] force balance: reactions balance the loads to 0.00011% (forces) and 1.8e-05% (moments)
-  [pass] hand calculation: beam theory through the critical section gives 15.2 MPa nominal; FEA peak is 3.47x that, a stress concentration of about 3.5 from the local shape
+  [pass] mesh convergence: max principal stress settled: 43 -> 50.9 -> 53 -> 52.3 MPa over 4 meshes, last change 1.4%
+  [pass] force balance: reactions balance the loads to 0.00014% (forces) and 8.4e-06% (moments)
+  [pass] hand calculation: beam theory through the critical section gives 15.2 MPa nominal; FEA peak is 3.45x that, a stress concentration of about 3.4 from the local shape
   [pass] singularities: no sharp corner or support artifact is above the reported stress
-  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 13.1 N sideways and 50 N along its axis; bearing stress 0.485 MPa, safety factor 103.05 on bearing
-  [pass] units and sanity: part 123 mm across, peak strain 0.015, max deflection 3.46 mm (2.8% of size): all plausible
+  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 2.7 N sideways and 45.7 N along its axis; bearing stress 0.1 MPa, safety factor 499.33 on bearing
+  [pass] units and sanity: part 123 mm across, peak strain 0.015, max deflection 3.47 mm (2.8% of size): all plausible
 
 Suggested fixes:
   - Stress piles up in the 0.5 mm fillet. A fillet of 3 mm (about half the 6 mm wall) spreads it out. ...
@@ -134,14 +134,14 @@ Suggested fixes:
 
 | Version | Peak stress | Safety factor (PLA, 50 MPa) | Verdict |
 |---|---|---|---|
-| As drawn, 0.5 mm corner | 52.8 MPa | 0.95 | fails |
-| 3 mm fillet | 24.5 MPa | 2.04 | marginal (target 2.5) |
-| Legs thickened to 10 mm | 21.5 MPa | 2.32 | marginal |
-| Gusset across the corner | 10.3 MPa | 4.84 | holds |
+| As drawn, 0.5 mm corner | 52.3 MPa | 0.96 | fails |
+| 3 mm fillet | 24.1 MPa | 2.08 | marginal (target 2.5) |
+| Legs thickened to 10 mm | 21.0 MPa | 2.38 | marginal |
+| Gusset across the corner | 9.82 MPa | 5.09 | holds |
 
 <p>
-  <img alt="The bracket as drawn: a thin line of high stress along the 0.5 mm inside corner, 52.8 MPa" src="examples/shelf-bracket/output/images/stress.png" width="49%">
-  <img alt="The bracket with a gusset: the peak drops to 10.3 MPa near the gusset toe" src="examples/shelf-bracket/output/fix-gusset/images/stress.png" width="49%">
+  <img alt="The bracket as drawn: a thin line of high stress along the 0.5 mm inside corner, 52.3 MPa" src="examples/shelf-bracket/output/images/stress.png" width="49%">
+  <img alt="The bracket with a gusset: the peak drops to 9.82 MPa near the gusset toe" src="examples/shelf-bracket/output/fix-gusset/images/stress.png" width="49%">
 </p>
 
 ## An agent on its own versus Wobbl
@@ -158,10 +158,10 @@ Wobbl answers those parts in minutes with the trap handling built in:
 
 | Part | Converged reference | Wobbl | Confidence |
 |---|---|---|---|
-| Cast motor mount, belt pull through four bolts | 124.3 MPa at the rib tip | 123.9 MPa, same spot | medium, and it says why: the verdict flips if the servo is treated as rigid (55.5 versus 124 MPa) |
-| ABS enclosure shell pressed near a corner | 93 MPa, 1.93 mm deflection | 89.8 MPa, 1.91 mm | high |
-| PA12 truss drone arm, thrust and torque | 11.5 MPa, 4.09 mm rise | 11.53 MPa, 4.08 mm | high |
-| PLA bracket, sharp inside corner | about 78 MPa | 80.0 MPa | high |
+| Cast motor mount, belt pull through four bolts | 124.3 MPa at the rib tip | 123.7 MPa, same spot | medium, and it says why: the verdict flips if the servo is treated as rigid (55.0 versus 124 MPa) |
+| ABS enclosure shell pressed near a corner | 93 MPa, 1.93 mm deflection | 93.0 MPa, 1.92 mm | medium, and it says why: large deflection theory lowers the peak 11% |
+| PA12 truss drone arm, thrust and torque | 11.5 MPa, 4.09 mm rise | 11.49 MPa, 4.08 mm | high |
+| PLA bracket, sharp inside corner | about 78 MPa | 80.5 MPa | high |
 
 The full comparison, with times and every trap, is in [docs/bakeoff.md](docs/bakeoff.md).
 
@@ -191,12 +191,12 @@ an excluded peak, make the supports match the real build.
 agent: solve_structural(path="bracket.py", material="pla",
                         fixtures=["bolt holes d=4.5", "wall x=min"],
                         loads=["40 N down @ top and within 12 of 65,12.5,6"])
-       -> verdict fails, 52.8 MPa on the 0.5 mm inside fillet, safety factor 0.95, confidence high
+       -> verdict fails, 52.3 MPa on the 0.5 mm inside fillet, safety factor 0.96, confidence high
 agent: suggest_fix(result_dir, apply=true)
-       -> 3 mm fillet: 24.5 MPa (2.04); legs at 10 mm: 21.5 MPa (2.32); gusset: 10.3 MPa (4.84)
+       -> 3 mm fillet: 24.1 MPa (2.08); legs at 10 mm: 21 MPa (2.38); gusset: 9.82 MPa (5.09)
 ```
 
-Strength studies take one to five minutes. Details, timeouts and the full
+Strength studies take one to seven minutes on a 2018 laptop. Details, timeouts and the full
 session are in [docs/agents.md](docs/agents.md).
 
 ## What it checks

@@ -34,7 +34,7 @@ find it even when their PATH does not include pipx's bin folder.
 | `solve_circuit(template or netlist, params)` | LED, RC, buck, MOSFET, or any netlist |
 | `list_materials()` | the materials table |
 
-Strength studies take one to five minutes. Wobbl registers Codex with a 900 s
+Strength studies take one to seven minutes on a 2018 laptop. Wobbl registers Codex with a 900 s
 tool timeout and Gemini CLI with 900000 ms; if your Claude Code setup cuts long
 tool calls short, raise `MCP_TOOL_TIMEOUT` (milliseconds) in its environment, or
 pass `quality="fast"` for a first look.
@@ -63,10 +63,10 @@ agent: inspect_geometry("bracket.py")
 agent: solve_structural(path="bracket.py", material="pla",
                         fixtures=["bolt holes d=4.5", "wall x=min"],
                         loads=["40 N down @ top and within 12 of 65,12.5,6"])
-       -> verdict fails, 52.8 MPa on the 0.5 mm inside fillet, safety factor 0.95, confidence high
+       -> verdict fails, 52.3 MPa on the 0.5 mm inside fillet, safety factor 0.96, confidence high
 agent: suggest_fix(result_dir, apply=true)
-       -> 3 mm fillet: 24.5 MPa (2.04); legs at 10 mm: 21.5 MPa (2.32); gusset: 10.3 MPa (4.84)
-agent: "It cracks at the inside corner: 52.8 MPa against PLA's 50 MPa. A 3 mm fillet halves the
-        stress; a gusset brings it to 10.3 MPa, safety factor 4.8. The gusset toe is a sharp corner
+       -> 3 mm fillet: 24.1 MPa (2.08); legs at 10 mm: 21 MPa (2.38); gusset: 9.82 MPa (5.09)
+agent: "It cracks at the inside corner: 52.3 MPa against PLA's 50 MPa. A 3 mm fillet halves the
+        stress; a gusset brings it to 9.82 MPa, safety factor 5.1. The gusset toe is a sharp corner
         Wobbl excluded as a singularity, so round it too. Heatmaps and report: ..."
 ```
