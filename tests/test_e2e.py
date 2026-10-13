@@ -73,3 +73,15 @@ def test_led_and_rc(tmp_path):
     assert all(c.status in ("pass", "info") for c in led.checks)
     rc = run_circuit("rc", {"r": "1k", "c": "1u", "v": "5"}, tmp_path / "rc")
     assert rc.values["v_at_tau"] == pytest.approx(5 * 0.63212, rel=0.005)
+
+
+@needs_ccx
+@needs_spice
+def test_validation_subset(tmp_path):
+    """A quick slice of the validation suite: exact answers and high confidence, including roller supports."""
+    from wobbl.validation.cases import run_cases
+
+    rows = run_cases(tmp_path, ["cantilever-tip", "lame", "slab", "led", "rc"], log=lambda m: None)
+    for r in rows:
+        assert r["pass"], r
+        assert r["confidence"] == "high", r
