@@ -225,7 +225,7 @@ explains every [check](https://sohan-bhat.github.io/wobbl/guides/results/checks/
 
 ## Validation
 
-Eighteen cases with known answers run through the same pipeline you get. Every
+Nineteen cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
@@ -233,7 +233,7 @@ modeled setup lands within 2%.
 |---|---|---|
 | Textbook and benchmark strength (Timoshenko, Kirsch, Lame, NAFEMS LE1 and LE10, torsion, self weight) | 8 | 1.54%, plate with a hole |
 | Real parts against converged reference models | 5 | 4.26%, PLA bracket with a 6 mm fillet |
-| Heat (slab conduction, lumped cooling) | 2 | 0.44% |
+| Heat (slab conduction, lumped cooling, a bar whose end jumps to 120 C) | 3 | 0.85%, the bar against the erfc solution |
 | Circuits (LED, RC, buck ripple) | 3 | 7.70%, buck ripple against an ideal formula that ignores switch and diode drops |
 
 The full table is [on the website](https://sohan-bhat.github.io/wobbl/validation/). Run it yourself with
@@ -264,7 +264,7 @@ Each folder has a `run.sh` that regenerates its outputs.
 - [CLI reference](https://sohan-bhat.github.io/wobbl/guides/cli/) with every command and option
 - [Agents and MCP](https://sohan-bhat.github.io/wobbl/guides/agents/) with what `wobbl setup` registers, the 13 tools and the skill
 - [How it checks itself](https://sohan-bhat.github.io/wobbl/guides/results/checks/), every check and what sets the confidence
-- [Validation](https://sohan-bhat.github.io/wobbl/validation/), the 18 cases and their setups
+- [Validation](https://sohan-bhat.github.io/wobbl/validation/), the 19 cases and their setups
 - [Bake-off](https://sohan-bhat.github.io/wobbl/validation/bakeoff/), a coding agent on its own versus Wobbl
 - [Contributing](https://sohan-bhat.github.io/wobbl/get-started/contributing/), with the architecture and how a new solver plugs in
 - [Publishing](docs/publishing.md), the release steps for PyPI

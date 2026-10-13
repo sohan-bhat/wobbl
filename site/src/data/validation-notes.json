@@ -59,6 +59,10 @@
     "group": "Heat",
     "plain": "A small aluminum cube cooling down in air for ten minutes"
   },
+  "sudden-face": {
+    "group": "Heat",
+    "plain": "An aluminum bar at 20 C whose end is suddenly held at 120 C, read 10 mm in after 2 s"
+  },
   "led": {
     "group": "Circuits",
     "plain": "A red LED on 5 V through a 150 ohm resistor"

@@ -34,7 +34,7 @@ cards:
 | [`wobbl report`](/guides/results/files/) | rebuilds and opens the HTML report of a finished run, covered with the result files |
 | [`wobbl fix`](/guides/cli/fix/) | lists fixes, or applies them and solves each version again |
 | [`wobbl materials`](/guides/cli/materials/) | prints the material table |
-| [`wobbl validate`](/guides/cli/validate/) | runs the 18 validation cases |
+| [`wobbl validate`](/guides/cli/validate/) | runs the 19 validation cases |
 | [`wobbl setup`](/guides/cli/setup/) | installs the solvers and connects your coding agents |
 | [`wobbl doctor`](/guides/cli/doctor/) | checks every piece Wobbl needs |
 | [`wobbl uninstall`](/guides/cli/uninstall/) | removes the agent registrations, and with `--all` the solvers too |

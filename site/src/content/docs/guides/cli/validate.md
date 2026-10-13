@@ -1,12 +1,12 @@
 ---
 title: "wobbl validate"
-description: "Run Wobbl's 18 validation cases with known answers on your own machine, all of them or a chosen few."
-lead: "validate runs the 18 cases with known answers through the same pipeline your studies use."
+description: "Run Wobbl's 19 validation cases with known answers on your own machine, all of them or a chosen few."
+lead: "validate runs the 19 cases with known answers through the same pipeline your studies use."
 order: 10
 ---
 
 ```sh
-wobbl validate                       # all 18 cases, about 30 minutes
+wobbl validate                       # all 19 cases, about 30 minutes
 wobbl validate --only lame,led       # a few of them
 ```
 
@@ -34,7 +34,7 @@ The output folder gets one subfolder per case, a `results.json` with every numbe
 | Textbook formulas | `cantilever-tip`, `cantilever-stress`, `plate-hole`, `lame`, `torsion`, `self-weight` |
 | Industry benchmarks | `nafems-le1`, `nafems-le10` |
 | Real parts | `cast-motor-mount`, `enclosure-shell`, `drone-arm-truss`, `bracket-sharp`, `bracket-fillet` |
-| Heat | `slab`, `lumped` |
+| Heat | `slab`, `lumped`, `sudden-face` |
 | Circuits | `led`, `rc`, `buck` |
 
 [Validation](/validation/) shows the published results, and

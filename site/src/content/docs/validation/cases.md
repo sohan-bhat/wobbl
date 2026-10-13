@@ -1,6 +1,6 @@
 ---
 title: "How the cases are set up"
-description: "The part, the loads, the supports and the reference answer behind each of Wobbl's 18 validation cases."
+description: "The part, the loads, the supports and the reference answer behind each of Wobbl's 19 validation cases."
 lead: "Each case builds its part, meshes it, refines until the answer settles and runs its checks, and the number is then compared with a known answer."
 order: 1
 ---
@@ -60,6 +60,12 @@ series resistance `L/k + 1/h`.
 The lumped case is a 20 mm aluminum cube at 100 C cooling in 10 W/(m2 K) air for ten minutes.
 Its mean temperature is compared with lumped capacitance, which is exact to well under 1% here
 because the Biot number is 2e-4.
+
+The sudden face case is a 100 mm aluminum bar at 20 C whose end is held at 120 C from the start,
+insulated elsewhere. The temperature rise 10 mm in after 2 s is compared with the erfc solution
+for a semi infinite solid, `100 erfc(x / (2 sqrt(alpha t)))`, which is exact here because the
+heat has not reached the far end yet. Like every held face that starts away from the part's
+temperature, the end ramps to 120 C over a few milliseconds instead of jumping at once.
 
 ## Circuits
 

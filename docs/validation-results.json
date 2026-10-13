@@ -287,6 +287,24 @@
   "wall_s": 121.0
  },
  {
+  "id": "sudden-face",
+  "title": "Aluminum bar whose end jumps to 120 C",
+  "domain": "heat",
+  "source": "semi infinite solid, erfc",
+  "quantity": "temperature rise 10 mm in after 2 s",
+  "unit": "C",
+  "expected": 52.68091641402388,
+  "wobbl": 52.232299999999995,
+  "error": 0.00851572912092442,
+  "tolerance": 0.02,
+  "pass": true,
+  "exact_theory": true,
+  "confidence": "high",
+  "depth_mm": 10.517,
+  "time_s": 133.1,
+  "wall_s": 133.2
+ },
+ {
   "id": "led",
   "title": "Red LED on 5 V through 150 ohm",
   "domain": "circuit",

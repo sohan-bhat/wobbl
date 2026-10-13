@@ -235,6 +235,29 @@ def lumped(out: Path):
     return float(f["T"].mean()), expected, {"confidence": o.confidence, "tau_s": round(tau, 1)}
 
 
+def sudden_face(out: Path):
+    """A 100 mm aluminum bar at 20 C whose end is held at 120 C from t = 0, read 10 mm in after 2 s. Heat has
+    not reached the far end yet, so the bar is a semi infinite solid and the rise is 100 erfc(x / (2 sqrt(a t)))."""
+    from ..materials import get_material
+    from ..thermal.study import run_thermal
+    from ..thermal.tools import study_from
+
+    L, t0, t1, depth, when = 100.0, 20.0, 120.0, 10.0, 2.0
+    part = G.box(out / "bar.step", L, 20, 20)
+    st = study_from(part, "6061-t6", films=[f"10 W/m2K at {t0} C @ x=max"], fixed=[f"{t1} C @ x=min"],
+                    ambient=f"{t0} C", duration="4 s")
+    o = run_thermal(st, out / "run")
+    f = np.load(out / "run" / "fields.npz")
+    i = int(np.argmin(np.abs(f["hist_t"] - when)))
+    j = _near(f["X"], (depth, 10, 10))
+    m = get_material("6061-t6")
+    alpha = m.conductivity / (m.density * m.specific_heat) * 1e6      # mm2/s
+    x = float(f["X"][j, 0])
+    expected = (t1 - t0) * math.erfc(x / (2 * math.sqrt(alpha * float(f["hist_t"][i]))))
+    return float(f["hist_T"][i, j]) - t0, expected, {"confidence": o.confidence, "depth_mm": round(x, 3),
+                                                     "time_s": round(o.t_total, 1)}
+
+
 # --- circuits ---------------------------------------------------------------------
 def led(out: Path):
     from ..circuits.run import run_circuit
@@ -294,6 +317,8 @@ CASES = [
          "cooled face temperature", "C", 0.01, True, slab),
     Case("lumped", "Aluminum cube cooling in air", "heat", "lumped capacitance (Biot 2e-4)",
          "mean temperature after 10 min", "C", 0.01, True, lumped),
+    Case("sudden-face", "Aluminum bar whose end jumps to 120 C", "heat", "semi infinite solid, erfc",
+         "temperature rise 10 mm in after 2 s", "C", 0.02, True, sudden_face),
     Case("led", "Red LED on 5 V through 150 ohm", "circuit", "diode equation solved by Newton", "LED current",
          "mA", 0.005, True, led),
     Case("rc", "RC charging", "circuit", "V (1 - e^-1) at t = RC", "voltage at one time constant", "V", 0.002,
