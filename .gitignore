@@ -28,3 +28,6 @@ examples/**/fix-*/report.html
 
 # browser automation scratch
 .playwright-cli/
+
+# website build output (scripts/build_site.py)
+_site/
