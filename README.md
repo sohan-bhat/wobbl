@@ -20,9 +20,10 @@
 
 <p align="center">
   <a href="https://sohan-bhat.github.io/wobbl/">Website</a> &nbsp;|&nbsp;
-  <a href="docs/getting-started.md">Getting started</a> &nbsp;|&nbsp;
-  <a href="docs/cli.md">CLI reference</a> &nbsp;|&nbsp;
-  <a href="examples">Examples</a>
+  <a href="https://sohan-bhat.github.io/wobbl/get-started/">Getting started</a> &nbsp;|&nbsp;
+  <a href="https://sohan-bhat.github.io/wobbl/guides/">Guides</a> &nbsp;|&nbsp;
+  <a href="https://sohan-bhat.github.io/wobbl/guides/reference/">CLI reference</a> &nbsp;|&nbsp;
+  <a href="https://sohan-bhat.github.io/wobbl/examples/">Examples</a>
 </p>
 
 ![Stress heatmap of a cast aluminum motor mount under a 2 kN belt pull, peak 124 MPa marked where the rib tip meets the upright](examples/cast-motor-mount/output/images/stress.png)
