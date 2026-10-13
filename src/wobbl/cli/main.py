@@ -366,8 +366,9 @@ def mcp():
 
 def _register():
     from .admin import doctor, setup, uninstall
+    from .thermal import thermal
 
-    for c in (setup, doctor, uninstall):
+    for c in (setup, doctor, uninstall, thermal):
         cli.add_command(c)
 
 
