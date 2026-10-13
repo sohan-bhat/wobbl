@@ -255,6 +255,12 @@ def main() -> None:
           f"same node at {np.mean(i_web == i_true):.0%} of whole degrees")
     vm0 = von_mises(math.cos(t0) * Sb[:, :6] + math.sin(t0) * Sb[:, 6:]) * F
     print(f"default pull: {vm0[ok].max():.4f} MPa (solver {info['governing_MPa']:.4f})")
+    # the peak's node for every whole degree, with its position and bending per newton as the page draws
+    # them, so the readout and the marker cost nothing while the pull turns
+    spots, at_deg = np.unique(i_web, return_inverse=True)
+    Pb = lo + qp[spots] / 65535 * (hi - lo)
+    Ub = qu[spots] * d_step
+    peak_nodes = [[round(float(v), 4) for v in Pb[k]] + [float(f"{v:.6g}") for v in Ub[k]] for k in range(len(spots))]
 
     blob = b"".join(blocks)
     data = gzip.compress(blob, compresslevel=9, mtime=0)
@@ -288,9 +294,11 @@ def main() -> None:
         "mesh": {"triangles": len(tris), "corners": nc, "nodes": n, "bounds_min": lo.round(5).tolist(),
                  "bounds_max": hi.round(5).tolist()},
         "layout": layout,
-        # governing von Mises at each whole degree, MPa at load_N, from the coded data: the page uses it
-        # when it cannot draw the part
+        # governing von Mises at each whole degree, MPa at load_N, from the coded data, and where it is:
+        # an index into peak_nodes, each x, y, z in mm, then case 1 and case 2 displacement in mm per newton
         "peak_by_degree": (g_web * F).round(3).tolist(),
+        "peak_at_degree": at_deg.ravel().tolist(),
+        "peak_nodes": peak_nodes,
         "converged": acc,
     }
     (a.out / f"{a.name}.json").write_text(json.dumps(manifest, indent=1) + "\n")
