@@ -110,7 +110,60 @@ def build_heat(mesh, study: ThermalStudy, faces, bbox, mat) -> tuple[HeatModel, 
         model.duration = study.duration
         model.time_step = study.duration / 200.0
         model.output_times = list(np.linspace(study.duration / 40, study.duration, 40))
+        model.ramp_time, info["ramp_reason"] = held_ramp(mesh, model)
     return model, info
+
+
+RAMP_FRACTION = 0.1       # of the time heat takes to cross the smallest element at a held face that starts away
+RAMP_RUN_FRACTION = 1e-3  # of the run, whichever is shorter
+RAMP_SPARE = 4.0          # times the shortest ramp CalculiX's smallest increments can follow
+
+
+def held_ramp(mesh, model: HeatModel) -> tuple[float, str]:
+    """How long a held temperature that starts away from the part's temperature takes to reach its target, s, and
+    why that long.
+
+    A face held at a new temperature from t = 0 moves its neighbors by a fixed amount however short the time step,
+    so CalculiX cannot keep each step under its temperature change limit. It rises linearly instead, over a tenth
+    of a2 / alpha for the smallest element touching such a face (a the edge of a regular tetrahedron of the same
+    volume, alpha the thermal diffusivity), which is quicker than that mesh can resolve, or over a thousandth of
+    the run if that is shorter. CalculiX never takes an increment under a millionth of the run and lets each one
+    change a temperature by at most DELTMX (see transient_deltmx), so a big jump over a long run ramps over at least
+    four times jump / DELTMX of those increments. Zero when every held temperature starts where the part does.
+    """
+    from ..solvers.calculix import MIN_INCREMENT, transient_deltmx
+
+    step = [(nodes, temp) for _, nodes, temp in model.fixed_temps if abs(temp - model.initial_temp) > 1e-6]
+    if not (model.transient and step):
+        return 0.0, ""
+    held = np.zeros(mesh.n_nodes, bool)
+    held[np.concatenate([n for n, _ in step])] = True
+    c = mesh.X[mesh.tets[held[mesh.tets].any(axis=1), :4]]
+    v = np.abs(np.einsum("ij,ij->i", c[:, 1] - c[:, 0], np.cross(c[:, 2] - c[:, 0], c[:, 3] - c[:, 0]))) / 6.0
+    a = float((6.0 * np.sqrt(2.0) * v.min()) ** (1.0 / 3.0))
+    alpha = model.conductivity / (model.density * model.specific_heat)    # mm2/s
+    jump = max(abs(temp - model.initial_temp) for _, temp in step)
+    options = [(RAMP_FRACTION * a * a / alpha, "a tenth of the time heat takes to cross the smallest element there, "
+                                                "quicker than this mesh can resolve"),
+               (RAMP_RUN_FRACTION * model.duration, "a thousandth of the run")]
+    ramp = min(options)
+    floor = RAMP_SPARE * MIN_INCREMENT * model.duration * jump / transient_deltmx(jump)
+    if floor > ramp[0]:
+        ramp = (floor, f"as quick as CalculiX's shortest time steps can follow for a {fmt(jump)} C jump over a run "
+                       "this long")
+    return ramp
+
+
+def _ramp_assumption(model: HeatModel, reason: str) -> str:
+    """The result's note on how held temperatures that start away from the part's reach their targets."""
+    step = [(name, temp) for name, _, temp in model.fixed_temps if abs(temp - model.initial_temp) > 1e-6]
+    start, over = fmt(model.initial_temp), f"in a straight line over the first {fmt(model.ramp_time)} s"
+    if len(step) == 1:
+        what = f"the held temperature at {step[0][0]} ramps from {start} C to {fmt(step[0][1])} C {over}"
+    else:
+        names = [f"{name} ({fmt(temp)} C)" for name, temp in step]
+        what = (f"the held temperatures at {', '.join(names[:-1])} and {names[-1]} ramp to their targets {over}")
+    return f"The part starts at {start} C, and {what} instead of jumping at once, {reason}."
 
 
 def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=None):
@@ -281,13 +334,16 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
     assumptions = [
         f"{mat.name}: conductivity {mat.conductivity:g} W/(m K), specific heat {mat.specific_heat:g} J/(kg K), "
         f"density {mat.density:g} kg/m3.",
-        ("Heat is generated evenly through the part." if not study.heat_faces else
+        ("No heat is made in the part." if not study.power else
+         "Heat is generated evenly through the part." if not study.heat_faces else
          f"Heat enters through {study.heat_faces}."),
         "Convection uses a fixed film coefficient; real coefficients vary with temperature and airflow.",
         f"Surrounding air or coolant at {fmt(study.ambient)} C does not heat up.",
         "Radiation " + (f"with emissivity {study.emissivity:g}." if study.emissivity else "is ignored (conservative)."),
         "Contact resistance between parts and internal airflow are not modeled.",
     ]
+    if model.ramp_time:
+        assumptions.append(_ramp_assumption(model, info["ramp_reason"]))
     fixes = []
     if verdict != "ok" and hA > 0 and study.power:
         need = (tmax - study.ambient) / max(limit - 5 - study.ambient, 1e-9)

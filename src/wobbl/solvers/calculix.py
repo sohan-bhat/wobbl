@@ -20,6 +20,10 @@ from .locate import find_tool, tool_env
 # large deflection load ramp: first increment, total, smallest increment, largest increment. Two steps, cut back
 # automatically when a step does not converge; elastic results do not depend on the path
 NLGEOM_STATIC = "0.5,1.,1e-5,1."
+DELTMX = 2.0   # largest temperature change, C, CalculiX allows in one increment of a transient
+JUMP_INCREMENTS = 50.0   # a held face that jumps gets at least this many increments of DELTMX through its jump
+DELTMX_MIN = 0.25        # but DELTMX never goes under this, C
+MIN_INCREMENT = 1e-6   # of the step time, the shortest increment CalculiX takes whatever smaller minimum it is given
 CCX_NAMES = ["ccx", "ccx_2.23", "ccx2.23", "ccx_2.22", "ccx_2.21", "ccx_static", "calculix"]
 
 
@@ -234,8 +238,24 @@ def write_static_inp(path: Path, model: StaticModel, nlgeom: bool = False) -> di
     return extra
 
 
+def transient_deltmx(jump: float) -> float:
+    """DELTMX, C, for a transient whose held faces jump by up to jump. It is 2 C, or a fiftieth of the jump when
+    that is smaller, so a 20 C jump gets as many increments through its fast start as a 100 C one and keeps the
+    same accuracy, and never under 0.25 C, so that a tiny jump does not slow the rest of the run to a crawl."""
+    return DELTMX if jump <= 0 else float(min(DELTMX, max(jump / JUMP_INCREMENTS, DELTMX_MIN)))
+
+
+def ramped_sets(model: HeatModel) -> list[int]:
+    """Indices of the held temperatures a transient ramps to, because they start away from the initial
+    temperature."""
+    if not (model.transient and model.ramp_time > 0):
+        return []
+    return [k for k, (_, _, temp) in enumerate(model.fixed_temps) if abs(temp - model.initial_temp) > 1e-6]
+
+
 def write_heat_inp(path: Path, model: HeatModel):
     mesh = model.mesh
+    ramped = ramped_sets(model)
     with open(path, "w") as f:
         f.write("*HEADING\nWobbl heat transfer\n")
         _write_mesh(f, mesh)
@@ -248,21 +268,39 @@ def write_heat_inp(path: Path, model: HeatModel):
         f.write("*SOLID SECTION, ELSET=EALL, MATERIAL=MAT\n")
         f.write("*PHYSICAL CONSTANTS, ABSOLUTE ZERO=-273.15, STEFAN BOLTZMANN=5.670374E-11\n")
         f.write(f"*INITIAL CONDITIONS, TYPE=TEMPERATURE\nNALL,{model.initial_temp:.10g}\n")
+        # A held face that jumps away from the initial temperature moves its neighbors by a fixed amount however
+        # short the increment, through the consistent heat capacity, so DELTMX could never be met. Each such face
+        # follows an amplitude that holds temperatures, from the initial one to its target over ramp_time, and the
+        # boundary value of 1 takes them as they are, which works for a target of 0 C too.
+        for k in ramped:
+            temp, tr = model.fixed_temps[k][2], model.ramp_time
+            end = max(model.duration, 2.0 * tr)
+            f.write(f"*AMPLITUDE, NAME=RAMP{k + 1}\n0.,{model.initial_temp:.10g},{tr:.10g},{temp:.10g},"
+                    f"{end:.10g},{temp:.10g}\n")
         if model.transient:
             dt = model.time_step or model.duration / 100.0
+            jump = max([abs(model.fixed_temps[k][2] - model.initial_temp) for k in ramped], default=0.0)
+            deltmx = transient_deltmx(jump)
+            if ramped:
+                # start with increments that move a ramped face by about DELTMX, but never under the shortest one
+                # CalculiX takes, which it reports as an error
+                dt = min(dt, max(model.ramp_time * deltmx / jump, 1.01 * MIN_INCREMENT * model.duration))
             if model.output_times:
                 f.write("*TIME POINTS, NAME=TP\n")
                 tp = [t for t in model.output_times if 0 < t <= model.duration]
                 for i in range(0, len(tp), 8):
                     f.write(", ".join(f"{t:.10g}" for t in tp[i:i + 8]) + "\n")
-            f.write("*STEP, INC=100000\n*HEAT TRANSFER, DELTMX=2.0\n")
+            f.write(f"*STEP, INC=100000\n*HEAT TRANSFER, DELTMX={deltmx:.6g}\n")
             f.write(f"{dt:.10g},{model.duration:.10g},{dt * 1e-4:.10g},{model.duration / 20.0:.10g}\n")
         else:
             f.write("*STEP\n*HEAT TRANSFER, STEADY STATE\n1.,1.\n")
-        if model.fixed_temps:
+        plain = [k for k in range(len(model.fixed_temps)) if k not in ramped]
+        if plain:
             f.write("*BOUNDARY\n")
-            for k, (name, nodes, temp) in enumerate(model.fixed_temps):
-                f.write(f"TFIX{k + 1},11,11,{temp:.10g}\n")
+            for k in plain:
+                f.write(f"TFIX{k + 1},11,11,{model.fixed_temps[k][2]:.10g}\n")
+        for k in ramped:
+            f.write(f"*BOUNDARY, AMPLITUDE=RAMP{k + 1}\nTFIX{k + 1},11,11,1.\n")
         if model.films:
             f.write("*FILM\n")
             for name, mask, h, tinf in model.films:

@@ -118,6 +118,7 @@ class HeatModel:
     duration: float = 0.0         # s
     time_step: float = 0.0        # initial step, s
     output_times: list[float] = field(default_factory=list)
+    ramp_time: float = 0.0        # s, a held temperature away from initial_temp rises to it linearly over this time
 
 
 @dataclass
