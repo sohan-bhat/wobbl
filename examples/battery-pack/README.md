@@ -18,5 +18,6 @@ radiates with emissivity 0.9.
 ![Temperature over the discharge](output/images/history.png)
 
 The pack heats almost uniformly (Biot number 0.012), so the answer is set by how
-fast the box sheds heat. Either the box needs airflow or a path to a metal wall,
-or the discharge has to stay under about 3.5 W to hold 60 C for the hour.
+fast the box sheds heat. Wobbl's fixes: roughly double the heat transfer (airflow
+or a thermal path to a metal wall), or cut the heat to about 3 W, which keeps the
+pack near 55 C with some margin under the limit.
