@@ -24,7 +24,8 @@
 @media (min-width: 1200px) { :root { --gutter: 48px; } }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: calc(var(--nav-h) + 16px); -webkit-tap-highlight-color: rgba(255, 212, 0, 0.25); }
+a, button, input, label { touch-action: manipulation; }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 body {
   margin: 0;
@@ -43,7 +44,6 @@ a:hover { text-decoration-color: var(--yellow); }
 code, pre, .mono { font-family: var(--mono); }
 code { font-size: 0.9em; color: var(--fg); }
 h1, h2, h3 { color: var(--fg); margin: 0; font-family: var(--sans); }
-[id] { scroll-margin-top: calc(var(--nav-h) + 16px); }
 ::selection { background: var(--yellow); color: var(--ink); }
 
 .wrap { width: 100%; max-width: 1320px; margin-inline: auto; padding-inline: var(--gutter); }
@@ -185,7 +185,8 @@ table.data tbody tr:first-child.group th { padding-top: 16px; }
   aspect-ratio: 1 / 1; min-height: 340px; overflow: hidden;
   touch-action: none; user-select: none; -webkit-user-select: none;
 }
-.viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+.viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.viewer canvas:focus-visible { outline-offset: -3px; }
 .viewer canvas:active { cursor: grabbing; }
 .viewer-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 24px; }
 .viewer[data-state="live"] .viewer-poster { display: none; }
