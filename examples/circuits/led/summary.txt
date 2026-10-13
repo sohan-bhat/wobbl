@@ -1,0 +1,21 @@
+FAILS. The LED fries: 36.9 mA through it, above its 30 mA rating (1.2x).
+
+Confidence: high. passed hand calculation, power balance
+LED current: 36.9 mA
+rating: 30 mA
+resistor power: 63.9 mW
+LED power: 120 mW
+
+Checks:
+  [pass] hand calculation: diode equation solved by hand gives 36.9 mA, ngspice 36.9 mA (5.4e-05% apart); the quick estimate (Vs - Vf)/R is 38.3 mA
+  [pass] power balance: supply gives 184 mW = resistor 63.9 mW + LED 120 mW (5.4e-08% apart)
+  [info] operating limits: LED 36.9 mA of 30 mA; resistor 63.9 mW of 250 mW
+
+Assumptions:
+  - blue LED modeled with the diode equation: 3.2 V at 20 mA, ideality 2.7, series resistance 1.5 ohm.
+  - Resistor 47 ohm exact, rated 0.25 W.
+  - Room temperature, steady DC.
+
+Suggested fixes:
+  - Use a 91 ohm resistor: Gives about 19.8 mA; it dissipates 35.6 mW, so a 0.25 W part is enough.
+Report: report.html

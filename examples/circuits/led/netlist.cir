@@ -1,0 +1,7 @@
+* LED with series resistor
+V1 vin 0 DC 5.0
+R1 vin a 47.0
+D1 a 0 LEDX
+.model LEDX D(IS=2.192242e-22 N=2.666666666666667 RS=1.5)
+.dc V1 5.0 5.0 1
+.end

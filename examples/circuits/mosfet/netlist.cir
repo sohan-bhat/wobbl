@@ -1,0 +1,8 @@
+* MOSFET conduction with a resistive load
+V1 vbus 0 DC 12.0
+RL vbus d 0.792
+VG g 0 PULSE(0 10 0 1.0000e-07 1.0000e-07 2.500000e-05 5.000000e-05)
+S1 d s g 0 SWMOD
+.model SWMOD SW(VT=5 VH=0.1 RON=0.008 ROFF=1e7)
+VS s 0 DC 0
+.end

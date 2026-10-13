@@ -1,0 +1,87 @@
+{
+ "domain": "circuit",
+ "part": "buck",
+ "question": "What is the ripple on this 12 V to 5 V buck at 2 A?",
+ "verdict": "ok",
+ "headline": "Output ripple 8.56 mV peak to peak on 5.07 V (within the 50 mV limit); inductor ripple 0.604 A, peak 2.33 A.",
+ "metrics": [
+  [
+   "ripple",
+   "8.56 mV"
+  ],
+  [
+   "output",
+   "5.07 V"
+  ],
+  [
+   "inductor ripple",
+   "0.604 A"
+  ],
+  [
+   "duty",
+   "43.7%"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed hand calculation, steady state, time step convergence"
+ ],
+ "checks": [
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "ideal waveform math (triangular inductor ripple dI = 0.583 A through C and ESR) gives 7.95 mV; ngspice 8.56 mV and 0.604 A (8% apart; the math ignores switch and diode drops)",
+   "detail": {}
+  },
+  {
+   "name": "steady state",
+   "status": "pass",
+   "summary": "average output moved 0.0069% between the last two 20 cycle windows",
+   "detail": {}
+  },
+  {
+   "name": "time step convergence",
+   "status": "pass",
+   "summary": "output ripple 0.00856 with the normal step, 0.00856 with half the step (0.0022% apart)",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Open loop at the steady state duty cycle 43.7%; real controllers add their own ripple and transients.",
+  "Switch on resistance 0.05 ohm, Schottky catch diode.",
+  "Capacitor ESR 10 mohm, no ESL."
+ ],
+ "values": {
+  "ripple_V": 0.008561,
+  "ripple_A": 0.603644,
+  "vout_avg": 5.072582,
+  "il_peak": 2.331019,
+  "params": {
+   "vin": 12.0,
+   "vout": 5.0,
+   "current": 2.0,
+   "frequency": 500000.0,
+   "inductor": 1e-05,
+   "capacitor": 2.2e-05,
+   "max_ripple": "0.05",
+   "esr": 0.01,
+   "duty": 0.436735,
+   "cycles": 300
+  },
+  "_figures": [
+   [
+    "waveform",
+    "Simulated waveform"
+   ]
+  ]
+ },
+ "images": {
+  "waveform": "images/waveform.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 8.446739,
+ "solver": "ngspice 41"
+}

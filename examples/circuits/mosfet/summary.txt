@@ -1,0 +1,17 @@
+OK. Junction reaches about 110 C (1.51 W: 1.37 W conduction, 0.144 W switching) with 40 C/W to 50 C air; limit 150 C.
+
+Confidence: high. passed hand calculation, thermal loop
+junction: 110 C
+limit: 150 C
+loss: 1.51 W
+theta JA: 40 C/W
+
+Checks:
+  [pass] hand calculation: conduction loss I_rms^2 R = 0.903 W; ngspice average of V x I = 0.903 W (0.00079% apart)
+  [pass] thermal loop: junction settles at 110 C after the on resistance warms up (12.1 mohm hot)
+
+Assumptions:
+  - On resistance 8 mohm at 25 C rising 0.6% per C.
+  - Switching loss from 40 ns edges: 0.5 V I (tr + tf) f.
+  - Junction to air 40 C/W (datasheet, no heatsink unless included).
+Report: report.html

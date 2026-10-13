@@ -1,0 +1,12 @@
+* Buck converter power stage, open loop at the steady state duty cycle
+V1 vin 0 DC 12.0
+VG g 0 PULSE(0 5 0 1.0000e-08 1.0000e-08 8.734694e-07 2.000000e-06)
+S1 vin sw g 0 SWMOD
+.model SWMOD SW(VT=2.5 VH=0.1 RON=0.05 ROFF=1e6)
+D1 0 sw SCHOTTKY
+.model SCHOTTKY D(IS=5e-5 N=1.05 RS=0.02)
+L1 sw out 9.999999999999999e-06 IC=2.0
+C1 out cmid 2.2e-05 IC=5.0
+R2 cmid 0 0.01
+R1 out 0 2.5
+.end

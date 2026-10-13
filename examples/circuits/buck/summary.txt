@@ -1,0 +1,20 @@
+OK. Output ripple 8.56 mV peak to peak on 5.07 V (within the 50 mV limit); inductor ripple 0.604 A, peak 2.33 A.
+
+Confidence: high. passed hand calculation, steady state, time step convergence
+ripple: 8.56 mV
+output: 5.07 V
+inductor ripple: 0.604 A
+duty: 43.7%
+
+Checks:
+  [pass] hand calculation: ideal waveform math (triangular inductor ripple dI = 0.583 A through C and ESR) gives 7.95 mV; ngspice 8.56 mV and 0.604 A (8% apart; the math ignores switch and diode drops)
+  [pass] steady state: average output moved 0.0069% between the last two 20 cycle windows
+  [pass] time step convergence: output ripple 0.00856 with the normal step, 0.00856 with half the step (0.0022% apart)
+
+Assumptions:
+  - Open loop at the steady state duty cycle 43.7%; real controllers add their own ripple and transients.
+  - Switch on resistance 0.05 ohm, Schottky catch diode.
+  - Capacitor ESR 10 mohm, no ESL.
+
+Images: waveform: images/waveform.png
+Report: report.html

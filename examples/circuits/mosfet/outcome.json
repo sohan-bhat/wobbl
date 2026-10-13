@@ -1,0 +1,76 @@
+{
+ "domain": "circuit",
+ "part": "mosfet",
+ "question": "How hot does this MOSFET get switching 15 A at 20 kHz in a 50 C box?",
+ "verdict": "ok",
+ "headline": "Junction reaches about 110 C (1.51 W: 1.37 W conduction, 0.144 W switching) with 40 C/W to 50 C air; limit 150 C.",
+ "metrics": [
+  [
+   "junction",
+   "110 C"
+  ],
+  [
+   "limit",
+   "150 C"
+  ],
+  [
+   "loss",
+   "1.51 W"
+  ],
+  [
+   "theta JA",
+   "40 C/W"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed hand calculation, thermal loop"
+ ],
+ "checks": [
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "conduction loss I_rms^2 R = 0.903 W; ngspice average of V x I = 0.903 W (0.00079% apart)",
+   "detail": {}
+  },
+  {
+   "name": "thermal loop",
+   "status": "pass",
+   "summary": "junction settles at 110 C after the on resistance warms up (12.1 mohm hot)",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "On resistance 8 mohm at 25 C rising 0.6% per C.",
+  "Switching loss from 40 ns edges: 0.5 V I (tr + tf) f.",
+  "Junction to air 40 C/W (datasheet, no heatsink unless included)."
+ ],
+ "values": {
+  "tj_C": 110.398532,
+  "p_total_W": 1.509969,
+  "p_cond_W": 1.365969,
+  "p_sw_W": 0.144,
+  "params": {
+   "current": 15.0,
+   "rds_on": 0.008,
+   "frequency": 20000.0,
+   "theta_ja": "40",
+   "ambient": "50",
+   "vbus": 12.0,
+   "duty": 0.5
+  },
+  "_figures": [
+   [
+    "waveform",
+    "Simulated waveform"
+   ]
+  ]
+ },
+ "images": {},
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 0.455702,
+ "solver": "ngspice 41"
+}
