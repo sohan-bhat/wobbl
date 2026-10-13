@@ -1,9 +1,9 @@
-// Drawing the hero part with three.js, which is bundled from npm. The data holds two unit belt pulls
-// at right angles in the pulley plane, solved on one mesh (scripts/solve_site_directions.py,
-// scripts/export_site_part.py). The model is linear elastic, so a pull of F newtons at angle t is
-// exactly F (cos t case1 + sin t case2). The vertex shader combines the two stress tensors and takes
-// von Mises from the result at every vertex, since von Mises does not add up across loads; turning
-// or sizing the pull only changes uniforms. This runs in draw-worker.js where the browser can draw
+// Drawing the hero part with three.js, which is bundled from npm. The data holds three unit loads on
+// the motor shaft, two at right angles in the pulley plane and one along the shaft, solved on one mesh
+// (scripts/solve_site_directions.py, scripts/export_site_part.py). The model is linear elastic, so a
+// load of F newtons along the unit direction u is exactly F (u1 case1 + u2 case2 + u3 case3). The
+// vertex shader combines the three stress tensors and takes von Mises from the result at every
+// vertex, since von Mises does not add up across loads; moving the load only changes uniforms. This runs in draw-worker.js where the browser can draw
 // in a worker, so WebGL never holds up the page, and on the page itself where it cannot.
 import {
   BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Line, LineBasicMaterial,
@@ -14,19 +14,25 @@ import {
 const VERT = /* glsl */ `
 attribute vec4 stressA;
 attribute vec4 stressB;
-attribute vec4 shear;
-attribute vec4 dispA;
+attribute vec4 stressC;
+attribute vec4 shearAB;
+attribute vec4 shearC;
+attribute vec3 dispA;
 attribute vec3 dispB;
+attribute vec3 dispC;
 uniform float uF;
-uniform vec2 uCS;
+uniform vec3 uU;
 uniform float uExag;
 uniform float uLimit;
 // each channel's largest value: the attributes arrive as -1 to 1
 uniform vec4 uRA;
 uniform vec4 uRB;
+uniform vec4 uRC;
 uniform vec4 uRS;
+uniform vec2 uRSC;
 uniform vec3 uRDA;
 uniform vec3 uRDB;
+uniform vec3 uRDC;
 varying vec3 vC;
 varying float vE;
 varying vec3 vN;
@@ -48,19 +54,19 @@ vec3 turbo(float x) {
   return vec3(dot(v4, kr4) + dot(v2, kr2), dot(v4, kg4) + dot(v2, kg2), dot(v4, kb4) + dot(v2, kb2));
 }
 void main() {
-  // the stress tensor for this pull, then von Mises from it
-  vec4 s = uCS.x * (stressA * uRA) + uCS.y * (stressB * uRB);
-  vec4 h = shear * uRS;
-  vec2 t = uCS.x * h.xy + uCS.y * h.zw;
+  // the stress tensor for this load, then von Mises from it
+  vec4 s = uU.x * (stressA * uRA) + uU.y * (stressB * uRB) + uU.z * (stressC * uRC);
+  vec4 h = shearAB * uRS;
+  vec2 t = uU.x * h.xy + uU.y * h.zw + uU.z * (shearC.xy * uRSC);
   vec3 d = s.xyz - s.yzx;
   float vm = uF * sqrt(0.5 * dot(d, d) + 3.0 * (s.w * s.w + dot(t, t)));
   float x = vm / uLimit;
   vC = x > 1.0 ? vec3(0.949, 0.949, 0.933) : turbo(x);
-  vE = dispA.w;
+  vE = shearC.z;
 #ifdef PICK
   vS = vm;
 #endif
-  vec3 p = position + (uExag * uF) * (uCS.x * dispA.xyz * uRDA + uCS.y * dispB * uRDB);
+  vec3 p = position + (uExag * uF) * (uU.x * dispA * uRDA + uU.y * dispB * uRDB + uU.z * dispC * uRDC);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vN = normalize(normalMatrix * normal);
   vV = -mv.xyz;
@@ -124,7 +130,7 @@ function arrow(color) {
   return g;
 }
 
-const SIZES = { position: 3, normal: 3, stressA: 4, stressB: 4, shear: 4, dispA: 4, dispB: 3 };
+const SIZES = { position: 3, normal: 3, stressA: 4, stressB: 4, stressC: 4, shearAB: 4, shearC: 4, dispA: 3, dispB: 3, dispC: 3 };
 const COLD = 0xffd400, HOT = 0xfff07a;
 
 /**
@@ -149,16 +155,19 @@ export async function createDrawer({ canvas, man, mesh: meshP, w, h, px, pause }
   camera.up.set(0, 0, 1);
   const uniforms = {
     uF: { value: man.load_N },
-    uCS: { value: new Vector2(1, 0) },
+    uU: { value: new Vector3(1, 0, 0) },
     uExag: { value: 60 },
     uLimit: { value: man.allowable_MPa },
     uHatch: { value: 1 },
     uPx: { value: px },
     uRA: { value: new Vector4() },
     uRB: { value: new Vector4() },
+    uRC: { value: new Vector4() },
     uRS: { value: new Vector4() },
+    uRSC: { value: new Vector2() },
     uRDA: { value: new Vector3() },
     uRDB: { value: new Vector3() },
+    uRDC: { value: new Vector3() },
   };
   const material = new ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, side: DoubleSide, uniforms });
   const pickMaterial = new ShaderMaterial({
@@ -182,22 +191,32 @@ export async function createDrawer({ canvas, man, mesh: meshP, w, h, px, pause }
   floor.position.set(center.x, center.y, lo.z - 0.4);
   scene.add(floor);
 
-  // The belt pull acts at the pulley, off the part, and turns in the pulley plane.
+  // The load acts on the motor shaft at the pulley, off the part, and can point any way.
   const pl = man.pull;
   const pAt = new Vector3(...pl.point);
-  const e1 = new Vector3(...pl.e1), e2 = new Vector3(...pl.e2);
-  const pDir = new Vector3(), Y = new Vector3(0, 1, 0);
+  const e1 = new Vector3(...pl.e1), e2 = new Vector3(...pl.e2), e3 = new Vector3(...pl.e3);
+  const pDir = new Vector3(), Y = new Vector3(0, 1, 0), side = new Vector3(), across = new Vector3();
   const pull = arrow(COLD);
   pull.position.copy(pAt);
   scene.add(pull);
-  // the circle the arrow's tip runs on, shown while the arrow is under the pointer or turning
-  const ringPts = [];
-  for (let k = 0; k <= 96; k++) {
-    const a = (k / 96) * Math.PI * 2;
-    ringPts.push(new Vector3().addScaledVector(e1, Math.cos(a)).addScaledVector(e2, Math.sin(a)));
-  }
-  const ring = new Line(new BufferGeometry().setFromPoints(ringPts),
-    new LineBasicMaterial({ color: COLD, transparent: true, opacity: 0.6, depthTest: false }));
+  // While the arrow is under the pointer or held, guides show the sphere its tip moves on, so depth
+  // reads: a faint shell, the circle in the pulley plane and the circle through the arrow and the shaft.
+  const circle = (a, b) => {
+    const pts = [];
+    for (let k = 0; k <= 96; k++) {
+      const t = (k / 96) * Math.PI * 2;
+      pts.push(new Vector3().addScaledVector(a, Math.cos(t)).addScaledVector(b, Math.sin(t)));
+    }
+    return new BufferGeometry().setFromPoints(pts);
+  };
+  const lineMat = new LineBasicMaterial({ color: COLD, transparent: true, opacity: 0.55, depthTest: false });
+  const ring = new Group();
+  const equator = new Line(circle(e1, e2), lineMat);
+  const meridian = new Line(circle(new Vector3(1, 0, 0), new Vector3(0, 1, 0)), lineMat);
+  meridian.matrixAutoUpdate = false;
+  const shell = new Mesh(new SphereGeometry(1, 32, 16),
+    new MeshBasicMaterial({ color: COLD, transparent: true, opacity: 0.07, depthWrite: false, depthTest: false }));
+  ring.add(shell, equator, meridian);
   ring.position.copy(pAt);
   ring.renderOrder = 3;
   ring.visible = false;
@@ -217,19 +236,22 @@ export async function createDrawer({ canvas, man, mesh: meshP, w, h, px, pause }
   const { arrays: m, range } = await meshP;
   uniforms.uRA.value.fromArray(range.stressA);
   uniforms.uRB.value.fromArray(range.stressB);
-  uniforms.uRS.value.fromArray(range.shear);
+  uniforms.uRC.value.fromArray(range.stressC);
+  uniforms.uRS.value.fromArray(range.shearAB);
+  uniforms.uRSC.value.fromArray(range.shearC);
   uniforms.uRDA.value.fromArray(range.dispA);
   uniforms.uRDB.value.fromArray(range.dispB);
+  uniforms.uRDC.value.fromArray(range.dispC);
   // Send the mesh to the GPU a few attributes at a time, each in its own step, by drawing it into
   // the probe's one pixel target; the first frame on screen then has nothing left to send.
   geo.setIndex(new BufferAttribute(m.index, 1));
-  for (const group of [['position', 'normal'], ['stressA', 'stressB'], ['shear', 'dispA', 'dispB']]) {
+  for (const group of [['position', 'normal', 'shearC'], ['stressA', 'stressB', 'stressC'], ['shearAB', 'dispA', 'dispB', 'dispC']]) {
     for (const name of group) geo.setAttribute(name, new BufferAttribute(m[name], SIZES[name], name !== 'position'));
     await pause();
     intoPick();
   }
 
-  // One frame of state from the page: the camera, and the pull and how it is drawn.
+  // One frame of state from the page: the camera, and the load and how it is drawn.
   function set(f) {
     const c = f.camera;
     camera.position.fromArray(c.position);
@@ -240,10 +262,10 @@ export async function createDrawer({ canvas, man, mesh: meshP, w, h, px, pause }
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
     uniforms.uF.value = f.load;
-    uniforms.uCS.value.set(f.cs[0], f.cs[1]);
+    uniforms.uU.value.fromArray(f.u);
     uniforms.uExag.value = f.exag;
     uniforms.uLimit.value = f.limit;
-    pDir.copy(e1).multiplyScalar(f.cs[0]).addScaledVector(e2, f.cs[1]);
+    pDir.copy(e1).multiplyScalar(f.u[0]).addScaledVector(e2, f.u[1]).addScaledVector(e3, f.u[2]);
     const len = f.len, grow = Math.min(f.grow, 1);
     pull.visible = len > 0.5;
     const { shaft, head, hub, materials: [solid, faint] } = pull.userData;
@@ -259,6 +281,13 @@ export async function createDrawer({ canvas, man, mesh: meshP, w, h, px, pause }
     faint.opacity = f.hot ? 0.5 : 0.35;
     ring.visible = f.ring;
     ring.scale.setScalar(Math.max(len, 16));
+    // the circle through the arrow and the shaft
+    side.copy(e1).multiplyScalar(f.u[0]).addScaledVector(e2, f.u[1]);
+    if (side.lengthSq() < 1e-6) side.copy(e1);
+    side.normalize();
+    across.crossVectors(side, e3);
+    meridian.matrix.makeBasis(side, e3, across);
+    meridian.matrixWorldNeedsUpdate = true;
   }
   const px1 = new Uint8Array(4);
   return {

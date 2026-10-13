@@ -31,9 +31,9 @@ function integers(r, channels, n, nc, pa, pb, ends) {
 }
 
 /**
- * Nodes, triangles and both unit cases from the gunzipped file: node positions (n x 3), the linear
- * triangles VTK would draw (four per curved triangle), stress per newton (n x 12: case 1 xx yy zz
- * xy yz zx, then case 2), displacement per newton (n x 6) and the excluded zone flags.
+ * Nodes, triangles and the three unit cases from the gunzipped file: node positions (n x 3), the
+ * linear triangles VTK would draw (four per curved triangle), stress per newton (n x 18: case 1 xx yy
+ * zz xy yz zx, then cases 2 and 3), displacement per newton (n x 9) and the excluded zone flags.
  */
 export function decodePart(man, buf) {
   const bytes = new Uint8Array(buf);
@@ -78,24 +78,24 @@ export function decodePart(man, buf) {
   if (m !== n) throw new Error('part data: node count does not match');
 
   const field = (key, channels) => integers(planes(bytes, L[key].offset, channels * n), channels, n, nc, pa, pb, ends);
-  const qp = field('position', 3), qs = field('stress', 12), qu = field('disp', 6);
+  const qp = field('position', 3), qs = field('stress', 18), qu = field('disp', 9);
 
   const pos = new Float32Array(n * 3);
   for (let k = 0; k < 3; k++) {
     const s = (hi[k] - lo[k]) / 65535;
     for (let i = 0; i < n; i++) pos[i * 3 + k] = lo[k] + qp[k * n + i] * s;
   }
-  const S = new Float64Array(n * 12), U = new Float64Array(n * 6);
+  const S = new Float64Array(n * 18), U = new Float64Array(n * 9);
   const ss = L.stress.step, ds = L.disp.step;
-  for (let c = 0; c < 12; c++) for (let i = 0; i < n; i++) S[i * 12 + c] = qs[c * n + i] * ss;
-  for (let c = 0; c < 6; c++) for (let i = 0; i < n; i++) U[i * 6 + c] = qu[c * n + i] * ds;
+  for (let c = 0; c < 18; c++) for (let i = 0; i < n; i++) S[i * 18 + c] = qs[c * n + i] * ss;
+  for (let c = 0; c < 9; c++) for (let i = 0; i < n; i++) U[i * 9 + c] = qu[c * n + i] * ds;
   // nodes near a peak carry a finer step
   const nh = L.hot.count;
-  const gaps = planes(bytes, L.hot.offset, nh), fine = planes(bytes, L.hot_stress.offset, nh * 12);
+  const gaps = planes(bytes, L.hot.offset, nh), fine = planes(bytes, L.hot_stress.offset, nh * 18);
   const every = Math.round(ss / L.hot_stress.step), fs = L.hot_stress.step;
   for (let j = 0, i = 0; j < nh; j++) {
     i += gaps[j];
-    for (let c = 0; c < 12; c++) S[i * 12 + c] = (qs[c * n + i] * every + fine[c * nh + j]) * fs;
+    for (let c = 0; c < 18; c++) S[i * 18 + c] = (qs[c * n + i] * every + fine[c * nh + j]) * fs;
   }
   const excl = new Uint8Array(buf, L.excluded.offset, n).slice();
 
@@ -175,21 +175,24 @@ function shade(pos, tri, n) {
 /**
  * Everything the GPU needs, one entry per drawn vertex, as small integers the GPU reads back as
  * -1 to 1 (normalized). The shader multiplies each channel by its largest value, in range, and
- * combines the two unit cases for the pull's size and angle, so turning the pull only changes uniforms.
- *   position          float x3
- *   normal            int8 x3
- *   stressA, stressB  int16 x4  xx yy zz xy of case 1 and case 2, MPa per newton
- *   shear             int16 x4  yz zx of case 1, then of case 2
- *   dispA             int16 x4  case 1 displacement in mm per newton, then 1 in an excluded zone
- *   dispB             int16 x3  case 2 displacement
+ * combines the three unit cases for the load's size and direction, so moving the load only changes
+ * uniforms.
+ *   position                   float x3
+ *   normal                     int8 x3
+ *   stressA, stressB, stressC  int16 x4  xx yy zz xy of cases 1, 2 and 3, MPa per newton
+ *   shearAB                    int16 x4  yz zx of case 1, then of case 2
+ *   shearC                     int16 x4  yz zx of case 3, then 1 in an excluded zone
+ *   dispA, dispB, dispC        int16 x3  displacement of each case in mm per newton
  */
 export function buildMesh(man, buf) {
   const { n, pos, tri, S, U, excl } = decodePart(man, buf);
   const { index, vNode, normal } = shade(pos, tri, n);
   const nv = vNode.length;
-  // which of a node's 12 stress or 6 displacement values goes in each channel
-  const pick = { stressA: [0, 1, 2, 3], stressB: [6, 7, 8, 9], shear: [4, 5, 10, 11] };
-  const pickU = { dispA: [0, 1, 2], dispB: [3, 4, 5] };
+  // which of a node's 18 stress or 9 displacement values goes in each channel
+  const pick = {
+    stressA: [0, 1, 2, 3], stressB: [6, 7, 8, 9], stressC: [12, 13, 14, 15], shearAB: [4, 5, 10, 11], shearC: [16, 17],
+  };
+  const pickU = { dispA: [0, 1, 2], dispB: [3, 4, 5], dispC: [6, 7, 8] };
   const range = {};
   const quantize = (key, from, src, stride, size) => {
     const ch = from[key], top = ch.map(() => 1e-30);
@@ -202,17 +205,17 @@ export function buildMesh(man, buf) {
     range[key] = top;
     return out;
   };
-  const stressA = quantize('stressA', pick, S, 12, 4), stressB = quantize('stressB', pick, S, 12, 4);
-  const shear = quantize('shear', pick, S, 12, 4);
-  const dispA = quantize('dispA', pickU, U, 6, 4), dispB = quantize('dispB', pickU, U, 6, 3);
+  const arrays = {};
+  for (const key of ['stressA', 'stressB', 'stressC', 'shearAB', 'shearC']) arrays[key] = quantize(key, pick, S, 18, 4);
+  for (const key of ['dispA', 'dispB', 'dispC']) arrays[key] = quantize(key, pickU, U, 9, 3);
   const position = new Float32Array(nv * 3), nrm = new Int8Array(nv * 3);
   for (let v = 0; v < nv; v++) {
     const i = vNode[v];
     position[v * 3] = pos[i * 3]; position[v * 3 + 1] = pos[i * 3 + 1]; position[v * 3 + 2] = pos[i * 3 + 2];
     nrm[v * 3] = Math.round(normal[v * 3] * 127); nrm[v * 3 + 1] = Math.round(normal[v * 3 + 1] * 127);
     nrm[v * 3 + 2] = Math.round(normal[v * 3 + 2] * 127);
-    dispA[v * 4 + 3] = excl[i] ? 32767 : 0;
+    arrays.shearC[v * 4 + 2] = excl[i] ? 32767 : 0;
   }
   const idx = nv < 65536 ? Uint16Array.from(index) : index;
-  return { arrays: { position, normal: nrm, stressA, stressB, shear, dispA, dispB, index: idx }, range };
+  return { arrays: { position, normal: nrm, ...arrays, index: idx }, range };
 }
