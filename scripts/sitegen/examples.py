@@ -71,7 +71,7 @@ class Run:
                     ("Target", f"{o['target_sf']:g}")]
         else:
             rows = [(k[:1].upper() + k[1:], v) for k, v in o.get("metrics", [])[:3]]
-        return rows + [("Confidence", o["confidence"])]
+        return [(k, v.replace(" ", "\u00a0")) for k, v in rows] + [("Confidence", o["confidence"])]
 
 
 @dataclass
@@ -218,7 +218,7 @@ def run_card(run: Run, *, compact: bool = False, link: tuple[str, str] | None = 
     fixed = ""
     if compact and run.fixes:
         rows = "".join(f'<li><span class="fx-name">{escape(fix_label(f))}</span><span class="fx-n">'
-                       f'{f["after"]["governing_MPa"]:.3g} MPa</span><span class="vword" data-verdict="'
+                       f'{f["after"]["governing_MPa"]:.3g}\u00a0MPa</span><span class="vword" data-verdict="'
                        f'{COLOR.get(f["after"]["verdict"], "marginal")}">{escape(f["after"]["verdict"].upper())}</span></li>'
                        for f in run.fixes)
         fixed = f'<div class="run-step run-fixed"><p class="run-label">After wobbl fix --apply</p><ol>{rows}</ol></div>'
@@ -235,7 +235,7 @@ def run_card(run: Run, *, compact: bool = False, link: tuple[str, str] | None = 
   <div class="run-steps">
     <div class="run-step"><p class="run-label">You ask</p><p class="run-ask">{escape(run.question)}</p></div>
     <div class="run-step"><p class="run-label">Wobbl runs</p>{term(run.command, "sh")}</div>
-    <div class="run-step"><p class="run-label">Checks</p>{checks(run)}</div>
+    {f'<div class="run-step"><p class="run-label">Checks</p>{checks(run)}</div>' if run.outcome.get("checks") else ""}
     {fixed}
   </div>
   <div class="run-result">

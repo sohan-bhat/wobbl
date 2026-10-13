@@ -56,13 +56,23 @@ for (const list of $$('[role="tablist"]')) {
     }
     if (focus) tab.focus();
   };
-  list.addEventListener('click', (e) => { const t = e.target.closest('[role="tab"]'); if (t) select(t); });
+  const fromUrl = new URLSearchParams(location.search).get('run');
+  const start = tabs.find((t) => t.id === `tab-${fromUrl}`);
+  if (start) select(start);
+  const remember = (tab) => {
+    const u = new URL(location.href);
+    u.searchParams.set('run', tab.id.replace(/^tab-/, ''));
+    history.replaceState(null, '', u);
+  };
+  list.addEventListener('click', (e) => { const t = e.target.closest('[role="tab"]'); if (t) { select(t); remember(t); } });
   list.addEventListener('keydown', (e) => {
     const i = tabs.indexOf(document.activeElement);
     const step = { ArrowRight: 1, ArrowLeft: -1, Home: -i, End: tabs.length - 1 - i }[e.key];
     if (i < 0 || step === undefined) return;
     e.preventDefault();
-    select(tabs[(i + step + tabs.length) % tabs.length], true);
+    const next = tabs[(i + step + tabs.length) % tabs.length];
+    select(next, true);
+    remember(next);
   });
 }
 

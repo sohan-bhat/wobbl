@@ -147,7 +147,9 @@ class Doc:
 
 
 def _md() -> MarkdownIt:
-    md = MarkdownIt("commonmark", {"html": True}).enable(["table", "strikethrough"])
+    # typographer only for curly quotes: the replacements rule would turn -- into dashes
+    md = MarkdownIt("commonmark", {"html": True, "typographer": True}).enable(["table", "strikethrough",
+                                                                               "smartquotes"])
 
     def fence(self, tokens, idx, options, env):
         tok = tokens[idx]
@@ -159,7 +161,11 @@ def _md() -> MarkdownIt:
         name = escape(tokens[idx].meta.get("label", "Table"), quote=True)
         return f'<div class="table-scroll" role="region" aria-label="{name}" tabindex="0"><table class="data">\n'
 
+    def code_inline(self, tokens, idx, options, env):
+        return f'<code translate="no">{escape(tokens[idx].content)}</code>'
+
     md.add_render_rule("fence", fence)
+    md.add_render_rule("code_inline", code_inline)
     md.add_render_rule("table_open", table_open)
     md.add_render_rule("table_close", lambda self, t, i, o, e: "</table></div>\n")
     return md

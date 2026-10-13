@@ -27,7 +27,7 @@ class Guide:
 
 
 GUIDES = [
-    Guide("strength", "strength.md", "Strength", "Check a part's strength",
+    Guide("strength", "strength.md", "Strength", "Check a part’s strength",
           "Hold the part the way it is mounted, load it, and read the verdict with its checks.",
           ["inspect", "material", "supports", "loads", "verdict"],
           "cast-mount-stress", "Stress heatmap of a cast motor mount, peak 124 MPa at the rib tip."),
@@ -44,11 +44,11 @@ GUIDES = [
           ["template or netlist", "ngspice", "textbook check", "fix"],
           "buck-waveform", "Output ripple of a 12 V to 5 V buck converter, 8.56 mV peak to peak."),
     Guide("agents", "agents.md", "Agents", "Use Wobbl from your agent",
-          "Claude Code, Codex, Cursor and Gemini CLI call Wobbl's tools and read the checks first.",
+          "Claude Code, Codex, Cursor and Gemini CLI call Wobbl’s tools and read the checks first.",
           ["your question", "MCP tools", "checks", "answer and heatmap"],
           "report-bracket", "The HTML report Wobbl wrote for the shelf bracket: fails, 52.3 MPa."),
     Guide("checks", "verification.md", "Verification", "How Wobbl checks an answer",
-          "Eight checks run on every strength answer and set its confidence, with the reasons.",
+          "8 checks run on every strength answer and set its confidence, with the reasons.",
           ["convergence", "balance", "hand calculation", "singularities", "confidence"],
           "motor-mount-noribs", "A printed motor mount with two idealization peaks labeled artifact."),
 ]

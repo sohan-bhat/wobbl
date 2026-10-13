@@ -68,7 +68,7 @@ og_title: Wobbl: simulate anything before you build it
     </div>
     <div class="panel">
       <h2 id="part-title" class="panel-title">The cast motor mount, in 3D</h2>
-      <p class="panel-sub">Wobbl's own result file. Drag to turn it; hover or tap to read the stress.</p>
+      <p class="panel-sub">Wobbl’s own result file. Drag to turn it; hover or tap to read the stress.</p>
       <div class="verdict" data-verdict="marginal">
         <p class="verdict-word" id="verdict-word" aria-live="polite">Marginal</p>
         <p class="verdict-why" id="verdict-why">Survives the load, but the safety factor is below the target of 2.</p>
@@ -104,17 +104,17 @@ og_title: Wobbl: simulate anything before you build it
 <section class="section bakeoff" aria-labelledby="bake-title">
   <div class="wrap">
     <h2 id="bake-title" class="h-plain">A coding agent alone, against Wobbl</h2>
-    <p class="bake-sub">Six parts, a CAD file and a strength question each, 15 minutes per trial.</p>
+    <p class="bake-sub">6 parts, a CAD file and a strength question each, 15 minutes per trial.</p>
     <div class="versus">
       <figure class="vs">
         <figcaption>Agent on its own</figcaption>
-        <ol class="trials" aria-label="10 trials, 1 answered"><li class="hit"></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li></ol>
+        <div class="trials" role="img" aria-label="10 trials, 1 answered"><i class="hit"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <p class="vs-big">1 <span>of 10 trials answered</span></p>
         <p class="vs-note">No answer on the two parts that fail.</p>
       </figure>
       <figure class="vs vs-wobbl">
         <figcaption>With Wobbl</figcaption>
-        <ol class="trials" aria-label="6 parts, 6 answered"><li class="hit"></li><li class="hit"></li><li class="hit"></li><li class="hit"></li><li class="hit"></li><li class="hit"></li></ol>
+        <div class="trials" role="img" aria-label="6 parts, 6 answered"><i class="hit"></i><i class="hit"></i><i class="hit"></i><i class="hit"></i><i class="hit"></i><i class="hit"></i></div>
         <p class="vs-big">6 <span>of 6 parts answered</span></p>
         <p class="vs-note">0.02 to 4.3% from converged references, 24&nbsp;s to 7&nbsp;min each.</p>
       </figure>
@@ -127,10 +127,10 @@ og_title: Wobbl: simulate anything before you build it
   <div class="wrap">
     <h2 id="deeper-title" class="h-label">Go deeper</h2>
     <ul class="deeper-grid">
-      <li><a href="{{url:guides/strength/}}"><span class="deeper-t">Check a part's strength</span><span>Loads, supports, materials and face selectors.</span></a></li>
+      <li><a href="{{url:guides/strength/}}"><span class="deeper-t">Check a part’s strength</span><span>Loads, supports, materials and face selectors.</span></a></li>
       <li><a href="{{url:guides/fix/}}"><span class="deeper-t">Fix a failing part</span><span>Fillets and gussets go into the part, then it is solved again.</span></a></li>
       <li><a href="{{url:guides/agents/}}"><span class="deeper-t">Use it from your agent</span><span>Prompts, a full session and the 13 tools.</span></a></li>
-      <li><a href="{{url:guides/checks/}}"><span class="deeper-t">How it checks an answer</span><span>Eight checks set the confidence of every strength result.</span></a></li>
+      <li><a href="{{url:guides/checks/}}"><span class="deeper-t">How it checks an answer</span><span>8 checks set the confidence of every strength result.</span></a></li>
     </ul>
   </div>
 </section>
