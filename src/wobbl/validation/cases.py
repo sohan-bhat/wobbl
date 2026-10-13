@@ -262,13 +262,13 @@ def run_cases(out_dir: str | Path, ids: list[str] | None = None, log=print) -> l
 
 
 def markdown_table(results: list[dict]) -> str:
-    lines = ["| Case | Quantity | Reference | Expected | Wobbl | Error | Tolerance | Result |",
-             "|---|---|---|---|---|---|---|---|"]
+    lines = ["| Case | Quantity | Reference | Expected | Wobbl | Error | Tolerance | Wobbl's confidence | Result |",
+             "|---|---|---|---|---|---|---|---|---|"]
     for r in results:
         if "wobbl" not in r:
-            lines.append(f"| {r['title']} | | | | error | | | FAIL |")
+            lines.append(f"| {r['title']} | | | | error | | | | FAIL |")
             continue
         lines.append(f"| {r['title']} | {r['quantity']} | {r['source']} | {r['expected']:.4g} {r['unit']} | "
                      f"{r['wobbl']:.4g} {r['unit']} | {100 * r['error']:.2f}% | {100 * r['tolerance']:.1f}% | "
-                     f"{'pass' if r['pass'] else 'FAIL'} |")
+                     f"{r.get('confidence', '')} | {'pass' if r['pass'] else 'FAIL'} |")
     return "\n".join(lines) + "\n"
