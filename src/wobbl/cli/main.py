@@ -46,7 +46,9 @@ def _out_dir(part: str, out: str | None) -> Path:
 def _strength_options(f):
     opts = [
         click.option("--material", "-m", default=None, help="Material name or custom:E=..,nu=..,yield=.."),
-        click.option("--load", "-l", "loads", multiple=True, help="Load, e.g. '200 N down @ top' (repeatable)."),
+        click.option("--load", "-l", "loads", multiple=True,
+                     help="Load, e.g. '200 N down @ top', or '300 N -x bearing @ hole d=6.6' for a bolt or pin "
+                          "pressing on one side of a hole (repeatable)."),
         click.option("--fix", "-f", "fixes", multiple=True,
                      help="Support, e.g. 'holes d=4.5', 'bolt holes', 'wall x=min' (repeatable)."),
         click.option("--target-sf", type=float, default=None, help="Required safety factor."),

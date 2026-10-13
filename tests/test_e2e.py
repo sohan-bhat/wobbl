@@ -42,6 +42,18 @@ def test_bolted_plate_cli_json(parts, tmp_path):
 
 
 @needs_ccx
+def test_bearing_load_from_the_cli(parts, tmp_path):
+    r = CliRunner().invoke(cli, ["run", parts["plate_hole"], "-m", "6061-t6", "--fix", "clamp x=max",
+                                 "--load", "300 N -x bearing @ hole d=8", "--quality", "fast", "--no-images",
+                                 "--json", "-o", str(tmp_path / "o")])
+    assert r.exit_code == 0, r.output
+    d = json.loads(r.output[r.output.index("{"):])
+    assert any("cosine distribution" in a for a in d["assumptions"])
+    bal = next(c for c in d["checks"] if c["name"] == "force balance")
+    assert bal["status"] == "pass"
+
+
+@needs_ccx
 def test_unheld_part_is_refused(parts, tmp_path):
     r = CliRunner().invoke(cli, ["run", parts["cantilever"], "-m", "pla", "--fix", "roller z=min",
                                  "--load", "10 N down @ top", "--quality", "fast", "-o", str(tmp_path / "x")])

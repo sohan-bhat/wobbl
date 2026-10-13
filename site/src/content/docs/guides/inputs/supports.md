@@ -21,9 +21,10 @@ times as you need.
 | roller | `roller y=0` | slides in its plane but cannot move off it, for symmetry planes and sliding fits |
 | wall | `wall x=min` | rests on a rigid wall that it can push on and lift off, solved as contact |
 
-The words `fix`, `bolted`, `slider`, `symmetry`, `rest` and `support` also work, as
-`fixed`, `bolt`, `roller`, `roller`, `wall` and `wall` respectively. Only fixed supports can
-hold some directions and not others.
+The words `fix`, `clamp`, `clamped`, `bolted`, `slider`, `symmetry`, `rest` and `support` also
+work, as `fixed`, `fixed`, `fixed`, `bolt`, `roller`, `roller`, `wall` and `wall` respectively,
+so `--fix "clamp x=min"` is the same as `--fix "x=min"`. Only fixed supports can hold some
+directions and not others, as in `clamp-z x=max`.
 
 ## Picking the right kind
 

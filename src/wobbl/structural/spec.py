@@ -4,8 +4,10 @@ Loads and fixtures can be written the way people talk about them:
 
     force     "200 N down @ top"               total force spread evenly over the faces
               "50 lbf -z @ x=max"
+              "300 N -x @ hole d=6.6"          on holes too, spread evenly over the hole faces
     pressure  "0.2 MPa @ top"                  pushes into the faces (negative pulls)
-    bolt      "300 N -x @ hole d=6.6"          a pin or bolt bearing on a hole (shared by all holes picked)
+    bolt      "300 N -x bearing @ hole d=6.6"  a pin or bolt bearing on the loaded side of a hole, shared by
+                                               all holes picked ('bearing' may also follow the faces)
     gravity   "3 g down"                       self weight times a factor (no faces)
     remote    "2000 N -0.87,0,-0.5 at 0,-30,66 @ holes d=6.6 rigid"
                                                a force at a point off the part, carried by the faces
@@ -28,6 +30,13 @@ from ..units import UnitError, parse_quantity
 
 LOAD_KINDS = ("force", "pressure", "bolt", "gravity", "remote", "moment")
 FIXTURE_KINDS = ("fixed", "roller", "bolt", "wall")
+LOAD_ALIASES = {"torque": "moment", "pin": "bolt", "bearing": "bolt", "weight": "gravity", "accel": "gravity",
+                "acceleration": "gravity"}
+FIXTURE_ALIASES = {"fix": "fixed", "slider": "roller", "symmetry": "roller", "bolted": "bolt", "rest": "wall",
+                   "support": "wall", "clamp": "fixed", "clamped": "fixed"}
+# every word that can start a fixture, longest first so 'fixed' wins over 'fix'
+_FIXTURE_WORDS = "|".join(sorted({*FIXTURE_KINDS, *FIXTURE_ALIASES}, key=len, reverse=True))
+_FIXTURE_HEAD = re.compile(rf"^({_FIXTURE_WORDS})(?:-([xyz]{{1,3}}))?\s*[:@]?\s+(.+)$", re.I)
 
 
 class SpecError(ValueError):
@@ -131,12 +140,12 @@ def parse_load(spec, kind: str | None = None) -> Load:
     text = str(spec).strip()
     head, faces = _split_selector(text)
     low = head.lower()
-    mc = re.search(r"\s+(rigid|distributed)\s*$", faces, re.I)
-    if mc:
+    while mc := re.search(r"\s+(rigid|distributed|bearing)\s*$", faces, re.I):  # words written after the faces
         faces = faces[:mc.start()].strip()
         low += " " + mc.group(1).lower()
     coupling = "rigid" if re.search(r"\brigid\b", low) else "distributed"
-    low = re.sub(r"\b(rigid|distributed)\b", "", low).strip()
+    bearing = re.search(r"\bbearing\b", low) is not None
+    low = re.sub(r"\b(rigid|distributed|bearing)\b", "", low).strip()
     point = None
     m = re.search(r"\bat\s+\(?(" + _VEC + r")\)?", low)
     if m:
@@ -150,8 +159,12 @@ def parse_load(spec, kind: str | None = None) -> Load:
     rest = low[m.end():].strip()
     if kind is None:
         kind = _guess_kind(unit, point, faces)
-    kind = {"torque": "moment", "pin": "bolt", "bearing": "bolt", "weight": "gravity", "accel": "gravity",
-            "acceleration": "gravity"}.get(kind, kind)
+        if bearing and kind == "force":
+            kind = "bolt"
+    kind = LOAD_ALIASES.get(kind, kind)
+    if bearing and kind != "bolt":
+        raise SpecError(f"'bearing' makes a force press on one side of a hole, as in '300 N -x bearing @ hole d=6.6', "
+                        f"so it cannot go with a {kind} load ('{text}')")
     if kind not in LOAD_KINDS:
         raise SpecError(f"unknown load type '{kind}' (use {', '.join(LOAD_KINDS)})")
     dim = {"force": "force", "bolt": "force", "remote": "force", "pressure": "stress", "moment": "moment",
@@ -215,15 +228,13 @@ def parse_fixture(spec, kind: str | None = None) -> Fixture:
     text = str(spec).strip()
     dofs = "xyz"
     if kind is None:
-        m = re.match(r"^(fixed|fix|roller|slider|symmetry|bolt|bolted|wall|rest|support)(?:-([xyz]{1,3}))?"
-                     r"\s*[:@]?\s+(.+)$", text, re.I)
+        m = _FIXTURE_HEAD.match(text)
         if m:
             kind, text = m.group(1).lower(), m.group(3)
             dofs = (m.group(2) or "xyz").lower()
         else:
             kind = "fixed"
-    kind = {"fix": "fixed", "slider": "roller", "symmetry": "roller", "bolted": "bolt", "rest": "wall",
-            "support": "wall", "clamp": "fixed", "clamped": "fixed"}.get(kind.lower(), kind.lower())
+    kind = FIXTURE_ALIASES.get(kind.lower(), kind.lower())
     if kind not in FIXTURE_KINDS:
         raise SpecError(f"unknown fixture type '{kind}' (use {', '.join(FIXTURE_KINDS)})")
     if not text:

@@ -60,7 +60,8 @@ def build_server():
     @srv.tool()
     def apply_load(study_id: str, load: str) -> dict:
         """Add a load, e.g. '200 N down @ top', '50 lbf -z @ x=max', '0.2 MPa @ top', '3 g down',
-        '300 N -x @ hole d=6.6' (bolt bearing), '2000 N -0.87,0,-0.5 at 0,-30,66 @ holes d=6.6 rigid',
+        '300 N -x bearing @ hole d=6.6' (a bolt or pin pressing on one side of the hole, where the same load
+        without bearing spreads evenly over the hole faces), '2000 N -0.87,0,-0.5 at 0,-30,66 @ holes d=6.6 rigid',
         '0.8 N*m +z at 210,0,25 @ top and within 14 of 210,0,25'."""
         return tools.apply_load(study_id, load)
 

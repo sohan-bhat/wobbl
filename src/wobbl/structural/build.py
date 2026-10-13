@@ -103,7 +103,8 @@ def bolt_bearing(mesh: Mesh, sel: Selection, faces: dict[int, FaceInfo], force: 
     for g in groups:
         f0 = faces[g[0]]
         if f0.axis is None:
-            raise SpecError(f"bolt loads need hole faces; face {f0.id} is not cylindrical")
+            raise SpecError(f"a bearing load needs hole faces, and face {f0.id} is not a cylinder. Pick holes, "
+                            "for example '@ hole d=6.6', or drop 'bearing' to spread the force evenly")
         a = np.asarray(f0.axis)
         cp = np.asarray(f0.axis_point)
         mask = mesh.surface_mask(g) & sel.tri_mask(mesh)

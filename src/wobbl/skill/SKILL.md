@@ -18,8 +18,10 @@ never write your own finite element code.
    and wall thickness. Use these to write selectors.
 2. **Decide loads and supports explicitly.** Ask the user if they are unclear. Write them as:
    - loads: `"200 N down @ top"`, `"50 lbf -z @ x=max"`, `"0.2 MPa @ top"`, `"3 g down"`,
-     `"300 N -x @ hole d=6.6"` (bolt bearing), `"2000 N -0.87,0,-0.5 at 0,-30,66 @ holes d=6.6 rigid"`
-     (force at a point off the part, carried by the faces), `"0.8 N*m +z at 210,0,25 @ top and within 14 of 210,0,25"`.
+     `"300 N -x bearing @ hole d=6.6"` (a bolt or pin pressing on one side of the hole, where the
+     same load without `bearing` spreads evenly over the hole faces),
+     `"2000 N -0.87,0,-0.5 at 0,-30,66 @ holes d=6.6 rigid"` (force at a point off the part, carried
+     by the faces), `"0.8 N*m +z at 210,0,25 @ top and within 14 of 210,0,25"`.
    - supports: `"holes d=4.5"` (fixed), `"bolt holes d=6.6"` (hole plus washer ring), `"x=min"`,
      `"wall x=min"` (can push, can lift off), `"roller y=0"`, `"fixed-z faces 7"` (only some directions).
    - selectors: `top`, `bottom`, `x=min`, `z>10`, `normal -z`, `holes d<6`, `hole near 55,0,10`,

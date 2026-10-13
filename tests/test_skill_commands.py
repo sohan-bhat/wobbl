@@ -103,8 +103,8 @@ def test_skill_loads_and_supports_read():
     load_texts = re.findall(r'`"([^"`]+)"`', loads)
     support_texts = re.findall(r'`"([^"`]+)"`', supports)
     assert len(load_texts) >= 5 and len(support_texts) >= 5
-    for t in load_texts:
-        parse_load(t)
+    kinds = {t: parse_load(t).kind for t in load_texts}
+    assert kinds["300 N -x bearing @ hole d=6.6"] == "bolt"
     for t in support_texts:
         parse_fixture(t)
 

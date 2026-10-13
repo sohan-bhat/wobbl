@@ -13,18 +13,19 @@ Pass `--load` as many times as you need, and Wobbl adds the loads together. Each
 written the same way, in this order.
 
 ```text Syntax
-MAGNITUDE UNIT  DIRECTION  [at X,Y,Z]  @ FACES  [rigid]
+MAGNITUDE UNIT  DIRECTION  [bearing]  [at X,Y,Z]  @ FACES  [rigid]
 ```
 
 ## Kinds of load
 
-Wobbl tells the kinds apart by the unit and by whether there is a point.
+Wobbl tells the kinds apart by the unit, by whether there is a point, and by the word `bearing`.
 
 | Kind | Example | What it means |
 |---|---|---|
 | force | `200 N down @ top` | the total force, spread evenly over the faces by area |
 | force along the normal | `20 N normal @ face 4` | pushes into each face along its own normal, and a negative value pulls out |
-| force into holes | `300 N -x @ hole d=6.6` | the force spread over the hole faces, with the peak where it meets the hole edge reported separately |
+| force into holes | `300 N -x @ hole d=6.6` | the force spread evenly over the hole faces, with the peak where it meets the hole edge reported separately |
+| bearing load | `300 N -x bearing @ hole d=6.6` | a bolt or pin pressing on the side of the hole the force points to, shared equally by the holes picked |
 | pressure | `0.2 MPa @ top` | pushes into the faces, and a negative value pulls |
 | gravity | `3 g down` | the part's own weight times the factor, with no faces needed |
 | remote force | `2000 N -0.87,0,-0.5 at 0,-30,66 @ holes d=6.6` | a force at a point off the part, carried by the faces |
@@ -33,6 +34,24 @@ Wobbl tells the kinds apart by the unit and by whether there is a point.
 Gravity needs no faces and points down unless you say otherwise. The `g` means gravity only
 when there is no `@`, because with faces the same letter reads as grams of force. A moment
 needs an axis, and when you leave out the point it turns about the center of its faces.
+
+## Bolts and pins in holes
+
+A bolt or a pin that pulls on a part presses on one side of its hole, and the far side carries
+nothing. Write `bearing` after the direction, or at the very end after the faces, and Wobbl
+puts the force on the loaded half of each hole with a cosine distribution that peaks where the
+bolt pushes hardest. When you pick several holes they share the force equally, and the result
+lists this in its assumptions.
+
+```text Flags
+--load "300 N -x bearing @ hole d=6.6"
+--load "1.2 kN -y @ holes d=8 bearing"
+```
+
+Without `bearing` the same string spreads the force evenly over the whole hole, all the way
+around, which suits a flange or a press fit better than a single bolt. A bearing load needs
+hole faces and a force unit, so Wobbl refuses it with a pressure, a moment, gravity or a point
+off the part.
 
 ## Directions
 

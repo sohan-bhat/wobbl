@@ -1,7 +1,9 @@
+import numpy as np
 import pytest
 
 from wobbl.ask import detect_domain, find_material
-from wobbl.structural.spec import SpecError, StructuralStudy, parse_fixture, parse_load
+from wobbl.structural.spec import (FIXTURE_ALIASES, FIXTURE_KINDS, LOAD_ALIASES, SpecError, StructuralStudy,
+                                   parse_fixture, parse_load)
 
 
 def test_force_load():
@@ -40,6 +42,85 @@ def test_fixtures():
     assert parse_fixture("bolt holes d=6.6").kind == "bolt"
     assert parse_fixture("wall x=min").kind == "wall"
     assert parse_fixture("roller y=0").kind == "roller"
+
+
+@pytest.mark.parametrize("word", sorted({*FIXTURE_KINDS, *FIXTURE_ALIASES}))
+def test_every_fixture_word_is_read(word):
+    """Each support kind and every alias in the map starts a fixture string, in any case and with a colon."""
+    want = FIXTURE_ALIASES.get(word, word)
+    for text in (f"{word} x=min", f"{word.upper()}: x=min", f"{word} @ x=min"):
+        fx = parse_fixture(text)
+        assert (fx.kind, fx.faces) == (want, "x=min"), text
+
+
+def test_clamp_reads_as_fixed():
+    fx = parse_fixture("clamp x=min")
+    assert fx.kind == "fixed" and fx.faces == "x=min" and fx.dofs == "xyz"
+    fx = parse_fixture("clamped-z x=max")
+    assert fx.kind == "fixed" and fx.dofs == "z" and fx.text == "fixed-z x=max"
+
+
+@pytest.mark.parametrize("alias", sorted(LOAD_ALIASES))
+def test_every_load_alias_is_read(alias):
+    sample = {"moment": "0.8 N*m +z @ top", "bolt": "300 N -x @ hole d=6.6", "gravity": "3 g down"}
+    want = LOAD_ALIASES[alias]
+    assert parse_load(sample[want], kind=alias).kind == want
+
+
+@pytest.mark.parametrize("text", ["300 N -x bearing @ hole d=6.6", "300 N -x @ hole d=6.6 bearing",
+                                  "bearing 300 N -x @ hole d=6.6", "300 N -x Bearing on hole d=6.6"])
+def test_bearing_keyword_makes_a_bolt_load(text):
+    ld = parse_load(text)
+    assert (ld.kind, ld.magnitude, ld.direction, ld.faces) == ("bolt", 300, [-1, 0, 0], "hole d=6.6")
+    assert ld.text == text
+
+
+def test_force_into_holes_without_bearing_is_unchanged():
+    ld = parse_load("300 N -x @ hole d=6.6")
+    assert ld.kind == "force" and ld.faces == "hole d=6.6"
+    assert parse_load({"kind": "bearing", "load": "300 N", "direction": "-x", "faces": "hole d=6.6"}).kind == "bolt"
+
+
+@pytest.mark.parametrize("bad", ["0.2 MPa bearing @ hole d=6.6", "300 N -x at 0,0,10 bearing @ hole d=6.6",
+                                 "3 g down bearing"])
+def test_bearing_only_goes_with_a_force(bad):
+    with pytest.raises(SpecError, match="bearing"):
+        parse_load(bad)
+
+
+def test_cli_reads_a_bearing_load():
+    from wobbl.cli.main import _study_from
+
+    st = _study_from("plate.step", "", {"loads": ["300 N -x bearing @ hole d=8", "50 N down @ top"],
+                                        "fixes": ["clamp x=min"]})
+    assert [ld.kind for ld in st.loads] == ["bolt", "force"] and st.fixtures[0].kind == "fixed"
+
+
+def test_bearing_load_presses_on_the_loaded_side_only(parts, tmp_path):
+    """Built on a real mesh, a bearing load pushes only on the half of the hole it faces, with the same total
+    force, while the plain force string still spreads over the whole hole."""
+    from wobbl.geometry.select import Selector
+    from wobbl.materials import resolve_material
+    from wobbl.mesh.mesher import Sizing, build_mesh
+    from wobbl.structural.build import build_static
+    from wobbl.structural.run import describe_part
+
+    prep, feats = describe_part(parts["plate_hole"], tmp_path)
+    mesh = build_mesh(prep, Sizing(h=4.0))
+    sel = Selector(feats.faces, feats.bbox)
+    fix = parse_fixture("x=max")
+    far_side = {}
+    for text in ("300 N -x bearing @ hole d=8", "300 N -x @ hole d=8"):
+        ld = parse_load(text)
+        built = build_static(mesh, [(ld, sel.select(ld.faces))], [(fix, sel.select(fix.faces))],
+                             resolve_material("6061-t6"), feats.faces)
+        F = built.model.forces
+        assert F.sum(0) == pytest.approx([-300, 0, 0], abs=1e-6)
+        f = np.linalg.norm(F, axis=1)
+        # share of the load on the +x half of the hole (axis at x = 50), past one element edge of the middle
+        far_side[text] = f[mesh.X[:, 0] > 51.0].sum() / f.sum()
+    assert far_side["300 N -x bearing @ hole d=8"] < 0.01
+    assert far_side["300 N -x @ hole d=8"] > 0.3
 
 
 def test_study_roundtrip():

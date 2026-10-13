@@ -20,6 +20,9 @@ aluminum 6061-T6 and says so in the assumptions.
 wobbl run bracket.py -m pla --fix "bolt holes d=4.5" --fix "wall x=min" \
   --load "40 N down @ top and within 12 of 65,12.5,6"
 
+# a steel tab pulled sideways by the bolt through its hole
+wobbl run tab.step -m mild-steel --fix "x=min" --load "1.5 kN +x bearing @ hole d=8.5"
+
 # a cast mount with a belt pull off the part and a house rule of safety factor 2
 wobbl run cast_motor_mount.step -m "custom:E=72400,nu=0.33,yield=165,process=cast" \
   --target-sf 2 --fix "z=min" --load "2000 N -0.8660254,0,-0.5 at 0,-30,66 @ holes d=6.6" \
@@ -35,8 +38,8 @@ wobbl run mount.py --param rib=0 -m petg --print-direction z --fix "bolt holes d
 | Option | What it does |
 |---|---|
 | `-m`, `--material` | a material key such as `pla` or `6061-t6`, a library material with one property changed such as `pla:yield=40`, or `custom:E=...,nu=...,yield=...`, as [Materials](/guides/inputs/materials/) explains |
-| `-l`, `--load` | a load, repeatable, as [Loads](/guides/inputs/loads/) explains |
-| `-f`, `--fix` | a support, repeatable, as [Supports](/guides/inputs/supports/) explains |
+| `-l`, `--load` | a load, repeatable, such as `200 N down @ top`, or `300 N -x bearing @ hole d=6.6` for a bolt pressing on one side of its hole, as [Loads](/guides/inputs/loads/) explains |
+| `-f`, `--fix` | a support, repeatable, such as `bolt holes d=4.5` or `clamp x=min`, as [Supports](/guides/inputs/supports/) explains |
 | `--target-sf` | the safety factor the part has to reach, by default the material's own |
 | `--quality` | `fast` for a quick look, `normal` (the default) or `fine` for a tighter tolerance |
 | `--budget` | seconds for the whole study, 300 by default |
