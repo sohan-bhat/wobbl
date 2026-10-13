@@ -151,7 +151,14 @@ export function render(body: string, where: string): { html: string; headings: H
         continue;
       }
       for (const c of kids) {
-        if (c.type === 'link_open') c.attrSet('href', siteHref(c.attrGet('href') ?? '', where));
+        if (c.type !== 'link_open') continue;
+        const href = siteHref(c.attrGet('href') ?? '', where);
+        c.attrSet('href', href);
+        // a file on the site, such as a report.html, loads as itself and is not prefetched
+        if (href.startsWith('/') && /\.[a-z0-9]+$/i.test(href)) {
+          c.attrSet('data-astro-reload', '');
+          c.attrSet('data-astro-prefetch', 'false');
+        }
       }
     } else if (tok.type === 'html_block') {
       tok.content = tok.content.replace(/\b(src|href)="(\/[^"]*)"/g, (_, a, v) => {

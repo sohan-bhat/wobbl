@@ -108,7 +108,7 @@ function openSearch() {
     js.onload = () => {
       // @ts-expect-error: PagefindUI is a global from the script above
       new PagefindUI({ element: '#search-ui', baseUrl: mount.dataset.base, bundlePath: bundle, showImages: false,
-        resetStyles: false, translations: { placeholder: 'Search the docs' } });
+        resetStyles: false, translations: { placeholder: 'Search the docs…' } });
       mount.querySelector('input')?.focus();
     };
     js.onerror = () => { mount.textContent = 'Search is built with the site. Run npm run build to try it locally.'; };

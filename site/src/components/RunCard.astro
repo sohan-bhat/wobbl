@@ -30,6 +30,6 @@ const sugg = run.fixes.length ? [] : (run.outcome.fixes ?? []).slice(0, 3).map((
       </div>
     )}
     <details class="run-summary"><summary>summary.txt</summary><Term code={run.summary} lang="text" label="summary.txt" /></details>
-    {run.report && <p class="run-files"><a href={url(run.report)}>Open the full report</a></p>}
+    {run.report && <p class="run-files"><a href={url(run.report)} data-astro-reload data-astro-prefetch="false">Open the full report</a></p>}
   </div>
 </div>
