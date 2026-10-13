@@ -66,7 +66,8 @@ def suggest_fixes(run, o) -> list[dict]:
             "kind": "fillet", "title": f"Round {where} to a {fmt(r_new)} mm radius",
             "summary": f"Stress piles up in {where}. A fillet of {fmt(r_new)} mm (about half the "
                        f"{fmt(t_loc or run.features.thickness_typical)} mm wall) spreads it out." + est,
-            "params": {"radius": r_new, "point": o.governing_xyz if not corner_spots else corner_spots[0].xyz},
+            "params": {"radius": r_new, "point": o.governing_xyz if not corner_spots else corner_spots[0].xyz,
+                       "face": face.id if small_fillet else None},
             "auto": True})
 
     # 2. thicker wall at the peak
@@ -93,7 +94,9 @@ def suggest_fixes(run, o) -> list[dict]:
             "summary": "The peak sits where two walls meet and bend. A gusset as thick as the wall, with legs about "
                        "half as long as the shorter wall, ties them together and usually cuts the corner stress by "
                        "half or more.",
-            "params": {"point": o.governing_xyz, "thickness": t_loc or run.features.thickness_typical},
+            "params": {"point": o.governing_xyz, "thickness": t_loc or run.features.thickness_typical,
+                       "face": face.id if (face is not None and face.role == "fillet") else None,
+                       "corner_faces": _corner_faces(run, corner_spots)},
             "auto": True})
 
     # 4. a stronger material
@@ -114,6 +117,14 @@ def suggest_fixes(run, o) -> list[dict]:
                                f"to within {fmt(new_arm)} mm brings the bending stress to the target.",
                     "params": {"arm": arm, "new_arm": new_arm}, "auto": False})
     return [f for f in fixes if f]
+
+
+def _corner_faces(run, corner_spots) -> list[int] | None:
+    if not corner_spots:
+        return None
+    p = np.asarray(corner_spots[0].xyz)
+    best = min(run.features.corners, key=lambda c: float(np.linalg.norm(c.points - p, axis=1).min()), default=None)
+    return list(best.faces) if best is not None else None
 
 
 def _material_swap(mat, gov, target) -> dict | None:

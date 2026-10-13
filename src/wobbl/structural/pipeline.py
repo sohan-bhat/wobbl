@@ -1,6 +1,7 @@
 """One call from a strength question to a verified, rendered, reported answer."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from ..report.render import convergence_plot, render_structural
@@ -15,6 +16,8 @@ def analyze_strength(study: StructuralStudy, out_dir: str | Path, progress: Prog
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     run = run_structural(study, out / "work", progress, pre=pre)
+    (out / "study.json").write_text(json.dumps(study.to_dict(), indent=1))
+    (out / "geometry.json").write_text(json.dumps(run.prep.to_dict(), indent=1))
     o = evaluate(run)
     o.workdir = str(out)
     if fixes:
