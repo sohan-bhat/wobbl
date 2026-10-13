@@ -1,7 +1,7 @@
 # Publishing a release
 
-Wobbl installs from git today. These are the exact steps to publish once the
-owner's PyPI account is ready. Nothing here has been run.
+Wobbl is on PyPI, and the release workflow publishes each new version when its tag is
+pushed. These are the steps for cutting a release.
 
 ## PyPI
 
