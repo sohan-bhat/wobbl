@@ -196,6 +196,11 @@ def build_static(mesh: Mesh, loads: list[tuple[Load, Selection | None]], fixture
         if not mask.any():
             raise SpecError(f"load '{ld.describe()}' covers no part of the mesh; widen the selection")
         built.load_patches[name] = mask
+        if sel.faces and all(faces[f].role == "hole" for f in sel.faces if f in faces):
+            # a load pushed into holes (bolts, pins, a flange) peaks where the idealized load meets the hole
+            # edge; like a support, that spot is reported separately rather than as the answer
+            built.zones[name] = np.unique(mesh.tris[mask].ravel())
+            built.zone_kind[name] = "load"
         n_, a_, c_ = mesh.tri_geometry(mask)
         if ld.kind == "force":
             if ld.direction is None:  # along the outward normal of each face (a push into the part if negative)

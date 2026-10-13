@@ -148,6 +148,8 @@ def describe_spot(hs: Hotspot, face: FaceInfo | None, zmap: ZoneMap) -> str:
         return f"at the edge of support {hs.zone} ({what})" if what else f"at the edge of support {hs.zone}"
     if hs.kind == "coupling":
         return f"where the rigid attachment {hs.zone} grabs the part ({what})"
+    if hs.kind == "load":
+        return f"where {hs.zone} is pushed into the holes ({what})"
     if face is not None and face.role in ("fillet", "hole", "boss"):
         return ("on " if face.role == "fillet" else "at the edge of ") + what
     return f"on {what}" if what else "in the body of the part"
