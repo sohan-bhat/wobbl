@@ -41,6 +41,8 @@ def suggest_fixes(run, o) -> list[dict]:
         gspot = min(feats, key=lambda h: float(np.linalg.norm(np.asarray(h.xyz) - np.asarray(o.governing_xyz))))
     face = run.features.faces.get(gspot.face) if gspot and gspot.face is not None else None
     t_loc, _ = local_thickness(run.mesh, np.asarray(o.governing_xyz))
+    if t_loc and face is not None and face.role == "fillet":
+        t_loc = min(t_loc, run.features.thickness_typical)  # a ray through a corner runs diagonally
     beam = o.beam or {}
 
     if o.verdict == "holds" and not corner_spots:

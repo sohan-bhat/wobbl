@@ -52,6 +52,11 @@ def convergence_check(values: list[float], tol: float, label: str, unit: str, st
     detail = {"values": values, "last_change": ch, "tolerance": tol, "stopped_by": stopped_by}
     if disp:
         detail["max_displacement"] = disp
+    if ch <= tol and len(values) < 3:
+        return Check("mesh convergence", "warn",
+                     f"{label} agreed on two meshes ({trend} {unit}, {100 * ch:.1f}%) but no third mesh was run "
+                     f"(stopped by {stopped_by or 'limit'}); two coarse meshes can agree and still both be off",
+                     detail)
     if ch <= tol:
         return Check("mesh convergence", "pass",
                      f"{label} settled: {trend} {unit} over {len(values)} meshes, last change {100 * ch:.1f}%", detail)
