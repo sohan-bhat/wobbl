@@ -44,6 +44,28 @@ for (const wrap of $$('.table-scroll')) {
   wrap.classList.add('stack');
 }
 
+// Tabs: arrow keys move between them, as the ARIA tabs pattern expects.
+for (const list of $$('[role="tablist"]')) {
+  const tabs = $$('[role="tab"]', list);
+  const select = (tab, focus) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    }
+    if (focus) tab.focus();
+  };
+  list.addEventListener('click', (e) => { const t = e.target.closest('[role="tab"]'); if (t) select(t); });
+  list.addEventListener('keydown', (e) => {
+    const i = tabs.indexOf(document.activeElement);
+    const step = { ArrowRight: 1, ArrowLeft: -1, Home: -i, End: tabs.length - 1 - i }[e.key];
+    if (i < 0 || step === undefined) return;
+    e.preventDefault();
+    select(tabs[(i + step + tabs.length) % tabs.length], true);
+  });
+}
+
 // The cast mount: readouts follow the load slider even without WebGL.
 const viewer = $('#viewer');
 if (viewer) {

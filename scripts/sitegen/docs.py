@@ -70,7 +70,7 @@ PAGES = [
             "Install Wobbl, add CalculiX and ngspice, connect Claude Code, Codex, Cursor or Gemini CLI, "
             "and get a first checked answer."),
     *[DocPage(f"guides/{g.slug}/", [g.source], "Guides", g.title, g.sentence) for g in GUIDES],
-    DocPage("guides/reference/", ["cli.md"], "Guides", "Command reference",
+    DocPage("guides/reference/", ["cli.md"], "Guides", "Command line reference",
             "Every Wobbl command and option, with the load, support and face selector syntax."),
     DocPage("validation/", ["validation.md", "bakeoff.md", "limits.md"], "Validation", "Validation",
             "18 cases with known answers, a bake off against a coding agent working alone, "
@@ -159,7 +159,7 @@ def guides_index() -> str:
   <ol class="guides">
 {chr(10).join(blocks)}
   </ol>
-  <p class="guides-ref">Every command and option: <a href="{url('guides/reference/')}">command reference</a>.</p>
+  <p class="guides-ref">Every command and option: <a href="{url('guides/reference/')}">command line reference</a>.</p>
 </div>"""
     return page(path="guides/", title="Guides | Wobbl",
                 description="Guides to checking strength, fixing parts, heat, circuits, using Wobbl from a "

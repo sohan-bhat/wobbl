@@ -88,20 +88,20 @@ h1 {
   text-wrap: balance; max-width: 15ch;
 }
 h2 {
-  font-stretch: 118%; font-weight: 780;
-  font-size: clamp(2rem, 1.05rem + 3.4vw, 4.1rem);
-  line-height: 1.02; letter-spacing: -0.022em;
-  text-wrap: balance; max-width: 26ch;
+  font-stretch: 112%; font-weight: 760;
+  font-size: clamp(1.6rem, 1.2rem + 1.5vw, 2.4rem);
+  line-height: 1.1; letter-spacing: -0.015em;
+  text-wrap: balance; max-width: 30ch;
 }
 h3 { font-stretch: 112%; font-weight: 700; font-size: 1.1rem; line-height: 1.3; letter-spacing: -0.005em; }
 .lead { font-size: clamp(1.1rem, 1rem + 0.4vw, 1.3rem); line-height: 1.55; max-width: 62ch; margin: 28px 0 0; color: var(--fg-2); text-wrap: pretty; }
 .note { max-width: 72ch; margin: 32px 0 0; color: var(--muted); font-size: 0.97rem; text-wrap: pretty; }
 .note a { color: var(--fg-2); white-space: nowrap; }
 
-.section { padding-block: clamp(80px, 4.5rem + 4.5vw, 152px); }
+.section { padding-block: clamp(64px, 3.5rem + 3vw, 120px); }
 
 /* Hero */
-.hero { padding-block: clamp(40px, 2rem + 3vw, 88px) clamp(72px, 4rem + 4vw, 136px); }
+.hero { padding-block: clamp(40px, 2rem + 3vw, 88px) clamp(8px, 1vw, 24px); }
 .hero h1 { max-width: none; }
 .hero-grid { display: grid; gap: 40px; margin-top: clamp(28px, 1rem + 2vw, 52px); align-items: start; }
 .lede { font-size: clamp(1.2rem, 1.05rem + 0.6vw, 1.5rem); line-height: 1.45; color: var(--fg); margin: 0; max-width: 30ch; text-wrap: pretty; }
@@ -116,6 +116,62 @@ figcaption .mono { color: var(--fg-2); margin-right: 8px; font-size: 0.85rem; }
   .hero-copy { padding-top: 12px; }
   .hero-fig { margin-right: calc(var(--gutter) * -1); margin-top: -24px; }
 }
+
+.hero-cta { margin: 28px 0 0; }
+
+/* What a run looks like: one example at a time */
+.tabs { display: flex; margin-top: 28px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tabs [role="tab"] {
+  flex: none; margin: 0 28px -1px 0; padding: 10px 0 14px; cursor: pointer; text-align: left;
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  font: 600 1.02rem/1.25 var(--sans); color: var(--fg-2);
+}
+.tabs [role="tab"] span { display: block; margin-bottom: 4px; font: 500 11px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.tabs [role="tab"]:hover { color: var(--fg); }
+.tabs [role="tab"][aria-selected="true"] { color: var(--fg); border-bottom-color: var(--yellow); }
+.tabs [role="tab"][aria-selected="true"] span { color: var(--yellow); }
+.tab-panel { margin-top: 40px; }
+.tab-panel .run-img, .tab-panel .run-metric { aspect-ratio: 4 / 3; object-fit: contain; }
+
+/* The 3D part's panel heading */
+.panel-title { font-size: 1.3rem; line-height: 1.2; max-width: none; }
+.panel-sub { margin: 8px 0 24px; font-size: 0.95rem; color: var(--fg-2); }
+
+/* Bake off: trials answered, one square each */
+.bake-sub { margin: 14px 0 0; max-width: 60ch; font-size: 1.05rem; }
+.versus { display: grid; gap: 20px; margin-top: 36px; }
+@media (min-width: 900px) { .versus { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; } }
+.vs { margin: 0; padding: 26px 24px 28px; border: 1px solid var(--line); background: var(--bg-2); }
+.vs-wobbl { border-top: 3px solid var(--yellow); }
+.vs figcaption { font: 500 12px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.trials { list-style: none; margin: 20px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.trials { gap: 6px; }
+.trials li { width: 22px; height: 22px; border: 1px solid var(--line-2); }
+@media (min-width: 560px) { .trials { gap: 8px; } .trials li { width: 26px; height: 26px; } }
+.trials li.hit { background: var(--fg-2); border-color: var(--fg-2); }
+.vs-wobbl .trials li.hit { background: var(--yellow); border-color: var(--yellow); }
+.vs-big { margin: 22px 0 0; color: var(--fg); font-stretch: 125%; font-weight: 800; font-size: clamp(2.6rem, 1.8rem + 2.4vw, 3.8rem); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.vs-big span { margin-left: 4px; font-stretch: 100%; font-size: max(0.3em, 0.95rem); font-weight: 600; letter-spacing: 0; color: var(--fg-2); }
+.vs-wobbl .vs-big { color: var(--yellow); }
+.vs-note { margin: 12px 0 0; color: var(--fg-2); }
+.bake-more { margin: 24px 0 0; }
+.bake-more a { font-weight: 600; text-decoration-color: var(--yellow); display: inline-block; padding: 4px 0; }
+
+/* Go deeper */
+.deeper { padding-top: 0; }
+.h-label { font: 500 12px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.run-fixed ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.run-fixed li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 12px; max-width: 440px; }
+.run-fixed .fx-name { color: var(--fg); }
+.run-fixed .fx-n { font: 500 0.9rem var(--mono); color: var(--fg); }
+.deeper-grid { list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 16px; }
+@media (min-width: 720px) { .deeper-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .deeper-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.deeper-grid li { display: flex; }
+.deeper-grid a { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 22px 20px; border: 1px solid var(--line); color: var(--fg-2); text-decoration: none; font-size: 0.95rem; }
+.deeper-grid a:hover { border-color: var(--line-2); background: var(--bg-2); }
+.deeper-t { color: var(--fg); font-weight: 650; font-size: 1.08rem; }
+.deeper-t::after { content: " ->"; font: 500 0.85em var(--mono); color: var(--yellow); }
 
 /* Terminal blocks: real commands and real output */
 .term { background: var(--bg-2); border: 1px solid var(--line); margin-top: 28px; min-width: 0; }
@@ -142,6 +198,7 @@ figcaption .mono { color: var(--fg-2); margin-right: 8px; font-size: 0.85rem; }
   padding: 8px 12px; min-height: 30px; cursor: pointer;
 }
 .copy:hover { border-color: var(--fg-2); }
+.term-note { margin-left: 10px; color: var(--muted); text-transform: none; letter-spacing: 0.02em; }
 .copy[data-done] { background: var(--yellow); border-color: var(--yellow); color: var(--ink); }
 
 /* Bake-off */
@@ -187,7 +244,7 @@ table.data tbody tr:first-child.group th { padding-top: 16px; }
 
 /* The pokeable part */
 .part { background: #111316; border-block: 1px solid var(--line); }
-.viewer-grid { display: grid; margin-top: 56px; }
+.viewer-grid { display: grid; }
 .viewer {
   position: relative; background: var(--bg); border: 1px solid var(--line);
   aspect-ratio: 1 / 1; min-height: 340px; overflow: hidden;
@@ -477,6 +534,7 @@ table.validation tbody th { font-weight: 400; }
 .guide-text > p:not(.guide-cat) { margin: 10px 0 0; max-width: 60ch; }
 .guide .flow { margin-top: 16px; }
 .guide-img { width: 100%; border: 1px solid var(--line); background: var(--bg); aspect-ratio: 16 / 10; object-fit: cover; }
+.guide-img[src*="report-"] { object-position: top; }
 @media (min-width: 900px) {
   .guide { grid-template-columns: minmax(0, 1fr) 360px; gap: 48px; align-items: center; }
 }
