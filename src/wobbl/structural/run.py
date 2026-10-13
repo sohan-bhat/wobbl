@@ -265,51 +265,18 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         if lv == 0:
             sizes = mesh.node_sizes()
             r_ex = float(max(0.2 * features.thickness_typical, 1.0 * np.nanmedian(sizes[measure > 0.5 * measure.max()])))
-            spots = find_hotspots(mesh, measure, zmap, features.faces, prep.diag)
-        elif lv == 1:
-            fresh = find_hotspots(mesh, measure, zmap, features.faces, prep.diag)
-            for f in fresh:
-                if all(np.linalg.norm(np.asarray(f.xyz) - np.asarray(s.xyz)) > 2 * s.radius for s in spots):
-                    f.id = len(spots) + 1
-                    f.values = [float("nan")]
-                    f.sizes = [float("nan")]
-                    spots.append(f)
-        track(spots, mesh, measure)
+        spots = _update_spots(spots, lv, mesh, measure, zmap, features, prep)
         excluded = zmap.excluded_mask(mesh.X, r_ex)
-        valid = ~excluded
-        if not valid.any():
-            valid = np.ones(len(measure), bool)
-        gi = np.nonzero(valid)[0][np.argmax(measure[valid])]
-        ri = int(np.argmax(measure))
-        dmag = res.displacement_magnitude()
-        di = int(np.argmax(dmag))
-        fapp, mapp = built.model.applied_total()
-        rf, rm = support_reactions(built, res, mesh)
-        levels.append(Level(lv, mesh.n_nodes, mesh.n_elems, float(sizing.h),
-                            float(np.nanmin(mesh.node_sizes())), mesh.t_mesh, res.t_solve,
-                            float(measure[gi]), mesh.X[gi].tolist(), float(measure[ri]), mesh.X[ri].tolist(),
-                            float(dmag[di]), mesh.X[di].tolist(), rf.tolist(), fapp.tolist(), rm.tolist(),
-                            mapp.tolist(), wall_iters))
+        levels.append(_record_level(lv, mesh, sizing, res, built, measure, excluded, wall_iters))
         last = (mesh, res, built, measure, mname, excluded)
         if lv == 0:
-            first = (built, float(measure[gi]), float(dmag.max()), excluded)
+            first = (built, levels[0].governing, levels[0].max_disp, excluded)
         classify(spots, tol)
-        _say(progress, "check", f"level {lv}: governing {measure[gi]:.4g} MPa"
+        _say(progress, "check", f"level {lv}: governing {levels[-1].governing:.4g} MPa"
                                 + (f" ({_pct(levels)} change)" if lv else ""))
-        if lv >= 1 and _converged(levels, spots, tol, 2 if study.quality == "fast" else 3):
-            stopped_by = "converged"
-            break
-        if lv == levels_max - 1:
-            stopped_by = "level limit"
-            break
-        elapsed = time.time() - t_start
-        est_next = res.t_solve * 2.6 + mesh.t_mesh * 2
-        if elapsed + est_next > study.budget:
-            stopped_by = "time budget"
-            break
-        growth = mesh.n_nodes / levels[-2].n_nodes if len(levels) > 1 else 1.25
-        if mesh.n_nodes * max(growth, 1.15) > q["max_nodes"]:
-            stopped_by = "node limit"
+        stopped_by = _stop_reason(levels, spots, tol, 2 if study.quality == "fast" else 3, levels_max, q,
+                                  study.budget, time.time() - t_start)
+        if stopped_by:
             break
         sizing = _refine(sizing, spots, levels, tol, lv, features)
     mesh, res, built, measure, mname, excluded = last
@@ -345,6 +312,58 @@ def support_reactions(built: BuiltModel, res: StaticResult, mesh: Mesh) -> tuple
             held[nc.nodes, :] = True
     R = np.where(held, res.RF, 0.0)
     return R.sum(0), np.cross(mesh.X, R).sum(0)
+
+
+def _update_spots(spots: list[Hotspot], lv: int, mesh: Mesh, measure: np.ndarray, zmap: ZoneMap,
+                  features: PartFeatures, prep: PreparedGeometry) -> list[Hotspot]:
+    """Find the peaks on the first mesh, add any the second mesh resolves for the first time, then record
+    every peak's value on this mesh."""
+    if lv == 0:
+        spots = find_hotspots(mesh, measure, zmap, features.faces, prep.diag)
+    elif lv == 1:
+        fresh = find_hotspots(mesh, measure, zmap, features.faces, prep.diag)
+        for f in fresh:
+            if all(np.linalg.norm(np.asarray(f.xyz) - np.asarray(s.xyz)) > 2 * s.radius for s in spots):
+                f.id = len(spots) + 1
+                f.values = [float("nan")]
+                f.sizes = [float("nan")]
+                spots.append(f)
+    track(spots, mesh, measure)
+    return spots
+
+
+def _record_level(lv: int, mesh: Mesh, sizing: Sizing, res: StaticResult, built: BuiltModel, measure: np.ndarray,
+                  excluded: np.ndarray, wall_iters: int = 0) -> Level:
+    """The governing stress (away from excluded zones), raw peak, deflection and balance on one mesh."""
+    valid = ~excluded
+    if not valid.any():
+        valid = np.ones(len(measure), bool)
+    gi = np.nonzero(valid)[0][np.argmax(measure[valid])]
+    ri = int(np.argmax(measure))
+    dmag = res.displacement_magnitude()
+    di = int(np.argmax(dmag))
+    fapp, mapp = built.model.applied_total()
+    rf, rm = support_reactions(built, res, mesh)
+    return Level(lv, mesh.n_nodes, mesh.n_elems, float(sizing.h), float(np.nanmin(mesh.node_sizes())), mesh.t_mesh,
+                 res.t_solve, float(measure[gi]), mesh.X[gi].tolist(), float(measure[ri]), mesh.X[ri].tolist(),
+                 float(dmag[di]), mesh.X[di].tolist(), rf.tolist(), fapp.tolist(), rm.tolist(), mapp.tolist(),
+                 wall_iters)
+
+
+def _stop_reason(levels: list[Level], spots: list[Hotspot], tol: float, min_levels: int, levels_max: int, q: dict,
+                 budget: float, elapsed: float) -> str:
+    """Why refinement stops after the latest level, or an empty string to refine again."""
+    L = levels[-1]
+    if len(levels) >= 2 and _converged(levels, spots, tol, min_levels):
+        return "converged"
+    if len(levels) >= levels_max:
+        return "level limit"
+    if elapsed + L.t_solve * 2.6 + L.t_mesh * 2 > budget:
+        return "time budget"
+    growth = L.n_nodes / levels[-2].n_nodes if len(levels) > 1 else 1.25
+    if L.n_nodes * max(growth, 1.15) > q["max_nodes"]:
+        return "node limit"
+    return ""
 
 
 def _pct(levels: list[Level]) -> str:
