@@ -14,6 +14,8 @@ That is the [shelf bracket example](/examples/shelf-bracket/), a printed PLA L b
 screwed to a wall and carrying 40 N. A study needs a part, a material, at least one support
 and at least one load, and the [inputs guides](/guides/inputs/) cover how to write each one.
 
+![The shelf bracket as drawn, with stress piling up along the 0.5 mm inside corner to a peak of 52.3 MPa](/img/bracket-as-drawn.webp "The shelf bracket as drawn. The peak sits on the 0.5 mm inside corner.")
+
 ## What happens during a run
 
 Wobbl reads the part and finds its holes, fillets, sharp inside corners and wall thickness.
@@ -75,3 +77,5 @@ puts 123.7 MPa on a rib tip, a safety factor of 1.33 against a target of 2. Trea
 servo as rigid moves the peak next to a bolt hole, where it converges to 55.0 MPa with a
 safety factor of 3.00. The verdict depends on that choice, so Wobbl marks the result medium
 confidence and says why. [Loads](/guides/inputs/loads/) has the syntax.
+
+![Stress heatmap of the cast motor mount with the peak of 124 MPa marked where a rib tip meets the upright](/img/cast-mount-stress.webp "The cast motor mount under a 2 kN belt pull, with the peak at the rib tip.")

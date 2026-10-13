@@ -5,7 +5,7 @@ lead: "Hold the part the way the real one is mounted, because the supports decid
 order: 3
 ---
 
-```sh
+```text Flags
 --fix "bolt holes d=4.5" --fix "wall x=min"
 ```
 
@@ -44,7 +44,7 @@ contact nodes change state.
 
 Wobbl refuses to solve a part that can still slide or spin, and names the motion that is free.
 
-```text
+```text Error
 the fixtures leave the part free to spin about z. Add a fixture that stops it, for example fix a hole or a face that is not parallel to the existing ones
 ```
 

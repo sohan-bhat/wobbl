@@ -5,7 +5,7 @@ lead: "Everything after the @ in a load or support picks faces by what they are 
 order: 5
 ---
 
-```text
+```text Selectors
 top   x=min   z>5   normal +z   hole d=4.5   holes d<6   fillets
 face 12   within 15 of 50,-25,35   top and within 12 of 65,12.5,6
 ```
@@ -40,7 +40,7 @@ clauses, `within` and `box`, are applied first, so `top and within 14 of 210,0,2
 highest flat face near that point, cut down to a 28 mm circle. That is the usual way to put a
 load on a small pad of a larger face.
 
-```sh
+```text Flags
 --load "40 N down @ top and within 12 of 65,12.5,6"
 --fix "bolt holes d=3.2 and x<0"
 --heat-faces "bottom and box 17.5,17.5,-1,42.5,42.5,0.5"

@@ -5,14 +5,14 @@ lead: "A load is a magnitude with its unit, a direction, and after an @ the face
 order: 2
 ---
 
-```sh
+```text Flag
 --load "200 N down @ top"
 ```
 
 Pass `--load` as many times as you need, and Wobbl adds the loads together. Each one is
 written the same way, in this order.
 
-```text
+```text Syntax
 MAGNITUDE UNIT  DIRECTION  [at X,Y,Z]  @ FACES  [rigid]
 ```
 
@@ -62,7 +62,7 @@ the faces are tied to the point as one rigid body instead, through a CalculiX
 faces merge into one attachment, which is how the drone arm example puts both thrust and
 torque on its motor pad.
 
-```sh
+```text Flags
 --load "25 N up at 150,0,15 @ top and within 15 of 150,0,15 rigid" \
 --load "0.5 N*m +z at 150,0,15 @ top and within 15 of 150,0,15 rigid"
 ```

@@ -59,7 +59,7 @@ library versions and floating point change where mesh nodes land.
 
 ## What does it not model?
 
-Plasticity after yield, fatigue, impact, vibration, bolt preload and contact between separate
+Plasticity after yield, buckling, fatigue, impact, vibration, bolt preload and contact between separate
 parts, among others. [Limits](/validation/limits/) lists them with what is planned.
 
 ## How do I remove it?

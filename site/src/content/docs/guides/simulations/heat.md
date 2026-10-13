@@ -17,6 +17,8 @@ The 15 W goes in through the 25 mm square the chip touches. Still air in a 40 C 
 heat away at about 6 W/(m2 K) and the anodized surface radiates. With no `--duration` the run
 is steady state, and the [heat sink example](/examples/heat-sink/) comes back like this.
 
+![Temperature map of the aluminum heat sink seen from below, 70.3 C under the chip and 67.1 C at the fin tips](/img/heat-sink-temperature.webp)
+
 ```text
 OK. Hottest point reaches 70.3 C (limit 85 C) at (30, 29.9, 0) mm at steady state.
 
@@ -34,6 +36,8 @@ wobbl thermal pack.py -m li-ion-cell --power "6 W" --film "5 W/m2K @ all" \
 when the limit is crossed. The [battery pack example](/examples/battery-pack/), a 2S2P pack in
 a sealed box, passes 60 C after about 21 minutes and reaches 74.5 C at the hour, so the
 verdict is hot.
+
+![The battery pack temperature over the one hour discharge, crossing the 60 C limit just after 20 minutes](/img/battery-history.webp)
 
 ## Choosing the inputs
 

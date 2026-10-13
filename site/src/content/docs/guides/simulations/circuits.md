@@ -34,6 +34,8 @@ This gives 8.56 mV peak to peak on 5.07 V, inside the 50 mV limit. The ideal for
 7.95 mV, and the gap comes from the switch and diode drops that ngspice models and the formula
 leaves out. The run is repeated at half the time step and the ripple agrees to 0.0022%.
 
+![Output voltage of the buck converter rippling between about 5.068 and 5.077 volts](/img/buck-waveform.webp)
+
 ## How hot a MOSFET gets
 
 ```sh

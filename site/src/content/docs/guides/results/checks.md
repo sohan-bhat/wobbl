@@ -69,6 +69,8 @@ something is. It becomes a warning when a sharp corner sits in a brittle materia
 excluded peak is more than one and a half times the answer, and a sharp corner in a brittle
 material also puts a fillet on the fix list.
 
+![Stress heatmap of a printed motor mount without its ribs, with a band of high stress along the base of the upright and two spots labeled artifact](/img/motor-mount-noribs.webp "Wobbl excludes the spots labeled artifact, where an idealized support or a sharp corner sets the stress, and reports 41.3 MPa from the fillet.")
+
 ## Bolt bearing
 
 At bolted and fixed holes, the stress right at the hole is set by the support idealization,

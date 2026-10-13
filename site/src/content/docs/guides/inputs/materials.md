@@ -52,7 +52,7 @@ their default limit.
 
 Give any properties after `custom:`, in MPa and kg/m3.
 
-```sh
+```text Flag
 -m "custom:E=72400,nu=0.33,yield=165,process=cast"
 ```
 
@@ -66,7 +66,7 @@ judged by yield unless you add `ductile=0`.
 
 To change one property of a library material, name it first.
 
-```sh
+```text Flag
 -m "pla:yield=40"
 ```
 

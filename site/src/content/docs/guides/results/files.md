@@ -56,6 +56,8 @@ give no folder, and `--open` opens it in your default browser. For a strength re
 the report again from `outcome.json` first, so the page picks up any fixes applied since the
 run, and for heat and circuit results it opens the existing report as it is.
 
+![The HTML report Wobbl wrote for the shelf bracket, with the fails verdict and the 52.3 MPa peak at the top](/img/report-bracket.webp)
+
 ## outcome.json
 
 This is the full result with the units in the key names, and these are the keys an agent or a
@@ -78,7 +80,8 @@ as `t_max_C` and `time_over_limit_s` for heat.
 
 ## result.vtu
 
-The field data from the finest mesh, with `displacement_mm`, `von_mises_MPa`,
-`max_principal_MPa`, `failure_measure_MPa` and `excluded_zone` on every node. The last one
-marks the regions that were set aside as singular, so you can see exactly which spots the
-answer ignores.
+This file holds the field data from the finest mesh, with `displacement_mm`, the full stress tensor as
+`stress_MPa`, `von_mises_MPa`, `max_principal_MPa`, `failure_measure_MPa` and `excluded_zone`
+on every node. The tensor is stored in VTK's order for a symmetric tensor, xx, yy, zz, xy, yz
+and zx, so ParaView reads it as one field. `excluded_zone` marks the regions that were set
+aside as singular, so you can see exactly which spots the answer ignores.

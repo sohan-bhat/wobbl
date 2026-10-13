@@ -31,7 +31,7 @@ a restart, the agent sees 13 tools and a skill that teaches it the workflow.
 Say what the part is made of, how it is held and what loads it. The agent fills in the rest
 from `inspect_geometry` and asks you when it cannot tell.
 
-```text
+```text Prompts
 Will this printed PLA shelf bracket hold its share of an 8 kg shelf? It is screwed to the wall through the two holes.
 Does this cast motor mount meet our safety factor 2 rule under a 2 kN emergency stop belt pull?
 Will a 15 W chip stay under 85 C on this heat sink without a fan?
@@ -42,7 +42,7 @@ What is the ripple on this 12 V to 5 V buck at 2 A?
 
 This is the shelf bracket from the examples, driven through the tools.
 
-```text
+```text Session
 > Will this printed PLA shelf bracket hold its share of an 8 kg shelf?
 
 agent: inspect_geometry("bracket.py")

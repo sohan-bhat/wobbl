@@ -27,6 +27,8 @@ or bracing the corner is what works. The gusset's own toe is a sharp corner too,
 excludes as a singularity and flags with medium confidence, so give it a small fillet in the
 real part.
 
+![The bracket with a gusset across its corner, where the peak drops to 9.82 MPa near the gusset toe](/img/bracket-gusset.webp "The gusset version, with the heatmap scaled to its own peak.")
+
 ## What it suggests
 
 | Fix | When | The number it gives |

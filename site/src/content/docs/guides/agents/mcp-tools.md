@@ -37,7 +37,7 @@ Loads, supports, films and selectors use exactly the syntax of the command line,
 
 This is the tool agents use most. The quickest way to call it is with everything at once.
 
-```text
+```text Tool call
 solve_structural(path="bracket.py", material="pla",
                  fixtures=["bolt holes d=4.5", "wall x=min"],
                  loads=["40 N down @ top and within 12 of 65,12.5,6"])
