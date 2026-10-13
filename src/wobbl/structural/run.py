@@ -73,6 +73,7 @@ class StructuralRun:
     stopped_by: str = ""
     t_total: float = 0.0
     notes: list[str] = field(default_factory=list)
+    nonlinear: dict | None = None
 
 
 def _say(progress: Progress | None, stage: str, detail: str = ""):
@@ -279,6 +280,8 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
                             float(dmag[di]), mesh.X[di].tolist(), rf.tolist(), fapp.tolist(), rm.tolist(),
                             mapp.tolist(), wall_iters))
         last = (mesh, res, built, measure, mname, excluded)
+        if lv == 0:
+            first = (built, float(measure[gi]), float(dmag.max()), excluded)
         classify(spots, tol)
         _say(progress, "check", f"level {lv}: governing {measure[gi]:.4g} MPa"
                                 + (f" ({_pct(levels)} change)" if lv else ""))
@@ -299,8 +302,10 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
             break
         sizing = _refine(sizing, spots, levels, tol, lv, features)
     mesh, res, built, measure, mname, excluded = last
+    nonlinear = _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work,
+                                        progress)
     run = StructuralRun(study, material, prep, features, sel_info, levels, spots, mesh, res, built, mname,
-                        measure, excluded, r_ex, work, tol, stopped_by, time.time() - t_start, notes)
+                        measure, excluded, r_ex, work, tol, stopped_by, time.time() - t_start, notes, nonlinear)
     _save_fields(run)
     return run
 
@@ -376,6 +381,26 @@ def _refine(sizing: Sizing, spots: list[Hotspot], levels: list[Level], tol: floa
     # the far field gets a little finer too, so global load paths converge
     new.h = sizing.h * 0.85
     return new
+
+
+def _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work, progress):
+    """When the part deflects a good fraction of its wall thickness, linear theory misses membrane
+    stiffening and changing geometry. Re-solve the first mesh with geometric nonlinearity and report
+    how much the peak and the deflection move."""
+    built, lin_peak, lin_disp, excluded = first
+    d = levels[-1].max_disp
+    if built.walls or (d < 0.3 * features.thickness_min and d < 0.03 * prep.diag):
+        return None
+    _say(progress, "check", f"deflection {d:.3g} mm is large next to the {features.thickness_min:.3g} mm wall; "
+                            "re-solving with large deflection theory")
+    try:
+        res = adapter.solve_static(built.model, work / "nlgeom", nlgeom=True)
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)[:200]}
+    m, _ = failure_measure(res, material, print_axis)
+    valid = ~excluded if (~excluded).any() else np.ones(len(m), bool)
+    return {"linear_peak": lin_peak, "nonlinear_peak": float(m[valid].max()), "linear_disp": lin_disp,
+            "nonlinear_disp": float(res.displacement_magnitude().max()), "nodes": built.model.mesh.n_nodes}
 
 
 def _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter, workdir):

@@ -197,6 +197,24 @@ def evaluate(run: StructuralRun) -> Outcome:
     # 6. sanity: units, size, deflection
     checks.append(_sanity(run, gov, allow))
 
+    # 7. large deflection: compare a geometrically nonlinear solve on the first mesh
+    nl = run.nonlinear
+    if nl and "error" not in nl and nl["linear_peak"] > 0:
+        ps = nl["nonlinear_peak"] / nl["linear_peak"] - 1
+        ds = nl["nonlinear_disp"] / max(nl["linear_disp"], 1e-12) - 1
+        s = (f"deflection is large next to the wall thickness, so Wobbl re-solved the first mesh with large "
+             f"deflection theory: the peak moves {100 * ps:+.0f}% and the deflection {100 * ds:+.0f}%")
+        if abs(ps) <= 0.10:
+            checks.append(Check("large deflection", "pass", s + "; linear theory holds", nl))
+        else:
+            est = gov * (1 + ps)
+            checks.append(Check("large deflection", "warn", s + f". Scaling the converged answer gives about "
+                                f"{fmt(est)} MPa; " + ("linear theory is conservative here" if ps < 0 else
+                                                       "linear theory underestimates here"), nl))
+    elif nl and "error" in nl:
+        checks.append(Check("large deflection", "info", "deflection is large next to the wall thickness, but the "
+                                                        f"large deflection solve did not finish ({nl['error']})"))
+
     level, reasons = confidence(checks, extra)
     if run.stopped_by in ("time budget", "node limit") and checks[0].status != "pass":
         reasons.append(f"refinement stopped by the {run.stopped_by}")

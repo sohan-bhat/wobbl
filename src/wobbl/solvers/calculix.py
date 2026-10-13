@@ -40,12 +40,14 @@ class CalculiX(SolverAdapter):
 
     # ------------------------------------------------------------------ static
     def solve_static(self, model: StaticModel, workdir: str | Path, job: str = "static",
-                     timeout: float = 3600) -> StaticResult:
+                     timeout: float = 3600, nlgeom: bool = False) -> StaticResult:
+        """Linear static solve; nlgeom=True accounts for large deflection (membrane stiffening, follower
+        geometry) with load increments."""
         ccx = self.require()
         work = Path(workdir)
         work.mkdir(parents=True, exist_ok=True)
         n = model.mesh.n_nodes
-        extra = write_static_inp(work / f"{job}.inp", model)
+        extra = write_static_inp(work / f"{job}.inp", model, nlgeom)
         log, t = _run(ccx, work, job, timeout)
         blocks = read_frd(work / f"{job}.frd", n + 2 * len(model.rigid))
         if "DISP" not in blocks or "STRESS" not in blocks:
@@ -139,7 +141,7 @@ def _nset(f, name: str, nodes: np.ndarray):
         f.write(", ".join(map(str, ids[i:i + 12])) + "\n")
 
 
-def write_static_inp(path: Path, model: StaticModel) -> dict[str, tuple[int, int]]:
+def write_static_inp(path: Path, model: StaticModel, nlgeom: bool = False) -> dict[str, tuple[int, int]]:
     """Write the .inp. Returns rigid body name -> (ref node index, rot node index), 0 based."""
     mesh = model.mesh
     n = mesh.n_nodes
@@ -187,7 +189,10 @@ def write_static_inp(path: Path, model: StaticModel) -> dict[str, tuple[int, int
             f.write("*EQUATION\n")
             for i, terms in eqs:
                 f.write(f"{len(terms)}\n" + ",".join(f"{i + 1},{d},{c:.10g}" for d, c in terms) + "\n")
-        f.write("*STEP\n*STATIC\n*BOUNDARY\n")
+        if nlgeom:
+            f.write("*STEP, NLGEOM, INC=200\n*STATIC\n0.1,1.,1e-5,0.25\n*BOUNDARY\n")
+        else:
+            f.write("*STEP\n*STATIC\n*BOUNDARY\n")
         for c in model.constraints:
             for d in c.dofs:
                 f.write(f"{_setname(c.name)},{d},{d}\n")
