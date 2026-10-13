@@ -134,9 +134,9 @@ def _render_vtk(out, X, tets, tris, measure, U, gxyz, gval, mlabel, allowable, t
     clim = [0.0, float(gval) if gval > 0 else float(measure.max())]
     artifacts = [s for s in spots if s.get("excluded") and s.get("values") and s["values"][-1] > gval]
 
-    def stress_plot(path, focus=None, zoom=1.3, size=(1600, 1000)):
+    def stress_plot(path, focus=None, zoom=1.15, size=(1600, 1000)):
         p = _plotter(size)
-        mspan = span / (zoom / 1.3)
+        mspan = span / (zoom / 1.15)
         p.add_mesh(surf, scalars="stress", cmap="turbo", clim=clim, smooth_shading=True, show_scalar_bar=True,
                    ambient=0.3, diffuse=0.8, specular=0.15,
                    scalar_bar_args=_bar(f"{mlabel}\n{unit}"), above_color="#ffffff" if artifacts else None)
