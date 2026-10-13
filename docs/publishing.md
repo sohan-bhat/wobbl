@@ -8,7 +8,9 @@ owner's PyPI account is ready. Nothing here has been run.
 1. Create the project on PyPI and a scoped API token (Account settings, API
    tokens, scope: project `wobbl`), or set up trusted publishing for the GitHub
    repository `sohan-bhat/wobbl` with workflow `release.yml`.
-2. Bump `version` in `pyproject.toml` and `__version__` in `src/wobbl/__init__.py`.
+2. Bump `version` in `pyproject.toml`, `__version__` in `src/wobbl/__init__.py` and
+   `version` in `npm/package.json`. The npm tests and the release workflow check that
+   they match.
 3. Build and check:
 
    ```sh
@@ -30,15 +32,35 @@ owner's PyPI account is ready. Nothing here has been run.
 
 After that, users install with `pipx install wobbl` or `uv tool install wobbl`.
 
-## npm (optional launcher)
+## npm
 
-An npm package only makes sense as a thin launcher for people who live in
-Node tooling (`npx wobbl ...` calling `uvx wobbl`). If wanted:
+`npm/` holds a small launcher so `npx wobbl ...` works. On first run it installs
+the matching Python package for good with `uv tool install` (or `pipx install`,
+or a uv it downloads and checks into `~/.wobbl/uv`), then hands every run to the
+installed `wobbl`. Its version always equals the Python package's version.
 
-1. `npm login` with the owner's account and check the name: `npm view wobbl`.
-2. Create `npm/package.json` with `"name": "wobbl"`, a `bin` entry pointing to a
-   script that runs `uvx wobbl "$@"` (or `pipx run wobbl`), and `"os"` left open.
-3. `npm publish --access public` from that folder.
+Publish it only after the same version is live on PyPI, since that is where the
+launcher installs from.
+
+The first publish is done by hand, once, because npm can only set up trusted
+publishing for a package that already exists:
+
+```sh
+npm login
+cd npm && npm publish --access public
+```
+
+Then turn on trusted publishing so tags publish it from CI:
+
+1. On npmjs.com open the `wobbl` package, then Settings, then Trusted Publisher.
+2. Pick GitHub Actions and fill in organization or user `sohan-bhat`, repository
+   `wobbl`, workflow filename `release.yml` and environment `npm`.
+3. Save. From the next tag on, the `npm` job in `release.yml` publishes with
+   provenance after the PyPI upload.
+
+Until trusted publishing is set up, that job logs a warning and skips the
+publish instead of failing the release. It also skips a version that is
+already on npm, so publishing a version by hand before tagging it is fine.
 
 ## Solver packages
 
