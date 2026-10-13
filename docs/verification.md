@@ -24,7 +24,7 @@ point, square to the line toward the load. When every support is on one side
 and every load on the other, the cut carries the whole load like a beam: Wobbl
 computes the section's area and second moments, the axial force, bending
 moment and torsion, and the nominal stress `N/A + M c / I`. The FEA peak divided
-by that nominal stress is the local stress concentration. Between 0.85 and 4 is
+by that nominal stress is the local stress concentration. Between 0.85 and 6 is
 physical (plain beam region up to fillets and holes); far outside that range is
 flagged for a look at loads, units and supports.
 

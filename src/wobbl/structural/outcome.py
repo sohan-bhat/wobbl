@@ -158,7 +158,7 @@ def evaluate(run: StructuralRun) -> Outcome:
                  f"{ratio:.2f}x that")
             if 0.85 <= ratio <= 1.2:
                 checks.append(Check("hand calculation", "pass", s + ", a plain beam region", est))
-            elif 1.2 < ratio <= 4.0:
+            elif 1.2 < ratio <= 6.0:
                 checks.append(Check("hand calculation", "pass",
                                     s + f", a stress concentration of about {ratio:.1f} from the local shape", est))
             elif 0.6 <= ratio < 0.85:

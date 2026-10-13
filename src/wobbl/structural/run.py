@@ -24,7 +24,7 @@ from .spec import SpecError, StructuralStudy
 
 QUALITY = {
     "fast": dict(fineness=0.8, nodes=20000, levels=3, tol=0.05, max_nodes=80000),
-    "normal": dict(fineness=1.0, nodes=35000, levels=4, tol=0.03, max_nodes=250000),
+    "normal": dict(fineness=1.0, nodes=35000, levels=5, tol=0.03, max_nodes=250000),
     "fine": dict(fineness=1.3, nodes=60000, levels=5, tol=0.02, max_nodes=400000),
 }
 
@@ -399,8 +399,8 @@ def _refine(sizing: Sizing, spots: list[Hotspot], levels: list[Level], tol: floa
         size = 0.5 * h
         face = features.faces.get(s.face) if (features and s.face is not None) else None
         if face is not None and face.radius and s.kind == "feature":
-            # jump straight toward a size that resolves the curve, at most four times finer per level
-            size = max(min(size, face.radius / 3.0), 0.25 * h)
+            # jump straight toward a size that resolves the curve, at most about seven times finer per level
+            size = max(min(size, face.radius / 4.0), 0.15 * h)
         tight = face is not None and features is not None and face.role == "fillet" and \
             face.radius < 0.25 * features.thickness_typical
         if tight and s.kind == "feature":
