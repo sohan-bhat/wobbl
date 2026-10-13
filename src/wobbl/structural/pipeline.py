@@ -47,6 +47,8 @@ def _save_vtu(run, path: Path):
 
         g = _grid(run.mesh.X, run.mesh.tets)
         g.point_data["displacement_mm"] = run.result.U
+        # xx, yy, zz, xy, yz, zx: VTK's order for a symmetric tensor, so ParaView reads it as one
+        g.point_data["stress_MPa"] = run.result.S
         g.point_data["von_mises_MPa"] = run.result.von_mises()
         g.point_data["failure_measure_MPa"] = run.measure
         g.point_data["max_principal_MPa"] = run.result.principal()[:, 2]
