@@ -1,10 +1,11 @@
 // The pokeable part: a real Wobbl result in 3D. This side runs on the page and keeps what the visitor
-// touches: the camera and its controls, the arrow that turns the belt pull, the probe and the labels.
+// touches: the camera and its controls, the arrow that points the load on the motor shaft, the probe
+// and the labels.
 // The drawing itself happens in part-draw.js, inside a worker (draw-worker.js) where the browser can
 // draw there, so loading the mesh, compiling shaders and every frame stay off the page's main thread.
-// The readout and the peak marker come from the peak the export found for every whole degree.
+// The readout and the peak marker come from the export's peak table over every direction.
 import { Orbit, orbitControls } from './orbit.js';
-import { fmt, peakNode, tablePerN } from './reading';
+import { fmt, peakNode, tablePerN, unit } from './reading';
 
 const idle = () => new Promise((r) => ('requestIdleCallback' in window ? requestIdleCallback(() => r(), { timeout: 600 }) : setTimeout(r, 50)));
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -68,8 +69,10 @@ function onPage(canvas, man, file, w, h, px) {
 
 /**
  * Draw the part in root. ui.data is the manifest, ui.state() gives { load, angle, exag },
- * ui.onChange(fn) and ui.onReset(fn) subscribe and return an unsubscribe, ui.setAngle(deg, byKey)
- * turns the pull when the visitor drags the arrow or presses the arrow keys, ui.worker says whether
+ * ui.onChange(fn) and ui.onReset(fn) subscribe and return an unsubscribe, ui.setDir(az, el, byKey)
+ * points the load when the visitor drags the arrow or presses the arrow keys, ui.touched() says the
+ * visitor really did something (a click, a tap, a drag or a key), ui.peaks() gives the peak table
+ * once it has loaded, ui.worker says whether
  * the browser can draw in a worker, and ui.signal aborts a start that is still loading. Resolves,
  * once the part has come in, to { dispose, view }: dispose tears it all down; view.get() and
  * view.set() read and move the camera, view.hot() lights the arrow as if held and view.hand()
@@ -105,7 +108,7 @@ async function build(root, ui, trash) {
   const canvas = document.createElement('canvas');
   canvas.setAttribute('role', 'img');
   canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag the yellow arrow, or press the left and right arrow keys, to turn the belt pull, five degrees a press or one with Shift. Drag elsewhere or press up and down to turn the part, scroll, pinch or press plus and minus to zoom, and double click or double tap to reset the view.');
+  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag the yellow arrow, or press the arrow keys, to point the load on the motor shaft, five degrees a press or one with Shift. Drag elsewhere to turn the part, pinch or press plus and minus to zoom, and double click or double tap to reset the view.');
   canvas.style.opacity = '0';
   canvas.style.transition = 'opacity 0.3s ease';
   root.prepend(canvas);
@@ -123,7 +126,7 @@ async function build(root, ui, trash) {
   const HOME = { az: Math.atan2(1.05, 0.62), el: Math.atan2(0.62, Math.hypot(0.62, 1.05)), dist: radius / Math.sin(Math.PI / 12) };
   const orbit = new Orbit({ target, ...HOME, fov: 30, aspect: vw / vh, minDist: radius * 1.3, maxDist: radius * 6 });
   const pl = man.pull;
-  const pAt = pl.point, e1 = pl.e1, e2 = pl.e2, axis = pl.axis;
+  const pAt = pl.point, e1 = pl.e1, e2 = pl.e2, e3 = pl.e3;
   let pDir = [...e1];
 
   // The part sits in the page's first screen: a vertical swipe still scrolls the page on phones,
@@ -132,7 +135,7 @@ async function build(root, ui, trash) {
   canvas.style.touchAction = 'pan-y';
   let onStart = () => {};
   trash.push(orbitControls(canvas, orbit, {
-    rotateSpeed: 0.8, onStart: () => onStart(), onChange: () => { busy(); requestRender(); },
+    rotateSpeed: 0.8, onStart: () => { onStart(); ui.touched(); }, onChange: () => { busy(); requestRender(); },
   }));
   function resetView() {
     Object.assign(orbit, HOME);
@@ -151,24 +154,20 @@ async function build(root, ui, trash) {
   const hand = root.querySelector('.hint-hand');
   const probe = root.querySelector('.probe');
   let peakP = [0, 0, 0];
-  let len = 0, cs = [1, 0], grow = 1, showTags = false, handOpacity = 0, limit = man.allowable_MPa;
-  let short = vw < 560;
-  loadTag.toggleAttribute('data-short', short);
+  let len = 0, u = [1, 0, 0], grow = 1, showTags = false, handOpacity = 0, limit = man.allowable_MPa;
   // how far the entrance has come (k) and how much of the bend it shows
   const enter = { k: 1, bend: 1 };
   let hovering = false, turning = null, auto = false;
 
   function apply() {
-    const t = (state.angle * Math.PI) / 180;
-    cs = [Math.cos(t), Math.sin(t)];
-    pDir = [0, 1, 2].map((k) => e1[k] * cs[0] + e2[k] * cs[1]);
+    u = unit(state.az, state.el);
+    pDir = [0, 1, 2].map((k) => e1[k] * u[0] + e2[k] * u[1] + e3[k] * u[2]);
     len = ((46 * state.load) / man.load_N) * grow;
-    // the peak for this angle, found by the export at every whole degree
-    const node = peakNode(man, state.angle), f = state.exag * enter.bend * state.load;
-    peakP = [0, 1, 2].map((k) => node[k] + f * (cs[0] * node[3 + k] + cs[1] * node[6 + k]));
-    peakTagV.textContent = `${(tablePerN(man, state.angle) * state.load).toFixed(1)} MPa`;
-    // on a narrow view the load label is just the number: the reading below already says belt pull
-    loadTag.textContent = `${fmt(state.load)} N${short ? '' : ' belt pull'}`;
+    // the peak for this direction, from the export's table
+    const peaks = ui.peaks(), node = peakNode(man, peaks, state.az, state.el), f = state.exag * enter.bend * state.load;
+    peakP = [0, 1, 2].map((k) => node[k] + f * (u[0] * node[3 + k] + u[1] * node[6 + k] + u[2] * node[9 + k]));
+    peakTagV.textContent = `${(tablePerN(man, peaks, state.az, state.el) * state.load).toFixed(1)} MPa`;
+    loadTag.textContent = `${fmt(state.load)} N`;
     if (probe.dataset.sticky) {
       probe.hidden = true;
       delete probe.dataset.sticky;
@@ -178,7 +177,7 @@ async function build(root, ui, trash) {
   // everything the drawing needs for one frame
   const frameState = () => ({
       camera: { position: orbit.eye, target: orbit.target, fov: orbit.fov, aspect: orbit.aspect, view: orbit.view },
-      load: state.load, cs, exag: state.exag * enter.bend, limit, len, grow: Math.min(grow, 1),
+      load: state.load, u, exag: state.exag * enter.bend, limit, len, grow: Math.min(grow, 1),
       hot: hovering || turning !== null || auto, ring: hovering || turning !== null,
   });
 
@@ -328,11 +327,6 @@ async function build(root, ui, trash) {
     vw = w;
     vh = h;
     sizes = null;
-    if (short !== vw < 560) {
-      short = vw < 560;
-      loadTag.toggleAttribute('data-short', short);
-      apply();
-    }
     back.size(w, h, px);
     if (enter.k >= 1) {
       orbit.aspect = w / h;
@@ -354,15 +348,29 @@ async function build(root, ui, trash) {
   // The arrow lights up under the pointer, while it is dragged, and while the idle animation turns it.
   const light = () => requestRender();
 
-  // Turning the pull: a drag that starts anywhere on the arrow moves its tip around the pulley.
-  // The pointer's ray meets the pulley plane, so the arrow follows it from any view.
-  function angleAt(x, y) {
-    const r = where();
-    const hit = Orbit.meet(orbit.ray(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), pAt, axis);
-    if (!hit) return null;
-    const d = [hit[0] - pAt[0], hit[1] - pAt[1], hit[2] - pAt[2]];
-    const a = Math.atan2(d[0] * e2[0] + d[1] * e2[1] + d[2] * e2[2], d[0] * e1[0] + d[1] * e1[1] + d[2] * e1[2]);
-    return (Math.round((a * 180) / Math.PI) + 360) % 360;
+  // Pointing the load: a drag that starts anywhere on the arrow moves its tip over a sphere around the
+  // pulley, as long as the arrow. Where the pointer's ray meets the sphere, the tip goes to the meeting
+  // point nearer to where it was, so it can swing round toward the viewer or away; where the ray
+  // misses, it goes to the nearest point of the sphere's outline.
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  function dirAt(x, y) {
+    const r = where(), R = Math.max(len, 16);
+    const { origin: o, dir: d } = orbit.ray(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+    const oc = [o[0] - pAt[0], o[1] - pAt[1], o[2] - pAt[2]];
+    const b = dot(d, oc), disc = b * b - (dot(oc, oc) - R * R);
+    let w;
+    if (disc >= 0) {
+      const was = pDir, near = [0, 1, 2].map((k) => oc[k] + (-b - Math.sqrt(disc)) * d[k]);
+      const far = [0, 1, 2].map((k) => oc[k] + (-b + Math.sqrt(disc)) * d[k]);
+      w = dot(near, was) >= dot(far, was) ? near : far;
+    } else {
+      w = [0, 1, 2].map((k) => oc[k] - b * d[k]);
+    }
+    const l = Math.hypot(w[0], w[1], w[2]) || 1;
+    w = w.map((v) => v / l);
+    const el = (Math.asin(Math.max(-1, Math.min(1, dot(w, e3)))) * 180) / Math.PI;
+    const az = (Math.atan2(dot(w, e2), dot(w, e1)) * 180) / Math.PI;
+    return [Math.round(az), Math.round(el)];
   }
   on(grip, 'pointerenter', (e) => { if (e.pointerType === 'mouse') { hovering = true; light(); } });
   on(grip, 'pointerleave', (e) => { if (e.pointerType === 'mouse') { hovering = false; light(); } });
@@ -372,14 +380,15 @@ async function build(root, ui, trash) {
     grip.setPointerCapture(e.pointerId);
     grip.dataset.turning = '';
     probe.hidden = true;
+    ui.touched();
     light();
   });
   // the page folds the moves into one update a frame, and this view draws in that same frame
   on(grip, 'pointermove', (e) => {
     if (turning !== e.pointerId) return;
     busy();
-    const deg = angleAt(e.clientX, e.clientY);
-    if (deg !== null) ui.setAngle(deg, false);
+    const [az, el] = dirAt(e.clientX, e.clientY);
+    ui.setDir(az, el, false);
   }, { passive: true });
   const endTurn = (e) => {
     if (turning !== e.pointerId) return;
@@ -414,7 +423,8 @@ async function build(root, ui, trash) {
   }
   let hoverAt = null, hoverRaf = 0;
   on(canvas, 'pointermove', (e) => {
-    if (e.pointerType !== 'mouse' || e.buttons || enter.k < 1) return;
+    // while the idle animation plays the values under the pointer would not hold still, so no probe
+    if (e.pointerType !== 'mouse' || e.buttons || enter.k < 1 || auto) return;
     hoverAt = [e.clientX, e.clientY];
     if (!hoverRaf) {
       hoverRaf = requestAnimationFrame(() => {
@@ -431,6 +441,8 @@ async function build(root, ui, trash) {
     hoverAt = null;
     if (e.pointerType === 'mouse') probe.hidden = true;
   });
+  // a press that the browser turns into a page scroll is no tap
+  on(canvas, 'pointercancel', () => { down = null; });
   // A double click, or two taps in quick succession, puts the camera back.
   let lastTap = 0;
   on(canvas, 'pointerup', (e) => {
@@ -444,21 +456,24 @@ async function build(root, ui, trash) {
       return;
     }
     lastTap = e.timeStamp;
+    ui.touched();
     probeAt(e.clientX, e.clientY, true);
   });
   on(canvas, 'dblclick', () => { probe.hidden = true; resetView(); });
 
-  // Keys on the part: left and right turn the pull, up and down tilt the view, plus and minus zoom.
+  // Keys on the part: left and right turn the load round the shaft, up and down tip it along the
+  // shaft, five degrees a press or one with Shift, and plus and minus zoom.
   on(canvas, 'keydown', (e) => {
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const turn = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
+    if (turn) {
       e.preventDefault();
-      const step = (e.shiftKey ? 1 : 5) * (e.key === 'ArrowRight' ? 1 : -1);
-      ui.setAngle(Math.round(ui.state().angle) + step, true); // the page's angle: several presses can land in one frame
+      ui.touched();
+      const step = e.shiftKey ? 1 : 5, now = ui.state(); // the page's direction: several presses can land in one frame
+      ui.setDir(Math.round(now.az) + turn[0] * step, Math.max(-90, Math.min(90, Math.round(now.el) + turn[1] * step)), true);
       return;
     }
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      orbit.el = Math.max(-1.33, Math.min(1.33, orbit.el + (e.shiftKey ? 0.3 : 0.1) * (e.key === 'ArrowUp' ? 1 : -1)));
-    } else if (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') {
+    if (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') {
+      ui.touched();
       orbit.dist *= e.key === '-' || e.key === '_' ? 1.12 : 1 / 1.12;
     } else {
       return;

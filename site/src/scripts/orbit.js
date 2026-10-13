@@ -58,24 +58,17 @@ export class Orbit {
     const d = unit([0, 1, 2].map((k) => cx * this.x[k] + cy * this.y[k] - this.near * this.z[k]));
     return { origin: this.eye, dir: d };
   }
-
-  /** Where a ray meets the plane through point with the given normal, or null. */
-  static meet(ray, point, normal) {
-    const den = dot(ray.dir, normal);
-    if (Math.abs(den) < 1e-9) return null;
-    const t = dot([point[0] - ray.origin[0], point[1] - ray.origin[1], point[2] - ray.origin[2]], normal) / den;
-    return t < 0 ? null : [0, 1, 2].map((k) => ray.origin[k] + t * ray.dir[k]);
-  }
 }
 
 /**
- * Drag to turn the camera round its target, pinch or wheel to move in and out, as OrbitControls does.
- * onStart runs when a drag or pinch begins, onChange after every move. Returns a function that
- * takes the listeners off again.
+ * Drag to turn the camera round its target and pinch to move in and out, as OrbitControls does. A
+ * plain wheel scrolls the page; a pinch on a trackpad, which browsers send as a wheel with ctrl held,
+ * zooms. onStart runs once a drag or pinch really moves, never for a press that turns into a page
+ * scroll, and onChange after every move. Returns a function that takes the listeners off again.
  */
 export function orbitControls(el, orbit, { onStart = () => {}, onChange = () => {}, rotateSpeed = 1 } = {}) {
   const pointers = new Map();
-  let span = 0;
+  let span = 0, started = false;
   const spread = () => {
     const [a, b] = [...pointers.values()];
     return Math.hypot(a.x - b.x, a.y - b.y);
@@ -83,16 +76,23 @@ export function orbitControls(el, orbit, { onStart = () => {}, onChange = () => 
   const down = (e) => {
     if (e.pointerType === 'mouse' && e.button > 0) return;
     el.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, touch: e.pointerType !== 'mouse' });
     if (pointers.size === 2) span = spread();
-    onStart();
+    if (pointers.size === 1) started = false;
   };
   const move = (e) => {
     const p = pointers.get(e.pointerId);
     if (!p) return;
     const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (!dx && !dy) return;
+    if (!started && pointers.size === 1 && p.touch) {
+      // one finger: up and down belong to the page's scroll until the finger has clearly gone sideways
+      const sx = e.clientX - p.x0, sy = e.clientY - p.y0;
+      if (Math.abs(sx) < 8 || Math.abs(sx) < Math.abs(sy)) return;
+    }
     p.x = e.clientX;
     p.y = e.clientY;
+    if (!started) { started = true; onStart(); }
     if (pointers.size === 1) {
       const k = (2 * Math.PI * rotateSpeed) / (el.clientHeight || 1);
       orbit.az -= dx * k;
@@ -109,6 +109,7 @@ export function orbitControls(el, orbit, { onStart = () => {}, onChange = () => 
   };
   const up = (e) => { pointers.delete(e.pointerId); if (pointers.size === 2) span = spread(); };
   const wheel = (e) => {
+    if (!e.ctrlKey) return;
     e.preventDefault();
     orbit.dist *= e.deltaY > 0 ? 1 / 0.95 : 0.95;
     orbit.update();
