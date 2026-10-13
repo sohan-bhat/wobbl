@@ -7,17 +7,17 @@
   Before, the cast motor mount's rigid servo case came out at 55.5 MPa on one
   run and 44.2 MPa on another, its main answer moved between 123.4 and 123.9
   MPa, the enclosure shell between 92.5 and 89.8 MPa and the shelf bracket
-  between 52.8 and 51.8 MPa. Four sources, all fixed:
-  - gmsh meshed faces on parallel threads, which moved nodes from run to run;
-    it now runs on one thread with a fixed seed, and OpenCASCADE booleans run
-    serially;
-  - the thinnest wall estimate drew random triangles from that mesh, weighted
-    them by area twice and took a quantile that jumped between 3 and 5.5 mm;
-    it now casts rays from points laid out on the CAD faces and averages the
-    thinnest 5% of the surface;
-  - the exclusion radius around singular spots came from the first mesh's
-    element sizes; it now comes from the sizes the sizing rules ask for;
-  - refinement stopped when the clock said the next mesh would not fit; the
+  between 52.8 and 51.8 MPa. Four sources caused it, and all four are fixed.
+  - gmsh meshed faces on parallel threads, which moved nodes from run to run,
+    so it now runs on one thread with a fixed seed, and OpenCASCADE booleans
+    run serially.
+  - The thinnest wall estimate drew random triangles from that mesh, weighted
+    them by area twice and took a quantile that jumped between 3 and 5.5 mm.
+    It now casts rays from points laid out on the CAD faces and averages the
+    thinnest 5% of the surface.
+  - The exclusion radius around singular spots came from the first mesh's
+    element sizes, and now it comes from the sizes the sizing rules ask for.
+  - Refinement stopped when the clock said the next mesh would not fit. The
     time budget is now spent by a cost model of each mesh and solve, with the
     clock only as a backstop at three times the budget.
   A test runs a study twice and compares every number. The cast motor mount
@@ -31,11 +31,11 @@
   its own peak. It used to solve it only on the mesh refined for the main
   answer, so a peak somewhere else came from a coarse mesh. When the verdict
   flips or the peak moves, Wobbl now refines around that peak with the main
-  study's convergence rule and time budget and reports the trend; if the budget
-  runs out first, the best mesh reached is labeled as not converged. On the cast
-  motor mount the rigid servo case now converges to 55.0 MPa (54.2, 54.3, 55.0
-  MPa over three meshes, safety factor 3.00); before, it read 47.2 MPa on the
-  mesh refined for the distributed case.
+  study's convergence rule and time budget and reports the trend, and if the
+  budget runs out first, the best mesh reached is labeled as not converged.
+  On the cast motor mount the rigid servo case now converges to 55.0 MPa (54.2, 54.3, 55.0
+  MPa over three meshes, safety factor 3.00), where before it read 47.2 MPa on
+  the mesh refined for the distributed case.
 - Custom materials no longer inherit printed PLA's properties. A custom cast
   aluminum listed a printed part assumption and PLA's density. Materials now say
   how they are made (`process=printed`, `molded`, `cast`, `wrought`), the
@@ -67,13 +67,14 @@ First release.
 - Second order tetrahedral meshes (gmsh) with feature sizing, hotspot refinement,
   automatic fallbacks (another algorithm, straight sided elements, a finer size),
   and every mesh attempt isolated in a child process with a timeout.
-- Loads: forces, pressures, bolt bearing, gravity, remote forces and moments
-  through distributing (RBE3 style) or rigid couplings. Supports: fixed (all or
-  some directions), bolted holes with washer rings, rollers, and wall contact
-  solved by an active set loop with a coarse pre solve and warm starts.
-- A face selector language: sides, planes, normals, holes and fillets by size,
-  nearest faces, spherical and box patches, ids.
-- 22 sourced materials plus custom properties; printed parts can be checked
+- Loads can be forces, pressures, bolt bearing, gravity, or remote forces and
+  moments through distributing (RBE3 style) or rigid couplings. Supports can be
+  fixed (in all or some directions), bolted holes with washer rings, rollers,
+  or wall contact solved by an active set loop with a coarse pre solve and warm
+  starts.
+- A face selector language picks sides, planes, normals, holes and fillets by
+  size, nearest faces, spherical and box patches, and ids.
+- 22 sourced materials plus custom properties, and printed parts can be checked
   across layers.
 
 **Verification on every answer**
@@ -82,16 +83,18 @@ First release.
   from exact CAD geometry, bolt bearing, units and deflection sanity, a large
   deflection re-solve when a part bends a good fraction of its wall, and the
   spread between rigid and distributed load attachment.
-- Confidence (high, medium, low) with reasons; never high after a failed check.
-- Bounded runtime: the last finished level is returned when time or a solver
-  runs out.
+- Confidence (high, medium, low) with reasons, and never high after a failed
+  check.
+- Bounded runtime, so the last finished level is returned when time or a
+  solver runs out.
 
 **Seeing and fixing**
 - Heatmaps with the failure point marked (VTK off screen, matplotlib fallback),
   convergence plots, plain text summaries and a self contained HTML report.
-- Fix suggestions with numbers; fillets and gussets applied to any STEP through
-  OpenCASCADE, thickness and fillet parameters of parametric parts, material
-  swaps, each re-simulated for a before and after table.
+- Fix suggestions with numbers. Fillets and gussets are applied to any STEP
+  through OpenCASCADE, along with thickness and fillet parameters of parametric
+  parts and material swaps, and each one is simulated again for a before and
+  after table.
 
 **Heat and circuits**
 - Steady and transient conduction with convection, radiation, heat sources and
@@ -103,5 +106,5 @@ First release.
 - `wobbl setup` installs CalculiX and ngspice into `~/.wobbl` with a pinned
   micromamba and registers an MCP server and skill for Claude Code, Codex, Cursor
   and Gemini CLI, with backups and `wobbl uninstall`.
-- Validation suite of 18 cases: textbook solutions, NAFEMS LE1 and LE10, and five
-  real parts against converged reference models.
+- A validation suite of 18 cases, with textbook solutions, NAFEMS LE1 and LE10,
+  and five real parts against converged reference models.
