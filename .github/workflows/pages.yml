@@ -6,8 +6,8 @@ on:
       - "site/**"
       - "docs/**"
       - "examples/**"
-      - "scripts/build_site.py"
-      - "scripts/sitegen/**"
+      - "CHANGELOG.md"
+      - "pyproject.toml"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -26,18 +26,23 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: site
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
-      - name: Build the site
+          node-version-file: site/.nvmrc
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Build the site and its search index
         run: |
-          python -m pip install "markdown-it-py==4.2.0"
-          python scripts/build_site.py --out _site
+          npm ci --no-audit --no-fund
+          npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: site/dist
       - id: deployment
         uses: actions/deploy-pages@v4

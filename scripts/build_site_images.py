@@ -4,7 +4,7 @@ Every picture on the site is a real Wobbl output from ``examples/``. This
 script trims the empty background around each one and writes two widths so
 the page can pick the right one with ``srcset``.
 
-    python scripts/build_site_images.py            # writes site/img/*.webp
+    python scripts/build_site_images.py            # writes site/public/img/*.webp
     python scripts/build_site_images.py enclosure-stress   # only the images named
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 EX = ROOT / "examples"
-OUT = ROOT / "site" / "img"
+OUT = ROOT / "site" / "public" / "img"
 BG = np.array([0x0E, 0x0F, 0x11])
 
 # name: (source, trim the empty background?, widths)
