@@ -129,6 +129,7 @@ class HeatResult:
     t_solve: float = 0.0
     log: str = ""
     solver: str = ""
+    reaction_flux: np.ndarray | None = None   # (n,) heat flow at fixed temperature nodes, mW
 
 
 def mass_properties(mesh: Mesh, density: float) -> tuple[float, np.ndarray]:

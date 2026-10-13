@@ -79,7 +79,8 @@ class CalculiX(SolverAdapter):
         times = np.array([s[0] for s in steps])
         hist = np.array([s[1][:, 0] for s in steps])
         flux = blocks["FLUX"][-1][1][:, :3] if "FLUX" in blocks else None
-        return HeatResult(hist[-1], times, hist, flux, t, log, f"CalculiX {self.version()}")
+        rfl = blocks["RFL"][-1][1][:, 0] if "RFL" in blocks else None
+        return HeatResult(hist[-1], times, hist, flux, t, log, f"CalculiX {self.version()}", rfl)
 
 
 def _run(ccx: Path, work: Path, job: str, timeout: float) -> tuple[str, float]:
@@ -267,7 +268,7 @@ def write_heat_inp(path: Path, model: HeatModel):
                 for e, fc in zip(mesh.tri_elem[mask], mesh.tri_face[mask]):
                     f.write(f"{e + 1},R{fc},{tenv:.10g},{eps:.10g}\n")
         tp = ", TIME POINTS=TP" if (model.transient and model.output_times) else ""
-        f.write(f"*NODE FILE{tp}\nNT\n*EL FILE{tp}\nHFL\n*END STEP\n")
+        f.write(f"*NODE FILE{tp}\nNT,RFL\n*EL FILE{tp}\nHFL\n*END STEP\n")
 
 
 def _setname(name: str) -> str:

@@ -1,8 +1,26 @@
 """Geometry for the validation cases, built with OpenCASCADE through gmsh and saved as STEP (mm)."""
 from __future__ import annotations
 
+import contextlib
 import math
+import os
+import sys
 from pathlib import Path
+
+
+@contextlib.contextmanager
+def quiet_stdout():
+    """OpenCASCADE prints STEP transfer statistics straight to file descriptor 1; send them to the void."""
+    sys.stdout.flush()
+    saved = os.dup(1)
+    null = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(null, 1)
+    try:
+        yield
+    finally:
+        os.dup2(saved, 1)
+        os.close(saved)
+        os.close(null)
 
 
 def _session(path: Path, build):
@@ -16,7 +34,8 @@ def _session(path: Path, build):
         gmsh.model.add("v")
         build(gmsh.model.occ)
         gmsh.model.occ.synchronize()
-        gmsh.write(str(path))
+        with quiet_stdout():
+            gmsh.write(str(path))
     finally:
         gmsh.finalize()
     return str(path)

@@ -145,12 +145,10 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
         T = res.T
         i = int(np.argmax(T))
         levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sz.h, "t_max": float(T[i]),
-                       "xyz": mesh.X[i].tolist(), "t_solve": res.t_solve})
+                       "t_min": float(T.min()), "xyz": mesh.X[i].tolist(), "t_solve": res.t_solve})
         last = (mesh, model, info, res)
-        if k >= 2:
-            a, b = levels[-2]["t_max"] - study.ambient, levels[-1]["t_max"] - study.ambient
-            if abs(b - a) <= 0.02 * max(abs(b), 1e-9):
-                break
+        if k >= 2 and _spread_change(levels, study.ambient) <= 0.02:
+            break
     mesh, model, info, res = last
     T = res.T
     np.savez_compressed(out / "fields.npz", X=mesh.X, T=T, tets=mesh.tets, tris=mesh.tris,
@@ -158,8 +156,14 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
     tmax = float(T.max())
     hot = mesh.X[int(np.argmax(T))]
     limit = study.limit if study.limit is not None else mat.max_service_temp
-    rises = [L["t_max"] - study.ambient for L in levels]
-    checks = [convergence_check(rises, 0.02, "temperature rise at the hottest point", "C", "")]
+    # converge whichever end of the temperature range moves more: the hot spot, or the cold face of a part
+    # whose hottest point is a held temperature
+    hot_r = [L["t_max"] - study.ambient for L in levels]
+    cold_r = [L["t_min"] - study.ambient for L in levels]
+    use_cold = len(levels) > 1 and _rel(cold_r) > _rel(hot_r)
+    checks = [convergence_check(cold_r if use_cold else hot_r, 0.02,
+                                "temperature at the coolest point" if use_cold else
+                                "temperature rise at the hottest point", "C", "")]
     extra = []
 
     # energy balance (steady): heat in = convection + radiation + fixed temperature boundaries
@@ -178,9 +182,15 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
         checks.append(Check("energy balance", st, f"heat in {fmt(study.power / 1000)} W, heat out through the "
                                                     f"surfaces {fmt(loss / 1000)} W ({100 * err:.2g}% apart)",
                             {"in_W": study.power / 1000, "out_W": loss / 1000}))
-    elif model.fixed_temps:
-        checks.append(Check("energy balance", "info", f"surfaces shed {fmt(loss / 1000)} W; the rest flows into "
-                                                      "the fixed temperature faces"))
+    elif model.fixed_temps and res.reaction_flux is not None and not model.transient:
+        fixed_nodes = np.unique(np.concatenate([n for _, n, _ in model.fixed_temps]))
+        q_fixed = float(res.reaction_flux[fixed_nodes].sum())
+        supplied = abs(q_fixed + study.power) if q_fixed * study.power >= 0 else abs(abs(q_fixed) - study.power)
+        err = abs(supplied - loss) / max(supplied, loss, 1e-12)
+        st = "pass" if err < 0.01 else ("warn" if err < 0.05 else "fail")
+        checks.append(Check("energy balance", st, f"held temperature faces exchange {fmt(abs(q_fixed) / 1000)} W, "
+                                                    f"heat made {fmt(study.power / 1000)} W, surfaces shed "
+                                                    f"{fmt(loss / 1000)} W ({100 * err:.2g}% apart)"))
     # lumped hand calculation
     vol = mesh.volume()
     film_area = sum(_tri_weights(mesh, m)[1] for m, _, _ in info["film_masks"])
@@ -281,6 +291,16 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
                                      ["history", "Temperature over time"]]},
                        img, fixes, prep.notes, solver=res.solver, t_total=time.time() - t0)
     return o.write(out)
+
+
+def _rel(vals: list[float]) -> float:
+    if len(vals) < 2:
+        return 0.0
+    return abs(vals[-1] - vals[-2]) / max(abs(vals[-1]), 1e-9)
+
+
+def _spread_change(levels: list[dict], ambient: float) -> float:
+    return max(_rel([L["t_max"] - ambient for L in levels]), _rel([L["t_min"] - ambient for L in levels]))
 
 
 def _vol_weights(mesh) -> np.ndarray:
