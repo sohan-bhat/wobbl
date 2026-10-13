@@ -429,7 +429,7 @@ def _large_deflection_check(adapter, first, levels, features, prep, material, pr
                             "re-solving with large deflection theory")
     # a nonlinear solve factorizes the matrix at every load increment; cap it so the check never
     # dominates the study
-    limit = max(60.0, min(300.0, 10.0 * levels[0].t_solve))
+    limit = max(120.0, min(420.0, 25.0 * levels[0].t_solve))
     try:
         res = adapter.solve_static(built.model, work / "nlgeom", nlgeom=True, timeout=limit)
     except Exception as e:  # noqa: BLE001
