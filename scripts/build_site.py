@@ -25,6 +25,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from sitegen import PAGES_SRC, ROOT, SITE_SRC, cfg, url
+from sitegen import docs
 from sitegen.layout import asset, page
 
 PORT = 8040
@@ -81,7 +82,13 @@ def build(out: Path) -> list[str]:
         shutil.rmtree(out)
     out.mkdir(parents=True)
     copy_static(out)
+    docs.register_routes()
     routes = []
+    for p in docs.PAGES:
+        write(out, p.path, docs.doc_page(p))
+        routes.append(p.path)
+    write(out, "guides/", docs.guides_index())
+    routes.append("guides/")
     for src in sorted(PAGES_SRC.glob("*.html")):
         path, html = hand_page(src, {})
         write(out, path, html)
