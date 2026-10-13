@@ -10,7 +10,7 @@ import { poster, posterSet } from '../lib/poster';
 ---
 <Base title="Wobbl: simulate anything before you build it" path=""
       description="Verified strength, heat and circuit simulation for Claude Code, Codex, Cursor, Gemini CLI and you. Every answer is checked before you see it. Open source, MIT.">
-  <link slot="head" rel="preload" as="image" href={poster} imagesrcset={posterSet} imagesizes="(min-width: 1000px) 56vw, 100vw">
+  <link slot="head" rel="preload" as="image" fetchpriority="high" href={poster} imagesrcset={posterSet} imagesizes="(min-width: 1000px) 56vw, 100vw">
 
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
