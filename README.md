@@ -46,16 +46,25 @@ $ wobbl fix wobbl-out/bracket --apply
 
 ## Why not just ask a model to do the math
 
-On a textbook shape a careful hand calculation is close: for a flat cantilever
-it lands within a few percent of a converged finite element answer. Real parts
-are not textbook shapes. Ribs, pockets, bosses, fillets, several holes, thin
-walls and off axis loads put the peak where no formula predicts it, and writing
-a finite element code from scratch inside a chat runs out of time long before
-it gives a trustworthy number. Wobbl does the part that takes an analyst: it
-meshes the real geometry, refines where the stress is, checks equilibrium,
-compares against beam theory, refuses to report singular peaks as real, and
-tells you how much to trust the answer. Typical studies take one to five
-minutes.
+We tested exactly that. Given a CAD file and a strength question, a capable
+coding agent working alone answered in **1 of 10** tries within 15 minutes. On
+beam like parts its hand calculations are good, within a few percent. On a
+ribbed cast motor mount and a thin walled enclosure, the two parts that actually
+fail, it produced nothing in 15 minutes over six tries: it kept writing its own
+finite element code and hitting the same traps (meshers folding thin curved
+walls, singular peaks at bonded bolts, load idealizations that flip the
+verdict).
+
+Wobbl answers those parts with the trap handling built in:
+
+| Part | Converged reference | Wobbl | Confidence |
+|---|---|---|---|
+| Cast motor mount, belt pull through four bolts | 124.3 MPa at the rib tip | 123.9 MPa, same spot | high |
+| ABS enclosure shell pressed near a corner | 93 MPa, 1.93 mm deflection | 92.5 MPa, 1.92 mm | high |
+| PA12 truss drone arm, thrust and torque | 11.5 MPa, 4.09 mm rise | 11.49 MPa, 4.08 mm | high |
+| PLA bracket, sharp inside corner | about 78 MPa | 79.8 MPa | high |
+
+The full comparison is in [docs/bakeoff.md](docs/bakeoff.md).
 
 ## Install
 
@@ -125,17 +134,13 @@ reasons. A result that failed a check is never reported as high confidence.
 
 ## Validation
 
-Thirteen cases with known answers run through the same pipeline users get:
-beams, a plate with a hole (Kirsch with Peterson's finite width factor), a
-thick walled pressure vessel (Lame), NAFEMS LE1 and LE10, torsion, self weight,
-slab conduction, lumped cooling, an LED, an RC circuit and buck ripple. The
-results table is in [docs/validation.md](docs/validation.md); run it yourself
-with `wobbl validate`.
-
-Wobbl was also run on the harder parts of a bake off against careful hand built
-reference models. On a cast motor mount loaded through four bolt holes it found
-124 MPa at (43.9, 9.0, 79.6) mm in about a minute; the reference converged to
-124 MPa at (43.8, 8.8, 79.8) after ten minutes of solving on its finest mesh.
+Eighteen cases with known answers run through the same pipeline users get:
+beams, a plate with a hole (Kirsch with Peterson's finite width factor), a thick
+walled pressure vessel (Lame), NAFEMS LE1 and LE10, torsion, self weight, slab
+conduction, lumped cooling, an LED, an RC circuit, buck ripple, and five real
+parts against converged reference models. Every case with an exact textbook or
+benchmark answer lands within 1.6%. The table is in
+[docs/validation.md](docs/validation.md); run it yourself with `wobbl validate`.
 
 ## Examples
 
@@ -143,6 +148,7 @@ Real products with real outputs (reports, heatmaps, summaries) in `examples/`:
 
 | Example | Question | Domain |
 |---|---|---|
+| [cast-motor-mount](examples/cast-motor-mount) | Does a cast motor mount meet a safety factor of 2 under a 2 kN belt pull? | strength, remote loads |
 | [shelf-bracket](examples/shelf-bracket) | Does a printed PLA bracket hold an 8 kg shelf, and what fixes it? | strength, fixes |
 | [motor-mount](examples/motor-mount) | Do the ribs on a printed NEMA 17 mount earn their keep? | strength |
 | [enclosure](examples/enclosure) | Does a PC enclosure survive a thumb press, and how far does it dent? | strength, thin walls |
