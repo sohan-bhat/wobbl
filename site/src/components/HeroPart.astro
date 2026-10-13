@@ -1,33 +1,100 @@
 ---
 // The 3D part in the landing page's hero: the viewer with its static poster, and the
 // controls under it. scripts/hero.ts drives it and scripts/viewer.js draws it.
+// The numbers come from public/data/cast-motor-mount.json (scripts/export_site_part.py) and are
+// filled in here at build time, so the reading is right before any script runs. The page links
+// the part's mesh by the content hash in its file name.
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { url } from '../lib/site';
 import { poster, posterSet } from '../lib/poster';
+import { WORD, fmt, reading, tablePerN, widths, type PartData } from '../scripts/reading';
+
+const man: PartData & { governing_MPa: number } =
+  JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/cast-motor-mount.json'), 'utf-8'));
+const MAX = 4000;
+const deg = Math.round(man.pull.default_deg);
+const r = reading(man, man.load_N, tablePerN(man, deg));
+const w = widths(man, MAX);
+// the browser reads what it needs of the manifest from the page instead of fetching it
+const { name, file, load_N, allowable_MPa, target_sf, pull, mesh, layout, peak_by_degree, peak_at_degree, peak_nodes } = man;
+const converged = man.converged.map(({ angle_deg, converged_MPa, superposed_MPa, difference_pct }) =>
+  ({ angle_deg, converged_MPa, superposed_MPa, difference_pct }));
+const json = JSON.stringify({ name, file, load_N, allowable_MPa, target_sf, pull, mesh, layout, peak_by_degree,
+  peak_at_degree, peak_nodes, converged }).replace(/</g, '\\u003c');
+// The camera Wobbl's heatmap of this part was drawn with (report/render.py: 1600 x 1000, 30 degrees
+// zoomed 1.15 times), the crop scripts/build_site_images.py took from it, and its color scale, so
+// the 3D view can start exactly where the poster is and fade in without a jump.
+const posterCamera = JSON.stringify({
+  position: [-241.2442, 288.7442, 248.9954], target: [0, 47.5, 56], fov: 30 / 1.15,
+  frame: [1600, 1000], crop: [355, 51, 1170, 949], clim: man.governing_MPa,
+});
 ---
-<figure class="hero-part">
-  <div class="viewer" id="viewer" data-state="poster" data-part={url('data/cast-motor-mount')} data-v="3">
+<figure class="hero-part" style={`--readout-w: ${w.peak + 4}ch; --limit-w: ${w.limit}ch`}>
+  <div class="viewer" id="viewer" data-state="poster" data-file={url(`data/${man.file}`)}>
     <img class="viewer-poster" src={poster} srcset={posterSet} sizes="(min-width: 1000px) 56vw, 100vw"
-         width="1170" height="949" fetchpriority="high"
+         width="1170" height="949" fetchpriority="high" data-camera={posterCamera}
          alt="Stress heatmap of a sand cast aluminum motor mount. The hottest spot, labeled 124 MPa, is where the rib tip meets the upright." />
     <p class="viewer-status" role="status" aria-live="polite"></p>
+    <p class="visually-hidden" id="part-said" aria-live="polite"></p>
+    <p class="viewer-note" id="part-note" hidden></p>
     <div class="probe" hidden></div>
     <div class="peak-tag" hidden><span class="target" aria-hidden="true"></span><span class="peak-tag-v"></span></div>
     <div class="load-tag" hidden></div>
+    <div class="pull-grip" hidden aria-hidden="true"></div>
     <button type="button" class="btn-outline btn-sm bend" id="bend" aria-pressed="true">Bend &times;60</button>
   </div>
   <div class="part-controls">
     <div class="control">
-      <label for="load">Belt pull <output id="load-out" for="load">2,000&nbsp;N</output></label>
-      <input type="range" id="load" name="load" autocomplete="off" min="0" max="4000" step="10" value="2000">
+      <label for="load">Belt pull <output id="load-out" for="load">{fmt(man.load_N)}&nbsp;N at {deg}°</output></label>
+      <input type="range" id="load" name="load" autocomplete="off" min="0" max={MAX} step="10" value={man.load_N}>
       <div class="legend" aria-hidden="true">
-        <div class="legend-bar"><span class="legend-target"></span><span class="legend-peak" id="legend-peak"></span></div>
-        <div class="legend-ticks"><span>0</span><span>82.5 target</span><span>165&nbsp;MPa yield</span></div>
+        <div class="legend-bar"><span class="legend-target"></span><span class="legend-peak" id="legend-peak" style={`left: ${Math.min(r.peak / man.allowable_MPa, 1) * 100}%`}></span></div>
+        <div class="legend-ticks"><span>0</span><span>{fmt(man.allowable_MPa / man.target_sf, 1)} target</span><span>{fmt(man.allowable_MPa)}&nbsp;MPa yield</span></div>
       </div>
     </div>
     <div class="live">
-      <p class="live-n"><span id="r-peak">123.7</span>&nbsp;MPa</p>
-      <p class="vword" id="verdict-word" data-verdict="marginal" aria-live="polite">Marginal</p>
+      <p class="live-n"><span id="r-peak">{fmt(r.peak, 1)}</span>&nbsp;MPa</p>
+      <p class="vword" id="verdict-word" data-verdict={r.verdict} aria-live="polite">{WORD[r.verdict]}</p>
+      <dl class="limits">
+        <div><dt>Meets the target up to</dt><dd id="r-target">{fmt(r.target)}&nbsp;N</dd></div>
+        <div><dt>Yields past</dt><dd id="r-yield">{fmt(r.yields)}&nbsp;N</dd></div>
+      </dl>
     </div>
   </div>
-  <figcaption>A cast motor mount from Wobbl’s own result. Drag to turn it and double tap to reset.</figcaption>
+  <figcaption>A cast motor mount from Wobbl’s own result. Drag the yellow arrow to change the belt direction, drag anywhere else to turn the part, and double tap to reset.</figcaption>
+  <script is:inline type="application/json" id="part-data" set:html={json}></script>
 </figure>
+
+<style>
+  /* the pull's size and direction, in a box as wide as "4,000 N at 359°" */
+  .control #load-out { min-width: 0; width: 15ch; white-space: nowrap; }
+
+  /* The loads the part takes, under the reading, in boxes sized for their widest value */
+  .limits { margin: 0; display: grid; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+  .limits div { display: flex; justify-content: space-between; gap: 12px; }
+  .limits dt, .limits dd { margin: 0; white-space: nowrap; }
+  .limits dd {
+    width: var(--limit-w, 7ch); text-align: right; color: var(--fg);
+    font: 500 0.85rem/1.5 var(--mono); font-variant-numeric: tabular-nums;
+  }
+  .live .limits { grid-column: 1 / -1; }
+
+  /* The hit area over the whole arrow, a pill wider than the arrow that turns with it. It takes the
+     drag that turns the pull, so the camera never orbits from there, and a touch on it never scrolls. */
+  .pull-grip {
+    position: absolute; left: 0; top: 0; z-index: 2; transform-origin: 0 50%; border-radius: 999px;
+    cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  .pull-grip[data-turning] { cursor: grabbing; }
+  .pull-grip[hidden], .viewer:not([data-state="live"]) .pull-grip { display: none; }
+
+  /* A note over the part, only near directions where the mesh reads off */
+  .viewer-note {
+    position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 2; margin: 0; width: fit-content;
+    max-width: min(46ch, calc(100% - 24px)); padding: 8px 10px; background: var(--bg); border: 1px solid var(--line-2);
+    font-size: 0.85rem; line-height: 1.45; color: var(--fg-2); pointer-events: none;
+  }
+  .viewer-note[hidden] { display: none; }
+  .peak-tag-v { box-sizing: content-box; min-width: var(--readout-w, 9ch); font-variant-numeric: tabular-nums; }
+</style>
