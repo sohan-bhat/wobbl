@@ -217,7 +217,9 @@ never reported as high confidence.
 Heat answers check energy balance and a lumped hand calculation; circuit answers
 compare with the textbook and run again at half the time step. Every study has a
 time budget, and when it runs out the last finished mesh level comes back with
-its checks. See [docs/verification.md](docs/verification.md).
+its checks. The same input gives the same answer on every run: meshing, wall
+thickness sampling and the budget are all deterministic. See
+[docs/verification.md](docs/verification.md).
 
 ## Validation
 
@@ -227,13 +229,13 @@ modeled setup lands within 2%.
 
 | Group | Cases | Largest error |
 |---|---|---|
-| Textbook and benchmark strength (Timoshenko, Kirsch, Lame, NAFEMS LE1 and LE10, torsion, self weight) | 8 | 1.62%, plate with a hole |
-| Real parts against converged reference models | 5 | 3.40%, ABS enclosure shell |
+| Textbook and benchmark strength (Timoshenko, Kirsch, Lame, NAFEMS LE1 and LE10, torsion, self weight) | 8 | 1.54%, plate with a hole |
+| Real parts against converged reference models | 5 | 4.26%, PLA bracket with a 6 mm fillet |
 | Heat (slab conduction, lumped cooling) | 2 | 0.44% |
 | Circuits (LED, RC, buck ripple) | 3 | 7.70%, buck ripple against an ideal formula that ignores switch and diode drops |
 
 The full table is in [docs/validation.md](docs/validation.md). Run it yourself
-with `wobbl validate` (about 7 minutes).
+with `wobbl validate` (about 30 minutes).
 
 ## Examples
 

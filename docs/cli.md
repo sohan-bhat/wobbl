@@ -32,7 +32,7 @@ wobbl run PART -m MATERIAL --fix SUPPORT --load LOAD [options]
 | `-f, --fix` | repeatable, see [supports](#supports) |
 | `--target-sf` | required safety factor (default: the material's, 1.5 for metals, 2.5 for printed plastics) |
 | `--quality` | `fast` (two meshes, 5% tolerance, for quick looks), `normal` (three or more meshes, 3%), `fine` (2%) |
-| `--budget` | seconds for the whole study, default 300; when it runs out Wobbl returns the last finished mesh level with its checks |
+| `--budget` | seconds for the whole study, default 300, spent by a cost model of each mesh rather than the clock, so the level reached is the same on every run; when it runs out Wobbl returns the last finished mesh level with its checks |
 | `--print-direction` | axis the print layers stack along, e.g. `z`; pull across layers is judged against the weaker layer strength |
 | `--param k=v` | parameter of a parametric `.py` part |
 | `--scale` | scale the geometry, e.g. `1000` for a file in meters, `25.4` for inches |

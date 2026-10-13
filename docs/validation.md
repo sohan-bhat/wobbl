@@ -5,7 +5,7 @@ meshes it, refines until the answer settles, runs its checks, and the number is
 compared with a textbook or benchmark value. Run them with:
 
 ```sh
-wobbl validate                 # all cases, about 7 minutes
+wobbl validate                 # all cases, about 30 minutes
 wobbl validate --only lame,led # a subset
 ```
 
@@ -13,31 +13,35 @@ wobbl validate --only lame,led # a subset
 
 | Case | Quantity | Reference | Expected | Wobbl | Error | Tolerance | Wobbl's confidence | Result |
 |---|---|---|---|---|---|---|---|---|
-| Cantilever tip deflection | tip deflection | Timoshenko beam theory | 0.8016 mm | 0.7957 mm | 0.73% | 3.0% | high | pass |
-| Cantilever bending stress at mid span | sigma_xx at mid span | Euler-Bernoulli, M c / I | 30 MPa | 30.06 MPa | 0.19% | 3.0% | high | pass |
-| Plate with a hole in tension | peak von Mises at the hole | Kirsch with Peterson finite width Kt | 30.35 MPa | 29.86 MPa | 1.62% | 4.0% | high | pass |
-| Thick walled pressure vessel | von Mises at the bore | Lame, plane strain | 231.3 MPa | 231.9 MPa | 0.27% | 3.0% | high | pass |
-| NAFEMS LE1 elliptic membrane | sigma_yy at point D | NAFEMS LE1 target 92.7 MPa | 92.7 MPa | 92.96 MPa | 0.28% | 4.0% | high | pass |
-| NAFEMS LE10 thick plate under pressure | sigma_yy at point D | NAFEMS LE10 target -5.38 MPa | -5.38 MPa | -5.413 MPa | 0.62% | 5.0% | medium | pass |
-| Round shaft in torsion | von Mises at the surface | tau = 16 T / (pi d^3) | 55.13 MPa | 55.64 MPa | 0.92% | 3.0% | high | pass |
+| Cantilever tip deflection | tip deflection | Timoshenko beam theory | 0.8016 mm | 0.7956 mm | 0.74% | 3.0% | high | pass |
+| Cantilever bending stress at mid span | sigma_xx at mid span | Euler-Bernoulli, M c / I | 30 MPa | 29.94 MPa | 0.21% | 3.0% | high | pass |
+| Plate with a hole in tension | peak von Mises at the hole | Kirsch with Peterson finite width Kt | 30.35 MPa | 29.89 MPa | 1.54% | 4.0% | high | pass |
+| Thick walled pressure vessel | von Mises at the bore | Lame, plane strain | 231.3 MPa | 232.3 MPa | 0.43% | 3.0% | high | pass |
+| NAFEMS LE1 elliptic membrane | sigma_yy at point D | NAFEMS LE1 target 92.7 MPa | 92.7 MPa | 92.92 MPa | 0.23% | 4.0% | high | pass |
+| NAFEMS LE10 thick plate under pressure | sigma_yy at point D | NAFEMS LE10 target -5.38 MPa | -5.38 MPa | -5.412 MPa | 0.59% | 5.0% | medium | pass |
+| Round shaft in torsion | von Mises at the surface | tau = 16 T / (pi d^3) | 55.13 MPa | 55.6 MPa | 0.85% | 3.0% | high | pass |
 | Cantilever under its own weight | tip deflection | q L^4 / (8 E I) | 1.443 mm | 1.441 mm | 0.16% | 3.0% | high | pass |
-| Cast motor mount with a belt pull through four bolts | peak von Mises at the rib tip | converged reference FEA, 278k nodes | 124.3 MPa | 123.9 MPa | 0.31% | 5.0% | medium | pass |
-| ABS enclosure shell pressed near a corner | peak von Mises at the corner boss | converged reference FEA, 281k nodes | 93 MPa | 89.83 MPa | 3.40% | 10.0% | high | pass |
-| PA12 truss drone arm at full thrust | peak von Mises at the first window corner | converged reference FEA, 403k nodes | 11.5 MPa | 11.53 MPa | 0.25% | 8.0% | high | pass |
-| PLA shelf bracket, 0.5 mm inside corner | max principal at the corner | converged reference FEA with wall contact | 78 MPa | 79.99 MPa | 2.55% | 8.0% | high | pass |
-| PLA shelf bracket, 6 mm fillet | max principal at the fillet | converged reference FEA with wall contact | 25.3 MPa | 25.56 MPa | 1.03% | 5.0% | medium | pass |
+| Cast motor mount with a belt pull through four bolts | peak von Mises at the rib tip | converged reference FEA, 278k nodes | 124.3 MPa | 123.7 MPa | 0.49% | 5.0% | medium | pass |
+| ABS enclosure shell pressed near a corner | peak von Mises at the corner boss | converged reference FEA, 281k nodes | 93 MPa | 92.98 MPa | 0.02% | 10.0% | medium | pass |
+| PA12 truss drone arm at full thrust | peak von Mises at the first window corner | converged reference FEA, 403k nodes | 11.5 MPa | 11.49 MPa | 0.11% | 8.0% | high | pass |
+| PLA shelf bracket, 0.5 mm inside corner | max principal at the corner | converged reference FEA with wall contact | 78 MPa | 80.48 MPa | 3.18% | 8.0% | high | pass |
+| PLA shelf bracket, 6 mm fillet | max principal at the fillet | converged reference FEA with wall contact | 25.3 MPa | 26.38 MPa | 4.26% | 5.0% | medium | pass |
 | Conduction through a slab into convection | cooled face temperature | 1D series resistance | 97.67 C | 97.67 C | 0.00% | 1.0% | high | pass |
 | Aluminum cube cooling in air | mean temperature after 10 min | lumped capacitance (Biot 2e-4) | 58.01 C | 58.27 C | 0.44% | 1.0% | high | pass |
 | Red LED on 5 V through 150 ohm | LED current | diode equation solved by Newton | 20 mA | 20 mA | 0.00% | 0.5% | high | pass |
 | RC charging | voltage at one time constant | V (1 - e^-1) at t = RC | 3.161 V | 3.161 V | 0.00% | 0.2% | high | pass |
 | Buck converter output ripple | peak to peak ripple | ideal triangular current through C and ESR | 7.949 mV | 8.561 mV | 7.70% | 15.0% | high | pass |
 
-Every case whose reference is exact for the modeled setup lands within 2%.
-Medium confidence is Wobbl telling you what the number leans on, not a miss:
-on LE10 the 2 mm band that stands in for the benchmark's line support makes a
-peak far above the answer (excluded and named), on the cast motor mount the
-verdict flips if the servo is treated as rigid instead of a bolt group, and on
-the filleted bracket the bonded screw bore reads more than twice the real peak.
+The full run took 29 minutes on a 2018 six core laptop (Intel i7-8750H), and
+every number above comes from it. Every case whose reference is exact for the
+modeled setup lands within 2%. Medium confidence is Wobbl telling you what the
+number leans on, not a miss: on LE10 the 2 mm band that stands in for the
+benchmark's line support makes a peak far above the answer (excluded and
+named), on the cast motor mount the verdict flips if the servo is treated as
+rigid instead of a bolt group, on the enclosure shell large deflection theory
+lowers the peak by 11% (the linear answer is the conservative one, and the
+reference is linear too), and on the filleted bracket the bonded screw bore
+reads nearly twice the real peak.
 The buck converter's reference is the ideal waveform formula, which ignores the
 switch and diode drops that ngspice models, so it gets a wider tolerance.
 

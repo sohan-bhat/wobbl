@@ -7,16 +7,16 @@
   "quantity": "tip deflection",
   "unit": "mm",
   "expected": 0.80156,
-  "wobbl": 0.7956929298245613,
-  "error": 0.007319564568390075,
+  "wobbl": 0.795648210526316,
+  "error": 0.007375354900050018,
   "tolerance": 0.03,
   "pass": true,
   "exact_theory": true,
   "confidence": "high",
   "levels": 3,
-  "nodes": 6156,
-  "time_s": 6.6,
-  "wall_s": 8.8
+  "nodes": 5772,
+  "time_s": 9.1,
+  "wall_s": 13.0
  },
  {
   "id": "cantilever-stress",
@@ -26,16 +26,16 @@
   "quantity": "sigma_xx at mid span",
   "unit": "MPa",
   "expected": 30.0,
-  "wobbl": 30.0574,
-  "error": 0.0019133333333333743,
+  "wobbl": 29.9368,
+  "error": 0.002106666666666612,
   "tolerance": 0.03,
   "pass": true,
   "exact_theory": true,
   "confidence": "high",
   "levels": 3,
-  "nodes": 6128,
-  "time_s": 6.5,
-  "wall_s": 6.7
+  "nodes": 5772,
+  "time_s": 7.7,
+  "wall_s": 7.9
  },
  {
   "id": "plate-hole",
@@ -45,16 +45,16 @@
   "quantity": "peak von Mises at the hole",
   "unit": "MPa",
   "expected": 30.35422222222222,
-  "wobbl": 29.862969992368548,
-  "error": 0.01618398344247567,
+  "wobbl": 29.886809959185857,
+  "error": 0.015398591326585567,
   "tolerance": 0.04,
   "pass": true,
   "exact_theory": true,
   "confidence": "high",
   "levels": 3,
-  "nodes": 86020,
-  "time_s": 89.2,
-  "wall_s": 91.2
+  "nodes": 85294,
+  "time_s": 73.3,
+  "wall_s": 75.3
  },
  {
   "id": "lame",
@@ -64,16 +64,16 @@
   "quantity": "von Mises at the bore",
   "unit": "MPa",
   "expected": 231.32468763863295,
-  "wobbl": 231.94078233842527,
-  "error": 0.0026633331101899257,
+  "wobbl": 232.33042856060297,
+  "error": 0.00434774572587405,
   "tolerance": 0.03,
   "pass": true,
   "exact_theory": true,
   "confidence": "high",
   "levels": 3,
-  "nodes": 12154,
-  "time_s": 11.2,
-  "wall_s": 11.5
+  "nodes": 12010,
+  "time_s": 13.4,
+  "wall_s": 13.8
  },
  {
   "id": "nafems-le1",
@@ -83,16 +83,16 @@
   "quantity": "sigma_yy at point D",
   "unit": "MPa",
   "expected": 92.7,
-  "wobbl": 92.9579,
-  "error": 0.002782092772383951,
+  "wobbl": 92.917,
+  "error": 0.002340884573894269,
   "tolerance": 0.04,
   "pass": true,
   "exact_theory": true,
   "confidence": "high",
   "levels": 3,
-  "nodes": 21340,
-  "time_s": 14.1,
-  "wall_s": 16.1
+  "nodes": 21322,
+  "time_s": 17.3,
+  "wall_s": 20.7
  },
  {
   "id": "nafems-le10",
@@ -102,16 +102,16 @@
   "quantity": "sigma_yy at point D",
   "unit": "MPa",
   "expected": -5.38,
-  "wobbl": -5.41318,
-  "error": 0.006167286245353116,
+  "wobbl": -5.41197,
+  "error": 0.005942379182156185,
   "tolerance": 0.05,
   "pass": true,
   "exact_theory": true,
   "confidence": "medium",
   "levels": 3,
-  "nodes": 52706,
-  "time_s": 132.2,
-  "wall_s": 139.0
+  "nodes": 52727,
+  "time_s": 170.0,
+  "wall_s": 179.9
  },
  {
   "id": "torsion",
@@ -121,16 +121,16 @@
   "quantity": "von Mises at the surface",
   "unit": "MPa",
   "expected": 55.13288954217921,
-  "wobbl": 55.63995709927298,
-  "error": 0.009197188126804898,
+  "wobbl": 55.6039907333634,
+  "error": 0.008544830410598782,
   "tolerance": 0.03,
   "pass": true,
   "exact_theory": true,
   "confidence": "high",
   "levels": 3,
-  "nodes": 14568,
-  "time_s": 21.1,
-  "wall_s": 21.5
+  "nodes": 12803,
+  "time_s": 54.6,
+  "wall_s": 54.9
  },
  {
   "id": "self-weight",
@@ -147,9 +147,9 @@
   "exact_theory": true,
   "confidence": "high",
   "levels": 3,
-  "nodes": 7643,
-  "time_s": 7.2,
-  "wall_s": 7.4
+  "nodes": 7604,
+  "time_s": 8.2,
+  "wall_s": 8.5
  },
  {
   "id": "cast-motor-mount",
@@ -159,18 +159,18 @@
   "quantity": "peak von Mises at the rib tip",
   "unit": "MPa",
   "expected": 124.3,
-  "wobbl": 123.91470990241473,
-  "error": 0.0030996789829868796,
+  "wobbl": 123.69544918224922,
+  "error": 0.004863642942484128,
   "tolerance": 0.05,
   "pass": true,
   "exact_theory": false,
   "confidence": "medium",
   "levels": 3,
-  "nodes": 108104,
-  "time_s": 207.0,
-  "max_disp_mm": 0.2652,
+  "nodes": 111956,
+  "time_s": 395.8,
+  "max_disp_mm": 0.2649,
   "reference_disp_mm": 0.266,
-  "wall_s": 210.0
+  "wall_s": 398.9
  },
  {
   "id": "enclosure-shell",
@@ -180,18 +180,18 @@
   "quantity": "peak von Mises at the corner boss",
   "unit": "MPa",
   "expected": 93.0,
-  "wobbl": 89.83452946284073,
-  "error": 0.03403731760386307,
+  "wobbl": 92.98309196316285,
+  "error": 0.0001818068477113014,
   "tolerance": 0.1,
   "pass": true,
   "exact_theory": false,
-  "confidence": "high",
-  "levels": 3,
-  "nodes": 154000,
-  "time_s": 501.8,
-  "top_deflection_mm": 1.9124,
+  "confidence": "medium",
+  "levels": 4,
+  "nodes": 165615,
+  "time_s": 348.2,
+  "top_deflection_mm": 1.9176,
   "reference_deflection_mm": 1.93,
-  "wall_s": 524.3
+  "wall_s": 366.7
  },
  {
   "id": "drone-arm-truss",
@@ -201,18 +201,18 @@
   "quantity": "peak von Mises at the first window corner",
   "unit": "MPa",
   "expected": 11.5,
-  "wobbl": 11.528360253905053,
-  "error": 0.002466109035221974,
+  "wobbl": 11.486920951424471,
+  "error": 0.0011373085717851106,
   "tolerance": 0.08,
   "pass": true,
   "exact_theory": false,
   "confidence": "high",
   "levels": 4,
-  "nodes": 112708,
-  "time_s": 699.9,
-  "motor_rise_mm": 4.0847,
+  "nodes": 97531,
+  "time_s": 414.3,
+  "motor_rise_mm": 4.0787,
   "reference_rise_mm": 4.09,
-  "wall_s": 703.2
+  "wall_s": 417.2
  },
  {
   "id": "bracket-sharp",
@@ -222,16 +222,16 @@
   "quantity": "max principal at the corner",
   "unit": "MPa",
   "expected": 78.0,
-  "wobbl": 79.98707414708163,
-  "error": 0.025475309577969594,
+  "wobbl": 80.4823214272363,
+  "error": 0.03182463368251667,
   "tolerance": 0.08,
   "pass": true,
   "exact_theory": false,
   "confidence": "high",
-  "levels": 4,
-  "nodes": 51145,
-  "time_s": 63.4,
-  "wall_s": 64.9
+  "levels": 3,
+  "nodes": 25348,
+  "time_s": 37.1,
+  "wall_s": 37.9
  },
  {
   "id": "bracket-fillet",
@@ -241,16 +241,16 @@
   "quantity": "max principal at the fillet",
   "unit": "MPa",
   "expected": 25.3,
-  "wobbl": 25.56160953151849,
-  "error": 0.010340297688477782,
+  "wobbl": 26.377178939200782,
+  "error": 0.04257624265615736,
   "tolerance": 0.05,
   "pass": true,
   "exact_theory": false,
   "confidence": "medium",
   "levels": 3,
-  "nodes": 13954,
-  "time_s": 20.1,
-  "wall_s": 20.4
+  "nodes": 14581,
+  "time_s": 23.2,
+  "wall_s": 23.6
  },
  {
   "id": "slab",
@@ -266,8 +266,8 @@
   "pass": true,
   "exact_theory": true,
   "confidence": "high",
-  "time_s": 11.9,
-  "wall_s": 12.0
+  "time_s": 12.6,
+  "wall_s": 12.7
  },
  {
   "id": "lumped",
@@ -277,14 +277,14 @@
   "quantity": "mean temperature after 10 min",
   "unit": "C",
   "expected": 58.01493145695876,
-  "wobbl": 58.27104863319821,
-  "error": 0.004414676873822777,
+  "wobbl": 58.27113992131691,
+  "error": 0.004416250401816412,
   "tolerance": 0.01,
   "pass": true,
   "exact_theory": true,
   "confidence": "high",
   "tau_s": 806.4,
-  "wall_s": 112.5
+  "wall_s": 121.0
  },
  {
   "id": "led",
@@ -300,7 +300,7 @@
   "pass": true,
   "exact_theory": true,
   "confidence": "high",
-  "wall_s": 0.2
+  "wall_s": 0.3
  },
  {
   "id": "rc",
@@ -332,6 +332,6 @@
   "pass": true,
   "exact_theory": false,
   "confidence": "high",
-  "wall_s": 7.3
+  "wall_s": 8.2
  }
 ]
