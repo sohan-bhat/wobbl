@@ -1,17 +1,17 @@
-FAILS. Peak 52.8 MPa on the 0.5 mm inside fillet (face 3) at (6.2, 12.2, 6.1). The part cracks at about 0.95x this load.
+FAILS. Peak 52.3 MPa on the 0.5 mm inside fillet (face 3) at (6.19, 12.6, 6.11). The part cracks at about 0.96x this load.
 
 Confidence: high. passed mesh convergence, force balance, hand calculation, singularities, bolt bearing, units and sanity
-Max deflection 3.46 mm at (90, 18.8, 6).
+Max deflection 3.47 mm at (90, 0, 6).
 Material PLA (3D printed), limit 50 MPa; mass 30.29 g.
 Loads: 40 N down @ top and within 12 of 65,12.5,6. Fixtures: bolt holes d=4.5; wall x=min.
 
 Checks:
-  [pass] mesh convergence: max principal stress settled: 44.2 -> 51.1 -> 53.4 -> 52.8 MPa over 4 meshes, last change 1.2%
-  [pass] force balance: reactions balance the loads to 0.00011% (forces) and 1.8e-05% (moments)
-  [pass] hand calculation: beam theory through the critical section gives 15.2 MPa nominal; FEA peak is 3.47x that, a stress concentration of about 3.5 from the local shape
+  [pass] mesh convergence: max principal stress settled: 43 -> 50.9 -> 53 -> 52.3 MPa over 4 meshes, last change 1.4%
+  [pass] force balance: reactions balance the loads to 0.00014% (forces) and 8.4e-06% (moments)
+  [pass] hand calculation: beam theory through the critical section gives 15.2 MPa nominal; FEA peak is 3.45x that, a stress concentration of about 3.4 from the local shape
   [pass] singularities: no sharp corner or support artifact is above the reported stress
-  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 13.1 N sideways and 50 N along its axis; bearing stress 0.485 MPa, safety factor 103.05 on bearing
-  [pass] units and sanity: part 123 mm across, peak strain 0.015, max deflection 3.46 mm (2.8% of size): all plausible
+  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 2.7 N sideways and 45.7 N along its axis; bearing stress 0.1 MPa, safety factor 499.33 on bearing
+  [pass] units and sanity: part 123 mm across, peak strain 0.015, max deflection 3.47 mm (2.8% of size): all plausible
 
 Assumptions:
   - Linear elastic material and small deflections (no yielding redistribution, no buckling).
@@ -24,10 +24,10 @@ Assumptions:
   - Contact between separate parts, friction and preload are not modeled.
 
 Suggested fixes:
-  - Stress piles up in the 0.5 mm fillet. A fillet of 3 mm (about half the 6 mm wall) spreads it out. With that radius the peak is usually about 1.4x the 15.2 MPa beam stress, roughly 21.3 MPa (safety factor 2.35).
-  - The wall through the peak is 6 mm. To reach safety factor 2.5 it needs 9.75 mm (+62%), because bending stress falls with thickness squared.
+  - Stress piles up in the 0.5 mm fillet. A fillet of 3 mm (about half the 6 mm wall) spreads it out. With that radius the peak is usually about 1.4x the 15.2 MPa beam stress, roughly 21.2 MPa (safety factor 2.35).
+  - The wall through the peak is 6 mm. To reach safety factor 2.5 it needs 9.7 mm (+62%), because bending stress falls with thickness squared.
   - The peak sits where two walls meet and bend. A gusset as thick as the wall, with legs about half as long as the shorter wall, ties them together and usually cuts the corner stress by half or more.
-  - The load acts 58.8 mm from the critical section. Moving a support or the load to within 22.3 mm brings the bending stress to the target.
+  - The load acts 58.9 mm from the critical section. Moving a support or the load to within 22.5 mm brings the bending stress to the target.
 
 Images: stress: images/stress.png, zoom: images/zoom.png, safety: images/safety.png, deformed: images/deformed.png, convergence: images/convergence.png, fix_before: images/stress.png, fix_after: fix-gusset/images/stress.png
 Report: report.html
