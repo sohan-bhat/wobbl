@@ -124,3 +124,23 @@ def test_load_attachment_variant_converges_at_its_own_peak(parts, tmp_path, monk
         assert f"over {len(lv)} meshes refined around that peak" in c.summary
     else:
         assert "did not converge" in c.summary and "not a result" in c.summary
+
+
+@needs_ccx
+def test_the_same_study_twice_gives_identical_answers(parts, tmp_path):
+    """Same input on the same machine: every number matches exactly, from the wall thickness through the meshes
+    to the checks and the other load attachment's refinement."""
+    from wobbl.structural.pipeline import analyze_strength
+    from wobbl.structural.spec import StructuralStudy, parse_fixture, parse_load
+
+    def once(k):
+        st = StructuralStudy(parts["mount"], "6061-t6", [parse_load("200 N -z at 30,20,40 @ holes d=4.5 rigid")],
+                             [parse_fixture("bottom")], quality="fast", budget=120)
+        o = analyze_strength(st, tmp_path / f"run{k}", render=False, fixes=False)
+        levels = [{k: v for k, v in L.items() if k not in ("t_mesh", "t_solve")} for L in o.levels]
+        return (o.governing_MPa, o.governing_xyz, o.max_disp_mm, levels, o.hotspots, o.features,
+                [(c.name, c.status, c.summary) for c in o.checks], o.confidence_reasons)
+
+    first, second = once(1), once(2)
+    assert first == second
+    assert first[3][0]["n_nodes"] > 0 and any(c[0] == "load introduction" for c in first[6])

@@ -34,7 +34,10 @@ attachment grabs the part. Those peaks climb without limit as the mesh is
 refined. Wobbl finds sharp inside corners from the CAD (exact normals, so a
 small fillet is not mistaken for a corner), tracks every peak through the
 refinement levels, and reports the governing stress from points at least a
-fixed distance away (a fifth of the wall thickness or one element). The excluded
+fixed distance away: a fifth of the typical wall, or the element size the first
+mesh asks for where the stress is highest, whichever is larger. Both come from
+the geometry and the sizing rules, not from the elements gmsh happened to make,
+so the distance is the same on every run. The excluded
 peaks are listed with their trend, for example `20.5 -> 27.3 -> 29.7 MPa,
 singular`. In a brittle material a sharp corner lowers confidence and the fix
 list asks for a fillet.
@@ -67,15 +70,47 @@ mistake), peak strain, stress far above or below the material limit, and
 deflection: over 6% of the part size is a warning (linear theory gets less
 accurate), over 20% is a failure.
 
-**Bounded runtime.** Every study has a time budget (`--budget`, by
-default 300 s). If a refinement level runs out of time, fails to mesh or the solver
-fails, Wobbl stops and returns the last finished level with its checks and
-heatmaps; the convergence check says how far it got. An agent always gets an
-answer back, with a confidence that matches it.
+**Bounded runtime.** Every study has a time budget (`--budget`, by default
+300 s). Wobbl spends it by a fixed cost model of each mesh and solve, from the
+node count, rather than by the clock, and stops refining when the next level
+would not fit. The model is calibrated on a 2018 six core laptop (Intel
+i7-8750H, CalculiX on four threads), so a faster machine reaches the same level
+and simply finishes sooner. If a level fails to mesh or the solver fails, Wobbl
+returns the last finished level with its checks and heatmaps, and the
+convergence check says how far it got. The clock is a backstop at three times
+the budget, for a machine far slower than the model or a stalled solver; a
+study stopped there says so in its notes, and that is the one case where the
+level reached, and so the answer, depends on the machine. An agent always gets
+an answer back, with a confidence that matches it.
 
 **Contact.** Wall supports are solved by an active set loop: a coarse linear
 pre solve finds the contact patch, each mesh level starts from it, and the loop
 stops when fewer than 2% of the contact nodes change state.
+
+## Repeatability
+
+The same study on the same input gives the same answer on every run, digit for
+digit, the rigid attachment variant included. Four things used to move it:
+
+- gmsh meshed faces on several threads, and the order they finished in changed
+  where nodes went (the same cast motor mount surface came out with 7441 to
+  7453 nodes). Wobbl now meshes on one thread with a fixed seed, and
+  OpenCASCADE booleans run serially. Meshing takes about twice as long; the
+  solve still dominates.
+- The thinnest wall estimate cast rays from 500 random triangles of that
+  changing mesh, weighted by area twice, and took a 5% quantile that jumped
+  between 3 and 5.5 mm. It now casts rays from points laid out on each CAD face
+  by a fixed sequence, weighted by the true area, and takes the mean of the
+  thinnest 5% of the surface, which moves smoothly when the geometry does.
+- The exclusion radius came from the size of the first mesh's elements at the
+  peaks. It now comes from the size the sizing rules ask for there.
+- Refinement stopped by the clock. It now stops by the cost model above.
+
+CalculiX gives bitwise identical results for the same input. A different
+machine can still give slightly different numbers when its gmsh, OpenCASCADE or
+CalculiX build differs, since library versions and floating point change where
+nodes land. Repeatability is checked run to run on one machine (a test runs a
+small study twice and compares every number), not across machines.
 
 ## Heat
 
