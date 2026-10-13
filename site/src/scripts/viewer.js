@@ -1,5 +1,5 @@
 // The pokeable part: a real Wobbl result drawn with three.js.
-// Data comes from scripts/export_site_part.py. Stress and displacement are
+// Data comes from scripts/export_site_part.py. three.js is bundled from npm. Stress and displacement are
 // scaled by the load slider; the model is linear elastic, so that is exact.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -247,15 +247,17 @@ export async function start(root, ui) {
   }
 
   let pending = false;
+  let raf = 0;
   function frame() {
     pending = false;
+    raf = 0;
     const moving = controls.enableDamping && controls.update();
     renderer.render(scene, camera);
     overlays();
     if (moving) requestRender();
   }
   function requestRender() {
-    if (!pending) { pending = true; requestAnimationFrame(frame); }
+    if (!pending) { pending = true; raf = requestAnimationFrame(frame); }
   }
   controls.addEventListener('change', requestRender);
 
@@ -269,7 +271,8 @@ export async function start(root, ui) {
     camera.updateProjectionMatrix();
     requestRender();
   }
-  new ResizeObserver(resize).observe(root);
+  const ro = new ResizeObserver(resize);
+  ro.observe(root);
 
   // Read the stress under the pointer.
   const ray = new THREE.Raycaster();
@@ -355,4 +358,18 @@ export async function start(root, ui) {
   apply();
   root.dataset.state = 'live';
   status.textContent = '';
+
+  // Leaving the page: stop drawing and give the WebGL context back to the browser.
+  return function dispose() {
+    if (raf) cancelAnimationFrame(raf);
+    ro.disconnect();
+    controls.dispose();
+    geo.dispose();
+    material.uniforms.uLut.value.dispose();
+    material.dispose();
+    scene.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
+    renderer.dispose();
+    renderer.forceContextLoss();
+    canvas.remove();
+  };
 }
