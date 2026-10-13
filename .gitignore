@@ -18,3 +18,10 @@ wobbl-out/
 *.12d
 spooles.out
 *.vtu
+
+# example runs keep their reports, summaries and images, not solver scratch
+examples/**/work/
+examples/**/*.npz
+examples/**/*.brep
+examples/**/geometry/*.json
+examples/**/fix-*/report.html

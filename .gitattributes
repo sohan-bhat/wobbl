@@ -5,3 +5,9 @@
 *.png binary
 examples/**/report.html binary
 docs/img/** binary
+examples/**/outcome.json linguist-generated -diff
+examples/**/study.json linguist-generated -diff
+examples/**/geometry.json linguist-generated -diff
+examples/**/summary.txt linguist-generated
+examples/**/*.html linguist-generated -diff
+examples/**/*.vtu binary
