@@ -145,6 +145,62 @@ def self_weight(out: Path):
     return float(-f["U"][end, 2].mean()), q * L ** 4 / (8 * E_STEEL * I), _info(o)
 
 
+# --- real parts from the bake off ------------------------------------------------
+# References: hand built gmsh + CalculiX models converged over four to six meshes (up to 400k nodes).
+PARTS = Path(__file__).parent / "parts"
+PLA_SPEC = "pla"
+
+
+def cast_motor_mount(out: Path):
+    """Sand cast A356-T6 motor mount, 2 kN belt pull at a pulley off the part, shared by four flange bolts."""
+    part = PARTS / "cast_motor_mount.step"
+    o, f = _strength(part, "custom:E=72400,nu=0.33,yield=165",
+                     ["2000 N -0.8660254,0,-0.5 at 0,-30,66 @ holes d=6.6"], ["z=min"], out / "run")
+    return o.governing_MPa, 124.3, {**_info(o), "max_disp_mm": round(o.max_disp_mm, 4), "reference_disp_mm": 0.266}
+
+
+def enclosure_shell(out: Path):
+    """Molded ABS shell with bosses, a snap tongue and a USB opening, 250 N pressed near one corner."""
+    part = PARTS / "enclosure_shell.step"
+    rim = _faces_where(part, out, lambda f: f.kind == "plane" and abs(f.bbox[0][2]) < 1e-3 and
+                       abs(f.bbox[1][2]) < 1e-3 and not (32 < f.centroid[0] < 44 and f.centroid[1] < -42))
+    o, f = _strength(part, "custom:E=2200,nu=0.35,yield=40", ["250 N -z @ top and within 15 of 50,-25,35"],
+                     [f"faces {rim}"], out / "run")
+    down = float(-f["U"][:, 2].min())
+    return o.governing_MPa, 93.0, {**_info(o), "top_deflection_mm": round(down, 4), "reference_deflection_mm": 1.93}
+
+
+def drone_arm_truss(out: Path):
+    """PA12 drone arm with Warren truss windows, 40 N thrust and 0.8 N m torque on a rigid motor."""
+    part = PARTS / "drone_arm_truss.step"
+    pad = "top and within 14 of 210,0,25"
+    o, f = _strength(part, "custom:E=1800,nu=0.39,yield=48",
+                     [f"40 N +z at 210,0,25 @ {pad} rigid", f"0.8 N*m +z at 210,0,25 @ {pad} rigid"], ["x=min"],
+                     out / "run")
+    X, U = f["X"], f["U"]
+    m = (np.linalg.norm(X[:, :2] - [210, 0], axis=1) < 14) & (np.abs(X[:, 2] - 25) < 0.01)
+    rise = float(U[m, 2].mean()) if m.any() else float("nan")
+    return o.governing_MPa, 11.5, {**_info(o), "motor_rise_mm": round(rise, 4), "reference_rise_mm": 4.09}
+
+
+def _bracket(name: str, out: Path):
+    part = PARTS / name
+    return _strength(part, PLA_SPEC, ["60 N -y @ normal +y and box 45,5,-1,55,7,21"],
+                     ["hole d=4.5", "wall x=min"], out / "run")
+
+
+def bracket_sharp(out: Path):
+    """PLA L bracket with a 0.5 mm inside corner, screwed to a wall, 60 N shelf load. Judged in tension."""
+    o, f = _bracket("shelf_bracket_sharp.step", out)
+    return o.governing_MPa, 78.0, _info(o)
+
+
+def bracket_fillet(out: Path):
+    """The same bracket with a 6 mm fillet."""
+    o, f = _bracket("shelf_bracket_fillet.step", out)
+    return o.governing_MPa, 25.3, _info(o)
+
+
 # --- heat -------------------------------------------------------------------------
 def slab(out: Path):
     from ..thermal.study import run_thermal
@@ -222,6 +278,18 @@ CASES = [
          "MPa", 0.03, True, torsion),
     Case("self-weight", "Cantilever under its own weight", "strength", "q L^4 / (8 E I)", "tip deflection", "mm",
          0.03, True, self_weight),
+    Case("cast-motor-mount", "Cast motor mount with a belt pull through four bolts", "strength",
+         "converged reference FEA, 278k nodes", "peak von Mises at the rib tip", "MPa", 0.05, False, cast_motor_mount),
+    Case("enclosure-shell", "ABS enclosure shell pressed near a corner", "strength",
+         "converged reference FEA, 281k nodes", "peak von Mises at the corner boss", "MPa", 0.10, False,
+         enclosure_shell),
+    Case("drone-arm-truss", "PA12 truss drone arm at full thrust", "strength", "converged reference FEA, 403k nodes",
+         "peak von Mises at the first window corner", "MPa", 0.08, False, drone_arm_truss),
+    Case("bracket-sharp", "PLA shelf bracket, 0.5 mm inside corner", "strength",
+         "converged reference FEA with wall contact", "max principal at the corner", "MPa", 0.08, False,
+         bracket_sharp),
+    Case("bracket-fillet", "PLA shelf bracket, 6 mm fillet", "strength", "converged reference FEA with wall contact",
+         "max principal at the fillet", "MPa", 0.05, False, bracket_fillet),
     Case("slab", "Conduction through a slab into convection", "heat", "1D series resistance",
          "cooled face temperature", "C", 0.01, True, slab),
     Case("lumped", "Aluminum cube cooling in air", "heat", "lumped capacitance (Biot 2e-4)",
