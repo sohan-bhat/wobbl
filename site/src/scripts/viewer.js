@@ -1,39 +1,83 @@
-// The pokeable part: a real Wobbl result drawn with three.js.
-// Data comes from scripts/export_site_part.py. three.js is bundled from npm. Stress and displacement are
-// scaled by the load slider; the model is linear elastic, so that is exact.
-import * as THREE from 'three';
+// The pokeable part: a real Wobbl result drawn with three.js, which is bundled from npm.
+// The data holds two unit belt pulls at right angles in the pulley plane, solved on one mesh
+// (scripts/solve_site_directions.py, scripts/export_site_part.py). The model is linear elastic, so a
+// pull of F newtons at angle t is exactly F (cos t case1 + sin t case2). The vertex shader combines
+// the two stress tensors and takes von Mises from the result at every vertex, since von Mises does
+// not add up across loads; turning or sizing the pull only changes uniforms. The readout and the
+// peak marker come from the peak the export found for every whole degree.
+// A worker fetches and lays out the mesh (part-worker.js), so the page's main thread stays free.
+import {
+  BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group,
+  MathUtils, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial,
+  SphereGeometry, Vector2, Vector3, Vector4, WebGLRenderTarget, WebGLRenderer,
+} from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { fmt, peakNode, tablePerN } from './reading';
 
 const VERT = /* glsl */ `
-attribute float stress;
-attribute float excl;
-uniform float uScale;
-varying float vS;
+attribute vec4 stressA;
+attribute vec4 stressB;
+attribute vec4 shear;
+attribute vec4 dispA;
+attribute vec3 dispB;
+uniform float uF;
+uniform vec2 uCS;
+uniform float uExag;
+uniform float uLimit;
+// each channel's largest value: the attributes arrive as -1 to 1
+uniform vec4 uRA;
+uniform vec4 uRB;
+uniform vec4 uRS;
+uniform vec3 uRDA;
+uniform vec3 uRDB;
+varying vec3 vC;
 varying float vE;
 varying vec3 vN;
 varying vec3 vV;
+#ifdef PICK
+varying float vS;
+#endif
+// Turbo, as a polynomial (Google, Apache 2.0), so the color needs no texture lookup
+vec3 turbo(float x) {
+  const vec4 kr4 = vec4(0.13572138, 4.61539260, -42.66032258, 132.13108234);
+  const vec4 kg4 = vec4(0.09140261, 2.19418839, 4.84296658, -14.18503333);
+  const vec4 kb4 = vec4(0.10667330, 12.64194608, -60.58204836, 110.36276771);
+  const vec2 kr2 = vec2(-152.94239396, 59.28637943);
+  const vec2 kg2 = vec2(4.27729857, 2.82956604);
+  const vec2 kb2 = vec2(-89.90310912, 27.34824973);
+  x = clamp(x, 0.0, 1.0);
+  vec4 v4 = vec4(1.0, x, x * x, x * x * x);
+  vec2 v2 = v4.zw * v4.z;
+  return vec3(dot(v4, kr4) + dot(v2, kr2), dot(v4, kg4) + dot(v2, kg2), dot(v4, kb4) + dot(v2, kb2));
+}
 void main() {
-  vS = stress * uScale;
-  vE = excl;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  // the stress tensor for this pull, then von Mises from it
+  vec4 s = uCS.x * (stressA * uRA) + uCS.y * (stressB * uRB);
+  vec4 h = shear * uRS;
+  vec2 t = uCS.x * h.xy + uCS.y * h.zw;
+  vec3 d = s.xyz - s.yzx;
+  float vm = uF * sqrt(0.5 * dot(d, d) + 3.0 * (s.w * s.w + dot(t, t)));
+  float x = vm / uLimit;
+  vC = x > 1.0 ? vec3(0.949, 0.949, 0.933) : turbo(x);
+  vE = dispA.w;
+#ifdef PICK
+  vS = vm;
+#endif
+  vec3 p = position + (uExag * uF) * (uCS.x * dispA.xyz * uRDA + uCS.y * dispB * uRDB);
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vN = normalize(normalMatrix * normal);
   vV = -mv.xyz;
   gl_Position = projectionMatrix * mv;
 }`;
 
 const FRAG = /* glsl */ `
-precision highp float;
-uniform float uLimit;
 uniform float uHatch;
 uniform float uPx;
-varying float vS;
+varying vec3 vC;
 varying float vE;
 varying vec3 vN;
 varying vec3 vV;
-uniform sampler2D uLut;
 void main() {
-  float x = vS / uLimit;
-  vec3 base = x > 1.0 ? vec3(0.949, 0.949, 0.933) : texture2D(uLut, vec2(clamp(x, 0.0, 1.0) * 0.99609375 + 0.001953125, 0.5)).rgb;
   vec3 v = normalize(vV);
   vec3 n = normalize(vN);
   n = faceforward(n, -v, n);
@@ -41,7 +85,7 @@ void main() {
   vec3 l2 = normalize(vec3(-0.7, -0.1, 0.45));
   float d = 0.34 + 0.6 * max(dot(n, l1), 0.0) + 0.2 * max(dot(n, l2), 0.0);
   float s = 0.16 * pow(max(dot(n, normalize(l1 + v)), 0.0), 28.0);
-  vec3 col = base * d + vec3(s);
+  vec3 col = vC * d + vec3(s);
   if (uHatch > 0.5 && vE > 0.5) {
     float k = mod(gl_FragCoord.x - gl_FragCoord.y, 9.0 * uPx);
     if (k < 2.5 * uPx) col = mix(col, vec3(0.055, 0.059, 0.067), 0.72);
@@ -49,137 +93,143 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-// matplotlib's turbo colormap, the one Wobbl's own heatmaps use, as 256 RGB hex triplets.
-const TURBO = '30123b32154333184a341b51351e5836215f37246638276d392a733a2d793b2f803c32863d358b3e38913f3b973f3e9c4040a24143a74146ac4249b1424bb5434eba4451bf4454c34456c74559cb455ccf455ed34661d64664da4666dd4669e0466be3476ee64771e94773eb4776ee4778f0477bf2467df44680f64682f84685fa4687fb458afc458cfd448ffe4391fe4294ff4196ff4099ff3e9bfe3d9efe3ba0fd3aa3fc38a5fb37a8fa35abf833adf731aff52fb2f42eb4f22cb7f02ab9ee28bceb27bee925c0e723c3e422c5e220c7df1fc9dd1ecbda1ccdd81bd0d51ad2d21ad4d019d5cd18d7ca18d9c818dbc518ddc218dec018e0bd19e2bb19e3b91ae4b61ce6b41de7b21fe9af20eaac22ebaa25eca727eea42aefa12cf09e2ff19b32f29835f39438f4913cf58e3ff68a43f78746f8844af8804ef97d52fa7a55fa7659fb735dfc6f61fc6c65fd6969fd666dfe6271fe5f75fe5c79fe597dff5680ff5384ff5188ff4e8bff4b8fff4992ff4796fe4499fe429cfe409ffd3fa1fd3da4fc3ca7fc3aa9fb39acfb38affa37b1f936b4f836b7f735b9f635bcf534bef434c1f334c3f134c6f034c8ef34cbed34cdec34d0ea34d2e935d4e735d7e535d9e436dbe236dde037dfdf37e1dd37e3db38e5d938e7d739e9d539ebd339ecd13aeecf3aefcd3af1cb3af2c93af4c73af5c53af6c33af7c13af8be39f9bc39faba39fbb838fbb637fcb336fcb136fdae35fdac34fea933fea732fea431fea130fe9e2ffe9b2dfe992cfe962bfe932afe9029fd8d27fd8a26fc8725fc8423fb8122fb7e21fa7b1ff9781ef9751df8721cf76f1af66c19f56918f46617f36315f26014f15d13f05b12ef5811ed5510ec530feb500eea4e0de84b0ce7490ce5470be4450ae2430ae14109df3f08dd3d08dc3b07da3907d83706d63506d43305d23105d02f05ce2d04cc2b04ca2a04c82803c52603c32503c12302be2102bc2002b91e02b71d02b41b01b21a01af1801ac1701a91601a71401a41301a112019e10019b0f01980e01950d01920b018e0a018b09028808028507028106027e05027a0403';
-function turboTexture() {
-  const data = new Uint8Array(256 * 4);
-  for (let i = 0; i < 256; i++) {
-    for (let k = 0; k < 3; k++) data[i * 4 + k] = parseInt(TURBO.substr(i * 6 + k * 2, 2), 16);
-    data[i * 4 + 3] = 255;
-  }
-  const tex = new THREE.DataTexture(data, 256, 1, THREE.RGBAFormat);
-  tex.magFilter = THREE.LinearFilter;
-  tex.minFilter = THREE.LinearFilter;
-  tex.needsUpdate = true;
-  return tex;
-}
+// The probe reads von Mises under the pointer from a one pixel render: 24 bits of MPa / 4096 in
+// red, green and blue, and alpha 1 in an excluded zone, a half elsewhere, 0 off the part.
+const PICK_FRAG = /* glsl */ `
+varying float vS;
+varying float vE;
+void main() {
+  float a = clamp(vS / 4096.0, 0.0, 0.99999) * 255.0;
+  float r = floor(a); a = (a - r) * 255.0;
+  float g = floor(a); a = (a - g) * 255.0;
+  gl_FragColor = vec4(r / 255.0, g / 255.0, floor(a) / 255.0, vE > 0.5 ? 1.0 : 0.5);
+}`;
 
-async function loadPart(base, version) {
-  const man = await (await fetch(`${base}.json?v=${version}`)).json();
-  const v = man.variants.distributed;
-  const res = await fetch(new URL(v.file, new URL(`${base}.json`, location.href)));
-  if (!res.ok) throw new Error(`part data: HTTP ${res.status}`);
-  let buf = await res.arrayBuffer();
-  const head = new Uint8Array(buf, 0, 2);
-  if (head[0] === 0x1f && head[1] === 0x8b) {
-    const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
-    buf = await new Response(stream).arrayBuffer();
-  }
-  const n = v.vertices, t = v.triangles, L = v.layout, lo = v.bounds_min, hi = v.bounds_max;
-  const qp = new Uint16Array(buf, L.position, n * 3);
-  const qn = new Int8Array(buf, L.normal, n * 4);
-  const qd = new Int16Array(buf, L.disp, n * 3);
-  const qs = new Uint16Array(buf, L.stress, n);
-  const qe = new Uint8Array(buf, L.excluded, n);
-  const pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3), disp = new Float32Array(n * 3);
-  const stress = new Float32Array(n), excl = new Float32Array(n);
-  const dk = v.disp_max_mm / 32767, sk = v.stress_max_MPa / 65535;
-  for (let i = 0; i < n; i++) {
-    for (let k = 0; k < 3; k++) {
-      pos[i * 3 + k] = lo[k] + (qp[i * 3 + k] / 65535) * (hi[k] - lo[k]);
-      nrm[i * 3 + k] = qn[i * 4 + k] / 127;
-      disp[i * 3 + k] = qd[i * 3 + k] * dk;
-    }
-    stress[i] = qs[i] * sk;
-    excl[i] = qe[i];
-  }
-  const index = v.index_type === 'uint16' ? new Uint16Array(buf, L.index, t * 3) : new Uint32Array(buf, L.index, t * 3);
-  return { man, v, pos, nrm, disp, stress, excl, index };
-}
-
+/** The belt pull: drawn solid, plus a faint copy that shows through the part when it is behind it. */
 function arrow(color) {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color });
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1, 16), mat);
-  const head = new THREE.Mesh(new THREE.ConeGeometry(3.6, 10, 24), mat);
-  const hub = new THREE.Mesh(new THREE.SphereGeometry(3.2, 20, 14), mat);
-  g.add(shaft, head, hub);
-  g.userData = { shaft, head, hub };
+  const g = new Group();
+  const solid = new MeshBasicMaterial({ color });
+  const ghost = new MeshBasicMaterial({ color, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false });
+  const parts = {};
+  for (const [k, geo] of Object.entries({
+    shaft: new CylinderGeometry(1.1, 1.1, 1, 12),
+    head: new ConeGeometry(3.6, 10, 20),
+    hub: new SphereGeometry(3.2, 16, 10),
+  })) {
+    const m = new Mesh(geo, solid);
+    const x = new Mesh(geo, ghost);
+    x.renderOrder = 2;
+    m.add(x);
+    parts[k] = m;
+    g.add(m);
+  }
+  g.userData = parts;
   return g;
 }
 
-export async function start(root, ui) {
-  const status = root.querySelector('.viewer-status');
-  status.textContent = 'Loading the 3D part…';
-  const P = await loadPart(root.dataset.part || 'data/cast-motor-mount', root.dataset.v || 1);
-  const { man, v } = P;
-  const n = v.vertices;
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-  renderer.setClearColor(0x000000, 0);
+const COLD = 0xffd400;
+
+/**
+ * Draw the part in root. ui.data is the manifest, ui.state() gives { load, angle, exag },
+ * ui.onChange(fn) and ui.onReset(fn) subscribe and return an unsubscribe, and ui.signal aborts a
+ * start that is still loading. Resolves to a function that tears it all down.
+ */
+export async function start(root, ui) {
+  const trash = [];
+  try {
+    return await build(root, ui, trash);
+  } catch (err) {
+    drop(trash);
+    throw err;
+  }
+}
+
+/** Run what dispose and a failed start leave behind, newest first. */
+const drop = (trash) => { for (const fn of trash.splice(0).reverse()) { try { fn(); } catch { /* already gone */ } } };
+
+async function build(root, ui, trash) {
+  const man = ui.data, signal = ui.signal;
+  const status = root.querySelector('.viewer-status');
+  const alive = () => { if (signal.aborted) throw new DOMException('The page was left', 'AbortError'); };
+  const teardown = () => drop(trash);
+
+  // The mesh is fetched and laid out in a worker while the main thread sets up WebGL.
+  const worker = new Worker(new URL('./part-worker.js', import.meta.url), { type: 'module' });
+  trash.push(() => worker.terminate());
+  const got = new Promise((resolve, reject) => {
+    worker.onmessage = (e) => (e.data.error ? reject(new Error(e.data.error)) : resolve(e.data.mesh));
+    worker.onerror = (e) => reject(new Error(e.message || 'the part worker failed'));
+    signal.addEventListener('abort', () => reject(new DOMException('The page was left', 'AbortError')), { once: true });
+  });
+  worker.postMessage({ file: new URL(root.dataset.file, document.baseURI).href, man });
+
+  status.textContent = 'Loading the 3D part…';
   const px = Math.min(window.devicePixelRatio || 1, 2);
+  const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+  trash.push(() => { renderer.dispose(); renderer.forceContextLoss(); });
+  renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(px);
   const canvas = renderer.domElement;
   canvas.setAttribute('role', 'img');
   canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag or use the arrow keys to orbit; scroll, pinch or press plus and minus to zoom; double click or double tap to reset the view. The belt pull slider changes the load.');
+  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag or use the arrow keys to orbit, scroll, pinch or press plus and minus to zoom, and double click or double tap to reset the view.');
+  canvas.style.opacity = '0';
   root.prepend(canvas);
+  trash.push(() => canvas.remove());
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
+  const scene = new Scene();
+  const camera = new PerspectiveCamera(30, 1, 1, 5000);
   camera.up.set(0, 0, 1);
 
-  const geo = new THREE.BufferGeometry();
-  const live = new Float32Array(P.pos);
-  const posAttr = new THREE.BufferAttribute(live, 3);
-  posAttr.setUsage(THREE.DynamicDrawUsage);
-  geo.setAttribute('position', posAttr);
-  geo.setAttribute('normal', new THREE.BufferAttribute(P.nrm, 3));
-  geo.setAttribute('stress', new THREE.BufferAttribute(P.stress, 1));
-  geo.setAttribute('excl', new THREE.BufferAttribute(P.excl, 1));
-  geo.setIndex(new THREE.BufferAttribute(P.index, 1));
-
-  const material = new THREE.ShaderMaterial({
-    vertexShader: VERT,
-    fragmentShader: FRAG,
-    side: THREE.DoubleSide,
-    uniforms: {
-      uScale: { value: 1 },
-      uLimit: { value: man.allowable_MPa },
-      uHatch: { value: 1 },
-      uPx: { value: px },
-      uLut: { value: turboTexture() },
-    },
+  const uniforms = {
+    uF: { value: man.load_N },
+    uCS: { value: new Vector2(1, 0) },
+    uExag: { value: 60 },
+    uLimit: { value: man.allowable_MPa },
+    uHatch: { value: 1 },
+    uPx: { value: px },
+    uRA: { value: new Vector4() },
+    uRB: { value: new Vector4() },
+    uRS: { value: new Vector4() },
+    uRDA: { value: new Vector3() },
+    uRDB: { value: new Vector3() },
+  };
+  const material = new ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, side: DoubleSide, uniforms });
+  const pickMaterial = new ShaderMaterial({
+    vertexShader: VERT, fragmentShader: PICK_FRAG, side: DoubleSide, uniforms, defines: { PICK: '' },
   });
-  const mesh = new THREE.Mesh(geo, material);
+  const geo = new BufferGeometry();
+  const mesh = new Mesh(geo, material);
+  mesh.frustumCulled = false;
   scene.add(mesh);
+  const pickScene = new Scene();
+  const pickMesh = new Mesh(geo, pickMaterial);
+  pickMesh.frustumCulled = false;
+  pickScene.add(pickMesh);
+  const pickTarget = new WebGLRenderTarget(1, 1);
+  trash.push(() => { geo.dispose(); material.dispose(); pickMaterial.dispose(); pickTarget.dispose(); });
 
   // The base is bolted flat to a frame: show that plane.
-  const lo = new THREE.Vector3(...v.bounds_min), hi = new THREE.Vector3(...v.bounds_max);
-  const size = new THREE.Vector3().subVectors(hi, lo);
-  const center = new THREE.Vector3().addVectors(lo, hi).multiplyScalar(0.5);
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(size.x * 1.4, size.y * 1.4),
-    new THREE.MeshBasicMaterial({ color: 0x15171a }),
-  );
+  const lo = new Vector3(...man.mesh.bounds_min), hi = new Vector3(...man.mesh.bounds_max);
+  const size = new Vector3().subVectors(hi, lo);
+  const center = new Vector3().addVectors(lo, hi).multiplyScalar(0.5);
+  const floor = new Mesh(new PlaneGeometry(size.x * 1.4, size.y * 1.4), new MeshBasicMaterial({ color: 0x15171a }));
   floor.position.set(center.x, center.y, lo.z - 0.4);
   scene.add(floor);
 
-  // The belt pull acts at the pulley, off the part.
-  const load = man.loads[0];
-  const pull = arrow(0xffd400);
+  // The belt pull acts at the pulley, off the part, and turns in the pulley plane.
+  const pl = man.pull;
+  const pAt = new Vector3(...pl.point);
+  const e1 = new Vector3(...pl.e1), e2 = new Vector3(...pl.e2);
+  const pDir = new Vector3(), Y = new Vector3(0, 1, 0);
+  const pull = arrow(COLD);
   scene.add(pull);
-  const pDir = new THREE.Vector3(...load.direction).normalize();
-  const pAt = new THREE.Vector3(...load.point);
-
-  // Governing point: highest stress outside the excluded zones.
-  let peakIdx = 0;
-  for (let i = 0, best = -1; i < n; i++) {
-    if (P.excl[i] < 0.5 && P.stress[i] > best) { best = P.stress[i]; peakIdx = i; }
-  }
-  const peakVal = P.stress[peakIdx];
+  trash.push(() => scene.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); }));
 
   const controls = new OrbitControls(camera, canvas);
+  trash.push(() => controls.dispose());
   // The part sits in the page's first screen: a vertical swipe still scrolls the page on phones,
   // a sideways drag turns the part.
   canvas.style.touchAction = 'pan-y';
@@ -190,41 +240,59 @@ export async function start(root, ui) {
   const radius = size.length() / 2;
   controls.minDistance = radius * 1.3;
   controls.maxDistance = radius * 6;
-  controls.target.copy(center).add(new THREE.Vector3(0, -6, -4));
-  const home = new THREE.Vector3(0.62, 1.05, 0.62).normalize();
+  controls.target.copy(center).add(new Vector3(0, -6, -4));
+  const home = new Vector3(0.62, 1.05, 0.62).normalize();
+  const homeDist = radius / Math.sin(MathUtils.degToRad(camera.fov / 2));
   function resetView() {
-    const dist = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.0;
-    camera.position.copy(controls.target).addScaledVector(home, dist);
+    camera.position.copy(controls.target).addScaledVector(home, homeDist);
     controls.update();
     requestRender();
   }
 
-  const state = { scale: 1, exag: 60, hatch: true };
+  const { arrays: m, range } = await got;
+  alive();
+  worker.terminate();
+  for (const [name, size] of [['position', 3], ['normal', 3], ['stressA', 4], ['stressB', 4], ['shear', 4], ['dispA', 4], ['dispB', 3]]) {
+    geo.setAttribute(name, new BufferAttribute(m[name], size, name !== 'position'));
+  }
+  geo.setIndex(new BufferAttribute(m.index, 1));
+  uniforms.uRA.value.fromArray(range.stressA);
+  uniforms.uRB.value.fromArray(range.stressB);
+  uniforms.uRS.value.fromArray(range.shear);
+  uniforms.uRDA.value.fromArray(range.dispA);
+  uniforms.uRDB.value.fromArray(range.dispB);
+
+  const state = { ...ui.state() };
   const peakTag = root.querySelector('.peak-tag');
   const peakTagV = root.querySelector('.peak-tag-v');
   const loadTag = root.querySelector('.load-tag');
   const probe = root.querySelector('.probe');
-  const tmp = new THREE.Vector3();
+  const tmp = new Vector3(), tip = new Vector3(), hubS = new Vector3(), peakP = new Vector3();
+  let len = 0, cs = [1, 0];
 
   function apply() {
-    const f = state.scale * state.exag;
-    const b = P.pos, d = P.disp;
-    for (let i = 0; i < n * 3; i++) live[i] = b[i] + d[i] * f;
-    posAttr.needsUpdate = true;
-    geo.computeBoundingSphere();
-    material.uniforms.uScale.value = state.scale;
-    material.uniforms.uHatch.value = state.hatch ? 1 : 0;
-    const len = 46 * state.scale;
+    const t = (state.angle * Math.PI) / 180;
+    cs = [Math.cos(t), Math.sin(t)];
+    uniforms.uF.value = state.load;
+    uniforms.uCS.value.set(cs[0], cs[1]);
+    uniforms.uExag.value = state.exag;
+    pDir.copy(e1).multiplyScalar(cs[0]).addScaledVector(e2, cs[1]);
+    len = (46 * state.load) / man.load_N;
     pull.visible = len > 0.5;
     const { shaft, head, hub } = pull.userData;
     pull.position.copy(pAt);
-    pull.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pDir);
-    shaft.scale.set(1, Math.max(len - 10, 0.01), 1);
-    shaft.position.set(0, Math.max(len - 10, 0) / 2, 0);
-    head.position.set(0, Math.max(len - 10, 0) + 5, 0);
+    pull.quaternion.setFromUnitVectors(Y, pDir);
+    const body = Math.max(len - 10, 0);
+    shaft.scale.set(1, Math.max(body, 0.01), 1);
+    shaft.position.set(0, body / 2, 0);
+    head.position.set(0, body + 5, 0);
     hub.position.set(0, 0, 0);
-    peakTagV.textContent = `${(peakVal * state.scale).toFixed(1)} MPa`;
-    loadTag.textContent = `${Math.round(load.magnitude * state.scale).toLocaleString('en-US')} N belt pull`;
+    // the peak for this angle, found by the export at every whole degree
+    const node = peakNode(man, state.angle), f = uniforms.uExag.value * state.load;
+    peakP.set(node[0] + f * (cs[0] * node[3] + cs[1] * node[6]), node[1] + f * (cs[0] * node[4] + cs[1] * node[7]),
+      node[2] + f * (cs[0] * node[5] + cs[1] * node[8]));
+    peakTagV.textContent = `${(tablePerN(man, state.angle) * state.load).toFixed(1)} MPa`;
+    loadTag.textContent = `${fmt(state.load)} N belt pull`;
     if (probe.dataset.sticky) {
       probe.hidden = true;
       delete probe.dataset.sticky;
@@ -232,22 +300,31 @@ export async function start(root, ui) {
     requestRender();
   }
 
-  function place(el, p, w, h) {
+  let vw = 1, vh = 1;
+  function place(el, p) {
     tmp.copy(p).project(camera);
     const vis = tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
     el.hidden = !vis;
-    if (vis) el.style.translate = `${((tmp.x + 1) / 2) * w}px ${((1 - tmp.y) / 2) * h}px`;
+    if (vis) el.style.translate = `${((tmp.x + 1) / 2) * vw}px ${((1 - tmp.y) / 2) * vh}px`;
+    return vis;
   }
-
-  let vw = 1, vh = 1;
   function overlays() {
-    const w = vw, h = vh;
-    place(peakTag, new THREE.Vector3(live[peakIdx * 3], live[peakIdx * 3 + 1], live[peakIdx * 3 + 2]), w, h);
-    if (pull.visible) place(loadTag, pAt, w, h); else loadTag.hidden = true;
+    hubS.copy(pAt).project(camera);
+    if (place(peakTag, peakP)) {
+      // the value reads away from the pulley, so the arrow stays clear of it
+      const left = tmp.x < hubS.x;
+      peakTag.style.flexDirection = left ? 'row-reverse' : '';
+      peakTag.style.transform = left ? 'translate(calc(-100% + 9px), -50%)' : '';
+    }
+    if (!pull.visible) { loadTag.hidden = true; return; }
+    // the label sits just past the arrow's tip, on the side the arrow points to
+    if (place(loadTag, tip.copy(pAt).addScaledVector(pDir, Math.max(len, 16) + 8))) {
+      const sx = tmp.x - hubS.x, sy = hubS.y - tmp.y, l = Math.hypot(sx, sy) || 1;
+      loadTag.style.transform = `translate(${(-50 + (50 * sx) / l).toFixed(1)}%, ${(-50 + (50 * sy) / l).toFixed(1)}%)`;
+    }
   }
 
-  let pending = false;
-  let raf = 0;
+  let pending = false, raf = 0;
   function frame() {
     pending = false;
     raf = 0;
@@ -259,6 +336,7 @@ export async function start(root, ui) {
   function requestRender() {
     if (!pending) { pending = true; raf = requestAnimationFrame(frame); }
   }
+  trash.push(() => cancelAnimationFrame(raf));
   controls.addEventListener('change', requestRender);
 
   function resize() {
@@ -273,44 +351,56 @@ export async function start(root, ui) {
   }
   const ro = new ResizeObserver(resize);
   ro.observe(root);
+  trash.push(() => ro.disconnect());
 
-  // Read the stress under the pointer.
-  const ray = new THREE.Raycaster();
-  const ndc = new THREE.Vector2();
-  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), bc = new THREE.Vector3();
+  // Listeners on elements outside the canvas, so dispose can take them off again.
+  const on = (el, type, fn, opts) => { el.addEventListener(type, fn, opts); trash.push(() => el.removeEventListener(type, fn, opts)); };
+
+  // The probe reads the stress under the pointer from a one pixel render, at most once a frame.
+  const px1 = new Uint8Array(4);
   function probeAt(clientX, clientY, sticky) {
     const r = canvas.getBoundingClientRect();
-    ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
-    ray.setFromCamera(ndc, camera);
-    const hit = ray.intersectObject(mesh, false)[0];
-    if (!hit) { probe.hidden = true; delete probe.dataset.sticky; return; }
-    const { a, b, c } = hit.face;
-    A.fromArray(live, a * 3); B.fromArray(live, b * 3); C.fromArray(live, c * 3);
-    THREE.Triangle.getBarycoord(hit.point, A, B, C, bc);
-    const s = (P.stress[a] * bc.x + P.stress[b] * bc.y + P.stress[c] * bc.z) * state.scale;
-    const ex = P.excl[a] + P.excl[b] + P.excl[c] > 1.5;
+    const x = clientX - r.left, y = clientY - r.top;
+    camera.setViewOffset(vw, vh, x, y, 1, 1);
+    renderer.setRenderTarget(pickTarget);
+    renderer.clear();
+    renderer.render(pickScene, camera);
+    renderer.readRenderTargetPixels(pickTarget, 0, 0, 1, 1, px1);
+    renderer.setRenderTarget(null);
+    camera.clearViewOffset();
+    if (!px1[3]) { probe.hidden = true; delete probe.dataset.sticky; return; }
+    const s = ((px1[0] + px1[1] / 255 + px1[2] / 65025) / 255) * 4096;
     const sf = s > 1e-6 ? man.allowable_MPa / s : Infinity;
     probe.innerHTML = `<b>${s.toFixed(1)} MPa</b><br>${sf > 99 ? 'safety factor above 99' : `safety factor ${sf.toFixed(2)}`}` +
-      (ex ? '<br><span class="x">excluded zone</span>' : '');
-    const x = clientX - r.left, y = clientY - r.top;
+      (px1[3] > 200 ? '<br><span class="x">excluded zone</span>' : '');
     probe.style.left = `${x}px`;
     probe.style.top = `${y}px`;
     probe.style.transform = x > r.width - 200 ? 'translate(calc(-100% - 14px), -50%)' : '';
     probe.hidden = false;
     if (sticky) probe.dataset.sticky = '1'; else delete probe.dataset.sticky;
   }
-  let hoverQueued = null;
-  canvas.addEventListener('pointermove', (e) => {
+  let hoverAt = null, hoverRaf = 0;
+  on(canvas, 'pointermove', (e) => {
     if (e.pointerType !== 'mouse' || e.buttons) return;
-    if (!hoverQueued) requestAnimationFrame(() => { probeAt(hoverQueued.x, hoverQueued.y, false); hoverQueued = null; });
-    hoverQueued = { x: e.clientX, y: e.clientY };
-  });
-  canvas.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') probe.hidden = true; });
+    hoverAt = [e.clientX, e.clientY];
+    if (!hoverRaf) {
+      hoverRaf = requestAnimationFrame(() => {
+        hoverRaf = 0;
+        if (hoverAt) probeAt(hoverAt[0], hoverAt[1], false);
+      });
+    }
+  }, { passive: true });
+  trash.push(() => cancelAnimationFrame(hoverRaf));
+  on(canvas, 'pointerleave', (e) => { if (e.pointerType === 'mouse') { hoverAt = null; probe.hidden = true; } });
   let down = null;
-  canvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; if (e.pointerType === 'mouse') probe.hidden = true; });
+  on(canvas, 'pointerdown', (e) => {
+    down = { x: e.clientX, y: e.clientY };
+    hoverAt = null;
+    if (e.pointerType === 'mouse') probe.hidden = true;
+  });
   // A double click, or two taps in quick succession, puts the camera back.
   let lastTap = 0;
-  canvas.addEventListener('pointerup', (e) => {
+  on(canvas, 'pointerup', (e) => {
     const tap = down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6;
     down = null;
     if (!tap) return;
@@ -323,22 +413,22 @@ export async function start(root, ui) {
     lastTap = e.timeStamp;
     probeAt(e.clientX, e.clientY, true);
   });
-  canvas.addEventListener('dblclick', () => { probe.hidden = true; resetView(); });
+  on(canvas, 'dblclick', () => { probe.hidden = true; resetView(); });
 
   // Keyboard orbit: arrows rotate about the part, plus and minus zoom.
-  const Z = new THREE.Vector3(0, 0, 1), off = new THREE.Vector3(), side = new THREE.Vector3();
-  canvas.addEventListener('keydown', (e) => {
+  const Z = new Vector3(0, 0, 1), off = new Vector3(), side = new Vector3(), next = new Vector3();
+  on(canvas, 'keydown', (e) => {
     const step = e.shiftKey ? 0.3 : 0.1;
     off.subVectors(camera.position, controls.target);
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       off.applyAxisAngle(Z, e.key === 'ArrowLeft' ? -step : step);
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       side.crossVectors(off, Z).normalize();
-      const next = off.clone().applyAxisAngle(side, e.key === 'ArrowUp' ? step : -step);
-      if (Math.abs(next.clone().normalize().z) < 0.97) off.copy(next);
+      next.copy(off).applyAxisAngle(side, e.key === 'ArrowUp' ? step : -step);
+      if (Math.abs(next.z / next.length()) < 0.97) off.copy(next);
     } else if (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') {
-      const len = off.length() * (e.key === '-' || e.key === '_' ? 1.12 : 1 / 1.12);
-      off.setLength(Math.min(controls.maxDistance, Math.max(controls.minDistance, len)));
+      const l = off.length() * (e.key === '-' || e.key === '_' ? 1.12 : 1 / 1.12);
+      off.setLength(Math.min(controls.maxDistance, Math.max(controls.minDistance, l)));
     } else {
       return;
     }
@@ -346,30 +436,26 @@ export async function start(root, ui) {
     camera.position.copy(controls.target).add(off);
     camera.lookAt(controls.target);
     controls.update();
-    requestRender();
   });
 
-  ui.onChange((s) => { Object.assign(state, s); apply(); });
-  ui.onReset(resetView);
-  Object.assign(state, ui.current());
-
+  trash.push(ui.onChange((s) => { Object.assign(state, s); apply(); }));
+  trash.push(ui.onReset(resetView));
+  Object.assign(state, ui.state());
   resize();
   resetView();
+
   apply();
+  // Swap the poster for the canvas once the first frame is on screen.
+  await nextFrame();
+  await nextFrame();
+  alive();
+  canvas.style.opacity = '';
   root.dataset.state = 'live';
   status.textContent = '';
 
-  // Leaving the page: stop drawing and give the WebGL context back to the browser.
+  // Leaving the page: stop drawing, take the listeners off and give the WebGL context back.
   return function dispose() {
-    if (raf) cancelAnimationFrame(raf);
-    ro.disconnect();
-    controls.dispose();
-    geo.dispose();
-    material.uniforms.uLut.value.dispose();
-    material.dispose();
-    scene.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
-    renderer.dispose();
-    renderer.forceContextLoss();
-    canvas.remove();
+    teardown();
+    for (const el of root.querySelectorAll('.peak-tag, .load-tag, .probe')) el.hidden = true;
   };
 }
