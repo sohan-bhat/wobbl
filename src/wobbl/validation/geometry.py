@@ -26,10 +26,13 @@ def quiet_stdout():
 def _session(path: Path, build):
     import gmsh
 
+    from ..geometry.cad import _deterministic
+
     if gmsh.isInitialized():
         gmsh.finalize()
     gmsh.initialize(readConfigFiles=False)
     gmsh.option.setNumber("General.Terminal", 0)
+    _deterministic(gmsh)
     try:
         gmsh.model.add("v")
         build(gmsh.model.occ)

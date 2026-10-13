@@ -170,7 +170,9 @@ def build_mesh(prep: PreparedGeometry, sizing: Sizing, verbose: bool = False, ti
     from .isolate import IsolatedCrash, IsolatedTimeout, run_isolated
 
     if timeout is None:
-        timeout = 60.0 + estimate_nodes(prep, sizing) / 1500.0
+        # generous on purpose: a timeout moves on to the next strategy, which gives a different mesh, so it must
+        # only catch a hung mesher and never a busy machine (serial meshing runs about 15k nodes a second)
+        timeout = 90.0 + estimate_nodes(prep, sizing) / 750.0
     attempts = [dict(alg2d=6, alg3d=10, curved=True), dict(alg2d=5, alg3d=1, curved=True),
                 dict(alg2d=1, alg3d=1, curved=False)]
     errors = []

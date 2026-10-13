@@ -44,12 +44,14 @@ def _build(path: str, params: dict, out: str) -> str:
     import gmsh
 
     from ..validation.geometry import quiet_stdout
+    from .cad import _deterministic
 
     ns = _exec(path)
     if gmsh.isInitialized():
         gmsh.finalize()
     gmsh.initialize(readConfigFiles=False)
     gmsh.option.setNumber("General.Terminal", 0)
+    _deterministic(gmsh)
     try:
         gmsh.model.add("part")
         ns["build"](gmsh.model.occ, **params)

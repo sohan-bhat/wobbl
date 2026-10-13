@@ -59,6 +59,22 @@ class PreparedGeometry:
                    d["volume"], d["n_bodies"], d["n_surfaces"], list(d.get("notes", [])), d.get("stl_angle", 30.0))
 
 
+def _deterministic(gmsh):
+    """Options that make gmsh give the same mesh for the same input every time.
+
+    Parallel 1D and 2D meshing hands faces to threads in whatever order they finish, which changes node
+    placement from run to run (the same surface mesh came out with 7441 to 7453 nodes on three runs). The
+    serial mesher is about twice as slow but repeatable, and the solve dominates a study anyway. The random
+    perturbations gmsh adds to break ties are seeded, and OpenCASCADE booleans run serially for the same reason.
+    """
+    opt = gmsh.option.setNumber
+    opt("General.NumThreads", 1)
+    for dim in ("1D", "2D", "3D"):
+        opt(f"Mesh.MaxNumThreads{dim}", 1)
+    opt("Mesh.RandomSeed", 1)
+    opt("Geometry.OCCParallel", 0)
+
+
 @contextlib.contextmanager
 def gmsh_session(verbose: bool = False):
     import gmsh
@@ -68,7 +84,7 @@ def gmsh_session(verbose: bool = False):
         gmsh.initialize(readConfigFiles=False, run=False, interruptible=False)
         gmsh.option.setNumber("General.Terminal", 1 if verbose else 0)
         gmsh.option.setNumber("General.Verbosity", 2)
-        gmsh.option.setNumber("General.NumThreads", max(1, (os.cpu_count() or 2)))
+        _deterministic(gmsh)
         try:
             gmsh.model.add("wobbl")
             yield gmsh
