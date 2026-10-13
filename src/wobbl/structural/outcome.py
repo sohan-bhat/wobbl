@@ -57,11 +57,13 @@ class Outcome:
         return _jsonable(d)
 
     def save(self, path: str | Path):
-        Path(path).write_text(json.dumps(self.to_dict(), indent=1))
+        from ..verify.checks import relative_paths
+        Path(path).write_text(json.dumps(relative_paths(self.to_dict(), Path(path).parent), indent=1))
 
     @classmethod
     def load(cls, path: str | Path) -> "Outcome":
-        d = json.loads(Path(path).read_text())
+        from ..verify.checks import absolute_paths
+        d = absolute_paths(json.loads(Path(path).read_text()), Path(path).parent)
         d["checks"] = [Check(**c) for c in d["checks"]]
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
@@ -112,8 +114,16 @@ def evaluate(run: StructuralRun) -> Outcome:
 
     # 1. mesh convergence of the governing stress (and the deflection alongside)
     gov_vals = [L.governing for L in run.levels]
-    checks.append(convergence_check(gov_vals, run.tol, run.measure_name, "MPa", run.stopped_by,
-                                    [L.max_disp for L in run.levels]))
+    conv = convergence_check(gov_vals, run.tol, run.measure_name, "MPa", run.stopped_by,
+                             [L.max_disp for L in run.levels])
+    bound = max(max(L.raw_max for L in run.levels), max(gov_vals))
+    if conv.status != "pass" and bound > 0 and allow / bound >= target * 1.2:
+        # the number is still moving, but even the highest peak seen on any mesh, artifacts included, leaves
+        # plenty of margin: the verdict does not depend on the unsettled digits
+        conv = Check("mesh convergence", "warn", conv.summary + f". Even the highest peak on any mesh "
+                     f"({fmt(bound)} MPa, artifacts included) leaves safety factor {allow / bound:.2f}, so the "
+                     "verdict holds either way", conv.detail)
+    checks.append(conv)
     dvals = [L.max_disp for L in run.levels]
     if len(dvals) >= 2 and dvals[-1] > 0 and abs(dvals[-1] - dvals[-2]) / dvals[-1] > 0.05:
         extra.append(("medium", f"max deflection still changing ({fmt(dvals[-2])} -> {fmt(dvals[-1])} mm)"))
@@ -351,10 +361,11 @@ def text_summary(o: Outcome) -> str:
         lines.append("Suggested fixes:")
         for f in o.fixes:
             lines.append(f"  - {f.get('summary', '')}")
+    from ..verify.checks import display_path
     if o.images:
         lines.append("")
-        lines.append("Images: " + ", ".join(f"{k}: {v}" for k, v in o.images.items()))
+        lines.append("Images: " + ", ".join(f"{k}: {display_path(v, o.workdir)}" for k, v in o.images.items()))
     if o.report:
-        lines.append(f"Report: {o.report}")
+        lines.append(f"Report: {display_path(o.report, o.workdir)}")
     _ = fmt_force
     return "\n".join(lines)

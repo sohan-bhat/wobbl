@@ -8,6 +8,7 @@ confidence.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 import numpy as np
 
@@ -110,3 +111,56 @@ def confidence(checks: list[Check], extra_reasons: list[tuple[str, str]] | None 
         passed = [c.name for c in checks if c.status == "pass"]
         reasons.insert(0, "passed " + ", ".join(passed) if passed else "no warnings")
     return ["low", "medium", "high"][level], reasons
+
+
+def relative_paths(d: dict, base: Path) -> dict:
+    """Paths inside a result folder are stored relative to it, so results can be moved or committed."""
+    out = dict(d)
+    for key in ("images",):
+        if isinstance(out.get(key), dict):
+            out[key] = {k: _rel(v, base) for k, v in out[key].items()}
+    for key in ("report", "workdir"):
+        if isinstance(out.get(key), str):
+            out[key] = _rel(out[key], base)
+    for f in out.get("fixes", []) or []:
+        after = f.get("after") or {}
+        for k in ("report", "stress_image", "step"):
+            if isinstance(after.get(k), str):
+                after[k] = _rel(after[k], base)
+    return out
+
+
+def absolute_paths(d: dict, base: Path) -> dict:
+    out = dict(d)
+    if isinstance(out.get("images"), dict):
+        out["images"] = {k: (v if k in ("renderer", "error") else _abs(v, base)) for k, v in out["images"].items()}
+    for key in ("report", "workdir"):
+        if isinstance(out.get(key), str) and out[key]:
+            out[key] = _abs(out[key], base)
+    for f in out.get("fixes", []) or []:
+        after = f.get("after") or {}
+        for k in ("report", "stress_image", "step"):
+            if isinstance(after.get(k), str) and after[k]:
+                after[k] = _abs(after[k], base)
+    return out
+
+
+def display_path(p, base) -> str:
+    """Path as shown in summaries: relative to the result folder when it is inside it."""
+    if not base:
+        return str(p)
+    r = _rel(p, Path(base))
+    return r if isinstance(r, str) else str(p)
+
+
+def _rel(p, base: Path):
+    try:
+        return str(Path(p).resolve().relative_to(base.resolve())) or "."
+    except (ValueError, TypeError, OSError):
+        return p
+
+
+def _abs(p, base: Path):
+    if not isinstance(p, str) or not p or Path(p).is_absolute() or "/" not in p and "." not in p:
+        return p
+    return str((base / p).resolve())

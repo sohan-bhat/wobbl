@@ -35,11 +35,13 @@ class GenericOutcome:
         return _jsonable(d)
 
     def save(self, path: str | Path):
-        Path(path).write_text(json.dumps(self.to_dict(), indent=1))
+        from .verify.checks import relative_paths
+        Path(path).write_text(json.dumps(relative_paths(self.to_dict(), Path(path).parent), indent=1))
 
     @classmethod
     def load(cls, path: str | Path) -> "GenericOutcome":
-        d = json.loads(Path(path).read_text())
+        from .verify.checks import absolute_paths
+        d = absolute_paths(json.loads(Path(path).read_text()), Path(path).parent)
         d["checks"] = [Check(**c) for c in d["checks"]]
         d["metrics"] = [tuple(m) for m in d["metrics"]]
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
@@ -52,10 +54,12 @@ class GenericOutcome:
         lines += ["", "Assumptions:"] + [f"  - {a}" for a in self.assumptions]
         if self.fixes:
             lines += ["", "Suggested fixes:"] + [f"  - {f['title']}: {f['summary']}" for f in self.fixes]
+        from .verify.checks import display_path
         if self.images:
-            lines += ["", "Images: " + ", ".join(f"{k}: {v}" for k, v in self.images.items())]
+            lines += ["", "Images: " + ", ".join(f"{k}: {display_path(v, self.workdir)}"
+                                                for k, v in self.images.items())]
         if self.report:
-            lines.append(f"Report: {self.report}")
+            lines.append(f"Report: {display_path(self.report, self.workdir)}")
         return "\n".join(lines)
 
     def write(self, out_dir: str | Path, sections_extra: list[str] | None = None) -> "GenericOutcome":
@@ -82,6 +86,7 @@ class GenericOutcome:
                     self.headline, self.metrics, self.confidence, self.confidence_reasons, sections,
                     f"Solver {self.solver}. Total time {self.t_total:.0f} s.")
         self.report = str(out / "report.html")
+        self.workdir = str(out)
         Path(self.report).write_text(html, encoding="utf-8")
         (out / "summary.txt").write_text(self.text() + "\n", encoding="utf-8")
         self.workdir = str(out)
