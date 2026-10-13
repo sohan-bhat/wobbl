@@ -139,7 +139,7 @@ def _fit_cylinder(pts: np.ndarray, nrm: np.ndarray, w: np.ndarray, verts: np.nda
     radial -= np.outer(radial @ axis, axis)
     radial /= np.maximum(np.linalg.norm(radial, axis=1), 1e-12)[:, None]
     concave = float(np.average(np.einsum("ij,ij->i", radial, nrm), weights=w)) < 0
-    t = q @ axis
+    t = qv @ axis  # extent along the axis from the vertices, which sit on the true edges
     center = center + axis * (0.5 * (t.max() + t.min()))
     sweep = _sweep_angle(radial, axis)
     return axis, center, r, concave, float(t.max() - t.min()), sweep
