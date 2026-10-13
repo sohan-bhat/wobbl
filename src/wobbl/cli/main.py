@@ -354,10 +354,10 @@ def materials():
     from ..materials import all_materials
 
     tb = Table(box=None, header_style="dim", padding=(0, 1))
-    for c in ("key", "name", "E MPa", "limit MPa", "criterion", "density", "k W/mK", "max C"):
+    for c in ("key", "name", "made", "E MPa", "limit MPa", "criterion", "density", "k W/mK", "max C"):
         tb.add_column(c)
     for m in all_materials():
-        tb.add_row(m.key, m.name, f"{m.E:g}", f"{m.allowable:g}", "yield" if m.ductile else "tensile",
+        tb.add_row(m.key, m.name, m.process, f"{m.E:g}", f"{m.allowable:g}", "yield" if m.ductile else "tensile",
                    f"{m.density:g}", f"{m.conductivity:g}", f"{m.max_service_temp:g}")
     ui.console.print(tb)
 

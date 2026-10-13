@@ -27,7 +27,7 @@ wobbl run PART -m MATERIAL --fix SUPPORT --load LOAD [options]
 
 | Option | Meaning |
 |---|---|
-| `-m, --material` | `pla`, `petg`, `abs`, `asa`, `nylon`, `pa12`, `pc`, `hdpe`, `6061-t6`, `7075-t6`, `6063-t5`, `5052-h32`, `mild-steel`, `4140`, `ss304`, `ti-6al-4v`, `copper`, `brass`, `wood`, `plywood`, `fr4`, `li-ion-cell`, or `custom:E=3000,nu=0.35,yield=40,density=1200` (MPa, kg/m3). `pla:yield=40` overrides one property. |
+| `-m, --material` | `pla`, `petg`, `abs`, `asa`, `nylon`, `pa12`, `pc`, `hdpe`, `6061-t6`, `7075-t6`, `6063-t5`, `5052-h32`, `a356-t6`, `mild-steel`, `4140`, `ss304`, `ti-6al-4v`, `copper`, `brass`, `wood`, `plywood`, `fr4`, `li-ion-cell`, or `custom:E=3000,nu=0.35,yield=40,density=1200` (MPa, kg/m3), plus `process=printed`, `molded`, `cast` or `wrought` to say how it is made (that sets the caveats, and the layer strength for prints; the properties you leave out come from the nearest library material made the same way). `pla:yield=40` overrides one property. |
 | `-l, --load` | repeatable, see [loads](#loads) |
 | `-f, --fix` | repeatable, see [supports](#supports) |
 | `--target-sf` | required safety factor (default: the material's, 1.5 for metals, 2.5 for printed plastics) |

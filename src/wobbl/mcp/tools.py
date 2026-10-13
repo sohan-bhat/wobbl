@@ -250,7 +250,7 @@ def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = 
 def list_materials() -> dict:
     from ..materials import all_materials
 
-    return {"materials": [{"key": m.key, "name": m.name, "E_MPa": m.E, "limit_MPa": m.allowable,
+    return {"materials": [{"key": m.key, "name": m.name, "process": m.process, "E_MPa": m.E, "limit_MPa": m.allowable,
                            "criterion": m.criterion, "density_kg_m3": m.density,
                            "conductivity_W_mK": m.conductivity, "max_service_C": m.max_service_temp}
                           for m in all_materials()]}

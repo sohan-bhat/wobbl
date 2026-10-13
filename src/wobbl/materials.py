@@ -14,6 +14,7 @@ solver units.
 from __future__ import annotations
 
 import difflib
+import math
 from dataclasses import dataclass, replace
 
 
@@ -38,6 +39,7 @@ class Material:
     aliases: tuple[str, ...] = ()
     source: str = ""
     notes: str = ""
+    process: str = ""             # how parts are made: printed, molded, cast, wrought, natural, laminated
 
     @property
     def criterion(self) -> str:
@@ -74,61 +76,71 @@ LIBRARY: dict[str, Material] = {m.key: m for m in [
     _M("pla", "PLA (3D printed)", "printed plastic", 3500, 0.36, 1240, 50, 50, 4, 0.13, 1800, 68e-6, 50,
        ductile=False, layer_factor=0.6, recommended_sf=2.5, aliases=("pla+", "polylactic acid"),
        source="Prusament PLA technical data sheet; Ultimaker PLA TDS",
-       notes="Brittle in bending, creeps under sustained load, softens near 55 C."),
+       notes="Brittle in bending, creeps under sustained load, softens near 55 C.", process="printed"),
     _M("petg", "PETG (3D printed)", "printed plastic", 2100, 0.38, 1270, 47, 50, 6, 0.20, 1200, 60e-6, 70,
        layer_factor=0.7, recommended_sf=2.5, aliases=("pet-g", "pet"),
-       source="Prusament PETG technical data sheet"),
+       source="Prusament PETG technical data sheet", process="printed"),
     _M("abs", "ABS (3D printed)", "printed plastic", 2200, 0.35, 1040, 33, 37, 7, 0.17, 1400, 90e-6, 85,
-       layer_factor=0.6, recommended_sf=2.5, source="Ultimaker ABS TDS; Prusament ASA/ABS data"),
+       layer_factor=0.6, recommended_sf=2.5, source="Ultimaker ABS TDS; Prusament ASA/ABS data", process="printed"),
     _M("asa", "ASA (3D printed)", "printed plastic", 2000, 0.35, 1070, 35, 40, 8, 0.17, 1300, 95e-6, 90,
-       layer_factor=0.6, recommended_sf=2.5, source="Prusament ASA technical data sheet"),
+       layer_factor=0.6, recommended_sf=2.5, source="Prusament ASA technical data sheet", process="printed"),
     _M("nylon", "Nylon PA6 (conditioned)", "printed plastic", 1800, 0.39, 1140, 50, 60, 30, 0.25, 1700, 85e-6, 100,
        layer_factor=0.7, recommended_sf=2.5, aliases=("pa6", "pa", "polyamide", "nylon 6"),
        source="BASF Ultramid B3S conditioned; Polymaker PA6 TDS",
-       notes="Absorbs moisture; dry values are stiffer and stronger."),
+       notes="Absorbs moisture; dry values are stiffer and stronger.", process="printed"),
     _M("pa12", "Nylon PA12 (SLS or MJF)", "printed plastic", 1700, 0.39, 1010, 48, 48, 20, 0.22, 1700, 100e-6, 120,
        layer_factor=0.9, recommended_sf=2.0, aliases=("nylon 12", "mjf", "sls nylon"),
-       source="HP 3D High Reusability PA 12 datasheet; EOS PA 2200"),
+       source="HP 3D High Reusability PA 12 datasheet; EOS PA 2200", process="printed"),
     _M("pc", "Polycarbonate", "molded plastic", 2350, 0.37, 1200, 62, 65, 100, 0.20, 1200, 68e-6, 120,
        recommended_sf=2.0, aliases=("polycarbonate", "lexan", "makrolon"),
-       source="Covestro Makrolon 2405 datasheet"),
+       source="Covestro Makrolon 2405 datasheet", process="molded"),
     _M("hdpe", "HDPE", "molded plastic", 1000, 0.42, 955, 26, 30, 500, 0.45, 1900, 120e-6, 80,
-       recommended_sf=2.5, aliases=("polyethylene",), source="MatWeb HDPE injection molded average"),
+       recommended_sf=2.5, aliases=("polyethylene",), source="MatWeb HDPE injection molded average", process="molded"),
     # metals
     _M("6061-t6", "Aluminum 6061-T6", "metal", 68900, 0.33, 2700, 276, 310, 12, 167, 896, 23.6e-6, 150,
        aliases=("6061", "al6061", "aluminum 6061", "aluminium 6061", "aluminum", "aluminium", "al"),
-       source="ASM Aerospace Specification Metals, Aluminum 6061-T6"),
+       source="ASM Aerospace Specification Metals, Aluminum 6061-T6", process="wrought"),
     _M("7075-t6", "Aluminum 7075-T6", "metal", 71700, 0.33, 2810, 503, 572, 11, 130, 960, 23.4e-6, 120,
        aliases=("7075", "al7075", "aluminum 7075", "aluminium 7075"),
-       source="ASM Aerospace Specification Metals, Aluminum 7075-T6"),
+       source="ASM Aerospace Specification Metals, Aluminum 7075-T6", process="wrought"),
     _M("6063-t5", "Aluminum 6063-T5", "metal", 68900, 0.33, 2700, 145, 186, 12, 209, 900, 23.4e-6, 150,
        aliases=("6063", "extrusion"), source="ASM Aerospace Specification Metals, Aluminum 6063-T5",
-       notes="Common for extrusions and heat sinks."),
+       notes="Common for extrusions and heat sinks.", process="wrought"),
     _M("5052-h32", "Aluminum 5052-H32", "metal", 70300, 0.33, 2680, 193, 228, 12, 138, 880, 23.8e-6, 150,
-       aliases=("5052", "sheet aluminum"), source="ASM Aerospace Specification Metals, Aluminum 5052-H32"),
+       aliases=("5052", "sheet aluminum"), source="ASM Aerospace Specification Metals, Aluminum 5052-H32",
+       process="wrought"),
+    _M("a356-t6", "Aluminum A356-T6 (sand cast)", "metal", 72400, 0.33, 2670, 165, 228, 3.5, 151, 963, 21.4e-6,
+       150, recommended_sf=2.0, aliases=("a356", "a356.0", "cast aluminum", "cast aluminium"),
+       source="MatWeb Aluminum A356.0-T6, sand cast; ASM Handbook Vol. 2", process="cast",
+       notes="Castings vary with porosity, so they carry a larger safety factor."),
     _M("mild-steel", "Mild steel (ASTM A36)", "metal", 200000, 0.29, 7850, 250, 400, 20, 51.9, 486, 11.7e-6, 400,
        aliases=("steel", "a36", "1018", "low carbon steel", "carbon steel", "mild steel"),
-       source="ASTM A36 minimum yield; MatWeb A36 typical properties"),
+       source="ASTM A36 minimum yield; MatWeb A36 typical properties", process="wrought"),
     _M("4140", "Steel 4140 (quenched and tempered)", "metal", 205000, 0.29, 7850, 655, 1020, 18, 42.6, 473,
-       12.3e-6, 400, aliases=("4140 steel", "chromoly", "4130"), source="MatWeb AISI 4140 Q&T 650 C"),
+       12.3e-6, 400, aliases=("4140 steel", "chromoly", "4130"), source="MatWeb AISI 4140 Q&T 650 C",
+       process="wrought"),
     _M("ss304", "Stainless steel 304 (annealed)", "metal", 193000, 0.29, 8000, 215, 505, 70, 16.2, 500, 17.3e-6,
        500, aliases=("304", "stainless", "stainless steel", "304 stainless", "ss"),
-       source="ASM Aerospace Specification Metals, AISI 304"),
+       source="ASM Aerospace Specification Metals, AISI 304", process="wrought"),
     _M("ti-6al-4v", "Titanium Ti-6Al-4V", "metal", 113800, 0.34, 4430, 880, 950, 14, 6.7, 526, 8.6e-6, 400,
-       aliases=("titanium", "ti64", "grade 5 titanium"), source="ASM Aerospace Specification Metals, Ti-6Al-4V"),
+       aliases=("titanium", "ti64", "grade 5 titanium"), source="ASM Aerospace Specification Metals, Ti-6Al-4V",
+       process="wrought"),
     _M("copper", "Copper C110", "metal", 115000, 0.31, 8890, 69, 220, 50, 388, 385, 17.0e-6, 200,
-       aliases=("cu", "c110", "c101"), source="Copper Development Association C11000 annealed"),
+       aliases=("cu", "c110", "c101"), source="Copper Development Association C11000 annealed", process="wrought"),
     _M("brass", "Brass C360", "metal", 97000, 0.31, 8500, 310, 385, 25, 115, 380, 20.5e-6, 200,
-       aliases=("c360",), source="Copper Development Association C36000 half hard"),
+       aliases=("c360",), source="Copper Development Association C36000 half hard", process="wrought"),
     # wood and composites
     _M("wood", "Douglas fir (along grain)", "wood", 12400, 0.30, 530, 50, 50, 1, 0.12, 1700, 4e-6, 80,
        ductile=False, recommended_sf=3.0, aliases=("douglas fir", "fir", "pine", "softwood", "lumber"),
        source="USDA Wood Handbook FPL-GTR-282, clear wood at 12 percent moisture (strength reduced from MOR 85 MPa)",
-       notes="Wood is orthotropic; Wobbl models it as isotropic along the grain. Knots and grain run out reduce strength."),
+       notes="Wood is orthotropic; Wobbl models it as isotropic along the grain. Knots and grain run out reduce "
+             "strength.",
+       process="natural"),
     _M("plywood", "Birch plywood", "wood", 8000, 0.30, 680, 35, 35, 1, 0.15, 1700, 6e-6, 80,
-       ductile=False, recommended_sf=3.0, aliases=("baltic birch",), source="Finnish birch plywood handbook, typical"),
+       ductile=False, recommended_sf=3.0, aliases=("baltic birch",), source="Finnish birch plywood handbook, typical",
+       process="natural"),
     _M("fr4", "FR4 (PCB laminate, in plane)", "electronics", 22000, 0.15, 1850, 300, 300, 2, 0.3, 1100, 14e-6, 130,
-       ductile=False, recommended_sf=2.0, aliases=("pcb", "g10"), source="Isola 370HR datasheet"),
+       ductile=False, recommended_sf=2.0, aliases=("pcb", "g10"), source="Isola 370HR datasheet", process="laminated"),
     _M("li-ion-cell", "Li-ion cell (lumped, effective)", "electronics", 5000, 0.3, 2500, 10, 10, 1, 3.0, 950,
        10e-6, 60, ductile=False, aliases=("battery", "18650", "21700", "cell"),
        source="Effective radial properties, Drake et al. J. Power Sources 252 (2014)",
@@ -158,8 +170,8 @@ def get_material(name: str) -> Material:
     k = _clean(name)
     if k in idx:
         return LIBRARY[idx[k]]
-    # tolerate extra words: "printed PETG", "6061-T6 aluminum"
-    for alias, key in sorted(idx.items(), key=lambda kv: -len(kv[0])):
+    # tolerate extra words: "printed PETG", "7075-T6 aluminum" (a grade number beats a generic word like aluminum)
+    for alias, key in sorted(idx.items(), key=lambda kv: (not any(c.isdigit() for c in kv[0]), -len(kv[0]))):
         if len(alias) >= 3 and alias in k:
             return LIBRARY[key]
     close = difflib.get_close_matches(k, list(idx), n=3, cutoff=0.6)
@@ -168,13 +180,24 @@ def get_material(name: str) -> Material:
                    f"custom properties like --material 'custom:E=3000,nu=0.35,yield=40'.")
 
 
+PROCESSES = {"printed": "printed", "3d printed": "printed", "molded": "molded", "moulded": "molded",
+             "injection molded": "molded", "cast": "cast", "casting": "cast", "wrought": "wrought",
+             "machined": "wrought", "rolled": "wrought", "extruded": "wrought", "forged": "wrought",
+             "natural": "natural", "wood": "natural", "laminated": "laminated", "laminate": "laminated"}
+
+
 def parse_custom(spec: str, base: Material | None = None) -> Material:
-    """custom:E=3000,nu=0.35,yield=40,density=1200 (MPa, kg/m3). Unspecified values come from base or PLA."""
+    """custom:E=72400,nu=0.33,yield=165,density=2670,process=cast (MPa, kg/m3).
+
+    ``process`` says how the part is made (printed, molded, cast, wrought, natural or laminated), which sets the
+    caveats a study lists and, for printed parts, the layer strength. Unspecified values come from ``base``, or
+    from the library material closest in stiffness among those made the same way (ordinary stock when no process
+    is given), so a custom aluminum gets an aluminum's density and a custom plastic a plastic's. Custom materials
+    are judged as ductile unless ductile=0.
+    """
     body = spec.split(":", 1)[1] if ":" in spec else spec
     vals: dict = {}
-    if base is None:
-        base = LIBRARY["pla"]
-        vals["ductile"] = True
+    process = None
     keymap = {"e": "E", "nu": "nu", "yield": "yield_strength", "sy": "yield_strength", "uts": "tensile_strength",
               "density": "density", "rho": "density", "k": "conductivity", "cp": "specific_heat",
               "cte": "cte", "tmax": "max_service_temp"}
@@ -186,13 +209,30 @@ def parse_custom(spec: str, base: Material | None = None) -> Material:
         if k == "ductile":
             vals["ductile"] = v.strip().lower() in ("1", "true", "yes")
             continue
+        if k in ("process", "class", "made"):
+            process = PROCESSES.get(v.strip().lower())
+            if process is None:
+                raise KeyError(f"unknown process '{v.strip()}' (use printed, molded, cast, wrought, natural or "
+                               "laminated)")
+            continue
         if k not in keymap:
-            raise KeyError(f"unknown custom material property '{k}' (use {', '.join(keymap)})")
+            raise KeyError(f"unknown custom material property '{k}' (use {', '.join(keymap)}, process, ductile)")
         vals[keymap[k]] = float(v)
     if "yield_strength" in vals and "tensile_strength" not in vals:
         vals["tensile_strength"] = vals["yield_strength"]
-    m = replace(base, key="custom", name="Custom material", aliases=(), source="user supplied", **vals)
-    return m
+    if base is not None:
+        return replace(base, key="custom", name="Custom material", aliases=(), source="user supplied",
+                       **({"process": process} if process else {}), **vals)
+    E = vals.get("E", LIBRARY["pla"].E)
+    # with no process given, nothing special is assumed: the base is ordinary stock, not a print or a casting
+    made = (process,) if process else ("wrought", "molded", "natural", "laminated")
+    pool = [m for m in LIBRARY.values() if m.process in made] or [m for m in LIBRARY.values() if m.process]
+    base = min(pool, key=lambda m: abs(math.log(m.E / E)))
+    vals.setdefault("ductile", True)
+    if process != "printed":
+        vals.setdefault("layer_factor", 1.0)
+    return replace(base, key="custom", name="Custom material" + (f" ({process})" if process else ""), aliases=(),
+                   source=f"user supplied; the rest from {base.name}", process=process or "", notes="", **vals)
 
 
 def resolve_material(spec: str) -> Material:

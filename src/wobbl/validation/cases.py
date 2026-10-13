@@ -154,7 +154,7 @@ PLA_SPEC = "pla"
 def cast_motor_mount(out: Path):
     """Sand cast A356-T6 motor mount, 2 kN belt pull at a pulley off the part, shared by four flange bolts."""
     part = PARTS / "cast_motor_mount.step"
-    o, f = _strength(part, "custom:E=72400,nu=0.33,yield=165",
+    o, f = _strength(part, "custom:E=72400,nu=0.33,yield=165,process=cast",
                      ["2000 N -0.8660254,0,-0.5 at 0,-30,66 @ holes d=6.6"], ["z=min"], out / "run")
     return o.governing_MPa, 124.3, {**_info(o), "max_disp_mm": round(o.max_disp_mm, 4), "reference_disp_mm": 0.266}
 

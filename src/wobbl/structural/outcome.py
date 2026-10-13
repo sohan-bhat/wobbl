@@ -391,6 +391,34 @@ def _sanity(run: StructuralRun, gov: float, allow: float) -> Check:
                  {"diag_mm": diag, "strain": strain, "deflection_ratio": d_rel})
 
 
+PROCESS_CAVEATS = {
+    "cast": "Cast part treated as sound and uniform; porosity or shrinkage in thick sections can lower the real "
+            "strength, which is why castings carry larger safety factors.",
+    "wrought": "Wrought metal treated as isotropic; rolled, drawn or extruded stock is close to it at yield.",
+    "molded": "Molded part treated as isotropic and uniform; weld lines and the area near the gate can be weaker "
+              "than the datasheet.",
+    "natural": "Wood treated as isotropic along the grain; it is far weaker across the grain, and knots and grain "
+               "run out lower the real strength.",
+    "laminated": "Laminate treated with its in plane properties; through the thickness it is far weaker.",
+}
+
+
+def process_caveat(mat, print_direction: str | None = None) -> str:
+    """The assumption that goes with how the part is made: layers for a print, porosity for a casting."""
+    if mat.process == "printed":
+        if print_direction:
+            return (f"Printed layers stack along {print_direction}; pull across layers is judged against "
+                    f"{mat.layer_factor:.0%} of the in-plane strength.")
+        return ("Printed part treated as isotropic at 100% infill; across the layers it is roughly "
+                f"{mat.layer_factor:.0%} as strong. Pass --print-direction to check that.")
+    if mat.process in PROCESS_CAVEATS:
+        return PROCESS_CAVEATS[mat.process]
+    if mat.key == "custom":
+        return ("Custom material treated as isotropic and uniform. Add process=printed, cast, molded or wrought to "
+                "the material for the caveats that go with how the part is made.")
+    return ""
+
+
 def assumptions(run: StructuralRun) -> list[str]:
     st, mat = run.study, run.material
     a = [
@@ -399,13 +427,9 @@ def assumptions(run: StructuralRun) -> list[str]:
         f"({mat.source}).",
         "Loads are static and applied all at once; no impact, vibration or fatigue.",
     ]
-    if mat.category == "printed plastic":
-        if st.print_direction:
-            a.append(f"Printed layers stack along {st.print_direction}; pull across layers is judged against "
-                     f"{mat.layer_factor:.0%} of the in-plane strength.")
-        else:
-            a.append("Printed part treated as isotropic at 100% infill; across the layers it is roughly "
-                     f"{mat.layer_factor:.0%} as strong. Pass --print-direction to check that.")
+    made = process_caveat(mat, st.print_direction)
+    if made:
+        a.append(made)
     if not mat.ductile:
         a.append("Brittle failure: judged by the largest tensile principal stress.")
     kinds = {f.kind for f in st.fixtures}

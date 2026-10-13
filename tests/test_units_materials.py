@@ -71,3 +71,22 @@ def test_internal_units():
     p = get_material("6061-t6").internal()
     assert p["density"] == pytest.approx(2.7e-9)
     assert p["conductivity"] == pytest.approx(167)
+
+
+def test_custom_materials_carry_how_they_are_made():
+    from wobbl.structural.outcome import process_caveat
+
+    cast = resolve_material("custom:E=72400,nu=0.33,yield=165,process=cast")
+    assert cast.process == "cast" and cast.category == "metal" and cast.layer_factor == 1.0
+    assert cast.density == get_material("a356-t6").density          # the rest comes from the nearest cast alloy
+    assert "Cast part" in process_caveat(cast) and "rinted" not in process_caveat(cast)
+    plain = resolve_material("custom:E=72400,nu=0.33,yield=165")   # nothing assumed: not printed, not cast
+    assert plain.process == "" and plain.category == "metal" and "Printed part" not in process_caveat(plain)
+    assert "process=" in process_caveat(plain)
+    printed = resolve_material("custom:E=1800,nu=0.39,yield=48,process=printed")
+    assert printed.layer_factor < 1.0 and "Printed part" in process_caveat(printed)
+    assert "layers stack along z" in process_caveat(get_material("petg"), "z")
+    assert "Wrought" in process_caveat(get_material("6061-t6"))
+    assert "Molded" in process_caveat(get_material("pc"))
+    with pytest.raises(KeyError):
+        resolve_material("custom:E=1000,yield=10,process=welded")
