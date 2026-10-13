@@ -24,7 +24,7 @@
  ],
  "confidence": "high",
  "confidence_reasons": [
-  "passed mesh convergence, hand calculation, units and sanity"
+  "passed mesh convergence, energy balance, hand calculation, units and sanity"
  ],
  "checks": [
   {
@@ -39,6 +39,20 @@
     "last_change": 2.3e-05,
     "tolerance": 0.02,
     "stopped_by": ""
+   }
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "over 60 min, heat in 21.6 kJ, stored 7.98 kJ, out through the surfaces 13.4 kJ (1% apart)",
+   "detail": {
+    "in_J": 21600.0,
+    "held_J": 0.0,
+    "stored_J": 7984.709699,
+    "out_J": 13398.810714,
+    "error": 0.010022,
+    "time_points": 41,
+    "held_faces_J": []
    }
   },
   {
@@ -86,7 +100,7 @@
      18.616107,
      32.456956
     ],
-    "t_solve": 35.76331
+    "t_solve": 25.120384
    },
    {
     "level": 1,
@@ -99,7 +113,7 @@
      18.493078,
      31.823386
     ],
-    "t_solve": 69.810636
+    "t_solve": 65.50935
    }
   ],
   "lumped_C": 72.182464,
@@ -138,6 +152,6 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 122.712054,
+ "t_total": 105.909335,
  "solver": "CalculiX 2.23"
 }

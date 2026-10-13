@@ -1,6 +1,6 @@
 HOT. Hottest point reaches 74.5 C (limit 60 C) at (18.5, 18.5, 31.8) mm after 60 min. It passes 60 C after about 21.1 min.
 
-Confidence: high. passed mesh convergence, hand calculation, units and sanity
+Confidence: high. passed mesh convergence, energy balance, hand calculation, units and sanity
 max temperature: 74.5 C
 limit: 60 C
 power: 6 W
@@ -8,6 +8,7 @@ mesh nodes: 9,610
 
 Checks:
   [pass] mesh convergence: temperature rise at the hottest point settled: 39.5 -> 39.5 C over 2 meshes, last change 0.0%
+  [pass] energy balance: over 60 min, heat in 21.6 kJ, stored 7.98 kJ, out through the surfaces 13.4 kJ (1% apart)
   [pass] hand calculation: lumped model with convection and radiation (Biot 0.012) gives a mean of 72.2 C at the end; FEA mean is 72.8 C (1.6% of the rise)
   [pass] units and sanity: temperatures between 69.5 and 74.5 C
 
