@@ -43,7 +43,7 @@ if (viewer) {
   const loadIn = $('#load'), exagIn = $('#exag'), hatchIn = $('#hatch');
   const listeners = [], resetters = [];
   const part = {
-    loadN: 2000, peak: 123.593, allow: 165, target: 2, defl: 0.265249,
+    loadN: 2000, peak: 123.695, allow: 165, target: 2, defl: 0.2649,
   };
   const current = () => ({ scale: +loadIn.value / part.loadN, exag: +exagIn.value, hatch: hatchIn.checked });
 
@@ -98,7 +98,7 @@ if (viewer) {
 
   // Numbers come from the exported result when it is reachable.
   const base = viewer.dataset.part || 'data/cast-motor-mount';
-  fetch(`${base}.json`).then((r) => r.json()).then((m) => {
+  fetch(`${base}.json?v=${viewer.dataset.v || 1}`).then((r) => r.json()).then((m) => {
     const v = m.variants.distributed;
     Object.assign(part, { loadN: m.load_N, peak: v.governing_MPa, allow: m.allowable_MPa, target: m.target_sf, defl: v.max_disp_mm });
     thresholds();
@@ -124,7 +124,7 @@ if (viewer) {
       onReset: (fn) => resetters.push(fn),
       current,
     };
-    const go = () => import('./viewer.js?v=2').then((m) => m.start(viewer, ui)).catch((err) => {
+    const go = () => import('./viewer.js?v=3').then((m) => m.start(viewer, ui)).catch((err) => {
       console.error(err);
       fallback('The 3D part did not load, so this is the static render Wobbl wrote. Reload the page to try again; the sliders still update the numbers.');
     });

@@ -29,14 +29,14 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
 <link rel="stylesheet" href="styles.css?v=2">
-<link rel="preload" as="image" href="img/cast-mount-stress.webp" imagesrcset="img/cast-mount-stress-800.webp 800w, img/cast-mount-stress.webp 1170w" imagesizes="(min-width: 1000px) 56vw, 100vw">
+<link rel="preload" as="image" href="img/cast-mount-stress.webp?v=2" imagesrcset="img/cast-mount-stress-800.webp?v=2 800w, img/cast-mount-stress.webp?v=2 1170w" imagesizes="(min-width: 1000px) 56vw, 100vw">
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<script type="module" src="app.js?v=2"></script>
+<script type="module" src="app.js?v=3"></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -76,8 +76,8 @@
         <a class="hero-link" href="#install">Read the quick start</a>
       </div>
       <figure class="hero-fig">
-        <img src="img/cast-mount-stress.webp" srcset="img/cast-mount-stress-800.webp 800w, img/cast-mount-stress.webp 1170w" sizes="(min-width: 1000px) 56vw, 100vw" width="1170" height="949" alt="Stress heatmap of a sand cast aluminum motor mount. The hottest spot, labeled 123 MPa, is where the rib tip meets the upright." fetchpriority="high">
-        <figcaption><span class="mono">wobbl run cast_motor_mount.step</span> A356 motor mount, 2&nbsp;kN belt pull through 4 bolts. Peak 123&nbsp;MPa at the rib tip.</figcaption>
+        <img src="img/cast-mount-stress.webp?v=2" srcset="img/cast-mount-stress-800.webp?v=2 800w, img/cast-mount-stress.webp?v=2 1170w" sizes="(min-width: 1000px) 56vw, 100vw" width="1170" height="949" alt="Stress heatmap of a sand cast aluminum motor mount. The hottest spot, labeled 124 MPa, is where the rib tip meets the upright." fetchpriority="high">
+        <figcaption><span class="mono">wobbl run cast_motor_mount.step</span> A356 motor mount, 2&nbsp;kN belt pull through 4 bolts. Peak 124&nbsp;MPa at the rib tip.</figcaption>
       </figure>
     </div>
   </div>
@@ -90,20 +90,20 @@
     <dl class="stats">
       <div class="stat"><dt>trials where the agent alone answered within 15 minutes</dt><dd>1<small> of 10</small></dd></div>
       <div class="stat"><dt>answers on the 2 parts that fail, over 6 trials</dt><dd>0</dd></div>
-      <div class="stat"><dt>the furthest Wobbl landed from the converged reference on those 2 parts</dt><dd>3.4<small>%</small></dd></div>
-      <div class="stat"><dt>Wobbl on the cast motor mount, every check included</dt><dd>3.5<small> min</small></dd></div>
+      <div class="stat"><dt>the furthest Wobbl landed from the converged reference on those 2 parts</dt><dd>0.5<small>%</small></dd></div>
+      <div class="stat"><dt>Wobbl on the cast motor mount, every check included</dt><dd>6.6<small> min</small></dd></div>
     </dl>
     <div class="table-scroll" role="region" aria-labelledby="bakeoff-caption" tabindex="0">
       <table class="data">
         <caption id="bakeoff-caption">Wobbl on the bake-off parts, against references converged by hand over four to six meshes of up to 400,000 nodes. Times are for the whole study on a 2018 six core laptop.</caption>
         <thead><tr><th scope="col">Part</th><th scope="col">Reference</th><th scope="col">Wobbl</th><th scope="col">Off by</th><th scope="col">Wobbl’s confidence</th><th scope="col">Time</th></tr></thead>
         <tbody>
-          <tr><th scope="row">Cast motor mount, 2&nbsp;kN belt pull through 4 bolts</th><td class="num">124.3&nbsp;MPa</td><td class="num">123.9&nbsp;MPa</td><td class="num">0.3%</td><td>medium: the verdict flips if the servo is rigid, and it says so</td><td class="num">3.5&nbsp;min</td></tr>
-          <tr><th scope="row">ABS enclosure shell, 250&nbsp;N near a corner</th><td class="num">93&nbsp;MPa, 1.93&nbsp;mm</td><td class="num">89.8&nbsp;MPa, 1.91&nbsp;mm</td><td class="num">3.4%, 0.9%</td><td>high</td><td class="num">9&nbsp;min</td></tr>
-          <tr><th scope="row">PA12 truss drone arm, 40&nbsp;N thrust and 0.8&nbsp;N m</th><td class="num">11.5&nbsp;MPa, 4.09&nbsp;mm</td><td class="num">11.53&nbsp;MPa, 4.08&nbsp;mm</td><td class="num">0.3%, 0.1%</td><td>high</td><td class="num">12&nbsp;min</td></tr>
-          <tr><th scope="row">PLA bracket, 0.5&nbsp;mm inside corner, wall contact</th><td class="num">about 78&nbsp;MPa</td><td class="num">80.0&nbsp;MPa</td><td class="num">2.6%</td><td>high</td><td class="num">65&nbsp;s</td></tr>
-          <tr><th scope="row">PLA bracket, 6&nbsp;mm fillet, wall contact</th><td class="num">25.3&nbsp;MPa</td><td class="num">25.6&nbsp;MPa</td><td class="num">1.0%</td><td>medium: the bonded screw bore reads 64&nbsp;MPa, excluded and named</td><td class="num">20&nbsp;s</td></tr>
-          <tr><th scope="row">6061 bar arm with root fillet and hole</th><td class="num">165.1&nbsp;MPa</td><td class="num">165.0&nbsp;MPa</td><td class="num">0.1%</td><td>high</td><td class="num">1 to 2&nbsp;min</td></tr>
+          <tr><th scope="row">Cast motor mount, 2&nbsp;kN belt pull through 4 bolts</th><td class="num">124.3&nbsp;MPa</td><td class="num">123.7&nbsp;MPa</td><td class="num">0.5%</td><td>medium: the verdict flips if the servo is rigid, and it says so</td><td class="num">6.6&nbsp;min</td></tr>
+          <tr><th scope="row">ABS enclosure shell, 250&nbsp;N near a corner</th><td class="num">93&nbsp;MPa, 1.93&nbsp;mm</td><td class="num">93.0&nbsp;MPa, 1.92&nbsp;mm</td><td class="num">0.02%, 0.6%</td><td>medium: large deflection theory lowers the peak 11%, and it says so</td><td class="num">6.1&nbsp;min</td></tr>
+          <tr><th scope="row">PA12 truss drone arm, 40&nbsp;N thrust and 0.8&nbsp;N m</th><td class="num">11.5&nbsp;MPa, 4.09&nbsp;mm</td><td class="num">11.49&nbsp;MPa, 4.08&nbsp;mm</td><td class="num">0.1%, 0.3%</td><td>high</td><td class="num">7&nbsp;min</td></tr>
+          <tr><th scope="row">PLA bracket, 0.5&nbsp;mm inside corner, wall contact</th><td class="num">about 78&nbsp;MPa</td><td class="num">80.5&nbsp;MPa</td><td class="num">3.2%</td><td>high</td><td class="num">38&nbsp;s</td></tr>
+          <tr><th scope="row">PLA bracket, 6&nbsp;mm fillet, wall contact</th><td class="num">25.3&nbsp;MPa</td><td class="num">26.4&nbsp;MPa</td><td class="num">4.3%</td><td>medium: the bonded screw bore reads 48.9&nbsp;MPa, excluded and named</td><td class="num">24&nbsp;s</td></tr>
+          <tr><th scope="row">6061 bar arm with root fillet and hole</th><td class="num">165.1&nbsp;MPa</td><td class="num">164.2&nbsp;MPa</td><td class="num">0.5%</td><td>high</td><td class="num">52&nbsp;s</td></tr>
         </tbody>
       </table>
     </div>
@@ -113,12 +113,12 @@
 
 <section id="part" class="section part" aria-labelledby="part-title">
   <div class="wrap">
-    <h2 id="part-title">123&nbsp;MPa at the rib tip. Drag the belt pull until it&nbsp;yields.</h2>
-    <p class="lead">This is the cast mount result Wobbl wrote, exported straight from its result file: 33,462 surface points, each with its stress and displacement. The model is linear elastic, so both scale exactly with the load. Hover or tap the part to read the stress at a point.</p>
+    <h2 id="part-title">124&nbsp;MPa at the rib tip. Drag the belt pull until it&nbsp;yields.</h2>
+    <p class="lead">This is the cast mount result Wobbl wrote, exported straight from its result file: 51,774 surface points, each with its stress and displacement. The model is linear elastic, so both scale exactly with the load. Hover or tap the part to read the stress at a point.</p>
   </div>
   <div class="wrap viewer-grid">
-    <div class="viewer" id="viewer" data-state="poster">
-      <img class="viewer-poster" src="img/cast-mount-stress-800.webp" srcset="img/cast-mount-stress-800.webp 800w, img/cast-mount-stress.webp 1170w" sizes="(min-width: 1000px) 64vw, 100vw" width="1170" height="949" loading="lazy" decoding="async" alt="Static stress heatmap of the cast motor mount, peak 124 MPa at the rib tip.">
+    <div class="viewer" id="viewer" data-state="poster" data-part="data/cast-motor-mount" data-v="3">
+      <img class="viewer-poster" src="img/cast-mount-stress-800.webp?v=2" srcset="img/cast-mount-stress-800.webp?v=2 800w, img/cast-mount-stress.webp?v=2 1170w" sizes="(min-width: 1000px) 64vw, 100vw" width="1170" height="949" loading="lazy" decoding="async" alt="Static stress heatmap of the cast motor mount, peak 124 MPa at the rib tip.">
       <p class="viewer-status" role="status" aria-live="polite">Loading the 3D part…</p>
       <div class="probe" hidden></div>
       <div class="peak-tag" hidden><span class="target" aria-hidden="true"></span><span class="peak-tag-v"></span></div>
@@ -131,15 +131,15 @@
         <p class="verdict-why" id="verdict-why">Survives the load, but the safety factor is below the target of 2.</p>
       </div>
       <dl class="readout">
-        <div><dt>Peak stress</dt><dd><span id="r-peak">123.6</span> MPa</dd></div>
-        <div><dt>Safety factor</dt><dd id="r-sf">1.34</dd></div>
+        <div><dt>Peak stress</dt><dd><span id="r-peak">123.7</span> MPa</dd></div>
+        <div><dt>Safety factor</dt><dd id="r-sf">1.33</dd></div>
         <div><dt>Max deflection</dt><dd><span id="r-defl">0.265</span> mm</dd></div>
         <div><dt>Target</dt><dd>2</dd></div>
       </dl>
       <div class="control">
         <label for="load">Belt pull <output id="load-out" for="load">2,000&nbsp;N</output></label>
         <input type="range" id="load" name="load" autocomplete="off" min="0" max="4000" step="10" value="2000">
-        <p class="hint" id="load-hint">Meets the target up to 1,335&nbsp;N. Yields past 2,670&nbsp;N.</p>
+        <p class="hint" id="load-hint">Meets the target up to 1,334&nbsp;N. Yields past 2,668&nbsp;N.</p>
       </div>
       <div class="control">
         <label for="exag">Shape exaggeration <output id="exag-out" for="exag">60x</output></label>
@@ -153,14 +153,14 @@
         <label class="check"><input type="checkbox" id="hatch" name="hatch" autocomplete="off" checked> Hatch excluded zones</label>
         <button type="button" class="btn-ghost" id="reset-view">Reset view</button>
       </div>
-      <p class="panel-note">White is past yield. Hatched zones sit next to the fixed base or where the load enters; Wobbl reports the stress away from them. Treat the servo as a rigid body instead of a bolt group and the peak moves next to a lower bolt hole, where it converges to 55.5&nbsp;MPa, safety factor 2.97, and the part passes. Wobbl solves both, refines each around its own peak, and marks this answer medium confidence for that reason.</p>
+      <p class="panel-note">White is past yield. Hatched zones sit next to the fixed base or where the load enters; Wobbl reports the stress away from them. Treat the servo as a rigid body instead of a bolt group and the peak moves next to a lower bolt hole, where it converges to 55.0&nbsp;MPa, safety factor 3.00, and the part passes. Wobbl solves both, refines each around its own peak, and marks this answer medium confidence for that reason.</p>
     </div>
   </div>
 </section>
 
 <section id="ask" class="section" aria-labelledby="ask-title">
   <div class="wrap">
-    <h2 id="ask-title">Ask about a printed bracket. Get 52.8&nbsp;MPa and a&nbsp;fix.</h2>
+    <h2 id="ask-title">Ask about a printed bracket. Get 52.3&nbsp;MPa and a&nbsp;fix.</h2>
     <p class="lead">Through the MCP server, your agent inspects the part, picks supports that match the real build, solves, reads the checks before the number and asks for a fix. This is the shelf bracket example, driven through the tools.</p>
     <div class="ask-grid">
       <div class="term transcript">
@@ -169,14 +169,14 @@
           <li class="you"><span class="who">you</span><p>Will this printed PLA shelf bracket hold its share of an 8 kg shelf?</p></li>
           <li class="call"><span class="who">tool</span><p>inspect_geometry("bracket.py")</p></li>
           <li class="call"><span class="who">tool</span><p>solve_structural(path="bracket.py", material="pla", fixtures=["bolt holes d=4.5", "wall x=min"], loads=["40&nbsp;N down @ top and within 12 of 65,12.5,6"])</p></li>
-          <li class="out"><span class="who"></span><p>verdict fails, 52.8&nbsp;MPa on the 0.5&nbsp;mm inside fillet, safety factor 0.95, confidence high</p></li>
+          <li class="out"><span class="who"></span><p>verdict fails, 52.3&nbsp;MPa on the 0.5&nbsp;mm inside fillet, safety factor 0.96, confidence high</p></li>
           <li class="call"><span class="who">tool</span><p>suggest_fix(result_dir, apply=true)</p></li>
-          <li class="out"><span class="who"></span><p>3&nbsp;mm fillet: 24.5&nbsp;MPa (2.04); legs at 10&nbsp;mm: 21.5&nbsp;MPa (2.32); gusset: 10.3&nbsp;MPa (4.84)</p></li>
-          <li class="reply"><span class="who">agent</span><p>It cracks at the inside corner: 52.8&nbsp;MPa against PLA’s 50&nbsp;MPa. A 3&nbsp;mm fillet halves the stress; a gusset brings it to 10.3&nbsp;MPa, safety factor 4.8. The gusset toe is a sharp corner Wobbl excluded as a singularity, so round it too.</p></li>
+          <li class="out"><span class="who"></span><p>3&nbsp;mm fillet: 24.1&nbsp;MPa (2.08); legs at 10&nbsp;mm: 21&nbsp;MPa (2.38); gusset: 9.82&nbsp;MPa (5.09)</p></li>
+          <li class="reply"><span class="who">agent</span><p>It cracks at the inside corner: 52.3&nbsp;MPa against PLA’s 50&nbsp;MPa. A 3&nbsp;mm fillet halves the stress; a gusset brings it to 9.82&nbsp;MPa, safety factor 5.1. The gusset toe is a sharp corner Wobbl excluded as a singularity, so round it too.</p></li>
         </ol>
       </div>
       <figure class="shot">
-        <img src="img/report-bracket.webp" width="1200" height="1387" loading="lazy" decoding="async" alt="The HTML report Wobbl wrote for the bracket: the word FAILS, peak 52.8 MPa, safety factor 0.95, confidence high, and the stress heatmap.">
+        <img src="img/report-bracket.webp?v=2" width="1200" height="1330" loading="lazy" decoding="async" alt="The HTML report Wobbl wrote for the bracket: the word FAILS, peak 52.3 MPa, safety factor 0.96, confidence high, and the stress heatmap.">
         <figcaption>Every run writes a self contained <span class="mono">report.html</span>, a plain <span class="mono">summary.txt</span> an agent can read, <span class="mono">outcome.json</span>, heatmaps and the full field as <span class="mono">result.vtu</span>.</figcaption>
       </figure>
     </div>
@@ -185,31 +185,31 @@
 
 <section id="fix" class="section" aria-labelledby="fix-title">
   <div class="wrap">
-    <h2 id="fix-title">The sharp corner cracks at 52.8&nbsp;MPa. A&nbsp;gusset takes it to&nbsp;10.3.</h2>
+    <h2 id="fix-title">The sharp corner cracks at 52.3&nbsp;MPa. A&nbsp;gusset takes it to&nbsp;9.82.</h2>
     <p class="lead"><code translate="no">wobbl fix --apply</code> edits the part, runs the whole study again for each version and lines up the numbers. Fillets and gussets go into any STEP file through OpenCASCADE, and the edited file is saved for your CAD tool.</p>
     <ol class="fixes">
       <li class="fix" data-verdict="fails">
-        <img src="img/bracket-as-drawn-560.webp" srcset="img/bracket-as-drawn-560.webp 560w, img/bracket-as-drawn.webp 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="781" loading="lazy" decoding="async" alt="Bracket as drawn: a thin red line of stress along the 0.5 mm inside corner, peak 52.8 MPa.">
+        <img src="img/bracket-as-drawn-560.webp?v=2" srcset="img/bracket-as-drawn-560.webp?v=2 560w, img/bracket-as-drawn.webp?v=2 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="777" loading="lazy" decoding="async" alt="Bracket as drawn: a thin red line of stress along the 0.5 mm inside corner, peak 52.3 MPa.">
         <h3>As drawn, 0.5&nbsp;mm corner</h3>
-        <p class="fix-n"><span>52.8&nbsp;MPa</span><span>SF 0.95</span></p>
+        <p class="fix-n"><span>52.3&nbsp;MPa</span><span>SF 0.96</span></p>
         <p class="fix-v">Fails</p>
       </li>
       <li class="fix" data-verdict="marginal">
-        <img src="img/bracket-fillet-560.webp" srcset="img/bracket-fillet-560.webp 560w, img/bracket-fillet.webp 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="781" loading="lazy" decoding="async" alt="Bracket with a 3 mm fillet: the stress spreads over the rounded corner, peak 24.5 MPa.">
+        <img src="img/bracket-fillet-560.webp?v=2" srcset="img/bracket-fillet-560.webp?v=2 560w, img/bracket-fillet.webp?v=2 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="777" loading="lazy" decoding="async" alt="Bracket with a 3 mm fillet: the stress spreads over the rounded corner, peak 24.1 MPa.">
         <h3>3&nbsp;mm fillet</h3>
-        <p class="fix-n"><span>24.5&nbsp;MPa</span><span>SF 2.04</span></p>
+        <p class="fix-n"><span>24.1&nbsp;MPa</span><span>SF 2.08</span></p>
         <p class="fix-v">Marginal</p>
       </li>
       <li class="fix" data-verdict="marginal">
-        <img src="img/bracket-thicken-560.webp" srcset="img/bracket-thicken-560.webp 560w, img/bracket-thicken.webp 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="781" loading="lazy" decoding="async" alt="Bracket with legs thickened to 10 mm: the corner still concentrates stress, peak 21.5 MPa.">
+        <img src="img/bracket-thicken-560.webp?v=2" srcset="img/bracket-thicken-560.webp?v=2 560w, img/bracket-thicken.webp?v=2 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="781" loading="lazy" decoding="async" alt="Bracket with legs thickened to 10 mm: the corner still concentrates stress, peak 21 MPa.">
         <h3>Legs at 10&nbsp;mm</h3>
-        <p class="fix-n"><span>21.5&nbsp;MPa</span><span>SF 2.32</span></p>
+        <p class="fix-n"><span>21&nbsp;MPa</span><span>SF 2.38</span></p>
         <p class="fix-v">Marginal</p>
       </li>
       <li class="fix" data-verdict="holds">
-        <img src="img/bracket-gusset-560.webp" srcset="img/bracket-gusset-560.webp 560w, img/bracket-gusset.webp 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="777" loading="lazy" decoding="async" alt="Bracket with a triangular gusset across the corner: peak 10.3 MPa near the gusset toe.">
+        <img src="img/bracket-gusset-560.webp?v=2" srcset="img/bracket-gusset-560.webp?v=2 560w, img/bracket-gusset.webp?v=2 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="781" loading="lazy" decoding="async" alt="Bracket with a triangular gusset across the corner: peak 9.82 MPa near the gusset toe.">
         <h3>Gusset across the corner</h3>
-        <p class="fix-n"><span>10.3&nbsp;MPa</span><span>SF 4.84</span></p>
+        <p class="fix-n"><span>9.82&nbsp;MPa</span><span>SF 5.09</span></p>
         <p class="fix-v">Holds</p>
       </li>
     </ol>
@@ -223,18 +223,18 @@
     <p class="lead">They set the confidence, high, medium or low, and the reasons are always printed next to it. A result that failed a check is never reported as high confidence.</p>
     <div class="checks-grid">
       <figure class="checks-fig">
-        <img src="img/motor-mount-noribs-800.webp" srcset="img/motor-mount-noribs-800.webp 800w, img/motor-mount-noribs.webp 1200w" sizes="(min-width: 1000px) 44vw, 100vw" width="1200" height="939" loading="lazy" decoding="async" alt="Printed motor mount without ribs. A band of high stress runs along the base of the upright, peak 43.8 MPa, with three spots labeled artifact at the bolt washers and the rigid motor face.">
-        <figcaption>A printed motor mount with its ribs removed. The spots marked artifact sit on idealized rigid supports and climb as the mesh refines, so Wobbl reports 43.8&nbsp;MPa from the fillet instead and lists them.</figcaption>
+        <img src="img/motor-mount-noribs-800.webp?v=2" srcset="img/motor-mount-noribs-800.webp?v=2 800w, img/motor-mount-noribs.webp?v=2 1200w" sizes="(min-width: 1000px) 44vw, 100vw" width="1200" height="939" loading="lazy" decoding="async" alt="Printed motor mount without ribs. A band of high stress runs along the base of the upright, peak 41.3 MPa, with spots labeled artifact where the rigid motor face grabs the part.">
+        <figcaption>A printed motor mount with its ribs removed. The spots marked artifact sit where an idealized rigid motor face grabs the part, so Wobbl reports 41.3&nbsp;MPa from the fillet instead and lists them. That fillet value still moves about 10% between meshes, and the result says so with medium confidence.</figcaption>
       </figure>
       <ul class="checks">
-        <li><h3>Mesh convergence</h3><p>At least three meshes, refined around the peaks that matter, until the stress moves less than 3%.</p><code translate="no">44.2 -> 51.1 -> 53.4 -> 52.8 MPa over 4 meshes</code></li>
-        <li><h3>Force and moment balance</h3><p>Reactions at the supports must cancel the applied loads to 0.5%.</p><code translate="no">reactions balance the loads to 0.00011%</code></li>
-        <li><h3>Hand calculation</h3><p>Beam theory through the critical section gives a nominal stress, and the ratio must be physical.</p><code translate="no">15.2 MPa nominal, a stress concentration of about 3.5</code></li>
-        <li><h3>Singularities</h3><p>Sharp inside corners come from exact CAD normals. Peaks there are excluded and named with their trend.</p><code translate="no">14.8, 20.5, 23.1 MPa and still rising: excluded</code></li>
-        <li><h3>Load introduction</h3><p>Off part loads are solved both rigid and distributed, each converged at its own peak, and the spread is reported.</p><code translate="no">rigid servo: 55.5 MPa over 3 meshes, safety factor 2.97</code></li>
-        <li><h3>Bolt bearing</h3><p>At bolted holes, reaction force over projected area replaces the idealized peak.</p><code translate="no">13.1 N sideways, bearing stress 0.485 MPa</code></li>
+        <li><h3>Mesh convergence</h3><p>At least three meshes, refined around the peaks that matter, until the stress moves less than 3%.</p><code translate="no">43 -> 50.9 -> 53 -> 52.3 MPa over 4 meshes</code></li>
+        <li><h3>Force and moment balance</h3><p>Reactions at the supports must cancel the applied loads to 0.5%.</p><code translate="no">reactions balance the loads to 0.00014%</code></li>
+        <li><h3>Hand calculation</h3><p>Beam theory through the critical section gives a nominal stress, and the ratio must be physical.</p><code translate="no">15.2 MPa nominal, a stress concentration of about 3.4</code></li>
+        <li><h3>Singularities</h3><p>Sharp inside corners come from exact CAD normals. Peaks there are excluded and named with their trend.</p><code translate="no">17.5, 24, 27.7 MPa and still rising: excluded</code></li>
+        <li><h3>Load introduction</h3><p>Off part loads are solved both rigid and distributed, each converged at its own peak, and the spread is reported.</p><code translate="no">rigid servo: 55 MPa over 3 meshes, safety factor 3.00</code></li>
+        <li><h3>Bolt bearing</h3><p>At bolted holes, reaction force over projected area replaces the idealized peak.</p><code translate="no">2.7 N sideways, bearing stress 0.1 MPa</code></li>
         <li><h3>Units and sanity</h3><p>Part size, peak strain and deflection have to be plausible for the material.</p><code translate="no">peak strain 0.015, deflection 2.8% of size</code></li>
-        <li><h3>Large deflection</h3><p>When a part bends a good fraction of its wall, a nonlinear re-solve confirms the linear answer.</p><code translate="no">runs only when the deflection calls for it</code></li>
+        <li><h3>Large deflection</h3><p>When a part bends a good fraction of its wall, a nonlinear re-solve confirms the linear answer.</p><code translate="no">drone arm: the peak moves +2.3%, linear theory holds</code></li>
       </ul>
     </div>
   </div>
@@ -246,7 +246,7 @@
     <p class="lead">Heat answers balance energy and compare with a lumped hand calculation. Circuit answers compare with the textbook and run again at half the time step.</p>
     <div class="bento">
       <article class="cell cell-wide">
-        <img src="img/heat-sink-temperature-800.webp" srcset="img/heat-sink-temperature-800.webp 800w, img/heat-sink-temperature.webp 1200w" sizes="(min-width: 1000px) 40vw, 100vw" width="1200" height="831" loading="lazy" decoding="async" alt="Temperature map of an aluminum heat sink seen from below: 70.3 C under the chip, fading to 67.1 C at the fin tips.">
+        <img src="img/heat-sink-temperature-800.webp?v=2" srcset="img/heat-sink-temperature-800.webp?v=2 800w, img/heat-sink-temperature.webp?v=2 1200w" sizes="(min-width: 1000px) 40vw, 100vw" width="1200" height="835" loading="lazy" decoding="async" alt="Temperature map of an aluminum heat sink seen from below: 70.3 C under the chip, fading to 67.1 C at the fin tips.">
         <div class="cell-text">
           <p class="big">70.3<small> C</small></p>
           <h3>A 15&nbsp;W chip without a fan</h3>
@@ -259,13 +259,13 @@
         <p>On 5&nbsp;V with a 47&nbsp;ohm resistor, it fries. Wobbl suggests 91&nbsp;ohm for about 20&nbsp;mA.</p>
       </article>
       <article class="cell">
-        <img src="img/battery-history-800.webp" srcset="img/battery-history-800.webp 800w, img/battery-history.webp 1200w" sizes="(min-width: 1000px) 30vw, 100vw" width="1200" height="675" loading="lazy" decoding="async" alt="Battery pack temperature over a one hour discharge, crossing the 60 C limit just after 20 minutes.">
+        <img src="img/battery-history-800.webp?v=2" srcset="img/battery-history-800.webp?v=2 800w, img/battery-history.webp?v=2 1200w" sizes="(min-width: 1000px) 30vw, 100vw" width="1200" height="675" loading="lazy" decoding="async" alt="Battery pack temperature over a one hour discharge, crossing the 60 C limit just after 20 minutes.">
         <p class="big">21<small> min</small></p>
         <h3>until a sealed battery pack passes 60&nbsp;C</h3>
         <p>A 2S2P pack making 6&nbsp;W in a 35&nbsp;C box. The lumped model gives a 72.2&nbsp;C mean at one hour; the FEA gives 72.8&nbsp;C.</p>
       </article>
       <article class="cell">
-        <img src="img/buck-waveform-800.webp" srcset="img/buck-waveform-800.webp 800w, img/buck-waveform.webp 1200w" sizes="(min-width: 1000px) 30vw, 100vw" width="1200" height="675" loading="lazy" decoding="async" alt="Output voltage of a buck converter rippling between about 5.068 and 5.077 volts.">
+        <img src="img/buck-waveform-800.webp?v=2" srcset="img/buck-waveform-800.webp?v=2 800w, img/buck-waveform.webp?v=2 1200w" sizes="(min-width: 1000px) 30vw, 100vw" width="1200" height="675" loading="lazy" decoding="async" alt="Output voltage of a buck converter rippling between about 5.068 and 5.077 volts.">
         <p class="big">8.56<small> mV</small></p>
         <h3>of ripple on a 12&nbsp;V to 5&nbsp;V buck</h3>
         <p>At 2&nbsp;A and 500&nbsp;kHz with ngspice. The ideal formula says 7.95&nbsp;mV, and the switch and diode drops explain the gap.</p>
@@ -306,27 +306,27 @@
 <section id="validation" class="section" aria-labelledby="validation-title">
   <div class="wrap">
     <h2 id="validation-title">18 cases with known answers. Every exact one lands within&nbsp;2%.</h2>
-    <p class="lead">Textbook solutions, NAFEMS LE1 and LE10, and five real parts against converged reference models, all through the same pipeline you get. Run them yourself with <code translate="no">wobbl validate</code>, about 7 minutes.</p>
+    <p class="lead">Textbook solutions, NAFEMS LE1 and LE10, and five real parts against converged reference models, all through the same pipeline you get. Run them yourself with <code translate="no">wobbl validate</code>, about 30 minutes.</p>
     <div class="table-scroll" role="region" aria-labelledby="validation-caption" tabindex="0">
       <table class="data validation">
         <caption id="validation-caption">Validation results from docs/validation.md. Every case passed its tolerance.</caption>
         <thead><tr><th scope="col">Case</th><th scope="col">Expected</th><th scope="col">Wobbl</th><th scope="col">Error</th><th scope="col">Confidence</th></tr></thead>
         <tbody>
           <tr class="group"><th colspan="5" scope="rowgroup">Textbook and benchmark strength</th></tr>
-          <tr><th scope="row">Cantilever tip deflection, Timoshenko</th><td class="num">0.8016&nbsp;mm</td><td class="num">0.7957&nbsp;mm</td><td class="num">0.73%</td><td>high</td></tr>
-          <tr><th scope="row">Cantilever stress at mid span, M c / I</th><td class="num">30&nbsp;MPa</td><td class="num">30.06&nbsp;MPa</td><td class="num">0.19%</td><td>high</td></tr>
-          <tr><th scope="row">Plate with a hole, Kirsch with Peterson</th><td class="num">30.35&nbsp;MPa</td><td class="num">29.86&nbsp;MPa</td><td class="num">1.62%</td><td>high</td></tr>
-          <tr><th scope="row">Thick walled pressure vessel, Lame</th><td class="num">231.3&nbsp;MPa</td><td class="num">231.9&nbsp;MPa</td><td class="num">0.27%</td><td>high</td></tr>
-          <tr><th scope="row">NAFEMS LE1 elliptic membrane</th><td class="num">92.7&nbsp;MPa</td><td class="num">92.96&nbsp;MPa</td><td class="num">0.28%</td><td>high</td></tr>
-          <tr><th scope="row">NAFEMS LE10 thick plate</th><td class="num">-5.38&nbsp;MPa</td><td class="num">-5.413&nbsp;MPa</td><td class="num">0.62%</td><td>medium</td></tr>
-          <tr><th scope="row">Round shaft in torsion</th><td class="num">55.13&nbsp;MPa</td><td class="num">55.64&nbsp;MPa</td><td class="num">0.92%</td><td>high</td></tr>
+          <tr><th scope="row">Cantilever tip deflection, Timoshenko</th><td class="num">0.8016&nbsp;mm</td><td class="num">0.7956&nbsp;mm</td><td class="num">0.74%</td><td>high</td></tr>
+          <tr><th scope="row">Cantilever stress at mid span, M c / I</th><td class="num">30&nbsp;MPa</td><td class="num">29.94&nbsp;MPa</td><td class="num">0.21%</td><td>high</td></tr>
+          <tr><th scope="row">Plate with a hole, Kirsch with Peterson</th><td class="num">30.35&nbsp;MPa</td><td class="num">29.89&nbsp;MPa</td><td class="num">1.54%</td><td>high</td></tr>
+          <tr><th scope="row">Thick walled pressure vessel, Lame</th><td class="num">231.3&nbsp;MPa</td><td class="num">232.3&nbsp;MPa</td><td class="num">0.43%</td><td>high</td></tr>
+          <tr><th scope="row">NAFEMS LE1 elliptic membrane</th><td class="num">92.7&nbsp;MPa</td><td class="num">92.92&nbsp;MPa</td><td class="num">0.23%</td><td>high</td></tr>
+          <tr><th scope="row">NAFEMS LE10 thick plate</th><td class="num">-5.38&nbsp;MPa</td><td class="num">-5.412&nbsp;MPa</td><td class="num">0.59%</td><td>medium</td></tr>
+          <tr><th scope="row">Round shaft in torsion</th><td class="num">55.13&nbsp;MPa</td><td class="num">55.6&nbsp;MPa</td><td class="num">0.85%</td><td>high</td></tr>
           <tr><th scope="row">Cantilever under its own weight</th><td class="num">1.443&nbsp;mm</td><td class="num">1.441&nbsp;mm</td><td class="num">0.16%</td><td>high</td></tr>
           <tr class="group"><th colspan="5" scope="rowgroup">Real parts against converged reference models</th></tr>
-          <tr><th scope="row">Cast motor mount, belt pull through 4 bolts</th><td class="num">124.3&nbsp;MPa</td><td class="num">123.9&nbsp;MPa</td><td class="num">0.31%</td><td>medium</td></tr>
-          <tr><th scope="row">ABS enclosure shell pressed near a corner</th><td class="num">93&nbsp;MPa</td><td class="num">89.83&nbsp;MPa</td><td class="num">3.40%</td><td>high</td></tr>
-          <tr><th scope="row">PA12 truss drone arm at full thrust</th><td class="num">11.5&nbsp;MPa</td><td class="num">11.53&nbsp;MPa</td><td class="num">0.25%</td><td>high</td></tr>
-          <tr><th scope="row">PLA shelf bracket, 0.5&nbsp;mm inside corner</th><td class="num">78&nbsp;MPa</td><td class="num">79.99&nbsp;MPa</td><td class="num">2.55%</td><td>high</td></tr>
-          <tr><th scope="row">PLA shelf bracket, 6&nbsp;mm fillet</th><td class="num">25.3&nbsp;MPa</td><td class="num">25.56&nbsp;MPa</td><td class="num">1.03%</td><td>medium</td></tr>
+          <tr><th scope="row">Cast motor mount, belt pull through 4 bolts</th><td class="num">124.3&nbsp;MPa</td><td class="num">123.7&nbsp;MPa</td><td class="num">0.49%</td><td>medium</td></tr>
+          <tr><th scope="row">ABS enclosure shell pressed near a corner</th><td class="num">93&nbsp;MPa</td><td class="num">92.98&nbsp;MPa</td><td class="num">0.02%</td><td>medium</td></tr>
+          <tr><th scope="row">PA12 truss drone arm at full thrust</th><td class="num">11.5&nbsp;MPa</td><td class="num">11.49&nbsp;MPa</td><td class="num">0.11%</td><td>high</td></tr>
+          <tr><th scope="row">PLA shelf bracket, 0.5&nbsp;mm inside corner</th><td class="num">78&nbsp;MPa</td><td class="num">80.48&nbsp;MPa</td><td class="num">3.18%</td><td>high</td></tr>
+          <tr><th scope="row">PLA shelf bracket, 6&nbsp;mm fillet</th><td class="num">25.3&nbsp;MPa</td><td class="num">26.38&nbsp;MPa</td><td class="num">4.26%</td><td>medium</td></tr>
           <tr class="group"><th colspan="5" scope="rowgroup">Heat</th></tr>
           <tr><th scope="row">Slab conduction into convection</th><td class="num">97.67&nbsp;C</td><td class="num">97.67&nbsp;C</td><td class="num">0.00%</td><td>high</td></tr>
           <tr><th scope="row">Aluminum cube cooling in air, lumped</th><td class="num">58.01&nbsp;C</td><td class="num">58.27&nbsp;C</td><td class="num">0.44%</td><td>high</td></tr>

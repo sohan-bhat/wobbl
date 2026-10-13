@@ -64,8 +64,8 @@ function turboTexture() {
   return tex;
 }
 
-async function loadPart(base) {
-  const man = await (await fetch(`${base}.json`)).json();
+async function loadPart(base, version) {
+  const man = await (await fetch(`${base}.json?v=${version}`)).json();
   const v = man.variants.distributed;
   const res = await fetch(new URL(v.file, new URL(`${base}.json`, location.href)));
   if (!res.ok) throw new Error(`part data: HTTP ${res.status}`);
@@ -111,7 +111,7 @@ function arrow(color) {
 export async function start(root, ui) {
   const status = root.querySelector('.viewer-status');
   status.textContent = 'Loading the 3D part (540 KB)…';
-  const P = await loadPart(root.dataset.part || 'data/cast-motor-mount');
+  const P = await loadPart(root.dataset.part || 'data/cast-motor-mount', root.dataset.v || 1);
   const { man, v } = P;
   const n = v.vertices;
 
