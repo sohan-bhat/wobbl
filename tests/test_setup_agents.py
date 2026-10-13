@@ -1,7 +1,12 @@
 import json
+import re
+import shlex
 
+import click
 import pytest
+from click.testing import CliRunner
 
+from wobbl.cli.main import cli
 from wobbl.setup import agents, installer
 
 
@@ -56,3 +61,20 @@ def test_install_plan_covers_every_platform():
         assert has_spice or "ngspice" in p["unavailable"]
     assert installer.plan("osx-arm64")["env_x86"]
     assert "ngspice" in installer.plan("linux-aarch64")["unavailable"]
+
+
+def test_setup_ends_with_real_next_steps(homes):
+    """The last line of setup names commands that exist. It used to suggest 'wobbl examples', which does not."""
+    r = CliRunner().invoke(cli, ["setup", "--no-solvers", "--agents", "none"])
+    assert r.exit_code == 0, r.output
+    text = " ".join(r.output.split())
+    assert "wobbl examples" not in text
+    assert text.startswith("Next, run wobbl doctor to check every piece")
+    suggested = re.findall(r'wobbl (?:"[^"]+"|\S+(?: "[^"]+")?)', text)
+    assert len(suggested) == 3, suggested
+    for cmd in suggested:
+        args = shlex.split(cmd)[1:]
+        root = click.Context(cli, info_name="wobbl")
+        name, sub, rest = cli.resolve_command(root, args)
+        sub.make_context(name, list(rest), parent=root)   # parses without running
+    assert any("LED" in s for s in suggested)           # the no file question from the first run guide

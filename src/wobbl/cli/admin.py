@@ -9,6 +9,11 @@ import click
 from .. import __version__
 from . import ui
 
+# what setup suggests last: check the install, then the no file question the first run guide starts with
+NEXT_STEP = ("Next, run [bold]wobbl doctor[/bold] to check every piece, then ask a first question that needs no "
+             "files with [bold]wobbl \"will a blue LED on 5V with a 47 ohm resistor fry?\"[/bold], or point it at "
+             "a part of your own with [bold]wobbl part.step \"will it hold 200 N?\"[/bold]")
+
 
 @click.command()
 @click.option("--agents", default="detected",
@@ -64,8 +69,7 @@ def setup(agents, no_agents, no_solvers, only, project, force, dry_run):
                 r.project_rules(Path.cwd())
             ui.console.print("  [dim]backups of changed files are in ~/.wobbl/backups; undo with "
                              "'wobbl uninstall'[/dim]")
-    ui.console.print("\n  next: [bold]wobbl doctor[/bold], then try [bold]wobbl examples[/bold] or "
-                     "[bold]wobbl part.step \"will it hold 200 N?\"[/bold]\n")
+    ui.console.print(f"\n  {NEXT_STEP}\n")
 
 
 @click.command()

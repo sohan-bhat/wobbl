@@ -77,4 +77,6 @@ as you point `WOBBL_CCX` at it. To keep everything somewhere other than `~/.wobb
 
 `wobbl doctor` lists every piece with `ok`, `missing`, `off` or `planned` next to it, which
 [wobbl doctor](/guides/cli/doctor/) explains line by line. If a solver shows as missing,
-running `wobbl setup` again usually fixes it, and `wobbl setup --force` starts over.
+running `wobbl setup` again usually fixes it, and `wobbl setup --force` starts over. Setup
+itself ends by pointing you at `wobbl doctor` and then at the LED question that
+[First run](/get-started/first-run/) begins with, which needs no files.
