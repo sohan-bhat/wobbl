@@ -97,3 +97,30 @@ def test_remote_load_reports_attachment_spread(parts, tmp_path):
     o = analyze_strength(st, tmp_path / "out", render=False, fixes=False)
     lp = next(c for c in o.checks if c.name == "load introduction")
     assert lp.status in ("pass", "info", "warn") and "rigid attachment" in lp.summary
+    d = lp.detail
+    assert d["alternative_levels"] and d["alternative_peak"] == pytest.approx(d["alternative_levels"][-1]["governing"])
+    assert d["refined"] == bool(d["refine_reason"])
+
+
+@needs_ccx
+def test_load_attachment_variant_converges_at_its_own_peak(parts, tmp_path, monkeypatch):
+    """When the other attachment needs it, the check refines that variant around its own peak and reports
+    the same convergence evidence as the main study."""
+    from wobbl.structural import run as run_mod
+    from wobbl.structural.pipeline import analyze_strength
+    from wobbl.structural.spec import StructuralStudy, parse_fixture, parse_load
+
+    monkeypatch.setattr(run_mod, "variant_needs_refinement", lambda *a: "forced by the test")
+    st = StructuralStudy(parts["mount"], "6061-t6", [parse_load("200 N -z at 30,20,40 @ holes d=4.5")],
+                         [parse_fixture("bottom")], quality="fast", budget=300)
+    o = analyze_strength(st, tmp_path / "out", render=False, fixes=False)
+    c = next(c for c in o.checks if c.name == "load introduction")
+    d = c.detail
+    assert d["refined"] and d["refine_reason"] == "forced by the test"
+    lv = d["alternative_levels"]
+    assert len(lv) >= 2 and lv[1]["n_nodes"] > lv[0]["n_nodes"]
+    assert d["alternative_peak"] == pytest.approx(lv[-1]["governing"])
+    if d["converged"]:
+        assert f"over {len(lv)} meshes refined around that peak" in c.summary
+    else:
+        assert "did not converge" in c.summary and "not a result" in c.summary
