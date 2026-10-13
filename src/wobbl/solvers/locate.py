@@ -52,7 +52,7 @@ def tool_env(tool: Path, threads: int | None = None) -> dict[str, str]:
         prefix = root.parent if root.name.lower() == "library" else root
         extra += [str(prefix / "Library" / "bin"), str(prefix / "Library" / "mingw-w64" / "bin"), str(prefix)]
     env["PATH"] = os.pathsep.join(extra + [env.get("PATH", "")])
-    n = str(threads or min(8, os.cpu_count() or 1))
+    n = str(threads or min(4, os.cpu_count() or 1))
     for k in ("OMP_NUM_THREADS", "CCX_NPROC_EQUATION_SOLVER", "CCX_NPROC_RESULTS", "CCX_NPROC_STIFFNESS",
               "OPENBLAS_NUM_THREADS"):
         env.setdefault(k, n)
