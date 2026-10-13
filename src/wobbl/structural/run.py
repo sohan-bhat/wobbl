@@ -19,6 +19,7 @@ from ..mesh.mesher import (Mesh, MeshError, Refinement, Sizing, auto_sizing, bui
                            requested_size)
 from ..solvers.base import SolverError
 from ..solvers import base as solvers
+from .budget import Budget, mesh_cost, solve_cost
 from .build import BuiltModel, build_static
 from .hotspots import Hotspot, ZoneMap, classify, find_hotspots, track
 from .spec import SpecError, StructuralStudy
@@ -208,6 +209,7 @@ def describe_part(path: str, workdir: str | Path, scale: float = 1.0, body: int 
 def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progress | None = None,
                    pre: tuple | None = None) -> StructuralRun:
     t_start = time.time()
+    budget = Budget(study.budget, t_start)
     work = Path(workdir)
     work.mkdir(parents=True, exist_ok=True)
     q = QUALITY.get(study.quality, QUALITY["normal"])
@@ -239,7 +241,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
     if any(fx.kind == "wall" for fx, _ in fixtures):
         _say(progress, "contact", "finding where the part presses on its wall support (coarse pre-solve)")
         wall_warm = _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter,
-                                      work / "contact")
+                                      work / "contact", budget)
     for lv in range(levels_max):
         try:
             _say(progress, "mesh", f"level {lv}: meshing (element size {sizing.h:.3g} mm)")
@@ -253,6 +255,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
                     if r.corners_only:
                         r.size *= factor
                 _say(progress, "mesh", f"level 0 had {mesh.n_nodes:,} nodes; coarsening to {sizing.h:.3g} mm")
+                budget.charge(mesh_cost(mesh.n_nodes))
                 mesh = build_mesh(prep, sizing)
             if lv == 0 and mesh.n_nodes > 2 * q["nodes"]:
                 notes.append(f"Thin walls need a large first mesh ({mesh.n_nodes:,} nodes), so this study takes longer "
@@ -261,8 +264,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
             built = build_static(mesh, loads, fixtures, material, features.faces)
             _say(progress, "solve", f"level {lv}: solving {mesh.n_nodes:,} nodes with {adapter.name}")
             res, wall_iters, wall_warm = _solve(adapter, built, work / f"level{lv}", wall_warm,
-                                                timeout=None if lv == 0 else
-                                                max(120.0, 1.5 * study.budget - (time.time() - t_start)))
+                                                timeout=None if lv == 0 else budget.timeout())
         except (MeshError, SolverError, IsolatedTimeout, IsolatedCrash) as e:
             if lv == 0:
                 raise
@@ -279,26 +281,27 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         spots = _update_spots(spots, lv, mesh, measure, zmap, features, prep)
         excluded = zmap.excluded_mask(mesh.X, r_ex)
         levels.append(_record_level(lv, mesh, sizing, res, built, measure, excluded, wall_iters))
+        budget.charge_level(mesh.n_nodes, wall_iters)
         last = (mesh, res, built, measure, mname, excluded)
         if lv == 0:
             first = (built, levels[0].governing, levels[0].max_disp, excluded)
         classify(spots, tol)
         _say(progress, "check", f"level {lv}: governing {levels[-1].governing:.4g} MPa"
                                 + (f" ({_pct(levels)} change)" if lv else ""))
-        stopped_by = _stop_reason(levels, spots, tol, 2 if study.quality == "fast" else 3, levels_max, q,
-                                  study.budget, time.time() - t_start)
+        stopped_by = _stop_reason(levels, spots, tol, 2 if study.quality == "fast" else 3, levels_max, q, budget)
         if stopped_by:
             break
         sizing = _refine(sizing, spots, levels, tol, lv, features)
     mesh, res, built, measure, mname, excluded = last
-    if time.time() - t_start < study.budget:
-        nonlinear = _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work,
-                                            progress)
-    else:
-        nonlinear = None if levels[-1].max_disp < 0.3 * features.thickness_min else {"error": "time budget used up"}
+    if stopped_by == "clock limit":
+        notes.append("Refinement stopped at the wall clock backstop (three times the budget): this machine ran "
+                     "slower than the budget's cost model, so here the level reached depends on the machine. A "
+                     "longer --budget reaches a finer mesh.")
+    nonlinear = _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work,
+                                        progress, budget)
     load_path = _load_path_check(adapter, study, q, prep, sizing, mesh, loads, fixtures, material, features,
                                  print_axis, r_ex, tol, work, progress, levels[-1],
-                                 _governing_spot(spots, levels[-1].governing_xyz), t_start)
+                                 _governing_spot(spots, levels[-1].governing_xyz), budget)
     run = StructuralRun(study, material, prep, features, sel_info, levels, spots, mesh, res, built, mname,
                         measure, excluded, r_ex, work, tol, stopped_by, time.time() - t_start, notes, nonlinear,
                         load_path)
@@ -363,18 +366,24 @@ def _record_level(lv: int, mesh: Mesh, sizing: Sizing, res: StaticResult, built:
 
 
 def _stop_reason(levels: list[Level], spots: list[Hotspot], tol: float, min_levels: int, levels_max: int, q: dict,
-                 budget: float, elapsed: float) -> str:
-    """Why refinement stops after the latest level, or an empty string to refine again."""
+                 budget: Budget) -> str:
+    """Why refinement stops after the latest level, or an empty string to refine again.
+
+    Every rule but the last depends only on the meshes and the answers, so a study stops at the same level on
+    every run. The wall clock backstop catches a machine far slower than the budget's cost model.
+    """
     L = levels[-1]
     if len(levels) >= 2 and _converged(levels, spots, tol, min_levels):
         return "converged"
     if len(levels) >= levels_max:
         return "level limit"
-    if elapsed + L.t_solve * 2.6 + L.t_mesh * 2 > budget:
+    if not budget.next_level_fits(L.n_nodes):
         return "time budget"
     growth = L.n_nodes / levels[-2].n_nodes if len(levels) > 1 else 1.25
     if L.n_nodes * max(growth, 1.15) > q["max_nodes"]:
         return "node limit"
+    if budget.clock_ran_out():
+        return "clock limit"
     return ""
 
 
@@ -464,21 +473,31 @@ def _peak_refinement(mesh: Mesh, spots: list[Hotspot], xyz) -> list[Refinement]:
     return [Refinement(0.5 * h, points=[tuple(xyz)], radius=2.5 * h, grow=3 * h, label="governing point")]
 
 
-def _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work, progress):
+NLGEOM_SOLVES = 20   # modeled linear solves in a large deflection re-solve (load increments times iterations)
+
+
+def _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work, progress,
+                            budget: Budget):
     """When the part deflects a good fraction of its wall thickness, linear theory misses membrane
     stiffening and changing geometry. Re-solve the first mesh with geometric nonlinearity and report
-    how much the peak and the deflection move."""
+    how much the peak and the deflection move.
+
+    Whether it runs is decided from the modeled cost, never by a timeout, which would make the check pass on
+    one run and go missing on the next. The wall clock limit is only a backstop for a stalled solve.
+    """
     built, lin_peak, lin_disp, excluded = first
     d = levels[-1].max_disp
     if built.walls or (d < 0.3 * features.thickness_min and d < 0.03 * prep.diag):
         return None
+    cost = NLGEOM_SOLVES * solve_cost(levels[0].n_nodes)
+    if budget.spent + cost > 1.5 * budget.seconds:
+        return {"error": "time budget used up"}
     _say(progress, "check", f"deflection {d:.3g} mm is large next to the {features.thickness_min:.3g} mm wall; "
                             "re-solving with large deflection theory")
-    # a nonlinear solve factorizes the matrix at every load increment; cap it so the check never
-    # dominates the study
-    limit = max(90.0, min(240.0, 15.0 * levels[0].t_solve))
+    budget.charge(cost)
     try:
-        res = adapter.solve_static(built.model, work / "nlgeom", nlgeom=True, timeout=limit)
+        res = adapter.solve_static(built.model, work / "nlgeom", nlgeom=True,
+                                   timeout=max(budget.timeout(), 4 * cost))
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)[:200]}
     m, _ = failure_measure(res, material, print_axis)
@@ -503,7 +522,7 @@ def variant_needs_refinement(primary: Level, variant: Level, primary_spot: Hotsp
 
 
 def _load_path_check(adapter, study, q, prep, sizing, mesh, loads, fixtures, material, features, print_axis, r_ex,
-                     tol, work, progress, primary: Level, primary_spot: Hotspot | None, t_start):
+                     tol, work, progress, primary: Level, primary_spot: Hotspot | None, budget: Budget):
     """Loads that act off the part (a belt pull at a pulley, thrust on a motor) can enter it through a rigid
     attachment or spread over the faces. The two idealizations can give very different peaks, so solve the
     other one too and report the spread.
@@ -517,7 +536,7 @@ def _load_path_check(adapter, study, q, prep, sizing, mesh, loads, fixtures, mat
     remote = [i for i, (ld, _) in enumerate(loads) if ld.kind in ("remote", "moment")]
     if not remote or any(fx.kind == "wall" for fx, _ in fixtures):
         return None
-    if time.time() - t_start > 1.3 * study.budget:
+    if budget.spent > 1.3 * budget.seconds:
         return {"skipped": "time budget"}
     alt = []
     for i, (ld, sel) in enumerate(loads):
@@ -529,7 +548,7 @@ def _load_path_check(adapter, study, q, prep, sizing, mesh, loads, fixtures, mat
     _say(progress, "check", f"re-solving with a {other} load attachment to see how much the answer depends on it")
     try:
         out = _converge_variant(adapter, study, q, prep, sizing, mesh, alt, fixtures, material, features,
-                                print_axis, r_ex, tol, work / "load_path", progress, primary, primary_spot, t_start,
+                                print_axis, r_ex, tol, work / "load_path", progress, primary, primary_spot, budget,
                                 other)
     except Exception as e:  # noqa: BLE001  the comparison is a bonus, never a reason to fail
         return {"error": str(e)[:200]}
@@ -537,7 +556,8 @@ def _load_path_check(adapter, study, q, prep, sizing, mesh, loads, fixtures, mat
 
 
 def _converge_variant(adapter, study, q, prep, sizing, mesh, loads, fixtures, material, features, print_axis, r_ex,
-                      tol, work, progress, primary: Level, primary_spot: Hotspot | None, t_start, label: str) -> dict:
+                      tol, work, progress, primary: Level, primary_spot: Hotspot | None, budget: Budget,
+                      label: str) -> dict:
     """Solve a variant of the study on the final mesh, then refine around its own peaks until they settle."""
     levels_max = min(study.max_levels, q["levels"])
     target = study.target_sf or material.recommended_sf
@@ -550,9 +570,7 @@ def _converge_variant(adapter, study, q, prep, sizing, mesh, loads, fixtures, ma
                 _say(progress, "check", f"{label} attachment, level {lv}: meshing (element size {sizing.h:.3g} mm)")
                 mesh = build_mesh(prep, sizing)
             built = build_static(mesh, loads, fixtures, material, features.faces)
-            res, _, _ = _solve(adapter, built, work / f"level{lv}", None,
-                               timeout=None if lv == 0 else
-                               max(120.0, 1.5 * study.budget - (time.time() - t_start)))
+            res, _, _ = _solve(adapter, built, work / f"level{lv}", None, timeout=None if lv == 0 else budget.timeout())
         except Exception as e:  # noqa: BLE001  a failed refinement keeps the last finished level
             if lv == 0:
                 raise
@@ -563,6 +581,7 @@ def _converge_variant(adapter, study, q, prep, sizing, mesh, loads, fixtures, ma
                        find_sharp_corners(mesh, faces=features.faces, tangent=features.tangent_pairs))
         spots = _update_spots(spots, lv, mesh, measure, zmap, features, prep)
         levels.append(_record_level(lv, mesh, sizing, res, built, measure, zmap.excluded_mask(mesh.X, r_ex)))
+        budget.charge_level(mesh.n_nodes, meshed=lv > 0)
         classify(spots, tol)
         if lv == 0:
             why = variant_needs_refinement(primary, levels[0], primary_spot, material.allowable, target)
@@ -571,8 +590,7 @@ def _converge_variant(adapter, study, q, prep, sizing, mesh, loads, fixtures, ma
                 break
         _say(progress, "check", f"{label} attachment, level {lv}: governing {levels[-1].governing:.4g} MPa"
                                 + (f" ({_pct(levels)} change)" if lv else f" ({why}, refining around it)"))
-        stopped_by = _stop_reason(levels, spots, tol, 2 if study.quality == "fast" else 3, levels_max, q,
-                                  study.budget, time.time() - t_start)
+        stopped_by = _stop_reason(levels, spots, tol, 2 if study.quality == "fast" else 3, levels_max, q, budget)
         if stopped_by:
             break
         # lv + 1: only the variant's governing stress is reported, so its idealized zone peaks are not chased
@@ -588,7 +606,7 @@ def _converge_variant(adapter, study, q, prep, sizing, mesh, loads, fixtures, ma
             "stopped_by": stopped_by, "tolerance": tol}
 
 
-def _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter, workdir):
+def _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter, workdir, budget: Budget):
     """Find the contact patch on a coarse linear mesh, where each iteration costs a fraction of a second.
 
     The patch shape depends on the overall stiffness of the part, which a coarse mesh captures well;
@@ -598,7 +616,8 @@ def _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter
     try:
         mesh = build_mesh(prep, coarse)
         built = build_static(mesh, loads, fixtures, material, features.faces)
-        _, _, warm = _solve(adapter, built, workdir, None)
+        _, iters, warm = _solve(adapter, built, workdir, None)
+        budget.charge_level(mesh.n_nodes, iters)
         return warm
     except Exception:  # noqa: BLE001  the pre-solve is only a head start
         return None

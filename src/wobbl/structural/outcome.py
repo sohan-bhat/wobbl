@@ -238,7 +238,7 @@ def evaluate(run: StructuralRun) -> Outcome:
                                                         f"large deflection solve did not finish ({nl['error']})"))
 
     level, reasons = confidence(checks, extra)
-    if run.stopped_by in ("time budget", "node limit") and checks[0].status != "pass":
+    if run.stopped_by in ("time budget", "node limit", "clock limit") and checks[0].status != "pass":
         reasons.append(f"refinement stopped by the {run.stopped_by}")
     mass = float(model.density * mesh.volume() * 1000.0)  # t -> kg
     head = _headline(verdict, gov, sf, target, mat, where, imperial, level)

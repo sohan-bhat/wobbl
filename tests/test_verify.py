@@ -60,21 +60,44 @@ def test_variant_refines_when_verdict_flips_or_peak_moves():
     assert "away" in variant_needs_refinement(main, _level(115.0, (41, 9.5, 81)), None, 165, 2)
 
 
+def _budget(spent, seconds=600.0, clock=0.0):
+    import time
+
+    from wobbl.structural.budget import Budget
+
+    return Budget(seconds, time.time() - clock, spent)
+
+
 def test_stop_reason_matches_the_main_loop_rules():
     from wobbl.structural.run import QUALITY, _stop_reason
 
     q, p = QUALITY["normal"], (0, 0, 0)
     one = [_level(50.0, p)]
-    assert _stop_reason(one, [], 0.03, 3, 4, q, 600, 100) == ""
-    assert _stop_reason(one, [], 0.03, 3, 4, q, 600, 590) == "time budget"
+    assert _stop_reason(one, [], 0.03, 3, 4, q, _budget(100)) == ""
+    assert _stop_reason(one, [], 0.03, 3, 4, q, _budget(590)) == "time budget"
     two = [_level(50.0, p), _level(50.5, p, n=60000)]
-    assert _stop_reason(two, [], 0.03, 3, 4, q, 600, 100) == ""        # two meshes are not enough evidence
+    assert _stop_reason(two, [], 0.03, 3, 4, q, _budget(100)) == ""        # two meshes are not enough evidence
     three = two + [_level(50.6, p, n=70000)]
-    assert _stop_reason(three, [], 0.03, 3, 4, q, 600, 100) == "converged"
+    assert _stop_reason(three, [], 0.03, 3, 4, q, _budget(100)) == "converged"
     moving = [_level(40.0, p), _level(45.0, p, n=60000), _level(50.0, p, n=70000), _level(55.0, p, n=80000)]
-    assert _stop_reason(moving, [], 0.03, 3, 4, q, 600, 100) == "level limit"
-    assert _stop_reason(moving[:2], [], 0.03, 3, 4, q, 600, 100) == ""
-    assert _stop_reason([_level(50.0, p, n=240000)], [], 0.03, 3, 4, q, 600, 100) == "node limit"
+    assert _stop_reason(moving, [], 0.03, 3, 4, q, _budget(100)) == "level limit"
+    assert _stop_reason(moving[:2], [], 0.03, 3, 4, q, _budget(100)) == ""
+    assert _stop_reason([_level(50.0, p, n=240000)], [], 0.03, 3, 4, q, _budget(100)) == "node limit"
+
+
+def test_the_clock_never_decides_the_level_reached():
+    """A busy or slow machine runs longer, but the study stops at the same level: the budget is spent by the
+    modeled cost of each mesh. Only a run past three times its budget is stopped by the clock."""
+    from wobbl.structural.budget import Budget, mesh_cost, solve_cost
+    from wobbl.structural.run import QUALITY, _stop_reason
+
+    q, one = QUALITY["normal"], [_level(50.0, (0, 0, 0), t=400.0)]
+    assert _stop_reason(one, [], 0.03, 3, 4, q, _budget(100, clock=1500)) == ""
+    assert _stop_reason(one, [], 0.03, 3, 4, q, _budget(100, clock=1900)) == "clock limit"
+    b = Budget(600)
+    b.charge_level(50000, solves=3)
+    assert b.spent == pytest.approx(mesh_cost(50000) + 3 * solve_cost(50000))
+    assert solve_cost(100000) > 2 * solve_cost(50000)   # direct solves grow faster than the mesh
 
 
 def _variant(values, converged, refined=True, stopped_by="converged"):
