@@ -319,6 +319,14 @@ def materials():
     ui.console.print(tb)
 
 
+@cli.command()
+def mcp():
+    """Run the MCP server on stdio (agents start this; 'wobbl setup' registers it)."""
+    from ..mcp.server import main as serve
+
+    serve()
+
+
 def _register():
     from .admin import doctor, setup, uninstall
 
