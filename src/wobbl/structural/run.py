@@ -313,8 +313,11 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
             break
         sizing = _refine(sizing, spots, levels, tol, lv, features)
     mesh, res, built, measure, mname, excluded = last
-    nonlinear = _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work,
-                                        progress)
+    if time.time() - t_start < study.budget:
+        nonlinear = _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work,
+                                            progress)
+    else:
+        nonlinear = None if levels[-1].max_disp < 0.3 * features.thickness_min else {"error": "time budget used up"}
     load_path = _load_path_check(adapter, study, mesh, loads, fixtures, material, features, print_axis, r_ex,
                                  work, progress, levels[-1].governing, t_start)
     run = StructuralRun(study, material, prep, features, sel_info, levels, spots, mesh, res, built, mname,
@@ -429,7 +432,7 @@ def _large_deflection_check(adapter, first, levels, features, prep, material, pr
                             "re-solving with large deflection theory")
     # a nonlinear solve factorizes the matrix at every load increment; cap it so the check never
     # dominates the study
-    limit = max(120.0, min(420.0, 25.0 * levels[0].t_solve))
+    limit = max(90.0, min(240.0, 15.0 * levels[0].t_solve))
     try:
         res = adapter.solve_static(built.model, work / "nlgeom", nlgeom=True, timeout=limit)
     except Exception as e:  # noqa: BLE001
