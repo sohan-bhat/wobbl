@@ -65,7 +65,7 @@ export function term(code: string, lang = 'sh', label?: string): string {
   }
   const out = lang === 'text';
   const button = out ? '' :
-    `<button class="copy" type="button" data-copy="${esc(copy.join('\n')).replace(/\n/g, '&#10;')}" aria-label="Copy: ${esc(name)}">Copy</button>`;
+    `<button class="copy" type="button" data-copy="${esc(copy.join('\n')).replace(/\n/g, '&#10;')}" aria-label="Copy the ${esc(name)} block">Copy</button>`;
   return `<div class="term${out ? ' term-out' : ''}" data-copy-block><div class="term-bar"><span>${esc(name)}</span>${button}</div>`
     + `<pre translate="no"${out ? ' tabindex="0"' : ''}><code>${lines.join('')}</code></pre></div>\n`;
 }

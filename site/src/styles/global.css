@@ -419,7 +419,7 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 }
 @media (max-width: 999px) {
   .docnav {
-    position: fixed; z-index: 41; inset: 0 auto 0 0; width: min(320px, 86vw); overflow-y: auto; padding: 16px;
+    position: fixed; z-index: 41; inset: 0 auto 0 0; width: min(320px, 86vw); overflow-y: auto; overscroll-behavior: contain; padding: 16px;
     background: var(--bg-2); border-right: 1px solid var(--line-2);
     transform: translateX(-100%); visibility: hidden; transition: transform 180ms ease-out, visibility 0s linear 180ms;
   }
@@ -462,7 +462,7 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .cards-t { color: var(--fg); font-weight: 650; font-size: 1.02rem; }
 
 /* Search, with Pagefind's interface themed to the site */
-.search { width: min(720px, calc(100vw - 32px)); max-height: min(80vh, 760px); margin: 10vh auto auto; padding: 0; background: var(--bg-2); color: var(--fg-2); border: 1px solid var(--line-2); }
+.search { overscroll-behavior: contain; width: min(720px, calc(100vw - 32px)); max-height: min(80vh, 760px); margin: 10vh auto auto; padding: 0; background: var(--bg-2); color: var(--fg-2); border: 1px solid var(--line-2); }
 .search::backdrop { background: rgba(5, 6, 7, 0.72); }
 .search-box { padding: 20px; }
 .search-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
@@ -473,6 +473,13 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
   --pagefind-ui-font: "Archivo", ui-sans-serif, system-ui, sans-serif;
 }
 #search-ui mark { background: var(--yellow); color: var(--ink); }
+#search-ui .pagefind-ui__search-clear, #search-ui .pagefind-ui__button {
+  --lip: 2px; border-radius: 0; background: var(--bg-3); color: var(--fg); border: 1px solid var(--line-2);
+  box-shadow: 0 var(--lip) 0 #050607; font: 600 12px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase;
+  transition: transform 70ms ease-out, box-shadow 70ms ease-out;
+}
+#search-ui .pagefind-ui__search-clear { height: auto; top: 10px; right: 10px; bottom: 12px; padding: 0 10px; }
+#search-ui .pagefind-ui__search-clear:active, #search-ui .pagefind-ui__button:active { transform: translateY(var(--lip)); box-shadow: 0 0 0 #050607; }
 
 /* A run: the question, the command and the checks beside the result */
 .ex-runs { display: grid; gap: 64px; margin-top: clamp(36px, 2rem + 2vw, 64px); }

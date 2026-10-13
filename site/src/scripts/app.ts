@@ -64,6 +64,7 @@ document.addEventListener('click', async (e) => {
   }
 
   if (t.closest('[data-search-open]')) { openSearch(); return; }
+  if (t instanceof HTMLDialogElement && t.id === 'search-dialog') { t.close(); return; } // a click on the backdrop
   if (t.closest('[data-search-close]')) { $<HTMLDialogElement>('#search-dialog')?.close(); return; }
   if (t.closest('[data-docnav-open]')) { docnav(true); return; }
   if (t.closest('[data-docnav-close]')) { docnav(false); return; }
@@ -75,7 +76,15 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     openSearch();
   }
-  if (e.key === 'Escape' && $('#docnav')?.dataset.open === 'true') docnav(false);
+  const nav = $('#docnav');
+  if (nav?.dataset.open !== 'true') return;
+  if (e.key === 'Escape') docnav(false);
+  if (e.key === 'Tab') { // keep focus inside the open drawer
+    const items = $$<HTMLElement>('a, button, summary', nav).filter((el) => el.offsetParent !== null);
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
 });
 
 // ---- search: Pagefind, loaded the first time the dialog opens ---------------------
