@@ -501,8 +501,8 @@ def _large_deflection_check(adapter, first, levels, features, prep, material, pr
     deflection move; the converged answer is scaled by that ratio.
 
     The first mesh is used when it is small. A large one is coarsened to about NLGEOM_NODES first: every
-    load step of a nonlinear solve costs a few linear solves, and on an 80,000 node drone arm the first mesh
-    took over half an hour. Whether the check runs is decided from the modeled cost, never by a timeout,
+    load step of a nonlinear solve costs a few linear solves, and on a 77,000 node drone arm the first mesh
+    was still running after 17 minutes. Whether the check runs is decided from the modeled cost, never by a timeout,
     which would make it pass on one run and go missing on the next.
     """
     built, lin_peak, lin_disp, excluded, sizing0 = first

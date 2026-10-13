@@ -26,15 +26,15 @@ report        wobbl/report: heatmaps (pyvista, matplotlib fallback), summary tex
 | `units.py` | parse `200 N`, `45 lbf`, `3 ksi`, `5 W/m2K`; one internal system (mm, N, MPa, t, s, mW, C) |
 | `materials.py` | sourced material table and custom materials |
 | `geometry/cad.py` | STEP, IGES, BREP and STL import through OpenCASCADE, healing only when broken, bonding touching bodies, tiny face removal; every CAD call runs in a child process |
-| `geometry/faces.py` | faces, holes, fillets, bosses, sharp inside corners and wall thickness from an oriented boundary mesh |
+| `geometry/faces.py` | faces, holes, fillets, bosses and sharp inside corners from an oriented boundary mesh; wall thickness from rays cast inward from points on the CAD faces |
 | `geometry/select.py` | the face selector language |
 | `geometry/parametric.py` | `.py` parts with named parameters |
 | `geometry/remap.py` | carry selections across geometry edits |
-| `mesh/mesher.py` | gmsh second order tets in CalculiX order, feature and hotspot refinement fields, fallbacks |
+| `mesh/mesher.py` | gmsh second order tets in CalculiX order, feature and hotspot refinement fields, fallbacks; one thread and a fixed seed, so the same input always gives the same mesh |
 | `mesh/isolate.py` | run native code in a child process with a timeout |
 | `fe.py` | solver neutral static and heat models and results |
 | `solvers/` | adapter interface, registry, CalculiX, ngspice, and placeholders for OpenFOAM, MuJoCo and Elmer |
-| `structural/` | load and support parsing, model building, the convergence loop, hotspots, verdict and report |
+| `structural/` | load and support parsing, model building, the convergence loop, hotspots, verdict and report; `budget.py` spends the time budget by a cost model of each mesh rather than the clock |
 | `thermal/` | heat studies and their checks |
 | `circuits/` | LED, RC, buck and MOSFET templates and arbitrary netlists |
 | `verify/` | shared checks, beam theory, confidence |
