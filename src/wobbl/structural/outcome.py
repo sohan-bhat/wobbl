@@ -66,6 +66,25 @@ class Outcome:
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
+def _where(run, gspot, xyz: np.ndarray) -> str:
+    """Name the governing location: the feature it sits on, else the nearest face and the coordinates."""
+    from .hotspots import nearest_face
+
+    at = f"({', '.join(f'{v:.3g}' for v in xyz)})"
+    if gspot is not None and np.linalg.norm(np.asarray(gspot.xyz) - xyz) <= 2.5 * gspot.radius and gspot.detail \
+            and "body of the part" not in gspot.detail:
+        return f"{gspot.detail} at {at}"
+    fid = nearest_face(run.mesh, xyz)
+    f = run.features.faces.get(fid) if fid is not None else None
+    if f is None:
+        return f"inside the part at {at}"
+    if f.role == "fillet":
+        return f"on the {f.radius:.3g} mm inside fillet (face {f.id}) at {at}"
+    if f.role == "hole":
+        return f"at the edge of the {2 * f.radius:.3g} mm hole (face {f.id}) at {at}"
+    return f"on face {f.id} at {at}"
+
+
 def _verdict(sf: float, target: float) -> str:
     if sf >= target:
         return "holds"
@@ -87,7 +106,7 @@ def evaluate(run: StructuralRun) -> Outcome:
     feats = [h for h in run.hotspots if h.kind == "feature"]
     if feats:
         gspot = min(feats, key=lambda h: float(np.linalg.norm(np.asarray(h.xyz) - np.asarray(lv.governing_xyz))))
-    where = gspot.detail if gspot else "in the body of the part"
+    where = _where(run, gspot, np.asarray(lv.governing_xyz))
     checks: list[Check] = []
     extra: list[tuple[str, str]] = []
 

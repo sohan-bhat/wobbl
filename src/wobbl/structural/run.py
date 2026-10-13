@@ -21,9 +21,9 @@ from .hotspots import Hotspot, ZoneMap, classify, find_hotspots, track
 from .spec import SpecError, StructuralStudy
 
 QUALITY = {
-    "fast": dict(fineness=0.8, nodes=20000, levels=3, tol=0.05, max_nodes=60000),
-    "normal": dict(fineness=1.0, nodes=35000, levels=4, tol=0.03, max_nodes=150000),
-    "fine": dict(fineness=1.3, nodes=60000, levels=5, tol=0.02, max_nodes=250000),
+    "fast": dict(fineness=0.8, nodes=20000, levels=3, tol=0.05, max_nodes=80000),
+    "normal": dict(fineness=1.0, nodes=35000, levels=4, tol=0.03, max_nodes=250000),
+    "fine": dict(fineness=1.3, nodes=60000, levels=5, tol=0.02, max_nodes=400000),
 }
 
 Progress = Callable[[str, str], None]
@@ -293,7 +293,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         if elapsed + est_next > study.budget:
             stopped_by = "time budget"
             break
-        growth = mesh.n_nodes / levels[-2].n_nodes if len(levels) > 1 else 1.6
+        growth = mesh.n_nodes / levels[-2].n_nodes if len(levels) > 1 else 1.25
         if mesh.n_nodes * max(growth, 1.15) > q["max_nodes"]:
             stopped_by = "node limit"
             break
