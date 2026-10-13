@@ -174,17 +174,24 @@ def build_mesh(prep: PreparedGeometry, sizing: Sizing, verbose: bool = False, ti
     attempts = [dict(alg2d=6, alg3d=10, curved=True), dict(alg2d=5, alg3d=1, curved=True),
                 dict(alg2d=1, alg3d=1, curved=False)]
     errors = []
-    for i, att in enumerate(attempts):
-        try:
-            mesh = run_isolated(_build, prep, sizing, verbose, timeout=timeout, **att)
-            if i > 0:
-                mesh.notes.append("Meshing needed a fallback strategy" +
-                                  ("" if att["curved"] else " (straight sided second order elements)") + ".")
-            return mesh
-        except (MeshError, IsolatedCrash, IsolatedTimeout) as e:
-            errors.append(str(e))
-    raise MeshError(f"gmsh could not mesh this part ({'; '.join(errors)}). Try a larger --mesh-size, "
-                    "or check the CAD for self intersections and gaps.")
+    # a size that is coarse next to a thin curved wall can make the surface mesh fold through itself; when
+    # every strategy fails, a finer global size usually meshes cleanly
+    for scale in (1.0, 0.75, 0.55):
+        trial = sizing if scale == 1.0 else Sizing(h=sizing.h * scale, refinements=sizing.refinements,
+                                                    order=sizing.order, curvature=sizing.curvature,
+                                                    h_min=sizing.h_min)
+        for i, att in enumerate(attempts if scale == 1.0 else attempts[1:]):
+            try:
+                mesh = run_isolated(_build, prep, trial, verbose, timeout=timeout, **att)
+                if i > 0 or scale != 1.0:
+                    mesh.notes.append("Meshing needed a fallback strategy" +
+                                      ("" if att["curved"] else " (straight sided second order elements)") +
+                                      (f" and a {scale:g}x finer size" if scale != 1.0 else "") + ".")
+                return mesh
+            except (MeshError, IsolatedCrash, IsolatedTimeout) as e:
+                errors.append(str(e))
+    raise MeshError(f"gmsh could not mesh this part ({'; '.join(errors[:3])}). Check the CAD for self "
+                    "intersections and gaps, or pass --mesh-size.")
 
 
 def _add_fields(gmsh, sizing: Sizing):
