@@ -185,16 +185,17 @@ def evaluate(run: StructuralRun) -> Outcome:
 
 def _headline(verdict, gov, sf, target, mat, where, imperial, level) -> str:
     s = fmt_stress(gov, imperial)
+    limit = mat.criterion.split(" vs ")[1]
     if verdict == "holds":
-        v = f"Holds. Peak {s} {where}, safety factor {sf:.2f} against {mat.criterion.split(' vs ')[1]} (target {target:g})."
+        v = f"Peak {s} {where}, safety factor {sf:.2f} against {limit} (target {target:g})."
     elif verdict == "marginal":
-        v = (f"Marginal. Peak {s} {where}: it survives the load but the safety factor {sf:.2f} is below the "
+        v = (f"Peak {s} {where}. It survives the load, but the safety factor {sf:.2f} is below the "
              f"{target:g} target.")
     else:
         what = "yields" if mat.ductile else "cracks"
-        v = f"Fails. Peak {s} {where}; the part {what} at about {sf:.2f}x this load."
+        v = f"Peak {s} {where}. The part {what} at about {sf:.2f}x this load."
     if level != "high":
-        v += f" Confidence {level}."
+        v += f" Confidence is {level}."
     return v
 
 
@@ -313,7 +314,7 @@ def assumptions(run: StructuralRun) -> list[str]:
 def text_summary(o: Outcome) -> str:
     """Plain language summary an agent can read in one pass."""
     imp = o.imperial
-    lines = [o.headline, ""]
+    lines = [f"{o.verdict.upper()}. {o.headline}", ""]
     lines.append(f"Confidence: {o.confidence}. " + "; ".join(o.confidence_reasons[:4]))
     lines.append(f"Max deflection {fmt_length(o.max_disp_mm, imp)} at ({', '.join(fmt(v) for v in o.max_disp_xyz)}).")
     lines.append(f"Material {o.material}, limit {fmt_stress(o.allowable_MPa, imp)}; mass {o.mass_kg * 1000:.4g} g.")

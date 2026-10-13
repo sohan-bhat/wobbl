@@ -74,7 +74,7 @@ def img_tag(path: str | Path, alt: str) -> str:
         return ""
     data = base64.b64encode(p.read_bytes()).decode()
     mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
-    return f'<img src="data:{mime};base64,{data}" alt="{esc(alt)}" loading="lazy">'
+    return f'<img src="data:{mime};base64,{data}" alt="{esc(alt)}">'
 
 
 def figure(path, caption, cls="") -> str:

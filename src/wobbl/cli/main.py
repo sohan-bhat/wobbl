@@ -32,8 +32,8 @@ class AskGroup(click.Group):
 
 def _out_dir(part: str, out: str | None) -> Path:
     if out:
-        return Path(out)
-    base = Path("wobbl-out") / Path(part).stem
+        return Path(out).resolve()
+    base = Path("wobbl-out").resolve() / Path(part).stem
     p, k = base, 2
     while p.exists():
         p = Path(f"{base}-{k}")
@@ -301,6 +301,43 @@ def _load_outcome(result_dir: str):
         return Outcome.load(d / "outcome.json")
     from ..outcome_generic import GenericOutcome
     return GenericOutcome.load(d / "outcome.json")
+
+
+@cli.command()
+@click.argument("result_dir", default="")
+@click.option("--apply", "do_apply", is_flag=True, help="Edit the geometry or material and re-run.")
+@click.option("--only", default=None, help="Comma list of fix kinds to apply: fillet, gusset, material.")
+def fix(result_dir, do_apply, only):
+    """Show fixes for a failing part; with --apply, re-run them and compare before and after."""
+    o = _load_outcome(result_dir)
+    if not o.fixes:
+        ui.console.print("  no fixes needed: the part meets its target")
+        return
+    if not do_apply:
+        for f in o.fixes:
+            ui.console.print(f"  [bold]{f['title']}[/bold]" + ("  [dim](auto)[/dim]" if f.get("auto") else ""))
+            ui.console.print(f"  [dim]{f['summary']}[/dim]")
+        ui.console.print("\n  run with --apply to re-simulate the automatic ones")
+        return
+    from ..fix.apply import apply_fixes
+
+    with ui.progress() as cb:
+        res = apply_fixes(o.workdir, only.split(",") if only else None, cb)
+    from rich.table import Table
+
+    tb = Table(box=None, header_style="dim", padding=(0, 2))
+    for c in ("", "peak MPa", "safety factor", "verdict"):
+        tb.add_column(c)
+    b = res["before"]
+    tb.add_row("before", f"{b['governing_MPa']:.3g}", f"{b['safety_factor']:.2f}", b["verdict"])
+    for r in res["after"]:
+        if "error" in r:
+            tb.add_row(r["fix"], "", "", f"[red]{r['error'][:60]}[/red]")
+        else:
+            tb.add_row(r["fix"], f"{r['governing_MPa']:.3g}", f"{r['safety_factor']:.2f}", r["verdict"])
+    ui.console.print()
+    ui.console.print(tb)
+    ui.console.print(f"\n  report {res['report']}\n")
 
 
 @cli.command()
