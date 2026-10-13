@@ -4,7 +4,7 @@ import pytest
 from wobbl.geometry.cad import GeometryError, prepare
 from wobbl.geometry.faces import analyze
 from wobbl.geometry.select import SelectionError, Selector
-from wobbl.mesh.mesher import Sizing, build_mesh, build_surface_mesh
+from wobbl.mesh.mesher import Sizing, build_mesh, build_surface_mesh, flat_elements
 
 
 @pytest.fixture(scope="module")
@@ -66,6 +66,19 @@ def test_second_order_mesh(plate):
     n, a, c = m.tri_geometry()
     bottom = c[:, 2] < 1e-6
     assert (n[bottom][:, 2] < -0.99).all()
+    assert flat_elements(m.X, m.tets) == 0
+
+
+def test_flat_elements_are_found():
+    # a sliver the 3D mesher once left in the NAFEMS LE1 membrane: four corners on one through thickness face
+    X = np.array([[2692.8882, 644.293, 100.0], [2781.615, 634.887, 100.0], [2781.615, 634.887, 0.0],
+                  [2692.8882, 644.293, 0.0], [0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0],
+                  [0.0, 0.0, 10.0]])
+    assert flat_elements(X, np.array([[0, 1, 2, 3]])) == 1
+    assert flat_elements(X, np.array([[4, 5, 6, 7]])) == 0
+    thin = X[[4, 5, 6, 7]].copy()
+    thin[3, 2] = 0.01                                   # a thin but real element is kept
+    assert flat_elements(thin, np.array([[0, 1, 2, 3]])) == 0
 
 
 def test_missing_file(tmp_path):

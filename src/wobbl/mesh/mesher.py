@@ -194,6 +194,16 @@ def build_mesh(prep: PreparedGeometry, sizing: Sizing, verbose: bool = False, ti
                     "intersections and gaps, or pass --mesh-size.")
 
 
+def flat_elements(X: np.ndarray, tets: np.ndarray, rel: float = 1e-9) -> int:
+    """Count tetrahedra whose four corners lie in one plane, judged against their longest edge."""
+    c = X[tets[:, :4]]
+    a, b, d = c[:, 1] - c[:, 0], c[:, 2] - c[:, 0], c[:, 3] - c[:, 0]
+    vol = np.abs(np.einsum("ij,ij->i", a, np.cross(b, d))) / 6.0
+    edge = np.max([np.linalg.norm(c[:, i] - c[:, j], axis=1)
+                   for i, j in ((0, 1), (1, 2), (2, 0), (0, 3), (1, 3), (2, 3))], axis=0)
+    return int((vol <= rel * edge ** 3).sum())
+
+
 def _sampling(gmsh, r: Refinement) -> int:
     """Distance fields sample their entities on a grid; a long fillet refined to a fine size needs samples
     closer than the target size, or the fine band breaks up between the samples."""
@@ -341,6 +351,11 @@ def _build(prep: PreparedGeometry, sizing: Sizing, verbose: bool, alg2d: int, al
     tets = lut[raw]
     if sizing.order == 2:
         tets = tets[:, GMSH_TO_CCX_TET10]
+    flat = flat_elements(X, tets)
+    if flat:
+        # straightening cannot fix these: they have no volume however the midside nodes sit, and the solver
+        # rejects them, so let the next meshing strategy try
+        raise MeshError(f"the mesher left {flat} flat elements with all four corners in one plane")
     tris, E, F, key = _boundary(tets, X, sizing.order)
     # map boundary faces to CAD surfaces
     n = len(X)

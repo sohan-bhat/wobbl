@@ -107,8 +107,7 @@ def _explain(errs: list[str], log: str, code: int) -> SolverError:
     low = text.lower()
     if "jacobian" in low:
         return SolverError("some mesh elements are inverted (nonpositive jacobian)",
-                           "Wobbl will retry with straight sided elements; if this persists, simplify tiny "
-                           "features or pass --mesh-size", log[-3000:])
+                           "Simplify tiny features or pass --mesh-size", log[-3000:])
     if "singular" in low or "zero pivot" in low or "rigid body" in low:
         return SolverError("the stiffness matrix is singular: the part is not fully held",
                            "Add fixtures that stop all sliding and rotation", log[-3000:])
