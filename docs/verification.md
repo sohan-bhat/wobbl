@@ -60,8 +60,8 @@ mistake), peak strain, stress far above or below the material limit, and
 deflection: over 6% of the part size is a warning (linear theory gets less
 accurate), over 20% is a failure.
 
-**Bounded runtime.** Every study has a time budget (`--budget`, 240 s by
-default). If a refinement level runs out of time, fails to mesh or the solver
+**Bounded runtime.** Every study has a time budget (`--budget`, by
+default 300 s). If a refinement level runs out of time, fails to mesh or the solver
 fails, Wobbl stops and returns the last finished level with its checks and
 heatmaps; the convergence check says how far it got. An agent always gets an
 answer back, with a confidence that matches it.

@@ -51,7 +51,7 @@ def _strength_options(f):
                      help="Support, e.g. 'holes d=4.5', 'bolt holes', 'wall x=min' (repeatable)."),
         click.option("--target-sf", type=float, default=None, help="Required safety factor."),
         click.option("--quality", type=click.Choice(["fast", "normal", "fine"]), default="normal"),
-        click.option("--budget", type=float, default=240.0, show_default=True, help="Seconds for the study."),
+        click.option("--budget", type=float, default=300.0, show_default=True, help="Seconds for the study."),
         click.option("--mesh-size", type=float, default=None, help="Global element size in mm."),
         click.option("--print-direction", default=None, help="Axis the print layers stack along, e.g. z."),
         click.option("--scale", type=float, default=1.0, help="Scale the geometry (1000 for files in meters)."),
@@ -114,7 +114,7 @@ def _study_from(part, question, kw):
 
     st = StructuralStudy(part=str(Path(part).resolve()), material=kw.get("material") or "auto",
                          target_sf=kw.get("target_sf"), quality=kw.get("quality", "normal"),
-                         budget=kw.get("budget", 240.0), question=question, scale=kw.get("scale", 1.0),
+                         budget=kw.get("budget", 300.0), question=question, scale=kw.get("scale", 1.0),
                          body=kw.get("body"), mesh_size=kw.get("mesh_size"),
                          print_direction=kw.get("print_direction"))
     st.params = dict(p.split("=", 1) for p in kw.get("params", ()) if "=" in p)

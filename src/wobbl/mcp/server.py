@@ -73,7 +73,7 @@ def build_server():
     @srv.tool()
     def solve_structural(study_id: str = "", path: str = "", material: str = "", loads: list[str] | None = None,
                          fixtures: list[str] | None = None, target_sf: float | None = None,
-                         quality: str = "normal", budget: float = 240.0, question: str = "",
+                         quality: str = "normal", budget: float = 300.0, question: str = "",
                          print_direction: str | None = None) -> dict:
         """Run the verified static strength study (mesh convergence, equilibrium, beam theory check,
         singularity detection). Returns verdict, governing stress and location, safety factor, deflection,

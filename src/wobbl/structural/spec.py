@@ -72,7 +72,7 @@ class StructuralStudy:
     fixtures: list[Fixture] = field(default_factory=list)
     target_sf: float | None = None
     quality: str = "normal"              # fast, normal, fine
-    budget: float = 240.0                 # seconds for the whole convergence study
+    budget: float = 300.0                 # seconds for the whole convergence study
     max_levels: int = 4
     question: str = ""
     imperial: bool = False
