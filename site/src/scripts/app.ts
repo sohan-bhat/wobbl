@@ -24,17 +24,18 @@ const say = (() => {
 
 // ---- once per visit: listeners on the document ---------------------------------
 
+// The skip link moves focus without a #main in the address bar. It listens in the capture
+// phase so it runs before the router, which would otherwise treat it as a same page link.
+document.addEventListener('click', (e) => {
+  if (!(e.target as Element).closest('a[data-skip]')) return;
+  e.preventDefault();
+  const main = $('#main');
+  main?.focus();
+  main?.scrollIntoView();
+}, true);
+
 document.addEventListener('click', async (e) => {
   const t = e.target as Element;
-
-  const skip = t.closest('a[data-skip]');
-  if (skip) {
-    e.preventDefault();
-    const main = $('#main');
-    main?.focus();
-    main?.scrollIntoView();
-    return;
-  }
 
   const copy = t.closest<HTMLButtonElement>('button.copy');
   if (copy) {
