@@ -1,13 +1,14 @@
-// The hero part's idle animation: a slow loop that swings the view, sweeps the belt pull around the
-// pulley and eases its size up and down, so the verdict moves through holds, marginal and fails.
-// It stops the moment the visitor does anything and comes back after a quiet spell, blending in
-// from wherever they left things. It only ever changes the view and the pull, never the URL.
+// The hero part's idle animation: a slow loop that swings the view, carries the load on the shaft
+// round a path over the sphere of directions and eases its size up and down, so the verdict moves
+// through holds, marginal and fails. It stops the moment the visitor clicks, taps, drags or presses a
+// key, and comes back after a quiet spell, blending in from wherever they left things. It only ever
+// changes the view and the load, never the URL.
 
 /** The camera around its target: azimuth and elevation in radians, distance in mm. */
 export interface View { az: number; el: number; dist: number }
-/** hand is how much of the hint pointer shows on the arrow's head, 0 to 1 */
-export interface Frame { angle: number; load: number; view: View; hand: number }
-export type Mode = 'playing' | 'held' | 'paused';
+/** az and el give the load's direction in degrees; hand is how much of the hint pointer shows, 0 to 1 */
+export interface Frame { az: number; el: number; load: number; view: View; hand: number }
+export type Mode = 'playing' | 'held';
 
 const LOOP = 16000; // ms for one loop
 const BLEND = 1000; // ms to ease from the visitor's state into the loop
@@ -22,35 +23,36 @@ const turn = (a: number, b: number, s: number, period: number) => {
 
 export interface Autoplay {
   play(): void;
-  pause(): void;
   hold(): void;
   destroy(): void;
   readonly mode: Mode;
 }
 
 /**
- * read() gives the state now, apply(frame) shows a frame, home is the starting view and startAngle the
- * default pull. Phones get at most 30 frames a second. onMode reports playing, held (by the visitor,
- * playing again after a quiet spell) and paused (by the button or a shared link, until play).
+ * read() gives the state now, apply(frame) shows a frame, home is the starting view and start the
+ * default direction. Phones get at most 30 frames a second. onMode reports playing, and held by the
+ * visitor, playing again after a quiet spell.
  */
 export function createAutoplay(o: {
-  root: HTMLElement; read(): Frame; apply(f: Frame): void; home: View; startAngle: number; phone: boolean;
+  root: HTMLElement; read(): Frame; apply(f: Frame): void; home: View; start: { az: number; el: number }; phone: boolean;
   onMode(m: Mode): void;
 }): Autoplay {
-  let mode: Mode = 'paused';
+  let mode: Mode = 'held';
   let t = 0, last = 0, lastShown = 0, raf = 0, quiet = 0;
   let from: Frame | null = null, blendAt = 0;
   let onScreen = true, shown = !document.hidden, leaving = false;
 
-  // The loop: a full turn of the pull, one swell of its size between 800 and 3,000 N, and the view
-  // swinging ten degrees either side of where it started, little enough that the arrow keeps
+  // The loop: the load goes once round the shaft while it tips out along the shaft and back in twice,
+  // a smooth path over the sphere of directions, its size swells once between 800 and 3,000 N, and
+  // the view swings ten degrees either side of where it started, little enough that the arrow keeps
   // facing the visitor. On the very first loop a pointer rides on the arrow's head, as if it were
   // dragging it round, and fades out; once the visitor has stepped in, it does not come back.
   let first = true, played = 0;
   const at = (ms: number): Frame => {
     const p = (ms / LOOP) * Math.PI * 2;
     return {
-      angle: (((o.startAngle + (360 * ms) / LOOP) % 360) + 360) % 360,
+      az: (((o.start.az + (360 * ms) / LOOP) % 360) + 360) % 360,
+      el: o.start.el + 30 * Math.sin(2 * p),
       load: 1900 + 1100 * Math.sin(p),
       view: { az: o.home.az + 0.17 * Math.sin(p), el: o.home.el + 0.045 * Math.sin(2 * p), dist: o.home.dist },
       hand: first ? Math.min(1, played / 400, (LOOP - played) / 700) * 0.9 : 0,
@@ -73,7 +75,8 @@ export function createAutoplay(o: {
     if (from) {
       const s = smooth((now - blendAt) / BLEND);
       f = {
-        angle: turn(from.angle, f.angle, s, 360),
+        az: turn(from.az, f.az, s, 360),
+        el: from.el + (f.el - from.el) * s,
         load: from.load + (f.load - from.load) * s,
         view: {
           az: turn(from.view.az, f.view.az, s, Math.PI * 2),
@@ -94,7 +97,7 @@ export function createAutoplay(o: {
     clearTimeout(quiet);
     if (m === 'held') quiet = window.setTimeout(() => set('playing'), QUIET);
     if (m === mode) return;
-    if (m === 'playing') { from = o.read(); blendAt = performance.now(); } else first = false;
+    if (m === 'playing') { from = o.read(); blendAt = performance.now(); } else if (played) first = false;
     mode = m;
     if (m === 'playing') wake(); else sleep();
     o.onMode(m);
@@ -110,8 +113,7 @@ export function createAutoplay(o: {
 
   return {
     play: () => set('playing'),
-    pause: () => set('paused'),
-    hold: () => { if (mode !== 'paused') set('held'); },
+    hold: () => set('held'),
     destroy() {
       sleep();
       clearTimeout(quiet);

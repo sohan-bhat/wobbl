@@ -3,25 +3,24 @@
 // controls under it. scripts/hero.ts drives it and scripts/viewer.js draws it.
 // The numbers come from public/data/cast-motor-mount.json (scripts/export_site_part.py) and are
 // filled in here at build time, so the reading is right before any script runs. The page links
-// the part's mesh by the content hash in its file name.
+// the part's mesh and its peak table by the content hash in their file names.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { url } from '../lib/site';
 import { poster, posterSet } from '../lib/poster';
-import { WORD, fmt, reading, tablePerN, widths, type PartData } from '../scripts/reading';
+import { WORD, fmt, reading, widths, type PartData } from '../scripts/reading';
 
 const man: PartData & { governing_MPa: number } =
   JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/cast-motor-mount.json'), 'utf-8'));
 const MAX = 4000;
-const deg = Math.round(man.pull.default_deg);
-const r = reading(man, man.load_N, tablePerN(man, deg));
+const r = reading(man, man.load_N, man.default_peak_MPa / man.load_N);
 const w = widths(man, MAX);
 // the browser reads what it needs of the manifest from the page instead of fetching it
-const { name, file, load_N, allowable_MPa, target_sf, pull, mesh, layout, peak_by_degree, peak_at_degree, peak_nodes } = man;
-const converged = man.converged.map(({ angle_deg, converged_MPa, superposed_MPa, difference_pct }) =>
-  ({ angle_deg, converged_MPa, superposed_MPa, difference_pct }));
-const json = JSON.stringify({ name, file, load_N, allowable_MPa, target_sf, pull, mesh, layout, peak_by_degree,
-  peak_at_degree, peak_nodes, converged }).replace(/</g, '\\u003c');
+const { name, file, load_N, allowable_MPa, target_sf, pull, mesh, layout, default_peak_MPa, peak_range_MPa, peak_nodes } = man;
+const converged = man.converged.map(({ azimuth_deg, elevation_deg, converged_MPa, superposed_MPa, difference_pct }) =>
+  ({ azimuth_deg, elevation_deg, converged_MPa, superposed_MPa, difference_pct }));
+const json = JSON.stringify({ name, file, load_N, allowable_MPa, target_sf, pull, mesh, layout, default_peak_MPa,
+  peak_range_MPa, peak_nodes, converged }).replace(/</g, '\\u003c');
 // The camera Wobbl's heatmap of this part was drawn with (report/render.py: 1600 x 1000, 30 degrees
 // zoomed 1.15 times), the crop scripts/build_site_images.py took from it, and its color scale, so
 // the 3D view can start exactly where the poster is and fade in without a jump.
@@ -30,8 +29,8 @@ const posterCamera = JSON.stringify({
   frame: [1600, 1000], crop: [355, 51, 1170, 949], clim: man.governing_MPa,
 });
 ---
-<figure class="hero-part" style={`--readout-w: ${w.peak + 4}ch; --limit-w: ${w.limit}ch`}>
-  <div class="viewer" id="viewer" data-state="poster" data-file={url(`data/${man.file}`)}>
+<figure class="hero-part" style={`--readout-w: ${w.peak + 4}ch`}>
+  <div class="viewer" id="viewer" data-state="poster" data-file={url(`data/${man.file}`)} data-peaks={url(`data/${man.peaks}`)}>
     <img class="viewer-poster" src={poster} srcset={posterSet} sizes="(min-width: 1000px) 56vw, 100vw"
          width="1170" height="949" fetchpriority="high" data-camera={posterCamera}
          alt="Stress heatmap of a sand cast aluminum motor mount. The hottest spot, labeled 124 MPa, is where the rib tip meets the upright." />
@@ -45,12 +44,11 @@ const posterCamera = JSON.stringify({
     <div class="hint-hand" hidden aria-hidden="true">
       <svg viewBox="0 0 24 26" width="24" height="26"><circle class="hint-ring" cx="5" cy="4" r="4" /><path d="M5 4v15.5l4.1-3.7 2.9 6.4 2.7-1.2-2.9-6.3h5.6Z" /></svg>
     </div>
-    <button type="button" class="btn-outline btn-sm motion" id="motion" aria-label="Pause the animation" hidden>Pause</button>
-    <button type="button" class="btn-outline btn-sm bend" id="bend" aria-pressed="true">Bend &times;60</button>
+    <button type="button" class="btn-outline btn-sm bend" id="bend" aria-pressed="true"><span class="bend-box" aria-hidden="true"></span>Bending &times;60</button>
   </div>
   <div class="part-controls">
     <div class="control">
-      <label for="load">Belt pull <output id="load-out" for="load">{fmt(man.load_N)}&nbsp;N at {deg}°</output></label>
+      <label for="load">Load <output id="load-out" for="load">{fmt(man.load_N)}&nbsp;N</output></label>
       <input type="range" id="load" name="load" autocomplete="off" min="0" max={MAX} step="10" value={man.load_N}>
       <div class="legend" aria-hidden="true">
         <div class="legend-bar"><span class="legend-target"></span><span class="legend-peak" id="legend-peak" style={`left: ${Math.min(r.peak / man.allowable_MPa, 1) * 100}%`}></span></div>
@@ -60,32 +58,17 @@ const posterCamera = JSON.stringify({
     <div class="live">
       <p class="live-n"><span id="r-peak">{fmt(r.peak, 1)}</span>&nbsp;MPa</p>
       <p class="vword" id="verdict-word" data-verdict={r.verdict} aria-live="polite">{WORD[r.verdict]}</p>
-      <dl class="limits">
-        <div><dt>Meets the target up to</dt><dd id="r-target">{fmt(r.target)}&nbsp;N</dd></div>
-        <div><dt>Yields past</dt><dd id="r-yield">{fmt(r.yields)}&nbsp;N</dd></div>
-      </dl>
     </div>
   </div>
-  <figcaption>A cast motor mount from Wobbl’s own result. Drag the yellow arrow to change the belt direction, drag anywhere else to turn the part, and double tap to reset.</figcaption>
   <script is:inline type="application/json" id="part-data" set:html={json}></script>
 </figure>
 
 <style>
-  /* the pull's size and direction, in a box as wide as "4,000 N at 359°" */
-  .control #load-out { min-width: 0; width: 15ch; white-space: nowrap; }
-
-  /* The loads the part takes, under the reading, in boxes sized for their widest value */
-  .limits { margin: 0; display: grid; gap: 4px; font-size: 0.85rem; color: var(--muted); }
-  .limits div { display: flex; justify-content: space-between; gap: 12px; }
-  .limits dt, .limits dd { margin: 0; white-space: nowrap; }
-  .limits dd {
-    width: var(--limit-w, 7ch); text-align: right; color: var(--fg);
-    font: 500 0.85rem/1.5 var(--mono); font-variant-numeric: tabular-nums;
-  }
-  .live .limits { grid-column: 1 / -1; }
+  /* the load, in a box as wide as "4,000 N" */
+  .control #load-out { min-width: 0; width: 7ch; white-space: nowrap; }
 
   /* The hit area over the whole arrow, a pill wider than the arrow that turns with it. It takes the
-     drag that turns the pull, so the camera never orbits from there, and a touch on it never scrolls. */
+     drag that points the load, so the camera never orbits from there, and a touch on it never scrolls. */
   .pull-grip {
     position: absolute; left: 0; top: 0; z-index: 2; transform-origin: 0 50%; border-radius: 999px;
     cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent;
@@ -103,9 +86,9 @@ const posterCamera = JSON.stringify({
   .hint-hand path { fill: var(--fg); stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
   .hint-ring { fill: none; stroke: var(--yellow); stroke-width: 2; }
 
-  /* Stops and starts the idle animation; a fixed width, so the label can change without moving it */
-  .motion { position: absolute; top: 12px; left: 12px; z-index: 3; box-sizing: content-box; min-width: 6ch; }
-  .motion[hidden], .viewer:not([data-state="live"]) .motion { display: none; }
+  /* The bending toggle, with a box that is filled while the bending shows */
+  .bend-box { width: 10px; height: 10px; flex: none; border: 1.5px solid currentColor; }
+  .bend[aria-pressed="true"] .bend-box { background: var(--yellow); border-color: var(--yellow); }
 
   /* A note over the part, only near directions where the mesh reads off */
   .viewer-note {
@@ -114,6 +97,7 @@ const posterCamera = JSON.stringify({
     font-size: 0.85rem; line-height: 1.45; color: var(--fg-2); pointer-events: none;
   }
   .viewer-note[hidden] { display: none; }
+
   /* The peak marker sits on the peak and the script places its value beside it, and the load label by
      its corner, both kept inside the view and clear of each other. Both have fixed widths, sized for
      their widest text, so a new value never changes their size. */
@@ -124,6 +108,5 @@ const posterCamera = JSON.stringify({
     position: absolute; left: 0; top: 0; white-space: nowrap;
     box-sizing: content-box; min-width: var(--readout-w, 9ch); font-variant-numeric: tabular-nums;
   }
-  .load-tag { transform: none; box-sizing: content-box; min-width: 17ch; font-variant-numeric: tabular-nums; }
-  .load-tag[data-short] { min-width: 7ch; }
+  .load-tag { transform: none; box-sizing: content-box; min-width: 7ch; font-variant-numeric: tabular-nums; }
 </style>
