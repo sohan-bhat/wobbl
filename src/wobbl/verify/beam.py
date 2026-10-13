@@ -11,6 +11,8 @@ path, the units or the setup deserve a second look.
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 
@@ -58,6 +60,9 @@ def beam_estimate(mesh, measure_at: np.ndarray, loads_force: np.ndarray, loads_m
     if np.linalg.norm(axis) < 1e-9:
         return None, "loads and fixtures coincide"
     axis /= np.linalg.norm(axis)
+    k = int(np.argmax(np.abs(axis)))
+    if abs(axis[k]) > np.cos(np.radians(20)):  # parts are usually modeled square to the axes: cut square
+        axis = np.eye(3)[k] * np.sign(axis[k])
     s_fix = (X[fixture_nodes] - H) @ axis
     s_load = (lp - H) @ axis
     if not ((s_fix < 0).all() and (s_load > 0).all()):
@@ -73,13 +78,17 @@ def beam_estimate(mesh, measure_at: np.ndarray, loads_force: np.ndarray, loads_m
         conn = sl.connectivity("closest", closest_point=H)
     except TypeError:
         conn = sl.connectivity(extraction_mode="closest", closest_point=H)
-    conn = conn.extract_surface().triangulate()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        conn = conn.extract_surface().triangulate()
     faces = conn.faces.reshape(-1, 4)[:, 1:]
     pts = np.asarray(conn.points)
     props = section_properties(pts[faces], axis)
     if props is None:
         return None, "empty section"
     A, G, I = props
+    if np.linalg.norm((G - H) - ((G - H) @ axis) * axis) > 1.5 * np.sqrt(A):
+        return None, "the cut through the critical point is not a single compact section"
     # resultant of the loads about the section centroid; force F with moment Mo about the origin
     M_G = Mo - np.cross(G, F)
     N = float(F @ axis)

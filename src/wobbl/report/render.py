@@ -7,9 +7,13 @@ renderer so there is always a picture.
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
 
 import numpy as np
+
+warnings.filterwarnings("ignore", module="pyvista")
+warnings.filterwarnings("ignore", message=".*extract_surface.*")
 
 BG = "#0e0f11"
 FG = "#f2f2ee"
@@ -30,10 +34,12 @@ def _grid(X: np.ndarray, tets: np.ndarray):
 
 
 def _surface(grid):
-    try:
-        return grid.extract_surface(nonlinear_subdivision=2)
-    except TypeError:
-        return grid.extract_surface()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            return grid.extract_surface(nonlinear_subdivision=2, algorithm="dataset_surface")
+        except TypeError:
+            return grid.extract_surface(nonlinear_subdivision=2)
 
 
 ISO_DIRS = np.array([[sx, sy, sz] for sx in (-1, 1) for sy in (-1, 1) for sz in (0.8, -0.8)], float)
