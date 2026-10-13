@@ -114,5 +114,16 @@ const posterCamera = JSON.stringify({
     font-size: 0.85rem; line-height: 1.45; color: var(--fg-2); pointer-events: none;
   }
   .viewer-note[hidden] { display: none; }
-  .peak-tag-v { box-sizing: content-box; min-width: var(--readout-w, 9ch); font-variant-numeric: tabular-nums; }
+  /* The peak marker sits on the peak and the script places its value beside it, and the load label by
+     its corner, both kept inside the view and clear of each other. Both have fixed widths, sized for
+     their widest text, so a new value never changes their size. */
+  .peak-tag { display: block; width: 0; height: 0; transform: none; }
+  .peak-tag[hidden], .load-tag[hidden] { display: none; }
+  .peak-tag .target { position: absolute; left: -9px; top: -9px; }
+  .peak-tag-v {
+    position: absolute; left: 0; top: 0; white-space: nowrap;
+    box-sizing: content-box; min-width: var(--readout-w, 9ch); font-variant-numeric: tabular-nums;
+  }
+  .load-tag { transform: none; box-sizing: content-box; min-width: 17ch; font-variant-numeric: tabular-nums; }
+  .load-tag[data-short] { min-width: 7ch; }
 </style>

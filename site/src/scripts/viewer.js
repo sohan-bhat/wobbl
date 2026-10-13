@@ -152,6 +152,8 @@ async function build(root, ui, trash) {
   const probe = root.querySelector('.probe');
   let peakP = [0, 0, 0];
   let len = 0, cs = [1, 0], grow = 1, showTags = false, handOpacity = 0, limit = man.allowable_MPa;
+  let short = vw < 560;
+  loadTag.toggleAttribute('data-short', short);
   // how far the entrance has come (k) and how much of the bend it shows
   const enter = { k: 1, bend: 1 };
   let hovering = false, turning = null, auto = false;
@@ -165,7 +167,8 @@ async function build(root, ui, trash) {
     const node = peakNode(man, state.angle), f = state.exag * enter.bend * state.load;
     peakP = [0, 1, 2].map((k) => node[k] + f * (cs[0] * node[3 + k] + cs[1] * node[6 + k]));
     peakTagV.textContent = `${(tablePerN(man, state.angle) * state.load).toFixed(1)} MPa`;
-    loadTag.textContent = `${fmt(state.load)} N belt pull`;
+    // on a narrow view the load label is just the number: the reading below already says belt pull
+    loadTag.textContent = `${fmt(state.load)} N${short ? '' : ' belt pull'}`;
     if (probe.dataset.sticky) {
       probe.hidden = true;
       delete probe.dataset.sticky;
@@ -179,26 +182,72 @@ async function build(root, ui, trash) {
       hot: hovering || turning !== null || auto, ring: hovering || turning !== null,
   });
 
-  // a point in mm to CSS pixels in the view, and its depth (below 1 in front of the camera)
+  // a point in mm to CSS pixels in the view, its depth (below 1 in front of the camera) and whether it is in view
   const toScreen = (p) => { const [x, y, z] = orbit.project(p); return [((x + 1) / 2) * vw, ((1 - y) / 2) * vh, z, x, y]; };
-  function place(el, p) {
-    const s = toScreen(p);
-    const vis = showTags && s[2] < 1 && Math.abs(s[3]) < 1.05 && Math.abs(s[4]) < 1.05;
-    el.hidden = !vis;
-    if (vis) el.style.translate = `${s[0]}px ${s[1]}px`;
-    return s;
-  }
+  const inView = (s) => s[2] < 1 && Math.abs(s[3]) < 1.05 && Math.abs(s[4]) < 1.05;
   const GRIP = coarse ? 44 : 28; // the arrow's hit area across, in CSS pixels
-  function overlays() {
-    const hubS = toScreen(pAt), pk = place(peakTag, peakP);
-    if (!peakTag.hidden) {
-      // the value reads away from the pulley, so the arrow stays clear of it
-      const left = pk[0] < hubS[0];
-      peakTag.style.flexDirection = left ? 'row-reverse' : '';
-      peakTag.style.transform = left ? 'translate(calc(-100% + 9px), -50%)' : '';
+
+  // The labels. Both have fixed widths in CSS, so their sizes are read once, and again only after a
+  // resize; each frame then tries a few places for each, best first, and takes the first pair that
+  // stays 8 px inside the view without touching. Nothing here reads the layout.
+  const INSET = 8, GAP = 6;
+  let sizes = null;
+  const inside = (r) => r[0] >= INSET && r[1] >= INSET && r[0] + r[2] <= vw - INSET && r[1] + r[3] <= vh - INSET;
+  const touch = (a, b) => !!(a && b && a[0] < b[0] + b[2] + 4 && b[0] < a[0] + a[2] + 4 && a[1] < b[1] + b[3] + 4 && b[1] < a[1] + a[3] + 4);
+  const clampIn = (r) => [Math.min(Math.max(r[0], INSET), vw - INSET - r[2]), Math.min(Math.max(r[1], INSET), vh - INSET - r[3]), r[2], r[3]];
+  // the peak's value beside its marker, on the side away from the pulley first, then the other side,
+  // then above and below
+  function peakSpots(at, awayLeft) {
+    const { pw, ph } = sizes, right = at[0] + 15, left = at[0] - 15 - pw, top = at[1] - ph / 2;
+    const out = [];
+    for (const dy of [0, -(ph + GAP), ph + GAP]) {
+      for (const x of awayLeft ? [left, right] : [right, left]) out.push([x, top + dy, pw, ph]);
     }
+    return out;
+  }
+  // the load just past the arrow's tip, then to either side of it, then back toward the pulley
+  function loadSpots(at, u) {
+    const { lw, lh } = sizes;
+    return [u, [-u[1], u[0]], [u[1], -u[0]], [-u[0], -u[1]]]
+      .map((d) => [at[0] - lw / 2 + (d[0] * (lw + GAP)) / 2, at[1] - lh / 2 + (d[1] * (lh + GAP)) / 2, lw, lh]);
+  }
+  function labels(pk, hubS, ld, u) {
+    peakTag.hidden = !pk;
+    loadTag.hidden = !ld;
+    if (!pk && !ld) return;
+    if (!sizes) {
+      sizes = { pw: peakTagV.offsetWidth, ph: peakTagV.offsetHeight, lw: loadTag.offsetWidth, lh: loadTag.offsetHeight };
+    }
+    const As = pk ? peakSpots(pk, pk[0] < hubS[0]) : [null], Bs = ld ? loadSpots(ld, u) : [null];
+    let a = null, b = null;
+    search: for (const ca of As) {
+      if (ca && !inside(ca)) continue;
+      for (const cb of Bs) {
+        if (cb && !inside(cb)) continue;
+        if (!touch(ca, cb)) { a = ca; b = cb; break search; }
+      }
+    }
+    if (!a && !b) {
+      // nowhere clean: keep the best places, inside the view, and move the load clear of the value
+      a = As[0] && clampIn(As[0]);
+      b = Bs[0] && clampIn(Bs[0]);
+      if (touch(a, b)) {
+        const below = a[1] + a[3] + GAP;
+        b = clampIn([b[0], below + b[3] <= vh - INSET ? below : a[1] - GAP - b[3], b[2], b[3]]);
+      }
+    }
+    if (pk) {
+      peakTag.style.translate = `${pk[0]}px ${pk[1]}px`;
+      peakTagV.style.translate = `${a[0] - pk[0]}px ${a[1] - pk[1]}px`;
+    }
+    if (ld) loadTag.style.translate = `${b[0]}px ${b[1]}px`;
+  }
+
+  function overlays() {
+    const hubS = toScreen(pAt), pkS = toScreen(peakP);
+    const pk = showTags && inView(pkS) ? pkS : null;
     const reach = Math.max(len, 16);
-    if (len <= 0.5 || !showTags) { loadTag.hidden = true; grip.hidden = true; hand.hidden = true; return; }
+    if (len <= 0.5 || !showTags) { labels(pk, hubS, null, null); grip.hidden = true; hand.hidden = true; return; }
     // the hit area: a pill over the whole arrow, hub to tip, wider than the arrow itself
     const tipS = toScreen(along(pAt, pDir, reach));
     const dx = tipS[0] - hubS[0], dy = tipS[1] - hubS[1], l = Math.hypot(dx, dy) || 1, pad = GRIP / 2;
@@ -213,12 +262,9 @@ async function build(root, ui, trash) {
       hand.style.translate = `${h[0]}px ${h[1]}px`;
       hand.style.opacity = String(handOpacity);
     }
-    // the label sits just past the arrow's tip, on the side the arrow points to
-    place(loadTag, along(pAt, pDir, reach + 8));
-    if (!loadTag.hidden) {
-      const sx = dx / l, sy = dy / l;
-      loadTag.style.transform = `translate(${(-50 + 50 * sx).toFixed(1)}%, ${(-50 + 50 * sy).toFixed(1)}%)`;
-    }
+    // the load label goes just past the arrow's tip, on the side the arrow points to
+    const ldS = toScreen(along(pAt, pDir, reach + 3));
+    labels(pk, hubS, inView(ldS) ? ldS : null, [dx / l, dy / l]);
   }
 
   // Draw on demand, at most once a frame, and not at all while the part is off screen. While the
@@ -281,6 +327,12 @@ async function build(root, ui, trash) {
     if (!w || !h) return;
     vw = w;
     vh = h;
+    sizes = null;
+    if (short !== vw < 560) {
+      short = vw < 560;
+      loadTag.toggleAttribute('data-short', short);
+      apply();
+    }
     back.size(w, h, px);
     if (enter.k >= 1) {
       orbit.aspect = w / h;
