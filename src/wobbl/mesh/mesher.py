@@ -283,15 +283,18 @@ def _build(prep: PreparedGeometry, sizing: Sizing, verbose: bool, alg2d: int, al
         if etype not in list(types):
             raise MeshError("no tetrahedra were generated")
         k = list(types).index(etype)
+        straightened = 0
         if sizing.order == 2 and curved:
             q = np.asarray(gmsh.model.mesh.getElementQualities(etags[k], "minDetJac"))
             if (q <= 0).any():
-                gmsh.model.mesh.optimize("HighOrder")
+                # curving midside nodes onto the CAD folded some thin elements. High order optimization can
+                # take minutes on thin walls; straight sided quadratic elements are always valid and cost nothing
+                straightened = int((q <= 0).sum())
+                gmsh.model.mesh.setOrder(1)
+                opt("Mesh.SecondOrderLinear", 1)
+                gmsh.model.mesh.setOrder(2)
                 types, etags, enodes = gmsh.model.mesh.getElements(3)
                 k = list(types).index(etype)
-                q = np.asarray(gmsh.model.mesh.getElementQualities(etags[k], "minDetJac"))
-                if (q <= 0).any():
-                    raise MeshError(f"{int((q <= 0).sum())} curved elements are inverted")
         ntags, coords, _ = gmsh.model.mesh.getNodes()
         nper = 10 if sizing.order == 2 else 4
         raw = np.asarray(enodes[k], dtype=np.int64).reshape(-1, nper)
@@ -336,6 +339,9 @@ def _build(prep: PreparedGeometry, sizing: Sizing, verbose: bool, alg2d: int, al
         tri_surf[hit] = ss[idx[hit]]
     mesh = Mesh(X, tets, tris, tri_surf, E, F, sizing.order, sizing, time.time() - t0,
                 surface_types=stypes, surface_curves=scurves)
+    if straightened:
+        mesh.notes.append(f"{straightened} curved elements folded on thin walls, so this mesh uses straight sided "
+                          "second order elements.")
     if (tri_surf < 0).any():
         mesh.notes.append(f"{int((tri_surf < 0).sum())} boundary faces could not be matched to a CAD surface.")
     if len(tets) == 0:

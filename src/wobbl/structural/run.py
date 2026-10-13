@@ -217,16 +217,19 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
     for lv in range(levels_max):
         _say(progress, "mesh", f"level {lv}: meshing (element size {sizing.h:.3g} mm)")
         mesh = build_mesh(prep, sizing)
-        tries = 0
-        while lv == 0 and mesh.n_nodes > 1.6 * q["nodes"] and tries < 3 and not study.mesh_size:
-            # small features made the first mesh too big to solve quickly: coarsen and try again
-            tries += 1
-            sizing.h *= 1.3
+        cap = 2.0 * features.thickness_min  # never coarser than this: thin walls and struts need real elements
+        if lv == 0 and mesh.n_nodes > 1.6 * q["nodes"] and not study.mesh_size and sizing.h < cap:
+            # small features made the first mesh too big to solve quickly: coarsen once, by the right amount
+            factor = min((mesh.n_nodes / q["nodes"]) ** (1 / 3), cap / sizing.h)
+            sizing.h *= factor
             for r in sizing.refinements:
                 if r.corners_only:
-                    r.size *= 1.3
+                    r.size *= factor
             _say(progress, "mesh", f"level 0 had {mesh.n_nodes:,} nodes; coarsening to {sizing.h:.3g} mm")
             mesh = build_mesh(prep, sizing)
+        if lv == 0 and mesh.n_nodes > 2 * q["nodes"]:
+            notes.append(f"Thin walls need a large first mesh ({mesh.n_nodes:,} nodes), so this study takes longer "
+                         "than usual.")
         notes += [n for n in mesh.notes if n not in notes]
         built = build_static(mesh, loads, fixtures, material, features.faces)
         _say(progress, "solve", f"level {lv}: solving {mesh.n_nodes:,} nodes with {adapter.name}")
