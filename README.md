@@ -59,10 +59,10 @@ Wobbl answers those parts with the trap handling built in:
 
 | Part | Converged reference | Wobbl | Confidence |
 |---|---|---|---|
-| Cast motor mount, belt pull through four bolts | 124.3 MPa at the rib tip | 123.9 MPa, same spot | high |
-| ABS enclosure shell pressed near a corner | 93 MPa, 1.93 mm deflection | 92.5 MPa, 1.92 mm | high |
-| PA12 truss drone arm, thrust and torque | 11.5 MPa, 4.09 mm rise | 11.49 MPa, 4.08 mm | high |
-| PLA bracket, sharp inside corner | about 78 MPa | 79.8 MPa | high |
+| Cast motor mount, belt pull through four bolts | 124.3 MPa at the rib tip | 123.9 MPa, same spot | medium, and it says why: the verdict flips if the servo is treated as rigid |
+| ABS enclosure shell pressed near a corner | 93 MPa, 1.93 mm deflection | 89.8 MPa, 1.91 mm | high |
+| PA12 truss drone arm, thrust and torque | 11.5 MPa, 4.09 mm rise | 11.53 MPa, 4.08 mm | high |
+| PLA bracket, sharp inside corner | about 78 MPa | 80.0 MPa | high |
 
 The full comparison is in [docs/bakeoff.md](docs/bakeoff.md).
 
@@ -139,7 +139,7 @@ beams, a plate with a hole (Kirsch with Peterson's finite width factor), a thick
 walled pressure vessel (Lame), NAFEMS LE1 and LE10, torsion, self weight, slab
 conduction, lumped cooling, an LED, an RC circuit, buck ripple, and five real
 parts against converged reference models. Every case with an exact textbook or
-benchmark answer lands within 1.6%. The table is in
+benchmark answer lands within 2%. The table is in
 [docs/validation.md](docs/validation.md); run it yourself with `wobbl validate`.
 
 ## Examples

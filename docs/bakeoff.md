@@ -33,11 +33,11 @@ study, including every check and the heatmaps.
 
 | Part | Reference | Wobbl | Difference | Wobbl's confidence | Time |
 |---|---|---|---|---|---|
-| Cast motor mount, 2 kN belt pull through four bolts | 124.3 MPa at the +X rib tip | 123.9 MPa at the same spot | 0.3% | high | about 2.5 min |
-| ABS enclosure shell, 250 N near a corner | 93 MPa at the corner boss fillet, 1.93 mm deflection | 92.5 MPa at the same fillet, 1.92 mm | 0.5%, 0.6% | high | about 13 min (thin walls, 166k nodes) |
-| PA12 truss drone arm, 40 N thrust and 0.8 N m | 11.5 MPa at the first window corner, motor rises 4.09 mm | 11.49 MPa at the same corner, 4.08 mm | 0.1%, 0.4% | high | about 12 min |
-| PLA bracket, 0.5 mm inside corner, wall contact | about 78 MPa (77.5, still moving 5%) | 79.8 MPa | 2.4% | high | 43 s |
-| PLA bracket, 6 mm fillet, wall contact | 25.3 MPa | 25.7 MPa | 1.4% | medium (the bonded screw bore reads 64 MPa, excluded and named) | 38 s |
+| Cast motor mount, 2 kN belt pull through four bolts | 124.3 MPa at the +X rib tip | 123.9 MPa at the same spot | 0.3% | medium: the verdict flips if the servo is rigid (named in the result) | about 3.5 min |
+| ABS enclosure shell, 250 N near a corner | 93 MPa at the corner boss fillet, 1.93 mm deflection | 89.8 MPa at the same fillet, 1.91 mm | 3.4%, 0.9% | high | about 9 min (thin walls, 154k nodes) |
+| PA12 truss drone arm, 40 N thrust and 0.8 N m | 11.5 MPa at the first window corner, motor rises 4.09 mm | 11.53 MPa at the same corner, 4.08 mm | 0.3%, 0.1% | high | about 12 min |
+| PLA bracket, 0.5 mm inside corner, wall contact | about 78 MPa (77.5, still moving 5%) | 80.0 MPa | 2.6% | high | 65 s |
+| PLA bracket, 6 mm fillet, wall contact | 25.3 MPa | 25.6 MPa | 1.0% | medium: the bonded screw bore reads 64 MPa, excluded and named | 20 s |
 | 6061 bar arm with root fillet and hole | 165.1 MPa (23,949 psi) | 165.0 MPa | 0.1% | high | about 1 to 2 min |
 
 The references took one to ten minutes of solving per mesh on their finest
