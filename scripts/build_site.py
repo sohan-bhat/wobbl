@@ -24,7 +24,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from sitegen import PAGES_SRC, ROOT, SITE_SRC, cfg, url
+from sitegen import PAGES_SRC, ROOT, SITE_SRC, cfg, full_url, url
 from sitegen import docs, examples
 from sitegen.layout import asset, page
 
@@ -94,7 +94,16 @@ def build(out: Path) -> list[str]:
         path, html = hand_page(src, {})
         write(out, path, html)
         routes.append(path)
+    sitemap(out, routes)
     return routes
+
+
+def sitemap(out: Path, routes: list[str]) -> None:
+    pages = sorted(r for r in routes if r.endswith("/") or r == "")
+    rows = "".join(f"  <url><loc>{full_url(r)}</loc></url>\n" for r in pages)
+    (out / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
+                                     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                                     f"{rows}</urlset>\n", encoding="utf-8")
 
 
 class Preview(SimpleHTTPRequestHandler):
