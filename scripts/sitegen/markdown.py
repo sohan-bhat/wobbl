@@ -18,6 +18,9 @@ from markdown_it.token import Token
 from . import ROOT, SITE_SRC, repo_url, url
 from .layout import image_size
 
+# A table cell that is a number with an optional unit: set in mono and kept on one line
+NUMBER = re.compile(r"^-?[\d.,]+(e-?\d+)?\s?(%|[A-Za-z/^\d]{1,6})?$")
+
 LABELS = {"sh": "Terminal", "console": "Terminal", "python": "Python", "text": "Output", "toml": "TOML",
           "json": "JSON"}
 
@@ -77,8 +80,10 @@ def term(code: str, lang: str = "sh", label: str | None = None) -> str:
         data = escape("\n".join(copy), quote=True).replace("\n", "&#10;")
         button = (f'<button class="copy" type="button" data-copy="{data}" '
                   f'aria-label="Copy: {escape(label, quote=True)}">Copy</button>')
-    return (f'<div class="term" data-copy-block><div class="term-bar"><span>{escape(label)}</span>{button}</div>'
-            f'<pre translate="no"><code>{"".join(lines)}</code></pre></div>\n')
+    kind = "term term-out" if lang == "text" else "term"
+    tab = ' tabindex="0"' if lang == "text" else ""  # output can scroll sideways on phones
+    return (f'<div class="{kind}" data-copy-block><div class="term-bar"><span>{escape(label)}</span>{button}</div>'
+            f'<pre translate="no"{tab}><code>{"".join(lines)}</code></pre></div>\n')
 
 
 def site_link(href: str, src_dir: Path) -> str:
@@ -207,6 +212,8 @@ def render(path: Path, *, demote: int = 0, used: set[str] | None = None, top_id:
                     toc.append((text, slug))
         elif tok.type == "table_open":
             tok.meta["label"] = last_heading or "Table"
+        elif tok.type == "td_open" and NUMBER.match(tokens[i + 1].content.strip()):
+            tok.attrSet("class", "num")
         elif tok.type == "html_block":
             tok.content = _html_attrs(tok.content, src_dir)
         elif tok.type == "inline":

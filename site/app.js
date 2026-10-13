@@ -30,7 +30,16 @@ document.addEventListener('click', async (e) => {
 for (const wrap of $$('.table-scroll')) {
   const heads = $$('thead th', wrap).map((th) => th.textContent.trim());
   for (const tr of $$('tbody tr', wrap)) {
-    [...tr.children].forEach((cell, i) => { if (cell.tagName === 'TD') cell.dataset.label = heads[i] || ''; });
+    [...tr.children].forEach((cell, i) => {
+      if (cell.tagName !== 'TD') return;
+      cell.dataset.label = heads[i] || '';
+      // the stacked layout is a two column grid: label, then the cell's content as one item
+      if (cell.childNodes.length > 1) {
+        const span = document.createElement('span');
+        span.append(...cell.childNodes);
+        cell.append(span);
+      }
+    });
   }
   wrap.classList.add('stack');
 }

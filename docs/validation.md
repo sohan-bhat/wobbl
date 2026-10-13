@@ -1,8 +1,10 @@
 # Validation
 
-Every case runs through the same pipeline a user gets: Wobbl builds the part,
-meshes it, refines until the answer settles, runs its checks, and the number is
-compared with a textbook or benchmark value. Run them with:
+18 cases with known answers, run through the same pipeline you get.
+
+Wobbl builds each part, meshes it, refines until the answer settles and runs its
+checks, and the number is compared with a textbook or benchmark value. Run them
+with:
 
 ```sh
 wobbl validate                 # all cases, about 30 minutes
