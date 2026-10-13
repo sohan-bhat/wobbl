@@ -266,8 +266,9 @@ def _input_fixes(d: dict, apply: bool) -> dict:
     fixes = [{"kind": f.get("kind", ""), "title": f.get("title", ""), "summary": f.get("summary", ""),
               "auto": False} for f in d.get("fixes") or []]
     out = {"domain": dom, "verdict": d.get("verdict", ""), "headline": d.get("headline", ""), "fixes": fixes}
-    out["note"] = (f"Each {_DOMAIN_WORD.get(dom, dom)} fix changes an input, so check it by calling {tool} again "
-                   "with the new value." if fixes else "This result has no fixes to suggest.")
+    word = f"{_DOMAIN_WORD[dom]} " if dom in _DOMAIN_WORD else ""
+    out["note"] = (f"Each {word}fix changes an input, so check it by calling {tool} again with the new value."
+                   if fixes else "This result has no fixes to suggest.")
     if apply:
         out["applied"] = False
         out["note"] = "Wobbl builds and solves fixes by itself only for strength results. " + out["note"]

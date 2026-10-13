@@ -3,7 +3,7 @@
 Fillets and gussets are built into any part through OpenCASCADE. On a parametric .py part, a thicker wall
 or a larger fillet changes its thickness or fillet parameter and rebuilds it, and no other parameter is
 touched. A material swap reuses the first solve when that is exact and solves again when it is not, as
-``material_swap_resolve`` explains. Every result says which way it was found.
+``material_swap_resolve`` explains, and its result says which way it was found.
 """
 from __future__ import annotations
 

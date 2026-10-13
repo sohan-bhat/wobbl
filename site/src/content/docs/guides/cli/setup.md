@@ -30,6 +30,7 @@ wobbl setup --dry-run                        # show what would change
 
 When setup finds no agents, it says so and suggests `--agents all` to register every one
 anyway. It ends by suggesting `wobbl doctor`, then the circuit question with no files that
-[First run](/get-started/first-run/) starts with, or a question about a part of your own. Every file it changes is backed up to `~/.wobbl/backups/<time>/` first, and a failed
+[First run](/get-started/first-run/) starts with, or a question about a part of your own.
+Every file it changes is backed up to `~/.wobbl/backups/<time>/` first, and a failed
 install points to its log at `~/.wobbl/setup.log`. [Setup](/get-started/setup/) explains what
 gets installed where, and the [agent guides](/guides/agents/) show what each agent receives.
