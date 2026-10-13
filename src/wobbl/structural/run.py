@@ -248,7 +248,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         if mesh.n_nodes * 1.8 > q["max_nodes"]:
             stopped_by = "node limit"
             break
-        sizing = _refine(sizing, spots, levels, tol, lv)
+        sizing = _refine(sizing, spots, levels, tol, lv, features)
     mesh, res, built, measure, mname, excluded = last
     run = StructuralRun(study, material, prep, features, sel_info, levels, spots, mesh, res, built, mname,
                         measure, excluded, r_ex, work, tol, stopped_by, time.time() - t_start, notes)
@@ -300,11 +300,23 @@ def refinement_targets(spots: list[Hotspot], governing: float, lv: int) -> list[
     return out
 
 
-def _refine(sizing: Sizing, spots: list[Hotspot], levels: list[Level], tol: float, lv: int) -> Sizing:
+def _refine(sizing: Sizing, spots: list[Hotspot], levels: list[Level], tol: float, lv: int,
+            features: PartFeatures | None = None) -> Sizing:
     new = Sizing(h=sizing.h, refinements=list(sizing.refinements), order=sizing.order, curvature=sizing.curvature)
+    done_faces = set()
     for s in refinement_targets(spots, levels[-1].governing, lv):
         h = s.sizes[-1] if s.sizes and np.isfinite(s.sizes[-1]) else sizing.h / 4
         size = 0.5 * h
+        face = features.faces.get(s.face) if (features and s.face is not None) else None
+        tight = face is not None and features is not None and face.role == "fillet" and \
+            face.radius < 0.25 * features.thickness_typical
+        if tight and s.kind == "feature":
+            # a peak on a fillet runs along it: refine the whole fillet so neighbours do not trade places
+            if face.id not in done_faces:
+                new.refinements.append(Refinement(size, surfaces=[face.id], grow=6 * size,
+                                                  label=f"fillet {face.id} at hotspot {s.id}"))
+                done_faces.add(face.id)
+            continue
         new.refinements.append(Refinement(size, points=[tuple(s.xyz)], radius=2.5 * h, grow=6 * size,
                                           label=f"hotspot {s.id}"))
     # the far field gets a little finer too, so global load paths converge
