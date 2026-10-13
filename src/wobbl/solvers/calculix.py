@@ -190,6 +190,8 @@ def write_static_inp(path: Path, model: StaticModel, nlgeom: bool = False) -> di
             for i, terms in eqs:
                 f.write(f"{len(terms)}\n" + ",".join(f"{i + 1},{d},{c:.10g}" for d, c in terms) + "\n")
         if nlgeom:
+            # results only at the end of the load ramp, so the .frd stays small
+            f.write("*TIME POINTS, NAME=TEND\n1.\n")
             f.write("*STEP, NLGEOM, INC=200\n*STATIC\n0.1,1.,1e-5,0.25\n*BOUNDARY\n")
         else:
             f.write("*STEP\n*STATIC\n*BOUNDARY\n")
@@ -222,7 +224,8 @@ def write_static_inp(path: Path, model: StaticModel, nlgeom: bool = False) -> di
             mag = np.linalg.norm(g)
             d = g / mag
             f.write(f"*DLOAD\nEALL,GRAV,{mag:.10g},{d[0]:.10g},{d[1]:.10g},{d[2]:.10g}\n")
-        f.write("*NODE FILE\nU,RF\n*EL FILE\nS\n*END STEP\n")
+        tp = ", TIME POINTS=TEND" if nlgeom else ""
+        f.write(f"*NODE FILE{tp}\nU,RF\n*EL FILE{tp}\nS\n*END STEP\n")
     return extra
 
 
