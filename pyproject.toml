@@ -31,6 +31,9 @@ dependencies = [
     "click>=8.1",
     "mcp>=1.2",
     "tomli>=2; python_version < '3.11'",
+    # cryptography (pulled in by mcp) stopped shipping Intel Mac wheels at 49, so
+    # without this cap those Macs would need Rust and a C compiler to install Wobbl
+    "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]
 
 [project.optional-dependencies]
@@ -40,7 +43,9 @@ dev = ["pytest>=7", "pytest-timeout>=2"]
 wobbl = "wobbl.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/sohan-bhat/wobbl"
+Homepage = "https://sohan-bhat.github.io/wobbl/"
+Documentation = "https://sohan-bhat.github.io/wobbl/get-started/"
+Source = "https://github.com/sohan-bhat/wobbl"
 Issues = "https://github.com/sohan-bhat/wobbl/issues"
 
 [tool.hatch.build.targets.wheel]
