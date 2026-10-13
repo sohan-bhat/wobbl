@@ -363,26 +363,42 @@ def _surface(prep: PreparedGeometry, h: float | None, curvature: int, alg: int) 
     h = h or prep.diag / 30.0
     with gmsh_session() as gmsh:
         load_into_session(gmsh, prep)
-        opt = gmsh.option.setNumber
-        opt("Mesh.MeshSizeMax", h)
-        opt("Mesh.MeshSizeMin", prep.diag / 250.0)
-        opt("Mesh.MeshSizeFromPoints", 0)
-        opt("Mesh.MeshSizeFromCurvature", 0 if prep.kind == "stl" else curvature)
-        opt("Mesh.Algorithm", alg)
-        if prep.kind != "stl":
-            try:
-                gmsh.model.mesh.generate(2)
-            except Exception as e:  # noqa: BLE001
-                raise MeshError(f"surface meshing failed: {e}") from e
-        ntags, coords, _ = gmsh.model.mesh.getNodes()
-        stypes, scurves, chunks = {}, {}, []
-        for _, s in gmsh.model.getEntities(2):
-            stypes[s] = gmsh.model.getType(2, s)
-            scurves[s] = [int(c) for c in gmsh.model.getAdjacencies(2, s)[1]]
-            st, _, sn = gmsh.model.mesh.getElements(2, s)
-            for tt, nn in zip(st, sn):
-                if tt == 2:
-                    chunks.append((s, np.asarray(nn, dtype=np.int64).reshape(-1, 3)))
+        sm = _surface_from_session(gmsh, h, curvature, alg, prep.diag, prep.kind == "stl")
+    sm.t_mesh = time.time() - t0
+    return sm
+
+
+def _surface_from_session(gmsh, h: float, curvature: int = 8, alg: int = 6, diag: float | None = None,
+                          is_stl: bool = False) -> SurfaceMesh:
+    """Surface mesh of whatever geometry is loaded in an open gmsh session."""
+    if diag is None:
+        bb = gmsh.model.getBoundingBox(-1, -1)
+        diag = float(np.linalg.norm(np.array(bb[3:]) - np.array(bb[:3])))
+    t0 = time.time()
+    opt = gmsh.option.setNumber
+    opt("Mesh.MeshSizeMax", min(h, diag / 30.0))
+    opt("Mesh.MeshSizeMin", diag / 250.0)
+    opt("Mesh.MeshSizeFromPoints", 0)
+    opt("Mesh.MeshSizeFromCurvature", 0 if is_stl else curvature)
+    opt("Mesh.Algorithm", alg)
+    if not is_stl:
+        try:
+            gmsh.model.mesh.generate(2)
+        except Exception as e:  # noqa: BLE001
+            raise MeshError(f"surface meshing failed: {e}") from e
+    ntags, coords, _ = gmsh.model.mesh.getNodes()
+    stypes, scurves, chunks = {}, {}, []
+    for _, s in gmsh.model.getEntities(2):
+        stypes[s] = gmsh.model.getType(2, s)
+        scurves[s] = [int(c) for c in gmsh.model.getAdjacencies(2, s)[1]]
+        st, _, sn = gmsh.model.mesh.getElements(2, s)
+        for tt, nn in zip(st, sn):
+            if tt == 2:
+                chunks.append((s, np.asarray(nn, dtype=np.int64).reshape(-1, 3)))
+    return _orient_surface(ntags, coords, chunks, stypes, scurves, diag, t0)
+
+
+def _orient_surface(ntags, coords, chunks, stypes, scurves, diag, t0) -> SurfaceMesh:
     if not chunks:
         raise MeshError("no surface triangles were generated")
     ntags = np.asarray(ntags, dtype=np.int64)
@@ -409,7 +425,7 @@ def _surface(prep: PreparedGeometry, h: float | None, curvature: int, alg: int) 
             n = nrm[i] / max(np.linalg.norm(nrm[i]), 1e-300)
             d = n + 0.05 * rng.standard_normal(3)
             d /= np.linalg.norm(d)
-            c = (V0[i] + V1[i] + V2[i]) / 3.0 + d * 1e-7 * prep.diag
+            c = (V0[i] + V1[i] + V2[i]) / 3.0 + d * 1e-7 * diag
             votes += 1 if _count_hits(c, d, V0, e1, e2) % 2 == 1 else -1
         if votes > 0:
             tris[idx] = tris[idx][:, [0, 2, 1]]
