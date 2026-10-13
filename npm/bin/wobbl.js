@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 
-// npx wobbl runs the real Wobbl, which is a Python package.
+// npx wobbl runs the real Wobbl, which is a Python package, and installs it on first use.
 //
 //   1. A wobbl of this exact version is already installed. Run it.
+//   2. Otherwise install it for good with `uv tool install`, or `pipx install` when there
+//      is no uv. An npx cache is not enough, because `wobbl setup` registers the installed
+//      command with Claude Code, Codex, Cursor and Gemini CLI, and it has to stay put.
 //
 // Everything this script says goes to stderr, so `npx wobbl mcp` keeps stdout clean.
 
@@ -13,6 +16,8 @@ const os = require('os');
 const path = require('path');
 
 const VERSION = require('../package.json').version;
+const PYTHON_SPEC = '>=3.10'; // keep in step with requires-python in pyproject.toml
+const UV_DOCS = 'https://docs.astral.sh/uv/getting-started/installation/';
 const ISSUES = 'https://github.com/sohan-bhat/wobbl/issues';
 const IS_WIN = process.platform === 'win32';
 
@@ -148,6 +153,23 @@ function runSync(file, args, env, timeout = 60000) {
   return spawnSync(f, a, { ...opts, env, encoding: 'utf8', windowsHide: true, timeout });
 }
 
+// Run an installer, showing its output on stderr and keeping a copy to explain failures.
+function runInstaller(file, args, env) {
+  return new Promise((resolve) => {
+    const [f, a, opts] = command(file, args, env);
+    let out = '';
+    const child = spawn(f, a, { ...opts, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const tee = (chunk) => {
+      out += chunk;
+      process.stderr.write(chunk);
+    };
+    child.stdout.on('data', tee);
+    child.stderr.on('data', tee);
+    child.on('error', (e) => resolve({ code: null, out: `${out}\n${e.message}` }));
+    child.on('close', (code) => resolve({ code, out }));
+  });
+}
+
 // -- versions ---------------------------------------------------------------
 
 // npm writes 0.2.0-rc.1 where Python writes 0.2.0rc1. Both become the PEP 440 form, and
@@ -198,6 +220,187 @@ function pickWobbl(env, firstDirs = []) {
     others.push({ file, real: realpath(file), version });
   }
   return { match: null, others };
+}
+
+// -- installing -------------------------------------------------------------
+
+// uv comes first because it fetches a Python 3.10 or newer by itself. pipx is the fallback,
+// and also the choice when it already manages an older wobbl, so there is one copy.
+function chooseInstaller({ uv, pipx, pipxOwnsWobbl }) {
+  if (pipx && pipxOwnsWobbl) return 'pipx';
+  if (uv) return 'uv';
+  if (pipx) return 'pipx';
+  return 'bootstrap';
+}
+
+const PATTERNS = {
+  network: /dns error|failed to lookup|name or service not known|nodename nor servname|getaddrinfo|name resolution|connection refused|connection reset|tcp connect|network is unreachable|timed out|error sending request|failed to fetch|could not fetch|newconnectionerror|max retries exceeded|proxyerror|sslerror|certificate verify/i,
+  python: /no interpreter found|no python|python downloads are not allowed|python-downloads|require a different python|requires-python/i,
+  missing: /not found in the package registry|there is no version of wobbl|no versions of wobbl|no matching distribution found|could not find a version that satisfies/i,
+  conflict: /already exists.*--force/i,
+  oldPython: /require a different python|requires-python|bad interpreter/i,
+};
+
+function reach(url) {
+  return new Promise((resolve) => {
+    const req = require('https').request(url, { method: 'HEAD', timeout: 6000 }, (res) => {
+      res.resume();
+      resolve(true);
+    });
+    req.on('timeout', () => req.destroy(new Error('timed out')));
+    req.on('error', () => resolve(false));
+    req.end();
+  });
+}
+
+// 'offline' when nothing answers, 'pypi' when only PyPI is out of reach, else 'online'.
+async function networkState(deps) {
+  const check = deps.reach || reach;
+  const [pypi, github] = await Promise.all([check('https://pypi.org/simple/'), check('https://github.com/')]);
+  if (pypi) return 'online';
+  return github ? 'pypi' : 'offline';
+}
+
+// Turn an installer's failed output into an explanation and a way forward.
+async function failure(tool, out, deps = {}) {
+  const retry = 'Check your connection, then run the same command again.';
+  if (PATTERNS.network.test(out)) {
+    const state = await networkState(deps);
+    if (state === 'offline') {
+      return new Stop([
+        'Wobbl could not reach the internet, so it could not download itself.',
+        retry,
+        'If you go online through a proxy, set HTTPS_PROXY so uv and pip can use it.',
+      ]);
+    }
+    if (state === 'pypi') {
+      return new Stop([
+        'Wobbl could not reach PyPI (pypi.org), where the wobbl package lives, even though the internet works.',
+        'pypi.org may be blocked on this network or briefly down. Try again in a minute.',
+        'If your company has its own package index, point uv at it with UV_INDEX_URL, or pipx with PIP_INDEX_URL.',
+      ]);
+    }
+    return new Stop([
+      `${tool} ran into a network problem while downloading wobbl ${VERSION}. Its output above has the details.`,
+      retry,
+      'If you go online through a proxy, set HTTPS_PROXY so uv and pip can use it.',
+    ]);
+  }
+  if (PATTERNS.python.test(out)) {
+    return new Stop([
+      `wobbl ${VERSION} needs Python 3.10 or newer, and ${tool} could not find or download one.`,
+      'Install Python 3.10 or newer, or let uv fetch it by unsetting UV_PYTHON_DOWNLOADS, then run the same command again.',
+    ]);
+  }
+  if (PATTERNS.missing.test(out)) {
+    return new Stop([
+      `wobbl ${VERSION} is not on PyPI yet, so there is nothing to install.`,
+      'If it came out in the last few minutes, wait a moment and run the same command again.',
+    ]);
+  }
+  const manual = tool === 'pipx' ? 'pipx install' : 'uv tool install';
+  return new Stop([
+    `${tool} could not install wobbl ${VERSION}. Its output above says why.`,
+    'You can also install it yourself and run wobbl directly',
+    '',
+    `    ${manual} wobbl==${VERSION}`,
+  ]);
+}
+
+function shown(file, env) {
+  const bare = path.basename(file, path.extname(file));
+  if (onPath(bare, env).some((f) => sameFile(f, file))) return bare;
+  return /\s/.test(file) ? `"${file}"` : file;
+}
+
+function binDirFrom(file, args, fallback, env) {
+  const r = runSync(file, args, env);
+  const dir = !r.error && r.status === 0 ? r.stdout.trim().split(/\r?\n/).pop() : '';
+  return dir || fallback;
+}
+
+async function installWithPipx(pipx, env, deps) {
+  const r = await runInstaller(pipx, ['install', '--force', `wobbl==${VERSION}`], env);
+  if (r.code === 0) {
+    const fallback = env.PIPX_BIN_DIR || path.join(homeOf(env), '.local', 'bin');
+    const bin = binDirFrom(pipx, ['environment', '--value', 'PIPX_BIN_DIR'], fallback, env);
+    return { tool: 'pipx', bin, fix: `${shown(pipx, env)} ensurepath` };
+  }
+  if (PATTERNS.oldPython.test(r.out)) return null;
+  throw await failure('pipx', r.out, deps);
+}
+
+async function installWithUv(uv, env, deps) {
+  const args = ['tool', 'install', '--python', PYTHON_SPEC, `wobbl==${VERSION}`];
+  let r = await runInstaller(uv, args, env);
+  if (r.code !== 0 && PATTERNS.conflict.test(r.out)) {
+    say('', `Another installer already put a wobbl command where uv keeps commands. Replacing it with wobbl ${VERSION}.`, '');
+    r = await runInstaller(uv, ['tool', 'install', '--force', ...args.slice(2)], env);
+  }
+  if (r.code !== 0) throw await failure('uv', r.out, deps);
+  const fallback = env.UV_TOOL_BIN_DIR || env.XDG_BIN_HOME || path.join(homeOf(env), '.local', 'bin');
+  const bin = binDirFrom(uv, ['tool', 'dir', '--bin'], fallback, env);
+  return { tool: 'uv', bin, fix: `${shown(uv, env)} tool update-shell` };
+}
+
+async function obtainUv() {
+  throw new Stop([
+    'Wobbl needs uv to install itself here, and uv is not on this computer.',
+    'Install uv, then run the same command again.',
+    '',
+    `    ${UV_DOCS}`,
+  ]);
+}
+
+async function install(env, others, deps = {}) {
+  say(`Setting up wobbl ${VERSION}. This happens once for each new version.`, '');
+  const uv = onPath('uv', env)[0];
+  const pipx = onPath('pipx', env)[0];
+  const pipxOwnsWobbl = others.some((w) => /[\\/]pipx[\\/]venvs[\\/]/i.test(w.real));
+  const how = chooseInstaller({ uv, pipx, pipxOwnsWobbl });
+  if (how === 'pipx') {
+    const done = await installWithPipx(pipx, env, deps);
+    if (done) return done;
+    say(
+      '',
+      'pipx has no Python 3.10 or newer to work with here, and Wobbl needs one.',
+      'Wobbl will use uv instead, which brings its own Python.',
+      '',
+    );
+  }
+  return installWithUv(uv || (await obtainUv()), env, deps);
+}
+
+function profileFile(env) {
+  const shell = path.basename(env.SHELL || '');
+  if (shell === 'zsh') return '~/.zshrc';
+  if (shell === 'bash') return process.platform === 'darwin' ? '~/.bash_profile' : '~/.bashrc';
+  return '~/.profile';
+}
+
+// wobbl setup registers the full path of the wobbl command, so agents find it either way.
+// PATH only matters for typing `wobbl` in a terminal. This prints the fix and changes nothing.
+function pathHint(bin, fix, env) {
+  if (pathDirs(env).some((d) => sameFile(d, bin))) return [];
+  const lines = [
+    '',
+    `${bin} is not on your PATH yet. Your agents find Wobbl anyway, because wobbl setup saves the full path.`,
+    'To type wobbl in new terminals as well, run this once',
+    '',
+    `    ${fix}`,
+    '',
+  ];
+  if (IS_WIN) {
+    const add = `[Environment]::SetEnvironmentVariable("Path", "${bin};" + [Environment]::GetEnvironmentVariable("Path", "User"), "User")`;
+    lines.push('or run this in PowerShell', '', `    ${add}`);
+  } else if (path.basename(env.SHELL || '') === 'fish') {
+    lines.push('or run this in fish', '', `    fish_add_path "${bin}"`);
+  } else {
+    const home = homeOf(env);
+    const dir = bin === home || bin.startsWith(home + path.sep) ? `$HOME${bin.slice(home.length)}` : bin;
+    lines.push(`or add this line to ${profileFile(env)} yourself`, '', `    export PATH="${dir}:$PATH"`);
+  }
+  return lines;
 }
 
 // -- handing over -----------------------------------------------------------
@@ -254,19 +457,25 @@ function execWobbl(file, args, env) {
   });
 }
 
-async function main(argv, env = process.env) {
+async function main(argv, env = process.env, deps = {}) {
   if (env[PROBE_ENV] === '1') {
     process.stdout.write(`${PROBE_REPLY} ${VERSION}\n`);
     return 0;
   }
   try {
-    const { match } = pickWobbl(env);
+    let { match, others } = pickWobbl(env);
     if (!match) {
-      throw new Stop([
-        `wobbl ${VERSION} is not installed yet. Install it with uv, then run the same command again.`,
-        '',
-        `    uv tool install wobbl==${VERSION}`,
-      ]);
+      const done = await install(env, others, deps);
+      ({ match } = pickWobbl(env, [done.bin]));
+      if (!match) {
+        throw new Stop([
+          `${done.tool} finished, but there is no wobbl ${VERSION} command in ${done.bin}.`,
+          'Please report this with the output above at',
+          '',
+          `    ${ISSUES}`,
+        ]);
+      }
+      say('', `Installed wobbl ${VERSION} with ${done.tool}. The wobbl command is ${match}.`, ...pathHint(done.bin, done.fix, env), '');
     }
     return await execWobbl(match, argv, env);
   } catch (e) {
@@ -291,6 +500,9 @@ if (require.main === module) {
 
 module.exports = {
   VERSION,
+  PYTHON_SPEC,
   Stop,
   canonical,
+  chooseInstaller,
+  failure,
 };
