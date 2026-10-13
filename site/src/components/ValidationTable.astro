@@ -1,0 +1,69 @@
+---
+// The validation results: one row per case with its known answer, Wobbl's answer, the
+// error drawn on a scale from 0 to the case's tolerance, the result and the confidence.
+// Numbers come from docs/validation-results.json (written by a full `wobbl validate`),
+// and the group and plain description of each case from src/data/validation-notes.json.
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { ROOT } from '../lib/site';
+
+interface Case {
+  id: string; title: string; domain: string; source: string; quantity: string; unit: string;
+  expected: number; wobbl: number; error: number; tolerance: number; pass: boolean; exact_theory: boolean;
+  confidence: string;
+}
+const cases: Case[] = JSON.parse(readFileSync(resolve(ROOT, 'docs/validation-results.json'), 'utf-8'));
+const notesFile = resolve(process.cwd(), 'src/data/validation-notes.json');
+const notes: Record<string, { group?: string; plain?: string }> = existsSync(notesFile)
+  ? JSON.parse(readFileSync(notesFile, 'utf-8')) : {};
+
+const ORDER = ['Textbook formulas', 'Industry benchmarks', 'Real parts from the bake off', 'Heat', 'Circuits'];
+const groupOf = (c: Case) => notes[c.id]?.group
+  ?? (c.domain === 'heat' ? 'Heat' : c.domain === 'circuit' ? 'Circuits'
+    : c.id.startsWith('nafems') ? 'Industry benchmarks' : c.exact_theory ? 'Textbook formulas' : 'Real parts from the bake off');
+const groups = [...new Set([...ORDER, ...cases.map(groupOf)])]
+  .map((g) => ({ label: g, rows: cases.filter((c) => groupOf(c) === g) }))
+  .filter((g) => g.rows.length);
+
+const num = (x: number, unit: string) => `${Number(x.toPrecision(4))} ${unit}`;
+const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
+const tol = (x: number) => `${Number((x * 100).toPrecision(3))}%`;
+const passed = cases.filter((c) => c.pass).length;
+---
+<div class="vtable">
+  <p class="vhead"><span class="vhead-n"><span data-count={passed}>{passed}</span> of {cases.length}</span> within tolerance</p>
+  <p class="vcap">Each bar runs from 0 to the case’s tolerance, so a shorter bar means a closer answer.</p>
+  <div class="table-scroll" role="region" aria-label="Validation results" tabindex="0">
+    <table class="data vt">
+      <thead>
+        <tr><th scope="col">Case</th><th scope="col">Known answer</th><th scope="col">Wobbl</th><th scope="col">Error</th>
+          <th scope="col">Tolerance</th><th scope="col">Result</th><th scope="col">Confidence</th></tr>
+      </thead>
+      {groups.map((g) => (
+        <tbody>
+          <tr class="group"><th colspan="7" scope="rowgroup">{g.label}</th></tr>
+          {g.rows.map((c) => {
+            const share = c.tolerance ? Math.min(c.error / c.tolerance, 1) : 0;
+            return (
+              <tr>
+                <th scope="row"><span class="vt-name">{c.title}</span>{notes[c.id]?.plain && <span class="vt-plain">{notes[c.id]!.plain}</span>}</th>
+                <td class="num">{num(c.expected, c.unit)}</td>
+                <td class="num">{num(c.wobbl, c.unit)}</td>
+                <td class="vt-err">
+                  <span class="vt-val">{pct(c.error)}</span>
+                  <span class="vt-scale" aria-hidden="true">
+                    <span class="vt-track"><i style={`width: ${(share * 100).toFixed(1)}%`}></i></span>
+                    <span class="vt-ticks"><span>0</span><span>{tol(c.tolerance)}</span></span>
+                  </span>
+                </td>
+                <td class="num">{tol(c.tolerance)}</td>
+                <td>{c.pass ? 'Pass' : 'Fail'}</td>
+                <td>{c.confidence[0].toUpperCase() + c.confidence.slice(1)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      ))}
+    </table>
+  </div>
+</div>

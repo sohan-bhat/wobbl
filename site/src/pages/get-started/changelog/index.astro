@@ -1,0 +1,18 @@
+---
+// The changelog, rendered from CHANGELOG.md at the repository root.
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import Docs from '../../../layouts/Docs.astro';
+import { render } from '../../../lib/markdown';
+import { ROOT } from '../../../lib/site';
+
+const text = readFileSync(resolve(ROOT, 'CHANGELOG.md'), 'utf-8')
+  .replace(/^# .*\n/, '')
+  .replace(/\]\((?!https?:|\/)([^)#]+)\)/g, '](https://github.com/sohan-bhat/wobbl/blob/main/$1)');
+const { html, headings } = render(text, 'CHANGELOG.md');
+---
+<Docs title="Changelog" path="get-started/changelog/" headings={headings} source="CHANGELOG.md"
+      description="What changed in each Wobbl release, from CHANGELOG.md in the repository."
+      lead="What changed in each release, newest first.">
+  <Fragment set:html={html} />
+</Docs>

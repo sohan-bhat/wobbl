@@ -1,0 +1,98 @@
+---
+// A docs page: the sidebar of every docs page on the left, the article in the
+// middle, its Contents on the right, then previous, next and an edit link.
+// Nothing here writes a #fragment to the address bar: Contents scrolls with JS.
+import Base from './Base.astro';
+import { sidebar, locate } from '../lib/sidebar';
+import { REPO, url } from '../lib/site';
+import type { Heading } from '../lib/markdown';
+
+interface Props {
+  title: string;
+  description: string;
+  path: string;             // route under the base, e.g. guides/inputs/loads/
+  lead?: string;
+  headings?: Heading[];
+  source?: string;          // repository path of the page's source, for "Edit this page"
+  wide?: boolean;           // no Contents column, for wide tables
+  crumb?: string;           // breadcrumb label for pages outside the sidebar groups
+}
+const { title, description, path, lead, headings = [], source, wide = false } = Astro.props;
+const here = `/${path}`;
+const spot = await locate(here);
+const SIDEBAR = await sidebar();
+const toc = wide ? [] : headings.filter((h) => h.depth === 2 || h.depth === 3);
+const crumbs = [{ label: 'Home', href: url() }];
+if (spot && spot.group.items[0].href !== here && spot.group.label !== title) {
+  crumbs.push({ label: spot.group.label, href: url(spot.group.items[0].href) });
+}
+---
+<Base title={`${title} | Wobbl`} description={description} path={path} search>
+  <div class="wrap docs">
+    <button type="button" class="btn-outline btn-sm docnav-open" data-docnav-open aria-controls="docnav" aria-expanded="false">
+      Menu<span class="docnav-here">{spot ? spot.item.label : title}</span>
+    </button>
+    <aside class="docnav" id="docnav" aria-label="Docs">
+      <div class="docnav-head">
+        <p>Docs</p>
+        <button type="button" class="btn-outline btn-sm" data-docnav-close>Close</button>
+      </div>
+      <nav>
+        {SIDEBAR.map((g) => {
+          const open = g.items.some((it) => it.href === here) || !spot;
+          return (
+            <details class="docnav-group" open={open || undefined}>
+              <summary>{g.label}</summary>
+              <ul>
+                {g.items.map((it) => (
+                  <li>
+                    <a href={url(it.href)} aria-current={it.href === here ? 'page' : undefined}>{it.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          );
+        })}
+      </nav>
+    </aside>
+    <div class="docnav-scrim" data-docnav-close hidden></div>
+
+    <article class="doc">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <ol>
+          {crumbs.map((c) => <li><a href={c.href}>{c.label}</a></li>)}
+          <li aria-current="page">{title}</li>
+        </ol>
+      </nav>
+      <header class="page-head">
+        <h1>{title}</h1>
+        {lead && <p class="page-lead" set:html={lead} />}
+      </header>
+      <div class="prose">
+        <slot />
+      </div>
+      <footer class="doc-foot">
+        {spot && (spot.prev || spot.next) && (
+          <nav class="pager" aria-label="Previous and next">
+            {spot.prev && <a class="pager-prev" href={url(spot.prev.href)}><span>Previous</span>{spot.prev.label}</a>}
+            {spot.next && <a class="pager-next" href={url(spot.next.href)}><span>Next</span>{spot.next.label}</a>}
+          </nav>
+        )}
+        {source && <p class="edit"><a href={`${REPO}/edit/main/${source}`}>Edit this page on GitHub</a></p>}
+      </footer>
+    </article>
+
+    {toc.length > 1 && (
+      <aside class="contents" aria-labelledby="contents-title">
+        <p id="contents-title">Contents</p>
+        <ul>
+          {toc.map((h) => (
+            <li class={h.depth === 3 ? 'sub' : undefined}>
+              <button type="button" data-scroll-to={h.slug}>{h.text}</button>
+            </li>
+          ))}
+        </ul>
+      </aside>
+    )}
+  </div>
+</Base>
