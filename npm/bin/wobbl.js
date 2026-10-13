@@ -7,16 +7,22 @@
 //   2. Otherwise install it for good with `uv tool install`, or `pipx install` when there
 //      is no uv. An npx cache is not enough, because `wobbl setup` registers the installed
 //      command with Claude Code, Codex, Cursor and Gemini CLI, and it has to stay put.
+//   3. With neither uv nor pipx around, download a pinned uv into ~/.wobbl/uv, check it
+//      against the SHA256 checksums of its GitHub release, and install with that.
 //
 // Everything this script says goes to stderr, so `npx wobbl mcp` keeps stdout clean.
 
 const { spawn, spawnSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const zlib = require('zlib');
 
 const VERSION = require('../package.json').version;
 const PYTHON_SPEC = '>=3.10'; // keep in step with requires-python in pyproject.toml
+const UV_VERSION = '0.12.17';
+const UV_RELEASES = 'https://github.com/astral-sh/uv/releases/download';
 const UV_DOCS = 'https://docs.astral.sh/uv/getting-started/installation/';
 const ISSUES = 'https://github.com/sohan-bhat/wobbl/issues';
 const IS_WIN = process.platform === 'win32';
@@ -222,6 +228,216 @@ function pickWobbl(env, firstDirs = []) {
   return { match: null, others };
 }
 
+// -- bootstrapping uv -------------------------------------------------------
+
+function uvDir(env) {
+  const base = env.WOBBL_HOME ? env.WOBBL_HOME.replace(/^~(?=$|[\\/])/, homeOf(env)) : path.join(homeOf(env), '.wobbl');
+  return path.join(path.resolve(base), 'uv');
+}
+
+function existingUv(env) {
+  const exe = path.join(uvDir(env), IS_WIN ? 'uv.exe' : 'uv');
+  return fs.existsSync(exe) ? exe : null;
+}
+
+function hasGlibc() {
+  try {
+    return Boolean(process.report.getReport().header.glibcVersionRuntime);
+  } catch {
+    return true;
+  }
+}
+
+// The name of uv's release build for a machine, or null when uv publishes none for it.
+function uvTarget(platform = process.platform, arch = process.arch, glibc = platform === 'linux' && hasGlibc()) {
+  const cpu = { x64: 'x86_64', arm64: 'aarch64', ia32: 'i686' }[arch];
+  if (platform === 'darwin' && (arch === 'x64' || arch === 'arm64')) return `${cpu}-apple-darwin`;
+  if (platform === 'win32' && cpu) return `${cpu}-pc-windows-msvc`;
+  if (platform !== 'linux') return null;
+  const libc = glibc ? 'gnu' : 'musl';
+  if (cpu) return `${cpu}-unknown-linux-${libc}`;
+  if (arch === 'arm') return `armv7-unknown-linux-${libc}eabihf`;
+  if (arch === 'riscv64') return `riscv64gc-unknown-linux-${libc}`;
+  if (arch === 'ppc64' && glibc) return 'powerpc64le-unknown-linux-gnu';
+  if (arch === 's390x' && glibc) return 's390x-unknown-linux-gnu';
+  return null;
+}
+
+function download(url, redirects = 5) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('http:') ? require('http') : require('https');
+    const req = client.get(url, { headers: { 'user-agent': `wobbl-npm/${VERSION}` } }, (res) => {
+      const { statusCode: status, headers } = res;
+      if (status >= 300 && status < 400 && headers.location && redirects > 0) {
+        res.resume();
+        const next = new URL(headers.location, url).href;
+        if (url.startsWith('https:') && !next.startsWith('https:')) reject(new Error(`refused to leave https for ${next}`));
+        else resolve(download(next, redirects - 1));
+        return;
+      }
+      if (status !== 200) {
+        res.resume();
+        reject(Object.assign(new Error(`HTTP ${status} for ${url}`), { status }));
+        return;
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    });
+    req.setTimeout(30000, () => req.destroy(Object.assign(new Error(`no answer from ${url}`), { code: 'ETIMEDOUT' })));
+    req.on('error', reject);
+  });
+}
+
+// The expected SHA256 of one asset in a release's sha256.sum, which lists `<hash> *<file>`.
+function checksumFor(sums, asset) {
+  for (const line of sums.split(/\r?\n/)) {
+    const m = /^([0-9a-f]{64})\s+\*?(\S+)$/i.exec(line.trim());
+    if (m && m[2] === asset) return m[1].toLowerCase();
+  }
+  return null;
+}
+
+// One file, found by base name, out of a .tar.gz with ustar, pax or GNU long name headers.
+function fromTarGz(archive, name) {
+  const tar = zlib.gunzipSync(archive);
+  let longName = null;
+  for (let off = 0; off + 512 <= tar.length; ) {
+    const h = tar.subarray(off, off + 512);
+    if (h.every((b) => b === 0)) break;
+    const field = (a, b) => h.toString('utf8', a, b).replace(/\0[\s\S]*$/, '');
+    const size = parseInt(field(124, 136).trim() || '0', 8);
+    const type = String.fromCharCode(h[156] || 48);
+    const body = tar.subarray(off + 512, off + 512 + size);
+    off += 512 + Math.ceil(size / 512) * 512;
+    if (type === 'L') {
+      longName = body.toString('utf8').replace(/\0[\s\S]*$/, '');
+    } else if (type === 'x') {
+      const m = /(?:^|\n)\d+ path=([^\n]*)\n/.exec(body.toString('utf8'));
+      if (m) longName = m[1];
+    } else if (type !== 'g') {
+      const prefix = h.toString('latin1', 257, 263) === 'ustar\0' ? field(345, 500) : '';
+      const full = longName || (prefix ? `${prefix}/${field(0, 100)}` : field(0, 100));
+      longName = null;
+      if ((type === '0' || type === '7') && path.posix.basename(full) === name) return Buffer.from(body);
+    }
+  }
+  return null;
+}
+
+// One file, found by base name, out of a .zip, read through its central directory.
+function fromZip(archive, name) {
+  let end = archive.length - 22;
+  while (end >= Math.max(0, archive.length - 65557) && archive.readUInt32LE(end) !== 0x06054b50) end--;
+  if (end < 0 || archive.readUInt32LE(end) !== 0x06054b50) return null;
+  let p = archive.readUInt32LE(end + 16);
+  for (let n = archive.readUInt16LE(end + 10); n > 0; n--) {
+    if (archive.readUInt32LE(p) !== 0x02014b50) return null;
+    const method = archive.readUInt16LE(p + 10);
+    const size = archive.readUInt32LE(p + 20);
+    const nameLength = archive.readUInt16LE(p + 28);
+    const local = archive.readUInt32LE(p + 42);
+    const entry = archive.toString('utf8', p + 46, p + 46 + nameLength).replace(/\\/g, '/');
+    p += 46 + nameLength + archive.readUInt16LE(p + 30) + archive.readUInt16LE(p + 32);
+    if (path.posix.basename(entry) !== name) continue;
+    const start = local + 30 + archive.readUInt16LE(local + 26) + archive.readUInt16LE(local + 28);
+    const data = archive.subarray(start, start + size);
+    if (method === 0) return Buffer.from(data);
+    if (method === 8) return zlib.inflateRawSync(data);
+    return null;
+  }
+  return null;
+}
+
+async function downloadFailure(error, host, deps) {
+  const yourself = ['Install uv or pipx yourself, then run the same command again.', '', `    ${UV_DOCS}`];
+  if (error.status) {
+    return new Stop([`${host} answered with HTTP ${error.status} when Wobbl asked for uv ${UV_VERSION}.`, ...yourself]);
+  }
+  if ((await networkState(deps)) === 'offline') {
+    return new Stop([
+      'Wobbl could not reach the internet, so it could not download uv.',
+      'Check your connection, then run the same command again.',
+    ]);
+  }
+  return new Stop([
+    `Wobbl could not download uv from ${host} (${error.code || error.message}).`,
+    `${host} may be blocked on this network, or the network needs a proxy, which this download does not use.`,
+    ...yourself,
+  ]);
+}
+
+// Download uv into ~/.wobbl/uv and check its SHA256 before anything runs it. The binary
+// is written under a temporary name and renamed into place, so a broken download never runs.
+async function bootstrapUv(env, deps = {}) {
+  const tell = deps.say || say;
+  const target = uvTarget(deps.platform, deps.arch, deps.glibc);
+  if (!target) {
+    throw new Stop([
+      'Wobbl needs uv or pipx to install itself, and neither is on this computer.',
+      `uv has no ready made download for ${deps.platform || process.platform} on ${deps.arch || process.arch}, so please install uv or pipx yourself, then run the same command again.`,
+      '',
+      `    ${UV_DOCS}`,
+    ]);
+  }
+  const windows = target.includes('windows');
+  const asset = `uv-${target}${windows ? '.zip' : '.tar.gz'}`;
+  const exeName = windows ? 'uv.exe' : 'uv';
+  const base = `${(env.WOBBL_UV_DOWNLOAD_URL || UV_RELEASES).replace(/\/+$/, '')}/${UV_VERSION}`;
+  const host = new URL(base).host;
+  tell(
+    'Wobbl needs uv or pipx to install itself, and neither is on this computer.',
+    `Downloading uv ${UV_VERSION} for ${target} from ${host}.`,
+    '',
+  );
+  const get = deps.download || download;
+  let archive;
+  let sums;
+  try {
+    [archive, sums] = await Promise.all([get(`${base}/${asset}`), get(`${base}/sha256.sum`)]);
+  } catch (e) {
+    throw await downloadFailure(e, host, deps);
+  }
+  const want = checksumFor(sums.toString('utf8'), asset);
+  if (want !== crypto.createHash('sha256').update(archive).digest('hex')) {
+    throw new Stop([
+      want
+        ? 'The uv download did not match its published SHA256 checksum, so Wobbl threw it away without running it.'
+        : `The uv ${UV_VERSION} checksum file does not list ${asset}, so Wobbl threw the download away without running it.`,
+      'This usually means the download was damaged on the way. Run the same command again.',
+    ]);
+  }
+  const binary = windows ? fromZip(archive, exeName) : fromTarGz(archive, exeName);
+  if (!binary) {
+    throw new Stop([
+      `The uv ${UV_VERSION} download has no ${exeName} in it.`,
+      'Install uv yourself, then run the same command again.',
+      '',
+      `    ${UV_DOCS}`,
+    ]);
+  }
+  const dir = uvDir(env);
+  const exe = path.join(dir, exeName);
+  const part = `${exe}.${process.pid}.part`;
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(part, binary, { mode: 0o755 });
+  try {
+    fs.renameSync(part, exe);
+  } catch (e) {
+    // Another launcher running at the same moment got there first, and Windows will not
+    // replace a uv.exe that is running. That copy passed the same check, so use it.
+    fs.rmSync(part, { force: true });
+    if (!fs.existsSync(exe)) throw e;
+  }
+  tell(
+    `Installed uv ${UV_VERSION} at ${exe}. Its SHA256 matched the release checksums.`,
+    'Wobbl only uses it to install itself. Your PATH and shell profile were not changed.',
+    '',
+  );
+  return exe;
+}
+
 // -- installing -------------------------------------------------------------
 
 // uv comes first because it fetches a Python 3.10 or newer by itself. pipx is the fallback,
@@ -343,18 +559,9 @@ async function installWithUv(uv, env, deps) {
   return { tool: 'uv', bin, fix: `${shown(uv, env)} tool update-shell` };
 }
 
-async function obtainUv() {
-  throw new Stop([
-    'Wobbl needs uv to install itself here, and uv is not on this computer.',
-    'Install uv, then run the same command again.',
-    '',
-    `    ${UV_DOCS}`,
-  ]);
-}
-
 async function install(env, others, deps = {}) {
   say(`Setting up wobbl ${VERSION}. This happens once for each new version.`, '');
-  const uv = onPath('uv', env)[0];
+  const uv = onPath('uv', env)[0] || existingUv(env);
   const pipx = onPath('pipx', env)[0];
   const pipxOwnsWobbl = others.some((w) => /[\\/]pipx[\\/]venvs[\\/]/i.test(w.real));
   const how = chooseInstaller({ uv, pipx, pipxOwnsWobbl });
@@ -368,7 +575,7 @@ async function install(env, others, deps = {}) {
       '',
     );
   }
-  return installWithUv(uv || (await obtainUv()), env, deps);
+  return installWithUv(uv || (await bootstrapUv(env, deps)), env, deps);
 }
 
 function profileFile(env) {
@@ -501,8 +708,14 @@ if (require.main === module) {
 module.exports = {
   VERSION,
   PYTHON_SPEC,
+  UV_VERSION,
   Stop,
+  bootstrapUv,
   canonical,
+  checksumFor,
   chooseInstaller,
   failure,
+  fromTarGz,
+  fromZip,
+  uvTarget,
 };
