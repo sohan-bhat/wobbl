@@ -284,11 +284,24 @@ input[type="range"]:focus-visible { outline-offset: 2px; }
 .legend-ticks { display: flex; justify-content: space-between; margin-top: 8px; font: 500 11px/1.3 var(--mono); color: var(--muted); padding-right: 12px; }
 
 /* Under the part: the load slider, one legend, one live reading */
-.part-controls { display: grid; gap: 16px 32px; margin-top: 8px; }
-.live { display: flex; align-items: center; gap: 12px; }
+.part-controls {
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "slider" "readout";
+  gap: 14px 28px; margin-top: 8px;
+}
+.part-controls .control { grid-area: slider; min-width: 0; }
+.part-controls output { display: inline-block; min-width: 7ch; text-align: right; }
+/* The reading never changes the layout: fixed boxes, right aligned, tabular digits */
+.live { grid-area: readout; display: grid; grid-template-columns: max-content max-content; justify-content: start; align-items: center; gap: 14px; }
 .live p { margin: 0; }
-.live-n { font-stretch: 125%; font-weight: 800; font-size: clamp(2.2rem, 1.6rem + 1.6vw, 3rem); line-height: 1; letter-spacing: -0.02em; color: var(--fg); white-space: nowrap; }
-.live .vword { font-size: 13px; padding: 4px 9px; }
+.live-n {
+  box-sizing: content-box; width: var(--readout-w, 9ch); text-align: right; white-space: nowrap; overflow: hidden;
+  font: 600 clamp(1.7rem, 1.35rem + 1vw, 2.3rem)/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--fg);
+}
+.live .vword { box-sizing: content-box; width: 10ch; margin: 0; padding: 5px 8px; text-align: center; font-size: 13px; text-transform: uppercase; }
+@media (min-width: 720px) {
+  .part-controls { grid-template-columns: minmax(0, 1fr) max-content; grid-template-areas: "slider readout"; align-items: end; }
+  .live { grid-template-columns: max-content; justify-items: end; gap: 10px; }
+}
 .bend {
   position: absolute; top: 12px; right: 12px; z-index: 3; min-height: 32px; padding: 6px 10px; cursor: pointer;
   background: transparent; color: var(--muted); border: 1px solid var(--line-2);
@@ -297,7 +310,6 @@ input[type="range"]:focus-visible { outline-offset: 2px; }
 .bend[aria-pressed="true"] { color: var(--fg); border-color: var(--fg-2); }
 .bend:hover { color: var(--fg); }
 .bend[hidden], .viewer:not([data-state="live"]) .bend { display: none; }
-@media (min-width: 720px) { .part-controls { grid-template-columns: minmax(0, 1fr) auto; align-items: end; } }
 .hero-part figcaption { margin-top: 16px; }
 
 /* A part and its fixed versions, side by side */

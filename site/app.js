@@ -92,6 +92,10 @@ if (viewer) {
   });
   const WORD = { holds: 'Holds', marginal: 'Marginal', fails: 'Fails' };
 
+  // Size the reading for its widest value, at the top of the slider, so dragging never moves anything.
+  const live = $('.live');
+  const fitReadout = () => live.style.setProperty('--readout-w', `${fmt(part.peak * +loadIn.max / part.loadN, 1).length + 4}ch`);
+
   function update() {
     const { scale } = current();
     const peak = part.peak * scale;
@@ -130,8 +134,10 @@ if (viewer) {
   fetch(`${base}.json?v=${viewer.dataset.v || 1}`).then((r) => r.json()).then((m) => {
     const v = m.variants.distributed;
     Object.assign(part, { loadN: m.load_N, peak: v.governing_MPa, allow: m.allowable_MPa, target: m.target_sf, defl: v.max_disp_mm });
+    fitReadout();
     update();
   }).catch(() => {});
+  fitReadout();
   update();
 
   const status = $('.viewer-status', viewer);
