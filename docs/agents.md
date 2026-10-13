@@ -1,23 +1,51 @@
-# Using Wobbl from coding agents
+# Use Wobbl from your agent
 
-`wobbl setup` registers Wobbl's MCP server and installs its skill for every
-coding agent it finds. Pick agents explicitly with `--agents claude,codex` or
-`--agents all`.
+Ask your coding agent about a part in plain words. It calls Wobbl's tools, reads
+the checks before the number and answers with a heatmap and a report.
 
-| Agent | MCP server | Skill or context |
-|---|---|---|
-| Claude Code | `claude mcp add --scope user wobbl` (or `~/.claude.json` when the CLI is absent) | `~/.claude/skills/wobbl/SKILL.md` |
-| Codex | `[mcp_servers.wobbl]` block in `~/.codex/config.toml` | `~/.codex/skills/wobbl/SKILL.md` |
-| Cursor | `mcpServers.wobbl` in `~/.cursor/mcp.json` | `~/.cursor/skills/wobbl/SKILL.md`; `wobbl setup --project` also writes `.cursor/rules/wobbl.mdc` |
-| Gemini CLI | extension at `~/.gemini/extensions/wobbl/` | `WOBBL.md` context in the same extension |
+`wobbl setup` connects Claude Code, Codex, Cursor and Gemini CLI; see
+[connect your coding agent](getting-started.md#connect-your-coding-agent).
 
-Every file Wobbl changes is copied to `~/.wobbl/backups/<time>/` first. What was
-installed is recorded in `~/.wobbl/agents.json`; `wobbl uninstall` removes exactly
-that and leaves the rest of each config alone. `wobbl doctor` shows the state of
-each agent.
+## What to ask
 
-The server command is the absolute path of the `wobbl` executable, so agents
-find it even when their PATH does not include pipx's bin folder.
+Say what the part is made of, how it is held and what loads it. The agent
+fills in the rest from `inspect_geometry` and asks when it cannot tell.
+
+```text Prompt
+Will this printed PLA shelf bracket hold its share of an 8 kg shelf? It is screwed to the wall through the two holes.
+```
+
+```text Prompt
+Does this cast motor mount meet our safety factor 2 rule under a 2 kN emergency stop belt pull?
+```
+
+```text Prompt
+Will a 15 W chip stay under 85 C on this heat sink without a fan?
+```
+
+```text Prompt
+What is the ripple on this 12 V to 5 V buck at 2 A?
+```
+
+## A session
+
+The shelf bracket from the [examples](../examples/shelf-bracket), driven through
+the tools:
+
+```text Claude Code with Wobbl
+> Will this printed PLA shelf bracket hold its share of an 8 kg shelf?
+
+agent: inspect_geometry("bracket.py")
+agent: solve_structural(path="bracket.py", material="pla",
+                        fixtures=["bolt holes d=4.5", "wall x=min"],
+                        loads=["40 N down @ top and within 12 of 65,12.5,6"])
+       -> verdict fails, 52.3 MPa on the 0.5 mm inside fillet, safety factor 0.96, confidence high
+agent: suggest_fix(result_dir, apply=true)
+       -> 3 mm fillet: 24.1 MPa (2.08); legs at 10 mm: 21 MPa (2.38); gusset: 9.82 MPa (5.09)
+agent: "It cracks at the inside corner: 52.3 MPa against PLA's 50 MPa. A 3 mm fillet halves the
+        stress; a gusset brings it to 9.82 MPa, safety factor 5.1. The gusset toe is a sharp corner
+        Wobbl excluded as a singularity, so round it too. Heatmaps and report: ..."
+```
 
 ## Tools
 
@@ -34,11 +62,6 @@ find it even when their PATH does not include pipx's bin folder.
 | `solve_circuit(template or netlist, params)` | LED, RC, buck, MOSFET, or any netlist |
 | `list_materials()` | the materials table |
 
-Strength studies take one to seven minutes on a 2018 laptop. Wobbl registers Codex with a 900 s
-tool timeout and Gemini CLI with 900000 ms; if your Claude Code setup cuts long
-tool calls short, raise `MCP_TOOL_TIMEOUT` (milliseconds) in its environment, or
-pass `quality="fast"` for a first look.
-
 Results are compact JSON: numbers, statuses, one line summaries and file
 paths. Agents open the PNG heatmaps or the HTML report when they need to see
 the part.
@@ -52,21 +75,9 @@ confidence number as the answer, never quote an excluded peak, check units, make
 the supports match the real build, and do not use `--quality fast` for a final
 answer.
 
-## Example session
+## Long studies
 
-This is the shelf bracket from `examples/shelf-bracket`, driven through the tools:
-
-```
-> Will this printed PLA shelf bracket hold its share of an 8 kg shelf?
-
-agent: inspect_geometry("bracket.py")
-agent: solve_structural(path="bracket.py", material="pla",
-                        fixtures=["bolt holes d=4.5", "wall x=min"],
-                        loads=["40 N down @ top and within 12 of 65,12.5,6"])
-       -> verdict fails, 52.3 MPa on the 0.5 mm inside fillet, safety factor 0.96, confidence high
-agent: suggest_fix(result_dir, apply=true)
-       -> 3 mm fillet: 24.1 MPa (2.08); legs at 10 mm: 21 MPa (2.38); gusset: 9.82 MPa (5.09)
-agent: "It cracks at the inside corner: 52.3 MPa against PLA's 50 MPa. A 3 mm fillet halves the
-        stress; a gusset brings it to 9.82 MPa, safety factor 5.1. The gusset toe is a sharp corner
-        Wobbl excluded as a singularity, so round it too. Heatmaps and report: ..."
-```
+Strength studies take one to seven minutes on a 2018 laptop. Wobbl registers
+Codex with a 900 s tool timeout and Gemini CLI with 900000 ms. If your Claude
+Code setup cuts long tool calls short, raise `MCP_TOOL_TIMEOUT` (milliseconds)
+in its environment, or pass `quality="fast"` for a first look.
