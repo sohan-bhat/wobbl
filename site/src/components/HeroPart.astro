@@ -1,0 +1,33 @@
+---
+// The 3D part in the landing page's hero: the viewer with its static poster, and the
+// controls under it. scripts/hero.ts drives it and scripts/viewer.js draws it.
+import { url } from '../lib/site';
+import { poster, posterSet } from '../lib/poster';
+---
+<figure class="hero-part">
+  <div class="viewer" id="viewer" data-state="poster" data-part={url('data/cast-motor-mount')} data-v="3">
+    <img class="viewer-poster" src={poster} srcset={posterSet} sizes="(min-width: 1000px) 56vw, 100vw"
+         width="1170" height="949" fetchpriority="high"
+         alt="Stress heatmap of a sand cast aluminum motor mount. The hottest spot, labeled 124 MPa, is where the rib tip meets the upright." />
+    <p class="viewer-status" role="status" aria-live="polite"></p>
+    <div class="probe" hidden></div>
+    <div class="peak-tag" hidden><span class="target" aria-hidden="true"></span><span class="peak-tag-v"></span></div>
+    <div class="load-tag" hidden></div>
+    <button type="button" class="btn-outline btn-sm bend" id="bend" aria-pressed="true">Bend &times;60</button>
+  </div>
+  <div class="part-controls">
+    <div class="control">
+      <label for="load">Belt pull <output id="load-out" for="load">2,000&nbsp;N</output></label>
+      <input type="range" id="load" name="load" autocomplete="off" min="0" max="4000" step="10" value="2000">
+      <div class="legend" aria-hidden="true">
+        <div class="legend-bar"><span class="legend-target"></span><span class="legend-peak" id="legend-peak"></span></div>
+        <div class="legend-ticks"><span>0</span><span>82.5 target</span><span>165&nbsp;MPa yield</span></div>
+      </div>
+    </div>
+    <div class="live">
+      <p class="live-n"><span id="r-peak">123.7</span>&nbsp;MPa</p>
+      <p class="vword" id="verdict-word" data-verdict="marginal" aria-live="polite">Marginal</p>
+    </div>
+  </div>
+  <figcaption>A cast motor mount from Wobbl’s own result. Drag to turn it and double tap to reset.</figcaption>
+</figure>

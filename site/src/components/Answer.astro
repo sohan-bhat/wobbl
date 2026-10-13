@@ -1,0 +1,25 @@
+---
+// The landing page's short form of a run: the question, one answer line and the result image.
+// The answer is written by hand, so the build checks that each of its numbers is in the run's outputs.
+import RunImage from './RunImage.astro';
+import { COLOR, assertNumbers, findRun } from '../lib/examples';
+import { url } from '../lib/site';
+interface Props { rel: string; answer: string }
+const { rel, answer } = Astro.props;
+const { ex, run } = findRun(rel);
+assertNumbers(answer, run);
+const checks = run.outcome.checks ?? [];
+const passed = checks.filter((c) => c.status === 'pass').length;
+const warned = checks.filter((c) => c.status === 'warn').length;
+const tally = `${passed} checks passed${warned ? `, ${warned} with a warning` : ''}`;
+---
+<div class="answer">
+  <div class="answer-text">
+    <p class="answer-ask">“{run.question}”</p>
+    <p class="answer-line" data-verdict={COLOR[run.outcome.verdict] ?? 'marginal'}>{answer}</p>
+    <p class="answer-checks"><a href={url('guides/results/checks/')}>{tally}</a></p>
+  </div>
+  <a class="answer-img" href={url(`examples/${ex.name}/`)} aria-label={`${ex.title} example`}>
+    <RunImage run={run} sizes="(min-width: 1000px) 56vw, 100vw" />
+  </a>
+</div>

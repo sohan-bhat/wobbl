@@ -1,0 +1,83 @@
+---
+// The landing page: the claim, the install command, the 3D part, one run per domain,
+// the bake off in two counts and links into the docs.
+import Base from '../layouts/Base.astro';
+import Answer from '../components/Answer.astro';
+import Term from '../components/Term.astro';
+import HeroPart from '../components/HeroPart.astro';
+import { url } from '../lib/site';
+import { poster, posterSet } from '../lib/poster';
+---
+<Base title="Wobbl: simulate anything before you build it" path=""
+      description="Verified strength, heat and circuit simulation for Claude Code, Codex, Cursor, Gemini CLI and you. Every answer is checked before you see it. Open source, MIT.">
+  <link slot="head" rel="preload" as="image" href={poster} imagesrcset={posterSet} imagesizes="(min-width: 1000px) 56vw, 100vw">
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <h1 id="hero-title">Simulate anything before you build&nbsp;it.</h1>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="lede">Ask your agent if a part will crack. Wobbl runs a real solver, then checks the answer before you see it.</p>
+          <div class="install">
+            <Term code={'pipx install "git+https://github.com/sohan-bhat/wobbl"\nwobbl setup'} label="Install" />
+          </div>
+          <p class="hero-cta"><a class="btn" href={url('get-started/')}>Get started</a></p>
+        </div>
+        <HeroPart />
+      </div>
+    </div>
+  </section>
+
+  <section class="section demo" aria-labelledby="demo-title">
+    <div class="wrap">
+      <h2 id="demo-title">What a run looks like</h2>
+      <div class="tabs" role="tablist" aria-label="Example runs">
+        <button type="button" role="tab" id="tab-strength" aria-controls="panel-strength" aria-selected="true"><span>Strength</span>Shelf bracket</button>
+        <button type="button" role="tab" id="tab-heat" aria-controls="panel-heat" aria-selected="false" tabindex="-1"><span>Heat</span>Heat sink</button>
+        <button type="button" role="tab" id="tab-circuit" aria-controls="panel-circuit" aria-selected="false" tabindex="-1"><span>Circuits</span>Blue LED</button>
+      </div>
+      <div class="tab-panel" role="tabpanel" id="panel-strength" aria-labelledby="tab-strength">
+        <Answer rel="shelf-bracket/output" answer="It fails at 52.3 MPa, and with a gusset it drops to 9.82 MPa and holds." />
+      </div>
+      <div class="tab-panel" role="tabpanel" id="panel-heat" aria-labelledby="tab-heat" hidden>
+        <Answer rel="heat-sink/output" answer="The chip peaks at 70.3 C, under the 85 C limit." />
+      </div>
+      <div class="tab-panel" role="tabpanel" id="panel-circuit" aria-labelledby="tab-circuit" hidden>
+        <Answer rel="circuits/led" answer="36.9 mA flows, so the LED fries. A 91 ohm resistor fixes it." />
+      </div>
+    </div>
+  </section>
+
+  <section class="section bakeoff" aria-labelledby="bake-title">
+    <div class="wrap">
+      <h2 id="bake-title">A coding agent alone, against Wobbl</h2>
+      <div class="versus">
+        <figure class="vs">
+          <figcaption>Agent on its own, 15 minutes per try</figcaption>
+          <div class="trials" role="img" aria-label="10 tries, 1 answered"><i class="hit"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <p class="vs-big"><span data-count="1">1</span> <span class="vs-of">of 10 tries answered</span></p>
+          <p class="vs-note">It had no answer for the two parts that fail.</p>
+        </figure>
+        <figure class="vs vs-wobbl">
+          <figcaption>With Wobbl</figcaption>
+          <div class="trials" role="img" aria-label="6 parts, 6 answered"><i class="hit"></i><i class="hit"></i><i class="hit"></i><i class="hit"></i><i class="hit"></i><i class="hit"></i></div>
+          <p class="vs-big"><span data-count="6">6</span> <span class="vs-of">of 6 parts answered</span></p>
+          <p class="vs-note">Within 0.02 to 4.3% of the right answer, in 24&nbsp;s to 7&nbsp;min each.</p>
+        </figure>
+      </div>
+      <p class="bake-more"><a href={url('validation/bake-off/')}>The full bake off</a></p>
+    </div>
+  </section>
+
+  <section class="section deeper" aria-labelledby="deeper-title">
+    <div class="wrap">
+      <h2 id="deeper-title" class="h-label">Go deeper</h2>
+      <ul class="deeper-grid">
+        <li><a href={url('guides/strength/')}>Check a part’s strength</a></li>
+        <li><a href={url('guides/fix/')}>Fix a failing part</a></li>
+        <li><a href={url('guides/agents/')}>Use it from your agent</a></li>
+        <li><a href={url('guides/heat/')}>Heat and circuits</a></li>
+      </ul>
+    </div>
+  </section>
+</Base>

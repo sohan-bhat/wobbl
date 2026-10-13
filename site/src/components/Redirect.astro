@@ -1,0 +1,19 @@
+---
+// A static redirect for a page that moved, so old links keep working on GitHub Pages.
+import { url, fullUrl } from '../lib/site';
+interface Props { to: string }
+const { to } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Moved</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href={fullUrl(to)}>
+<meta http-equiv="refresh" content={`0; url=${url(to)}`}>
+</head>
+<body>
+<p>This page moved to <a href={url(to)}>{fullUrl(to)}</a>.</p>
+</body>
+</html>
