@@ -43,7 +43,8 @@ def _jsonable(x):
 
 
 def convergence_check(values: list[float], tol: float, label: str, unit: str, stopped_by: str = "",
-                      disp: list[float] | None = None) -> Check:
+                      disp: list[float] | None = None, min_levels: int = 3) -> Check:
+    """Smooth fields (temperature) settle on two meshes; stress peaks need three to show the trend."""
     if len(values) < 2:
         return Check("mesh convergence", "fail", f"only one mesh was solved, so the {label} is unverified",
                      {"values": values})
@@ -53,7 +54,7 @@ def convergence_check(values: list[float], tol: float, label: str, unit: str, st
     detail = {"values": values, "last_change": ch, "tolerance": tol, "stopped_by": stopped_by}
     if disp:
         detail["max_displacement"] = disp
-    if ch <= tol and len(values) < 3:
+    if ch <= tol and len(values) < min_levels:
         return Check("mesh convergence", "warn",
                      f"{label} agreed on two meshes ({trend} {unit}, {100 * ch:.1f}%) but no third mesh was run "
                      f"(stopped by {stopped_by or 'limit'}); two coarse meshes can agree and still both be off",

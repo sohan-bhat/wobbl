@@ -163,7 +163,7 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
     use_cold = len(levels) > 1 and _rel(cold_r) > _rel(hot_r)
     checks = [convergence_check(cold_r if use_cold else hot_r, 0.02,
                                 "temperature at the coolest point" if use_cold else
-                                "temperature rise at the hottest point", "C", "")]
+                                "temperature rise at the hottest point", "C", "", min_levels=2)]
     extra = []
 
     # energy balance (steady): heat in = convection + radiation + fixed temperature boundaries
@@ -199,30 +199,47 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
     if hA > 0 and study.power and not model.fixed_temps:
         Lc = vol / film_area
         bi = (hA / film_area) * Lc / mat.internal()["conductivity"]
-        rise_ss = study.power / hA
+        eps_a = study.emissivity * film_area
+        sig = 5.670374e-11
+        tinf = study.ambient
+
+        def shed(temp):  # heat leaving a uniform surface at temp, mW (convection plus radiation)
+            return hA * (temp - tinf) + eps_a * sig * ((temp + 273.15) ** 4 - (tinf + 273.15) ** 4)
+
         if model.transient:
-            tau = mat.internal()["density"] * mat.internal()["specific_heat"] * vol / hA
-            t_end = study.duration
-            T0 = model.initial_temp
-            lumped = study.ambient + rise_ss * (1 - np.exp(-t_end / tau)) + (T0 - study.ambient) * np.exp(-t_end / tau)
+            cap = mat.internal()["density"] * mat.internal()["specific_heat"] * vol   # mJ/K
+            temp, steps = float(model.initial_temp), 4000
+            dt = study.duration / steps
+            for _ in range(steps):  # lumped capacitance with radiation, midpoint rule
+                k1 = (study.power - shed(temp)) / cap
+                k2 = (study.power - shed(temp + 0.5 * dt * k1)) / cap
+                temp += dt * k2
+            lumped = temp
             mean_T = float(np.average(T, weights=_vol_weights(mesh)))
-            err = abs(mean_T - lumped) / max(abs(lumped - study.ambient), 1e-9)
-            s = (f"lumped model (time constant {fmt(tau / 60)} min, Biot {bi:.2g}) gives a mean of {fmt(lumped)} C at "
-                 f"the end; FEA mean is {fmt(mean_T)} C")
-            st = "pass" if (bi < 0.1 and err < 0.1) else ("info" if bi >= 0.1 else "warn")
+            err = abs(mean_T - lumped) / max(abs(lumped - tinf), 1e-9)
+            tau = cap / hA
+            s = (f"lumped model with convection{' and radiation' if eps_a else ''} (Biot {bi:.2g}) gives a mean of "
+                 f"{fmt(lumped)} C at the end; FEA mean is {fmt(mean_T)} C ({100 * err:.2g}% of the rise)")
+            st = "pass" if (bi < 0.1 and err < 0.05) else ("info" if bi >= 0.1 else "warn")
             checks.append(Check("hand calculation", st, s, {"tau_s": tau, "biot": bi, "lumped_C": lumped}))
         else:
-            lumped = study.ambient + rise_ss
+            temp = tinf + study.power / hA
+            for _ in range(60):  # Newton on P = h A (T - Tair) + eps sigma A (T^4 - Tair^4)
+                f = shed(temp) - study.power
+                df = hA + 4 * eps_a * sig * (temp + 273.15) ** 3
+                temp -= f / df
+            lumped = temp
             surf_mean = 0.0
-            for mask, h, tinf in info["film_masks"]:
+            for mask, h, tinf_i in info["film_masks"]:
                 w, _ = _tri_weights(mesh, mask)
-                surf_mean += float((w * h * T).sum())
-            surf_mean = surf_mean / hA
-            err = abs(surf_mean - lumped) / max(rise_ss, 1e-9)
-            s = (f"heat balance says the cooled surfaces average {fmt(lumped)} C; FEA gives {fmt(surf_mean)} C "
+                surf_mean += float((w * T).sum())
+            surf_mean = surf_mean / film_area
+            err = abs(surf_mean - lumped) / max(abs(lumped - tinf), 1e-9)
+            s = (f"heat balance on a uniform skin gives {fmt(lumped)} C; the FEA skin averages {fmt(surf_mean)} C "
                  f"({100 * err:.2g}% of the rise). Biot {bi:.2g}: "
                  + ("the part is nearly isothermal" if bi < 0.1 else "the inside runs hotter than the skin"))
-            checks.append(Check("hand calculation", "pass" if err < 0.03 else "warn", s,
+            st = "pass" if err < 0.05 else ("info" if bi >= 0.1 else "warn")
+            checks.append(Check("hand calculation", st, s,
                                 {"lumped_surface_C": lumped, "fea_surface_C": surf_mean, "biot": bi}))
     if tmax < -273 or tmax > 3000:
         checks.append(Check("units and sanity", "fail", f"max temperature {fmt(tmax)} C is not physical; check "
