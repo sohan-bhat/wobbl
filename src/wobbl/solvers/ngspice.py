@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -17,7 +18,9 @@ class NgSpice(SolverAdapter):
     domains = ("circuit",)
 
     def locate(self) -> Path | None:
-        return find_tool(["ngspice", "ngspice_con"], "WOBBL_NGSPICE", prefixes=("env", "env-x86"))
+        # on Windows ngspice.exe is the GUI build; the console build answers batch runs and -v promptly
+        names = ["ngspice_con", "ngspice"] if sys.platform == "win32" else ["ngspice", "ngspice_con"]
+        return find_tool(names, "WOBBL_NGSPICE", prefixes=("env", "env-x86"))
 
     def version(self) -> str:
         p = self.locate()

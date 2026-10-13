@@ -214,8 +214,14 @@ def verify(log: Log = print) -> dict:
         out["unavailable"].setdefault("ngspice", "ngspice is not installed")
     else:
         v = sp.version()
-        ok = bool(v)
-        err = ""
+        ok, err = False, ""
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                data, _, _ = sp.run("* check\nV1 a 0 DC 1\nR1 a 0 1k\n.dc V1 1 1 1\n.end\n", tmp, ["i(v1)"], "t",
+                                    timeout=60)
+                ok = abs(float(data["i(v1)"][-1]) + 1e-3) < 1e-6
+        except Exception as e:  # noqa: BLE001
+            err = str(e)[:200]
         if not ok and sys.platform == "darwin":
             err = "the Intel ngspice needs Rosetta 2: run 'softwareupdate --install-rosetta --agree-to-license'"
         out["solvers"]["ngspice"] = {"path": str(path), "version": v, "works": ok, "error": err}
