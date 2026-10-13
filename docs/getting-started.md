@@ -137,9 +137,8 @@ If setup found no agents, `wobbl setup --agents all` registers every one.
 **Setup stops on a config file.** It will not overwrite a file that is not valid
 JSON. Fix or remove that file and run `wobbl setup` again.
 
-**The agent gives up on a long study.** Strength studies take one to seven
-minutes on a 2018 laptop. For Claude Code, raise `MCP_TOOL_TIMEOUT`
-(milliseconds) in its environment, or ask for `quality="fast"` for a first look.
+**The agent gives up on a long study.** Raise its tool timeout: see
+[long studies](agents.md#long-studies).
 
 **The part is the wrong size.** Files are read in millimeters. Pass
 `--scale 25.4` for a file drawn in inches or `--scale 1000` for meters.

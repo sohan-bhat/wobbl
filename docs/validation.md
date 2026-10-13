@@ -104,10 +104,4 @@ voltage at one time constant against `1 - e^-1`; a 12 V to 5 V buck converter's
 output ripple against the ideal triangular ripple current through the output
 capacitor and its ESR.
 
-## Real parts
-
-Wobbl was also run on the harder parts of a bake off where reference answers
-came from hand built, carefully converged models (gmsh plus CalculiX, meshes up
-to 400,000 nodes). See [bakeoff.md](bakeoff.md).
-
 The raw results are in [validation-results.json](validation-results.json).

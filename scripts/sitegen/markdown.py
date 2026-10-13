@@ -179,13 +179,14 @@ def _text(inline: Token) -> str:
 
 
 def render(path: Path, *, demote: int = 0, used: set[str] | None = None, top_id: str | None = None,
-           keep_lead: bool = False, drop_code: set[str] = frozenset()) -> Doc:
+           keep_lead: bool = False, drop_code: set[str] = frozenset(), fold: set[str] = frozenset()) -> Doc:
     """Render one Markdown file. The H1 becomes the title and the paragraph after it the lead.
 
     ``demote`` shifts headings down a level for a file shown as a section of a
     longer page; its H1 then stays in the body as a heading with ``top_id``.
     ``keep_lead`` leaves the first paragraph in the body, and code blocks whose
-    text is in ``drop_code`` are left out.
+    text is in ``drop_code`` are left out. Sections whose heading id is in
+    ``fold`` are folded into a <details> that opens on a click.
     """
     used = set() if used is None else used
     src_dir = path.parent
@@ -202,6 +203,13 @@ def render(path: Path, *, demote: int = 0, used: set[str] | None = None, top_id:
 
     out: list[Token] = []
     last_heading = ""
+    folded = 0  # the heading level of the open <details>, 0 when none is open
+
+    def html(text: str) -> Token:
+        t = Token("html_block", "", 0)
+        t.content = text
+        return t
+
     i = 0
     while i < len(tokens):
         tok = tokens[i]
@@ -222,6 +230,17 @@ def render(path: Path, *, demote: int = 0, used: set[str] | None = None, top_id:
                 tok.attrSet("id", slug)
                 if level == 2:
                     toc.append((text, slug))
+                if folded and level <= folded:
+                    out.append(html("</div></details>\n"))
+                    folded = 0
+                if slug in fold:
+                    out.append(html('<details class="fold"><summary>'))
+                    folded = level
+            elif folded == level and tokens[i - 2].attrGet("id") in fold:
+                out.append(tok)
+                out.append(html('</summary><div class="fold-body">\n'))
+                i += 1
+                continue
         elif tok.type == "table_open":
             tok.meta["label"] = last_heading or "Table"
         elif tok.type == "td_open" and NUMBER.match(tokens[i + 1].content.strip()):
@@ -249,5 +268,7 @@ def render(path: Path, *, demote: int = 0, used: set[str] | None = None, top_id:
                     c.content = _html_attrs(c.content, src_dir)
         out.append(tok)
         i += 1
+    if folded:
+        out.append(html("</div></details>\n"))
     body = MD.renderer.render(out, MD.options, {})
     return Doc(title=title, lead=lead, body=body, toc=toc)

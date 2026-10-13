@@ -165,3 +165,12 @@ if (viewer) {
     }
   }
 }
+
+// A link to a heading inside a folded section opens that section.
+const openTarget = () => {
+  const el = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  const fold = el && el.closest('details');
+  if (fold && !fold.open) { fold.open = true; el.scrollIntoView(); }
+};
+addEventListener('hashchange', openTarget);
+openTarget();

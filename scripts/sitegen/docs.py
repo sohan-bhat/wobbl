@@ -6,6 +6,7 @@ breadcrumb, a short flow, an "on this page" list and links to the next guide.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from html import escape
 
@@ -63,6 +64,8 @@ class DocPage:
     description: str
     anchors: list[str] = field(default_factory=list)
     wide: bool = False
+    fold: frozenset[str] = frozenset()   # heading ids whose sections start closed
+    visual: str = ""                     # a key of VISUALS: a figure drawn under the title
 
 
 PAGES = [
@@ -74,7 +77,9 @@ PAGES = [
             "Every Wobbl command and option, with the load, support and face selector syntax."),
     DocPage("validation/", ["validation.md", "bakeoff.md", "limits.md"], "Validation", "Validation",
             "18 cases with known answers, a bake off against a coding agent working alone, "
-            "and what Wobbl does not model yet.", anchors=["bake-off", "limits"], wide=True),
+            "and what Wobbl does not model yet.", anchors=["bake-off", "limits"], wide=True,
+            fold=frozenset({"results", "the-cases", "what-the-agent-did-on-its-own",
+                            "the-traps-and-what-wobbl-does-about-each"}), visual="validation"),
 ]
 
 
@@ -103,10 +108,10 @@ def _pager(path: str) -> str:
 
 def doc_page(p: DocPage) -> str:
     used: set[str] = set()
-    first = render(DOCS / p.sources[0], used=used)
+    first = render(DOCS / p.sources[0], used=used, fold=p.fold)
     body, toc = first.body, list(first.toc)
     for src, anchor in zip(p.sources[1:], p.anchors):
-        part = render(DOCS / src, demote=1, used=used, top_id=anchor)
+        part = render(DOCS / src, demote=1, used=used, top_id=anchor, fold=p.fold)
         body += part.body
         toc += part.toc
     trail = [("Home", "")]
@@ -126,6 +131,7 @@ def doc_page(p: DocPage) -> str:
     {f'<p class="page-lead">{first.lead}</p>' if first.lead else ''}
     {steps}
   </header>
+  {VISUALS[p.visual]() if p.visual else ''}
   <div class="doc-grid">
     <article class="prose">
 {body}
@@ -164,3 +170,53 @@ def guides_index() -> str:
     return page(path="guides/", title="Guides | Wobbl",
                 description="Guides to checking strength, fixing parts, heat, circuits, using Wobbl from a "
                             "coding agent and how Wobbl checks its answers.", main=main)
+
+
+GROUPS = [
+    ("Textbook and benchmark strength", lambda c: c["domain"] == "strength" and c["exact_theory"]),
+    ("Real parts against converged references", lambda c: c["domain"] == "strength" and not c["exact_theory"]),
+    ("Heat", lambda c: c["domain"] == "heat"),
+    ("Circuits", lambda c: c["domain"] == "circuit"),
+]
+
+
+def _num(x: float, unit: str) -> str:
+    return f"{x:.4g}\u00a0{unit}"
+
+
+def validation_chart() -> str:
+    """Each case's error as a share of its tolerance, from docs/validation-results.json.
+
+    One bar per case, on one scale where the right edge is the case's own
+    tolerance, so a bar that stops short of the edge is a pass. The full table,
+    with every reference and value, stays in the folded Results section below.
+    """
+    cases = json.loads((DOCS / "validation-results.json").read_text(encoding="utf-8"))
+    groups = []
+    for name, keep in GROUPS:
+        rows = []
+        for c in (c for c in cases if keep(c)):
+            share = min(c["error"] / c["tolerance"], 1) if c["tolerance"] else 0
+            tip = (f"Expected {_num(c['expected'], c['unit'])}, Wobbl {_num(c['wobbl'], c['unit'])}, "
+                   f"{'pass' if c['pass'] else 'fail'}")
+            rows.append(f"""<li class="vrow" title="{escape(tip, quote=True)}">
+        <span class="vname">{escape(c['title'])}</span>
+        <span class="vbar" aria-hidden="true"><i style="width: {share * 100:.1f}%"></i></span>
+        <span class="vval">{c['error'] * 100:.2f}%<small> of {c['tolerance'] * 100:g}%</small></span>
+      </li>""")
+        if rows:
+            groups.append(f"""<div class="vgroup">
+    <p class="vgroup-t">{escape(name)}</p>
+    <ul>
+      {(chr(10) + "      ").join(rows)}
+    </ul>
+  </div>""")
+    passed = sum(c["pass"] for c in cases)
+    return f"""<figure class="vchart" aria-labelledby="vchart-title">
+  <figcaption id="vchart-title"><span class="vchart-t">Error against each case\u2019s tolerance</span>
+    <span class="vchart-k">{passed} of {len(cases)} pass. The bar\u2019s full width is the tolerance.</span></figcaption>
+  {(chr(10) + "  ").join(groups)}
+</figure>"""
+
+
+VISUALS = {"validation": validation_chart}
