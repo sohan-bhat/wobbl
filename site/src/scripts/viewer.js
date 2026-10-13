@@ -7,8 +7,8 @@
 // peak marker come from the peak the export found for every whole degree.
 // A worker fetches and lays out the mesh (part-worker.js), so the page's main thread stays free.
 import {
-  BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group,
-  MathUtils, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial,
+  BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Line, LineBasicMaterial,
+  MathUtils, Mesh, MeshBasicMaterial, PerspectiveCamera, Plane, PlaneGeometry, Raycaster, Scene, ShaderMaterial,
   SphereGeometry, Vector2, Vector3, Vector4, WebGLRenderTarget, WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -123,7 +123,7 @@ function arrow(color) {
     parts[k] = m;
     g.add(m);
   }
-  g.userData = parts;
+  g.userData = { ...parts, materials: [solid, ghost] };
   return g;
 }
 
@@ -131,12 +131,18 @@ const SIZES = { position: 3, normal: 3, stressA: 4, stressB: 4, shear: 4, dispA:
 const idle = () => new Promise((r) => ('requestIdleCallback' in window ? requestIdleCallback(() => r(), { timeout: 600 }) : setTimeout(r, 50)));
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-const COLD = 0xffd400;
+const COLD = 0xffd400, HOT = 0xfff07a;
+const easeInOut = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+const easeOut = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - (1 - x) ** 3);
+const lerp = (a, b, k) => a + (b - a) * k;
 
 /**
  * Draw the part in root. ui.data is the manifest, ui.state() gives { load, angle, exag },
- * ui.onChange(fn) and ui.onReset(fn) subscribe and return an unsubscribe, and ui.signal aborts a
- * start that is still loading. Resolves to a function that tears it all down.
+ * ui.onChange(fn) and ui.onReset(fn) subscribe and return an unsubscribe, ui.setAngle(deg, byKey)
+ * turns the pull when the visitor drags the arrow or presses the arrow keys, and ui.signal aborts a
+ * start that is still loading. Resolves, once the part has come in, to { dispose, view }: dispose
+ * tears it all down; view.get() and view.set() read and move the camera, view.hot() lights the
+ * arrow as if held and view.hand() shows the hint pointer on its head, for the idle animation.
  */
 export async function start(root, ui) {
   const trash = [];
@@ -154,6 +160,8 @@ const drop = (trash) => { for (const fn of trash.splice(0).reverse()) { try { fn
 async function build(root, ui, trash) {
   const man = ui.data, signal = ui.signal;
   const status = root.querySelector('.viewer-status');
+  const poster = root.querySelector('.viewer-poster');
+  let view = null;
   const alive = () => { if (signal.aborted) throw new DOMException('The page was left', 'AbortError'); };
   const teardown = () => drop(trash);
 
@@ -174,6 +182,7 @@ async function build(root, ui, trash) {
 
   // Phones get at most 1.5 device pixels per CSS pixel, desktops 2; multisampling only below 2.
   const coarse = matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 600;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const fullPx = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
   let px = fullPx;
   const renderer = new WebGLRenderer({ antialias: fullPx < 2, alpha: true, powerPreference: 'default' });
@@ -183,8 +192,9 @@ async function build(root, ui, trash) {
   const canvas = renderer.domElement;
   canvas.setAttribute('role', 'img');
   canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag or use the arrow keys to orbit, scroll, pinch or press plus and minus to zoom, and double click or double tap to reset the view.');
+  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag the yellow arrow, or press the left and right arrow keys, to turn the belt pull, five degrees a press or one with Shift. Drag elsewhere or press up and down to turn the part, scroll, pinch or press plus and minus to zoom, and double click or double tap to reset the view.');
   canvas.style.opacity = '0';
+  canvas.style.transition = 'opacity 0.3s ease';
   root.prepend(canvas);
   trash.push(() => canvas.remove());
 
@@ -233,17 +243,29 @@ async function build(root, ui, trash) {
   // The belt pull acts at the pulley, off the part, and turns in the pulley plane.
   const pl = man.pull;
   const pAt = new Vector3(...pl.point);
-  const e1 = new Vector3(...pl.e1), e2 = new Vector3(...pl.e2);
+  const e1 = new Vector3(...pl.e1), e2 = new Vector3(...pl.e2), axis = new Vector3(...pl.axis);
   const pDir = new Vector3(), Y = new Vector3(0, 1, 0);
   const pull = arrow(COLD);
   scene.add(pull);
+  // the circle the arrow's tip runs on, shown while the arrow is under the pointer or turning
+  const ringPts = [];
+  for (let k = 0; k <= 96; k++) {
+    const a = (k / 96) * Math.PI * 2;
+    ringPts.push(new Vector3().addScaledVector(e1, Math.cos(a)).addScaledVector(e2, Math.sin(a)));
+  }
+  const ring = new Line(new BufferGeometry().setFromPoints(ringPts),
+    new LineBasicMaterial({ color: COLD, transparent: true, opacity: 0.6, depthTest: false }));
+  ring.position.copy(pAt);
+  ring.renderOrder = 3;
+  ring.visible = false;
+  scene.add(ring);
   trash.push(() => scene.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); }));
 
   // No damping: the part stops when the pointer stops, so nothing keeps drawing after a drag.
   const controls = new OrbitControls(camera, canvas);
   trash.push(() => controls.dispose());
   // The part sits in the page's first screen: a vertical swipe still scrolls the page on phones,
-  // a sideways drag turns the part.
+  // a sideways drag turns the part, and a drag that starts on the arrow turns the pull.
   canvas.style.touchAction = 'pan-y';
   controls.enableDamping = false;
   controls.rotateSpeed = 0.8;
@@ -296,27 +318,33 @@ async function build(root, ui, trash) {
   const peakTag = root.querySelector('.peak-tag');
   const peakTagV = root.querySelector('.peak-tag-v');
   const loadTag = root.querySelector('.load-tag');
+  const grip = root.querySelector('.pull-grip');
+  const hand = root.querySelector('.hint-hand');
   const probe = root.querySelector('.probe');
-  const tmp = new Vector3(), tip = new Vector3(), hubS = new Vector3(), peakP = new Vector3();
-  let len = 0, cs = [1, 0];
+  const tmp = new Vector3(), tip = new Vector3(), hubS = new Vector3(), tipS = new Vector3(), peakP = new Vector3();
+  let len = 0, cs = [1, 0], grow = 1, showTags = false, handOpacity = 0;
+  // how far the entrance has come (k) and how much of the bend it shows
+  const enter = { k: 1, bend: 1 };
 
   function apply() {
     const t = (state.angle * Math.PI) / 180;
     cs = [Math.cos(t), Math.sin(t)];
     uniforms.uF.value = state.load;
     uniforms.uCS.value.set(cs[0], cs[1]);
-    uniforms.uExag.value = state.exag;
+    uniforms.uExag.value = state.exag * enter.bend;
     pDir.copy(e1).multiplyScalar(cs[0]).addScaledVector(e2, cs[1]);
-    len = (46 * state.load) / man.load_N;
+    len = ((46 * state.load) / man.load_N) * grow;
     pull.visible = len > 0.5;
     const { shaft, head, hub } = pull.userData;
     pull.position.copy(pAt);
     pull.quaternion.setFromUnitVectors(Y, pDir);
-    const body = Math.max(len - 10, 0);
+    const body = Math.max(len - 10 * Math.min(grow, 1), 0);
+    head.scale.setScalar(Math.max(Math.min(grow, 1), 0.01));
     shaft.scale.set(1, Math.max(body, 0.01), 1);
     shaft.position.set(0, body / 2, 0);
-    head.position.set(0, body + 5, 0);
+    head.position.set(0, body + 5 * Math.min(grow, 1), 0);
     hub.position.set(0, 0, 0);
+    ring.scale.setScalar(Math.max(len, 16));
     // the peak for this angle, found by the export at every whole degree
     const node = peakNode(man, state.angle), f = uniforms.uExag.value * state.load;
     peakP.set(node[0] + f * (cs[0] * node[3] + cs[1] * node[6]), node[1] + f * (cs[0] * node[4] + cs[1] * node[7]),
@@ -333,11 +361,13 @@ async function build(root, ui, trash) {
   let vw = 1, vh = 1;
   function place(el, p) {
     tmp.copy(p).project(camera);
-    const vis = tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
+    const vis = showTags && tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
     el.hidden = !vis;
     if (vis) el.style.translate = `${((tmp.x + 1) / 2) * vw}px ${((1 - tmp.y) / 2) * vh}px`;
     return vis;
   }
+  const toScreen = (p, out) => { out.copy(p).project(camera); out.set(((out.x + 1) / 2) * vw, ((1 - out.y) / 2) * vh, out.z); return out; };
+  const GRIP = coarse ? 44 : 28; // the arrow's hit area across, in CSS pixels
   function overlays() {
     hubS.copy(pAt).project(camera);
     if (place(peakTag, peakP)) {
@@ -346,11 +376,27 @@ async function build(root, ui, trash) {
       peakTag.style.flexDirection = left ? 'row-reverse' : '';
       peakTag.style.transform = left ? 'translate(calc(-100% + 9px), -50%)' : '';
     }
-    if (!pull.visible) { loadTag.hidden = true; return; }
+    const reach = Math.max(len, 16);
+    if (!pull.visible || !showTags) { loadTag.hidden = true; grip.hidden = true; hand.hidden = true; return; }
+    // the hit area: a pill over the whole arrow, hub to tip, wider than the arrow itself
+    toScreen(pAt, hubS);
+    toScreen(tip.copy(pAt).addScaledVector(pDir, reach), tipS);
+    const dx = tipS.x - hubS.x, dy = tipS.y - hubS.y, l = Math.hypot(dx, dy) || 1, pad = GRIP / 2;
+    grip.hidden = hubS.z > 1;
+    grip.style.width = `${l + 2 * pad}px`;
+    grip.style.height = `${GRIP}px`;
+    grip.style.transform = `translate(${hubS.x - (pad * dx) / l}px, ${hubS.y - (pad * dy) / l - pad}px) rotate(${Math.atan2(dy, dx)}rad)`;
+    // the hint pointer rests on the arrow's head
+    hand.hidden = handOpacity <= 0.01;
+    if (!hand.hidden) {
+      toScreen(tip.copy(pAt).addScaledVector(pDir, reach - 4), tipS);
+      hand.style.translate = `${tipS.x}px ${tipS.y}px`;
+      hand.style.opacity = String(handOpacity);
+    }
     // the label sits just past the arrow's tip, on the side the arrow points to
-    if (place(loadTag, tip.copy(pAt).addScaledVector(pDir, Math.max(len, 16) + 8))) {
-      const sx = tmp.x - hubS.x, sy = hubS.y - tmp.y, l = Math.hypot(sx, sy) || 1;
-      loadTag.style.transform = `translate(${(-50 + (50 * sx) / l).toFixed(1)}%, ${(-50 + (50 * sy) / l).toFixed(1)}%)`;
+    if (place(loadTag, tip.copy(pAt).addScaledVector(pDir, reach + 8))) {
+      const sx = dx / l, sy = dy / l;
+      loadTag.style.transform = `translate(${(-50 + 50 * sx).toFixed(1)}%, ${(-50 + 50 * sy).toFixed(1)}%)`;
     }
   }
 
@@ -362,7 +408,8 @@ async function build(root, ui, trash) {
     pending = false;
     raf = 0;
     dirty = false;
-    if (now < busyUntil && last) {
+    // only the visitor's own drags count: the idle animation draws at its own pace on purpose
+    if (now < busyUntil && last && !auto) {
       gaps.push(now - last);
       if (gaps.length > 6) gaps.shift();
       if (gaps.length === 6 && gaps.filter((g) => g > 24).length >= 4 && px > 1) {
@@ -419,8 +466,10 @@ async function build(root, ui, trash) {
     vw = w;
     vh = h;
     renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    if (enter.k >= 1) {
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
     requestRender();
   }
   const ro = new ResizeObserver(resize);
@@ -433,6 +482,57 @@ async function build(root, ui, trash) {
   const moved = () => { rect = null; };
   on(window, 'scroll', moved, { passive: true });
   on(window, 'resize', moved, { passive: true });
+
+  // The arrow lights up under the pointer, while it is dragged, and while the idle animation turns it.
+  let hovering = false, turning = null, auto = false;
+  function light() {
+    const hot = hovering || turning !== null || auto;
+    const [solid, faint] = pull.userData.materials;
+    solid.color.setHex(hot ? HOT : COLD);
+    faint.color.setHex(hot ? HOT : COLD);
+    faint.opacity = hot ? 0.5 : 0.35;
+    ring.visible = hovering || turning !== null;
+    requestRender();
+  }
+
+  // Turning the pull: a drag that starts anywhere on the arrow moves its tip around the pulley.
+  // The pointer's ray meets the pulley plane, so the arrow follows it from any view.
+  const ray = new Raycaster(), ndc = new Vector2(), plane = new Plane().setFromNormalAndCoplanarPoint(axis, pAt);
+  const hit = new Vector3();
+  function angleAt(x, y) {
+    const r = where();
+    ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    if (!ray.ray.intersectPlane(plane, hit)) return null;
+    hit.sub(pAt);
+    return (Math.round(MathUtils.radToDeg(Math.atan2(hit.dot(e2), hit.dot(e1)))) + 360) % 360;
+  }
+  on(grip, 'pointerenter', (e) => { if (e.pointerType === 'mouse') { hovering = true; light(); } });
+  on(grip, 'pointerleave', (e) => { if (e.pointerType === 'mouse') { hovering = false; light(); } });
+  on(grip, 'pointerdown', (e) => {
+    if (!e.isPrimary || e.button > 0) return;
+    turning = e.pointerId;
+    grip.setPointerCapture(e.pointerId);
+    grip.dataset.turning = '';
+    probe.hidden = true;
+    light();
+  });
+  // the page folds the moves into one update a frame, and this view draws in that same frame
+  on(grip, 'pointermove', (e) => {
+    if (turning !== e.pointerId) return;
+    busy();
+    const deg = angleAt(e.clientX, e.clientY);
+    if (deg !== null) ui.setAngle(deg, false);
+  }, { passive: true });
+  const endTurn = (e) => {
+    if (turning !== e.pointerId) return;
+    turning = null;
+    delete grip.dataset.turning;
+    hovering = e.pointerType === 'mouse' && grip.matches(':hover');
+    light();
+  };
+  on(grip, 'pointerup', endTurn);
+  on(grip, 'pointercancel', endTurn);
 
   // The probe reads the stress under the pointer from a one pixel render, at most once a frame.
   const px1 = new Uint8Array(4);
@@ -459,7 +559,7 @@ async function build(root, ui, trash) {
   }
   let hoverAt = null, hoverRaf = 0;
   on(canvas, 'pointermove', (e) => {
-    if (e.pointerType !== 'mouse' || e.buttons) return;
+    if (e.pointerType !== 'mouse' || e.buttons || enter.k < 1) return;
     hoverAt = [e.clientX, e.clientY];
     if (!hoverRaf) {
       hoverRaf = requestAnimationFrame(() => {
@@ -493,16 +593,19 @@ async function build(root, ui, trash) {
   });
   on(canvas, 'dblclick', () => { probe.hidden = true; resetView(); });
 
-  // Keyboard orbit: arrows rotate about the part, plus and minus zoom.
+  // Keys on the part: left and right turn the pull, up and down tilt the view, plus and minus zoom.
   const Z = new Vector3(0, 0, 1), off = new Vector3(), side = new Vector3(), next = new Vector3();
   on(canvas, 'keydown', (e) => {
-    const step = e.shiftKey ? 0.3 : 0.1;
-    off.subVectors(camera.position, controls.target);
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      off.applyAxisAngle(Z, e.key === 'ArrowLeft' ? -step : step);
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const step = (e.shiftKey ? 1 : 5) * (e.key === 'ArrowRight' ? 1 : -1);
+      ui.setAngle(Math.round(ui.state().angle) + step, true); // the page's angle: several presses can land in one frame
+      return;
+    }
+    off.subVectors(camera.position, controls.target);
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       side.crossVectors(off, Z).normalize();
-      next.copy(off).applyAxisAngle(side, e.key === 'ArrowUp' ? step : -step);
+      next.copy(off).applyAxisAngle(side, (e.shiftKey ? 0.3 : 0.1) * (e.key === 'ArrowUp' ? 1 : -1));
       if (Math.abs(next.z / next.length()) < 0.97) off.copy(next);
     } else if (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') {
       const l = off.length() * (e.key === '-' || e.key === '_' ? 1.12 : 1 / 1.12);
@@ -516,24 +619,104 @@ async function build(root, ui, trash) {
     controls.update();
   });
 
+  // The idle animation moves the camera through these, as azimuth and elevation around the target.
+  const arm = new Vector3();
+  view = {
+    get() {
+      arm.subVectors(camera.position, controls.target);
+      const dist = arm.length();
+      return { az: Math.atan2(arm.y, arm.x), el: Math.asin(MathUtils.clamp(arm.z / dist, -1, 1)), dist };
+    },
+    set(v) {
+      const c = Math.cos(v.el), t = controls.target;
+      camera.position.set(t.x + v.dist * c * Math.cos(v.az), t.y + v.dist * c * Math.sin(v.az), t.z + v.dist * Math.sin(v.el));
+      camera.lookAt(t);
+      controls.update();
+    },
+    hot(onIt) { if (auto !== onIt) { auto = onIt; light(); } },
+    hand(opacity) { if (handOpacity !== opacity) { handOpacity = opacity; requestRender(); } },
+  };
+
   trash.push(ui.onChange((s) => { Object.assign(state, s); busy(); apply(); drawNow(); }));
   trash.push(ui.onReset(resetView));
   Object.assign(state, ui.state());
   resize();
   resetView();
 
-  apply();
-  // Swap the poster for the canvas once the first frame is on screen.
-  await nextFrame();
-  await nextFrame();
-  alive();
-  canvas.style.opacity = '';
+  // The entrance: the canvas fades in over the poster from the poster's own camera, colors and
+  // unbent shape, then the view eases round to its home, the part takes its load and bends,
+  // and the arrow grows out of the pulley. About a second in all; a plain fade with reduced motion.
+  const pc = poster && poster.dataset.camera ? JSON.parse(poster.dataset.camera) : null;
+  const homePos = camera.position.clone(), homeTarget = controls.target.clone(), homeFov = camera.fov;
+  function entranceAt(k, g) {
+    enter.k = k;
+    const e = easeInOut(k);
+    const pos = new Vector3(...pc.position), target = new Vector3(...pc.target);
+    const a0 = new Vector3().subVectors(pos, target), a1 = new Vector3().subVectors(homePos, homeTarget);
+    const s0 = { az: Math.atan2(a0.y, a0.x), el: Math.asin(a0.z / a0.length()), r: a0.length() };
+    const s1 = { az: Math.atan2(a1.y, a1.x), el: Math.asin(a1.z / a1.length()), r: a1.length() };
+    let daz = s1.az - s0.az;
+    daz = ((daz + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    const az = s0.az + daz * e, el = lerp(s0.el, s1.el, e), r = lerp(s0.r, s1.r, e);
+    controls.target.lerpVectors(target, homeTarget, e);
+    camera.position.set(Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)).multiplyScalar(r).add(controls.target);
+    camera.lookAt(controls.target);
+    // the poster's frame: its render size and crop, shown contained in this box
+    const [fw, fh] = pc.frame, [cx, cy, cw, ch] = pc.crop;
+    const s = Math.min(vw / cw, vh / ch), ox = (vw - cw * s) / 2, oy = (vh - ch * s) / 2;
+    camera.fov = lerp(pc.fov, homeFov, e);
+    camera.aspect = lerp(fw / fh, vw / vh, e);
+    if (k < 1) camera.setViewOffset(lerp(fw * s, vw, e), lerp(fh * s, vh, e), lerp(cx * s - ox, 0, e), lerp(cy * s - oy, 0, e), vw, vh);
+    else camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+    uniforms.uLimit.value = lerp(pc.clim, man.allowable_MPa, e);
+    enter.bend = e;
+    grow = easeOut(g);
+    apply();
+    drawNow();
+  }
+  if (pc && !reduce) {
+    entranceAt(0, 0);
+    await nextFrame();
+    alive();
+    canvas.style.opacity = '';
+    status.textContent = '';
+    const t0 = performance.now();
+    // a visitor who grabs the part before it settles gets the settled view at once
+    let cut = false;
+    const onStart = () => { cut = true; };
+    controls.addEventListener('start', onStart);
+    await new Promise((done) => {
+      const step = (now) => {
+        if (signal.aborted) { done(); return; }
+        const ms = cut ? 1e9 : now - t0;
+        if (ms > 300 && root.dataset.state !== 'live') root.dataset.state = 'live';
+        entranceAt(Math.min(Math.max((ms - 150) / 950, 0), 1), Math.min(Math.max((ms - 550) / 500, 0), 1));
+        if (ms >= 1100) done(); else requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+    controls.removeEventListener('start', onStart);
+    alive();
+  } else {
+    apply();
+    await nextFrame();
+    alive();
+    canvas.style.opacity = '';
+    await new Promise((r) => setTimeout(r, 300));
+    alive();
+  }
   root.dataset.state = 'live';
   status.textContent = '';
+  showTags = true;
+  requestRender();
 
   // Leaving the page: stop drawing, take the listeners off and give the WebGL context back.
-  return function dispose() {
-    teardown();
-    for (const el of root.querySelectorAll('.peak-tag, .load-tag, .probe')) el.hidden = true;
+  return {
+    dispose() {
+      teardown();
+      for (const el of root.querySelectorAll('.peak-tag, .load-tag, .probe, .pull-grip, .hint-hand')) el.hidden = true;
+    },
+    view,
   };
 }
