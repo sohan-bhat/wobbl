@@ -25,6 +25,8 @@ class AskGroup(click.Group):
     """Lets 'wobbl part.step "question"' work next to the subcommands."""
 
     def resolve_command(self, ctx, args):
+        if args and args[0] not in self.commands and " " in args[0].strip():
+            return "ask", self.commands["ask"], ["-", *args]  # a question with no file: circuits
         if args and args[0] not in self.commands and (os.path.exists(args[0]) or "." in Path(args[0]).name):
             return "ask", self.commands["ask"], args
         return super().resolve_command(ctx, args)
@@ -83,6 +85,8 @@ def ask(ctx, part, question, **kw):
     from ..ask import detect_domain
 
     dom = detect_domain(question, part)
+    if part == "-" and dom != "circuit":
+        ui.fail("pass the part file first: wobbl part.step \"your question\"")
     if dom == "circuit":
         from .circuits import circuit_ask
         return circuit_ask(part, question, kw)
@@ -366,9 +370,10 @@ def mcp():
 
 def _register():
     from .admin import doctor, setup, uninstall
+    from .circuits import circuit
     from .thermal import thermal
 
-    for c in (setup, doctor, uninstall, thermal):
+    for c in (setup, doctor, uninstall, thermal, circuit):
         cli.add_command(c)
 
 

@@ -242,6 +242,7 @@ def line_plot(path: str | Path, x, ys: dict, xlabel: str, ylabel: str, hline: fl
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(8, 4.5), dpi=150, facecolor=BG)
     ax.set_facecolor(BG)
     colors = [MARK, "#4a90d9", "#3ccf7a", "#ff6b6b"]
