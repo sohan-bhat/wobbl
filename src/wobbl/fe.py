@@ -130,6 +130,7 @@ class HeatResult:
     log: str = ""
     solver: str = ""
     reaction_flux: np.ndarray | None = None   # (n,) heat flow at fixed temperature nodes, mW
+    reaction_flux_history: np.ndarray | None = None   # (steps, n) the same at each output time of a transient
 
 
 def mass_properties(mesh: Mesh, density: float) -> tuple[float, np.ndarray]:

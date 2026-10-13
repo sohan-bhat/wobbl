@@ -191,6 +191,10 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
         checks.append(Check("energy balance", st, f"held temperature faces exchange {fmt(abs(q_fixed) / 1000)} W, "
                                                     f"heat made {fmt(study.power / 1000)} W, surfaces shed "
                                                     f"{fmt(loss / 1000)} W ({100 * err:.2g}% apart)"))
+    elif model.transient:
+        bal = transient_energy_balance(mesh, model, study, info, res)
+        if bal is not None:
+            checks.append(bal)
     # lumped hand calculation
     vol = mesh.volume()
     film_area = sum(_tri_weights(mesh, m)[1] for m, _, _ in info["film_masks"])
@@ -314,6 +318,169 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
                                      ["history", "Temperature over time"]]},
                        img, fixes, prep.notes, solver=res.solver, t_total=time.time() - t0)
     return o.write(out)
+
+
+SIGMA = 5.670374e-11   # Stefan Boltzmann constant, mW/(mm2 K4)
+
+
+def transient_energy_balance(mesh, model, study: ThermalStudy, info: dict, res) -> Check | None:
+    """Energy balance over a transient run, the counterpart of the steady one.
+
+    The heat made over the run, plus whatever flows in through held temperature faces, has to equal the change in
+    heat stored in the part plus the heat its surfaces shed over the run. Stored heat uses the exact weights of the
+    quadratic temperature field, and the heat flows are integrated over the saved time points with the trapezoid
+    rule, starting from the uniform initial temperature at t = 0. CalculiX steps backward in time between those
+    points, so the two sides drift apart by about the error of its time steps, and the check passes within 2%.
+    """
+    if not len(res.history_t) or len(res.history_T) != len(res.history_t):
+        return None
+    times = np.concatenate([[0.0], np.asarray(res.history_t, float)])
+    hist = np.vstack([np.full((1, mesh.n_nodes), float(model.initial_temp)), np.asarray(res.history_T, float)])
+    rho_c = model.density * model.specific_heat
+    weights = _quad_vol_weights(mesh)
+    stored = rho_c * float(weights @ (hist[-1] - hist[0]))           # mJ
+    out_rate = np.zeros(len(times))                                   # mW leaving through convection and radiation
+    for mask, h, tinf in info["film_masks"]:
+        w, _ = _tri_weights(mesh, mask)
+        out_rate += h * ((hist - tinf) @ w)
+        if study.emissivity > 0:
+            out_rate += study.emissivity * SIGMA * (((hist + 273.15) ** 4 - (tinf + 273.15) ** 4) @ w)
+    shed = _trapezoid(out_rate, times)
+    made = study.power * times[-1]
+    held = 0.0
+    if model.fixed_temps:
+        if res.reaction_flux_history is None or len(res.reaction_flux_history) != len(res.history_t):
+            return None
+        held = _held_inflow(mesh, model, study, info, res.reaction_flux_history, times, hist, weights)
+    scale = max(abs(made), abs(held), abs(stored), abs(shed))
+    if scale < 1e-9:   # nothing made, held or exchanged: no heat to account for
+        return None
+    err = abs(made + held - stored - shed) / scale
+    st = "pass" if err < 0.02 else ("warn" if err < 0.05 else "fail")
+    src = f"heat in {_energy(made)}" + (f" plus {_energy(held)} through held temperature faces" if model.fixed_temps
+                                        else "")
+    s = (f"over {fmt(times[-1] / 60)} min, {src}, stored {_energy(stored)}, out through the surfaces "
+         f"{_energy(shed)} ({100 * err:.2g}% apart)")
+    if st != "pass":
+        s += (". The time steps are coarse for how fast this part responds, so treat the temperatures between "
+              "them as approximate")
+    return Check("energy balance", st, s, {"in_J": made / 1000, "held_J": held / 1000, "stored_J": stored / 1000,
+                                           "out_J": shed / 1000, "error": err, "time_points": len(times)})
+
+
+def _held_inflow(mesh, model, study, info, rfl_hist, times, hist, weights) -> float:
+    """Heat that entered the part through its held temperature faces over the run, mJ.
+
+    CalculiX's RFL is the conduction flow at each node, which sums to zero over the part, so the heat a held face
+    supplies is its RFL plus what the held nodes exchange themselves: their share of the consistent heat capacity
+    and of the convection and radiation on faces that touch them, less the heat made at them.
+    """
+    held = np.zeros(mesh.n_nodes, bool)
+    for _, nodes, _ in model.fixed_temps:
+        held[nodes] = True
+    inflow = _integrate_from_start(rfl_hist[:, held].sum(1), times)
+    inflow += model.density * model.specific_heat * _held_capacity(mesh, held, hist[-1] - hist[0])
+    surf = np.zeros(len(times))
+    for mask, h, tinf in info["film_masks"]:
+        surf += h * _held_surface(mesh, mask, held, hist - tinf)
+        if study.emissivity > 0:
+            surf += study.emissivity * SIGMA * _held_surface(mesh, mask, held,
+                                                             (hist + 273.15) ** 4 - (tinf + 273.15) ** 4)
+    inflow += _trapezoid(surf, times)
+    made_at_held = model.volumetric * weights[held].sum()
+    for _, mask, q in model.fluxes:
+        w, _ = _tri_weights(mesh, mask)
+        made_at_held += q * w[held].sum()
+    return inflow - made_at_held * times[-1]
+
+
+def _integrate_from_start(rate, times) -> float:
+    """Integral from t = 0 of a heat flow saved at times[1:], for flows through held faces.
+
+    Such a flow can settle within the first saved interval (a thin metal part), grow like sqrt(t) (a thick plastic
+    one) or fall like 1/sqrt(t) (a face held hotter than the part), so the first interval follows a power law fitted
+    to the first two saved points instead of a straight line from zero. The rest uses the trapezoid rule.
+    """
+    rate, t = np.asarray(rate, float), np.asarray(times[1:], float)
+    p = 1.0
+    if len(rate) > 1 and rate[0] * rate[1] > 0:
+        p = float(np.clip(np.log(rate[1] / rate[0]) / np.log(t[1] / t[0]), -0.9, 3.0))
+    return rate[0] * t[0] / (p + 1.0) + _trapezoid(rate, t)
+
+
+_TET_EDGES = [(0, 1), (1, 2), (2, 0), (0, 3), (1, 3), (2, 3)]   # midside nodes 4 to 9 of a CalculiX C3D10
+
+
+def _tet10_mass() -> np.ndarray:
+    """Consistent mass matrix of a straight sided 10 node tetrahedron of unit volume and unit density."""
+    M = np.full((4, 4), 1.0) + 5.0 * np.eye(4)
+    M = np.pad(M, ((0, 6), (0, 6)))
+    for k, e in enumerate(_TET_EDGES):
+        for c in range(4):
+            M[c, 4 + k] = M[4 + k, c] = -4.0 if c in e else -6.0
+        for m, f in enumerate(_TET_EDGES):
+            M[4 + k, 4 + m] = 32.0 if k == m else (16.0 if set(e) & set(f) else 8.0)
+    return M / 420.0
+
+
+def _tri6_mass() -> np.ndarray:
+    """Consistent mass matrix of a 6 node triangle of unit area, midsides on edges 0-1, 1-2 and 2-0."""
+    M = np.zeros((6, 6))
+    M[:3, :3] = np.full((3, 3), -1.0) + 7.0 * np.eye(3)
+    for k, e in enumerate([(0, 1), (1, 2), (2, 0)]):
+        for c in range(3):
+            M[c, 3 + k] = M[3 + k, c] = 0.0 if c in e else -4.0
+    M[3:, 3:] = np.full((3, 3), 16.0) + 16.0 * np.eye(3)
+    return M / 180.0
+
+
+def _held_capacity(mesh, held: np.ndarray, dT: np.ndarray) -> float:
+    """Sum over held nodes of the consistent capacity matrix times the temperature change, per unit rho c."""
+    if mesh.tets.shape[1] != 10:
+        return 0.0
+    c = mesh.X[mesh.tets[:, :4]]
+    v = np.abs(np.einsum("ij,ij->i", c[:, 1] - c[:, 0], np.cross(c[:, 2] - c[:, 0], c[:, 3] - c[:, 0]))) / 6.0
+    touch = held[mesh.tets].any(axis=1)
+    phi = held[mesh.tets[touch]].astype(float)
+    return float((v[touch] * np.einsum("ei,ij,ej->e", phi, _tet10_mass(), dT[mesh.tets[touch]])).sum())
+
+
+def _held_surface(mesh, mask: np.ndarray, held: np.ndarray, field: np.ndarray) -> np.ndarray:
+    """For each row of field (one per time), the consistent surface integral of it weighted by the held nodes'
+    shape functions over the masked faces."""
+    tris = mesh.tris[mask]
+    touch = held[tris].any(axis=1)
+    if not touch.any():
+        return np.zeros(len(field))
+    _, a, _ = mesh.tri_geometry(mask)
+    tris, a = tris[touch], a[touch]
+    if tris.shape[1] != 6:   # linear faces: a lumped split is as good as the solver's own
+        return (field[:, tris] * (held[tris] * (a / 3.0)[:, None])[None]).sum((1, 2))
+    phi = held[tris].astype(float) * a[:, None]
+    return np.einsum("ei,ij,tej->t", phi, _tri6_mass(), field[:, tris])
+
+
+def _trapezoid(y, x) -> float:
+    y, x = np.asarray(y, float), np.asarray(x, float)
+    return float(np.sum(0.5 * (y[1:] + y[:-1]) * np.diff(x)))
+
+
+def _energy(mj: float) -> str:
+    j = mj / 1000.0
+    return f"{fmt(j / 1000)} kJ" if abs(j) >= 1000 else f"{fmt(j)} J"
+
+
+def _quad_vol_weights(mesh) -> np.ndarray:
+    """Exact integration weights of a field over the mesh. For 10 node tetrahedra each corner carries -V/20 and each
+    midside node V/5, which integrates a quadratic field exactly, unlike the even split in _vol_weights."""
+    c = mesh.X[mesh.tets[:, :4]]
+    v = np.abs(np.einsum("ij,ij->i", c[:, 1] - c[:, 0], np.cross(c[:, 2] - c[:, 0], c[:, 3] - c[:, 0]))) / 6.0
+    w = np.zeros(mesh.n_nodes)
+    quadratic = mesh.tets.shape[1] == 10
+    for k in range(mesh.tets.shape[1]):
+        share = (-v / 20.0 if k < 4 else v / 5.0) if quadratic else v / 4.0
+        np.add.at(w, mesh.tets[:, k], share)
+    return w
 
 
 def _rel(vals: list[float]) -> float:

@@ -67,7 +67,9 @@ faces as the films. [wobbl thermal](/guides/cli/thermal/) lists every option.
 
 The hottest point has to settle within 2% between meshes, and two meshes are enough here
 because temperature is a smooth field. In steady state, the heat going in has to match the
-heat leaving by convection, radiation and any held temperature faces to within 1%. A lumped
+heat leaving by convection, radiation and any held temperature faces to within 1%. In a
+transient, the heat made over the run has to match the heat the part stored plus the heat it
+shed along the way to within 2%, which the battery pack closes to 1%. A lumped
 hand calculation treats the part as one uniform block and is compared with the surface
 average in steady state, or with the mean temperature over time in a transient. When
 radiation is off but the part runs hot, the result says how much heat radiation could shed.

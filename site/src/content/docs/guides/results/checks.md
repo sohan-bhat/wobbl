@@ -112,9 +112,19 @@ verdict is the same but the numbers differ more, and warns when the verdict flip
 | Check | What it compares |
 |---|---|
 | Mesh convergence | the temperature rise at the hottest point, which has to settle within 2% over two meshes, or the coolest point when the hottest is a held temperature |
-| Energy balance | in steady state, heat in against heat out by convection, radiation and held temperature faces, passing within 1% |
+| Energy balance | in steady state, heat in against heat out by convection, radiation and held temperature faces, passing within 1%, and in a transient, the heat made and let in by held faces over the run against the change in stored heat plus the heat shed over the run, passing within 2% |
 | Hand calculation | a lumped model of the whole part, against the surface average in steady state or the mean temperature over time in a transient, with the Biot number that says whether the part is nearly uniform |
 | Units and sanity | that the temperatures are physical, with a note on how much heat radiation could shed when it is off and the part runs above 70 C |
+
+A transient keeps its own books. Wobbl adds up the heat made over the run and the heat that
+came in or left through held temperature faces, then compares that with how much more heat
+the part holds at the end than at the start plus everything convection and radiation carried
+away along the way. The stored heat uses the exact weights of the quadratic temperature field,
+and the flows are summed over the 40 saved time points. CalculiX steps through time with
+implicit steps between those points, so the two sides differ by about the error of its time
+steps, which is why a transient passes within 2% and warns up to 5%. The battery pack example
+closes to 1% and the lumped cooling case to 0.9%. A warning says the time steps are coarse for
+how fast the part responds, so the temperatures between them are approximate.
 
 ## Circuit checks
 

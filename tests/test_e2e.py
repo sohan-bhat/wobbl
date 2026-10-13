@@ -102,6 +102,61 @@ def test_thermal_block_energy_balance(parts, tmp_path):
     assert next(c for c in o.checks if c.name == "energy balance").status == "pass"
 
 
+def _balance(o):
+    return next(c for c in o.checks if c.name == "energy balance")
+
+
+@needs_ccx
+def test_transient_energy_balance_on_the_battery_pack(tmp_path):
+    """The battery pack example exactly as its run.sh runs it: 6 W for an hour has to end up stored in the pack or
+    shed by convection and radiation."""
+    from pathlib import Path
+
+    from wobbl.thermal.study import run_thermal
+    from wobbl.thermal.tools import study_from
+
+    pack = Path(__file__).resolve().parents[1] / "examples" / "battery-pack" / "pack.py"
+    st = study_from(str(pack), "li-ion-cell", "6 W", "", ["5 W/m2K @ all"], "35 C", [], "60 min", "60 C", 0.9)
+    o = run_thermal(st, tmp_path / "pack")
+    bal = _balance(o)
+    assert bal.status == "pass", bal.summary
+    d = bal.detail
+    assert d["in_J"] == pytest.approx(6 * 3600) and d["held_J"] == 0
+    assert d["stored_J"] > 0 and d["out_J"] > 0 and d["error"] < 0.02
+    assert d["stored_J"] + d["out_J"] == pytest.approx(d["in_J"], rel=0.02)
+
+
+@needs_ccx
+def test_transient_energy_balance_on_the_lumped_validation_case(tmp_path):
+    """The lumped cooling case makes no heat, so the heat the cube loses has to match what its surfaces shed."""
+    from wobbl.outcome_generic import GenericOutcome
+    from wobbl.validation.cases import run_cases
+
+    row = run_cases(tmp_path, ["lumped"], log=lambda m: None)[0]
+    assert row["pass"], row
+    bal = _balance(GenericOutcome.load(tmp_path / "lumped" / "run" / "outcome.json"))
+    assert bal.status == "pass", bal.summary
+    d = bal.detail
+    assert d["in_J"] == 0 and d["stored_J"] < 0
+    assert -d["stored_J"] == pytest.approx(d["out_J"], rel=0.02)
+
+
+@needs_ccx
+def test_transient_energy_balance_with_a_held_face(tmp_path):
+    """A plate held at the air temperature on its bottom face passes nearly all its heat out through that face."""
+    from wobbl.thermal.study import run_thermal
+    from wobbl.thermal.tools import study_from
+    from wobbl.validation import geometry as G
+
+    part = G.box(tmp_path / "plate.step", 60, 40, 5)
+    st = study_from(str(part), "6061-t6", power="5 W", films=["10 W/m2K @ top"], fixed=["25 C @ bottom"],
+                    ambient="25 C", duration="5 min")
+    bal = _balance(run_thermal(st, tmp_path / "heat"))
+    assert bal.status == "pass", bal.summary
+    assert bal.detail["held_J"] == pytest.approx(-5 * 300, rel=0.01)
+    assert "through held temperature faces" in bal.summary
+
+
 @needs_spice
 def test_led_and_rc(tmp_path):
     from wobbl.circuits.run import run_circuit

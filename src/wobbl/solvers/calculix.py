@@ -85,7 +85,10 @@ class CalculiX(SolverAdapter):
         hist = np.array([s[1][:, 0] for s in steps])
         flux = blocks["FLUX"][-1][1][:, :3] if "FLUX" in blocks else None
         rfl = blocks["RFL"][-1][1][:, 0] if "RFL" in blocks else None
-        return HeatResult(hist[-1], times, hist, flux, t, log, f"CalculiX {self.version()}", rfl)
+        rfl_hist = None
+        if "RFL" in blocks and len(blocks["RFL"]) == len(steps):
+            rfl_hist = np.array([s[1][:, 0] for s in blocks["RFL"]])
+        return HeatResult(hist[-1], times, hist, flux, t, log, f"CalculiX {self.version()}", rfl, rfl_hist)
 
 
 def _run(ccx: Path, work: Path, job: str, timeout: float) -> tuple[str, float]:
