@@ -20,8 +20,12 @@ from . import cad_edit
 
 def _load(result_dir: Path):
     o = Outcome.load(result_dir / "outcome.json")
-    study = StructuralStudy.from_dict(json.loads((result_dir / "study.json").read_text()))
-    prep = PreparedGeometry.from_dict(json.loads((result_dir / "geometry.json").read_text()))
+    sd = json.loads((result_dir / "study.json").read_text())
+    sd["part"] = str((result_dir / sd["part"]).resolve())
+    study = StructuralStudy.from_dict(sd)
+    gd = json.loads((result_dir / "geometry.json").read_text())
+    gd["source"], gd["path"] = (str((result_dir / gd[k]).resolve()) for k in ("source", "path"))
+    prep = PreparedGeometry.from_dict(gd)
     return o, study, prep
 
 

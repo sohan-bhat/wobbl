@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from ..report.render import convergence_plot, render_structural
+from ..verify.checks import rel_up
 from .outcome import Outcome, evaluate
 from .report import write_outputs
 from .run import Progress, run_structural
@@ -16,8 +17,12 @@ def analyze_strength(study: StructuralStudy, out_dir: str | Path, progress: Prog
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     run = run_structural(study, out / "work", progress, pre=pre)
-    (out / "study.json").write_text(json.dumps(study.to_dict(), indent=1))
-    (out / "geometry.json").write_text(json.dumps(run.prep.to_dict(), indent=1))
+    sd = study.to_dict()
+    sd["part"] = rel_up(sd["part"], out)
+    gd = run.prep.to_dict()
+    gd["source"], gd["path"] = rel_up(gd["source"], out), rel_up(gd["path"], out)
+    (out / "study.json").write_text(json.dumps(sd, indent=1))
+    (out / "geometry.json").write_text(json.dumps(gd, indent=1))
     o = evaluate(run)
     o.workdir = str(out)
     if fixes:

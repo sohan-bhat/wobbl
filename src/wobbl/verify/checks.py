@@ -123,6 +123,8 @@ def relative_paths(d: dict, base: Path) -> dict:
     for key in ("report", "workdir"):
         if isinstance(out.get(key), str):
             out[key] = _rel(out[key], base)
+    if isinstance(out.get("part"), str) and Path(out["part"]).is_absolute():
+        out["part"] = rel_up(out["part"], base)
     for f in out.get("fixes", []) or []:
         after = f.get("after") or {}
         for k in ("report", "stress_image", "step"):
@@ -138,12 +140,24 @@ def absolute_paths(d: dict, base: Path) -> dict:
     for key in ("report", "workdir"):
         if isinstance(out.get(key), str) and out[key]:
             out[key] = _abs(out[key], base)
+    if isinstance(out.get("part"), str) and out["part"].startswith(".."):
+        out["part"] = str((base / out["part"]).resolve())
     for f in out.get("fixes", []) or []:
         after = f.get("after") or {}
         for k in ("report", "stress_image", "step"):
             if isinstance(after.get(k), str) and after[k]:
                 after[k] = _abs(after[k], base)
     return out
+
+
+def rel_up(p, base) -> str:
+    """Relative path even when it has to climb out of base (../part.step); absolute if on another drive."""
+    import os
+
+    try:
+        return os.path.relpath(str(p), str(base))
+    except ValueError:
+        return str(p)
 
 
 def display_path(p, base) -> str:
