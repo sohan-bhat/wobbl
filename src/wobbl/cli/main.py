@@ -319,6 +319,16 @@ def materials():
     ui.console.print(tb)
 
 
+def _register():
+    from .admin import doctor, setup, uninstall
+
+    for c in (setup, doctor, uninstall):
+        cli.add_command(c)
+
+
+_register()
+
+
 def main():
     try:
         cli(prog_name="wobbl")
