@@ -1,0 +1,34 @@
+{
+  "name": "wobbl",
+  "version": "0.1.0",
+  "description": "Simulate anything before you build it. Runs the Wobbl CLI and MCP server with npx.",
+  "keywords": [
+    "simulation",
+    "fea",
+    "mcp",
+    "engineering",
+    "cad",
+    "calculix",
+    "ngspice"
+  ],
+  "homepage": "https://sohan-bhat.github.io/wobbl/",
+  "bugs": {
+    "url": "https://github.com/sohan-bhat/wobbl/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sohan-bhat/wobbl.git",
+    "directory": "npm"
+  },
+  "license": "MIT",
+  "author": "Sohan Bhat",
+  "bin": {
+    "wobbl": "bin/wobbl.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
