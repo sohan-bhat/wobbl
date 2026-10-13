@@ -49,9 +49,33 @@
   directory.
 - Meshes with flat sliver elements (all four corners in one plane) are rejected
   and remeshed with the next strategy instead of failing in CalculiX.
+- Every command in the agent skill now runs. The circuit example used flags
+  that do not exist and the heat example left out the required material, so a
+  test now parses each command in the skill against the real CLI.
+- `suggest_fix` answers heat and circuit results instead of raising
+  AttributeError, and returns their fixes with a note to solve again.
+- Supports written as `clamp x=min` or `clamped x=min` are read as fixed.
+- `wobbl setup` ends by suggesting `wobbl doctor` and a first question with no
+  files, instead of `wobbl examples`, which does not exist.
+- `wobbl fix --only` lists `thicken` and refuses kinds it does not know, and
+  the fix help says that only the thickness and fillet parameters of a
+  parametric part change.
+- A material swap is solved again when scaling the first solve would be wrong,
+  which is when Poisson's ratio moves by more than 0.05, a load depends on the
+  material, or the new material is judged by a different stress. The output
+  says which way each swap was found.
+- `solve_structural` tells agents a study takes one to seven minutes, the same
+  as the docs and the slowest validation run, instead of one to four.
 
 **Added**
 - Sand cast aluminum A356-T6 in the materials library.
+- A `bearing` keyword for a bolt or pin pressing on one side of a hole, as in
+  `--load "300 N -x bearing @ hole d=6.6"`. Without it the force still spreads
+  evenly over the hole faces.
+- Transient heat runs get an energy balance like steady ones. The heat made
+  and let in over the run has to match the change in stored heat plus the
+  heat shed, within 2%. The battery pack closes to 1.0% and the lumped
+  cooling case to 0.9%.
 
 **Docs**
 - The validation suite takes about 30 minutes (29 on a 2018 six core laptop),
