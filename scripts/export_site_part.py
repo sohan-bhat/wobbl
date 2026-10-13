@@ -1,12 +1,13 @@
-"""Export the website's motor mount as two unit belt pulls the browser combines.
+"""Export the website's motor mount as three unit loads the browser combines.
 
-The hero lets visitors turn the belt pull around the pulley and change its size.
-The model is linear elastic, so a pull of F newtons at angle t is exactly
-F * (cos t * case1 + sin t * case2). This script takes the two unit cases from
-scripts/solve_site_directions.py (same mesh, node for node), keeps the outer
-surface, and writes the full stress tensor and the displacement of both cases
-at every surface node, so the page can rebuild the tensor for any direction and
-take von Mises from it. Von Mises itself does not add up across loads.
+The hero lets visitors point a load on the motor shaft any way in 3D and change
+its size. The model is linear elastic, so a load of F newtons along the unit
+direction u is exactly F * (u1 * case1 + u2 * case2 + u3 * case3). This script
+takes the three unit cases from scripts/solve_site_directions.py (same mesh,
+node for node), keeps the outer surface, and writes the full stress tensor and
+the displacement of each case at every surface node, so the page can rebuild
+the tensor for any direction and take von Mises from it. Von Mises itself does
+not add up across loads.
 
     python scripts/export_site_part.py --cases /tmp/dirs \\
         --example examples/cast-motor-mount --name cast-motor-mount --out site/public/data
@@ -29,6 +30,11 @@ curved triangle into four as VTK does. What makes it small is coding:
 All streams are zigzag coded int32 split into four byte planes, then the file
 is gzipped. Offsets are in the JSON manifest; the binary file's name carries a
 hash of its contents, so a browser never shows an old mesh from its cache.
+
+The peak table goes in its own small file, also named by its hash: the
+governing von Mises and its node for directions every 2 degrees over half the
+sphere, since a load and its opposite give the same von Mises. The page reads
+the reading and the peak marker from it for any direction.
 """
 from __future__ import annotations
 
@@ -168,15 +174,21 @@ def von_mises(S: np.ndarray) -> np.ndarray:
     return np.sqrt(0.5 * ((sxx - syy) ** 2 + (syy - szz) ** 2 + (szz - sxx) ** 2) + 3.0 * (sxy ** 2 + syz ** 2 + szx ** 2))
 
 
-def sweep(S1: np.ndarray, S2: np.ndarray, ok: np.ndarray, degrees: np.ndarray):
-    """Governing von Mises (outside excluded zones) and its node for each angle, per newton of pull, plus
-    how close each allowed node comes to the governing value at any of the angles."""
+def directions(az_deg: np.ndarray, el_deg: np.ndarray) -> np.ndarray:
+    """Unit directions in the case basis (pulley plane e1, e2 and the shaft e3) for azimuth and elevation."""
+    az, el = np.radians(az_deg), np.radians(el_deg)
+    return np.stack([np.cos(el) * np.cos(az), np.cos(el) * np.sin(az), np.sin(el)], axis=-1)
+
+
+def sweep(S: np.ndarray, ok: np.ndarray, dirs: np.ndarray):
+    """Governing von Mises (outside excluded zones) and its node for each direction, per newton, plus how
+    close each allowed node comes to the governing value for any of them. S holds the three cases'
+    stresses side by side, 18 channels."""
     idx = np.flatnonzero(ok)
-    A, B = S1[idx], S2[idx]
-    gov, arg, near = np.empty(len(degrees)), np.empty(len(degrees), np.int64), np.zeros(len(idx))
-    for k, d in enumerate(degrees):
-        t = math.radians(d)
-        vm = von_mises(math.cos(t) * A + math.sin(t) * B)
+    A, B, C = S[idx, :6], S[idx, 6:12], S[idx, 12:]
+    gov, arg, near = np.empty(len(dirs)), np.empty(len(dirs), np.int64), np.zeros(len(idx))
+    for k, d in enumerate(dirs):
+        vm = von_mises(d[0] * A + d[1] * B + d[2] * C)
         j = int(np.argmax(vm))
         gov[k], arg[k] = vm[j], idx[j]
         near = np.maximum(near, vm / vm[j])
@@ -193,13 +205,15 @@ def main() -> None:
     ap.add_argument("--fine-every", type=int, default=20, help="fine stress step is the step over this")
     ap.add_argument("--disp-step", type=float, default=2e-4, help="mm at the example's load")
     ap.add_argument("--hot", type=float, default=0.04, help="nodes within this fraction of a peak get the fine step")
+    ap.add_argument("--grid", type=float, default=2.0, help="degrees between the peak table's directions")
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
 
     info = json.loads((a.cases / "cases.json").read_text())
-    X, tets, U1, S1, ex = read_case(a.cases / "case1.vtu")
-    X2, tets2, U2, S2, _ = read_case(a.cases / "case2.vtu")
-    assert np.array_equal(X, X2) and np.array_equal(tets, tets2), "the two cases must share one mesh"
+    cases = [read_case(a.cases / f"case{k}.vtu") for k in (1, 2, 3)]
+    X, tets, ex = cases[0][0], cases[0][1], cases[0][4]
+    for c in cases[1:]:
+        assert np.array_equal(X, c[0]) and np.array_equal(tets, c[1]), "the cases must share one mesh"
     F = float(info["load_N"])
 
     tris = boundary(X, tets)
@@ -223,41 +237,48 @@ def main() -> None:
     # unit cases per newton, coded on steps given at the example's load
     s_step, d_step = a.stress_step / F, a.disp_step / F
     fine = s_step / a.fine_every
-    S = np.concatenate([S1, S2], axis=1)[old]
-    U = np.concatenate([U1, U2], axis=1)[old]
+    S = np.concatenate([c[3] for c in cases], axis=1)[old]
+    U = np.concatenate([c[2] for c in cases], axis=1)[old]
     qs = np.round(S / s_step).astype(np.int64)
     qu = np.round(U / d_step).astype(np.int64)
-    add("stress", planes(residuals(qs, nc, preds, ends)), channels=12, step=s_step)
-    add("disp", planes(residuals(qu, nc, preds, ends)), channels=6, step=d_step)
+    add("stress", planes(residuals(qs, nc, preds, ends)), channels=18, step=s_step)
+    add("disp", planes(residuals(qu, nc, preds, ends)), channels=9, step=d_step)
     excl = ex[old]
     add("excluded", excl.astype(np.uint8).tobytes(), count=n)
 
+    # Von Mises is the same for u and -u, so half the sphere covers every direction: azimuth from 0 up
+    # to 180 degrees and elevation from -90 to 90.
+    g = a.grid
+    az_grid, el_grid = np.arange(0, 180, g), np.arange(-90, 90 + g / 2, g)
+    AZ, EL = np.meshgrid(az_grid, el_grid, indexing="ij")
+    table = directions(AZ.ravel(), EL.ravel())
+
     # nodes near the peak for some direction get the fine step
     ok = ~excl
-    # von Mises is the same for opposite pulls, so half a turn covers every direction
-    _, _, idx, near = sweep(S[:, :6], S[:, 6:], ok, np.arange(0, 180, 0.25))
+    caz, cel = np.meshgrid(np.arange(0, 180, 3.0), np.arange(-90, 91, 3.0), indexing="ij")
+    _, _, idx, near = sweep(S, ok, directions(caz.ravel(), cel.ravel()))
     hot = idx[near >= 1 - a.hot]
     qf = np.round(S[hot] / fine).astype(np.int64) - qs[hot] * a.fine_every
     add("hot", planes(np.diff(hot, prepend=0)), count=len(hot))
-    add("hot_stress", planes(qf), channels=12, step=fine)
+    add("hot_stress", planes(qf), channels=18, step=fine)
     print(f"{len(hot)} nodes carry the fine stress step")
 
     # what the browser will compute, from the coded values
     assert np.array_equal(decode(residuals(qs, nc, preds, ends), nc, preds, ends), qs)
     Sb = qs * s_step
     Sb[hot] = (qs[hot] * a.fine_every + qf) * fine
-    t0 = math.radians(info["theta0_deg"])
-    whole = np.arange(360.0)
-    g_true, i_true, _, _ = sweep(S[:, :6], S[:, 6:], ok, whole)
-    g_web, i_web, _, _ = sweep(Sb[:, :6], Sb[:, 6:], ok, whole)
+    g_true, i_true, _, _ = sweep(S, ok, table)
+    g_web, i_web, _, _ = sweep(Sb, ok, table)
     err = np.abs(g_web - g_true).max() * F
-    print(f"coded peaks differ from the solver's by at most {err:.4f} MPa at {F:g} N; "
-          f"same node at {np.mean(i_web == i_true):.0%} of whole degrees")
-    vm0 = von_mises(math.cos(t0) * Sb[:, :6] + math.sin(t0) * Sb[:, 6:]) * F
+    print(f"coded peaks differ from the solver's by at most {err:.4f} MPa at {F:g} N over {len(table)} directions; "
+          f"same node for {np.mean(i_web == i_true):.0%} of them")
+    t0 = math.radians(info["theta0_deg"])
+    vm0 = von_mises(math.cos(t0) * Sb[:, :6] + math.sin(t0) * Sb[:, 6:12]) * F
     print(f"default pull: {vm0[ok].max():.4f} MPa (solver {info['governing_MPa']:.4f})")
-    # the peak's node for every whole degree, with its position and bending per newton as the page draws
-    # them, so the readout and the marker cost nothing while the pull turns
-    spots, at_deg = np.unique(i_web, return_inverse=True)
+    # the peak's node for every direction in the table, with its position and bending per newton as the
+    # page draws them, so the readout and the marker cost nothing while the load turns
+    spots, at = np.unique(i_web, return_inverse=True)
+    assert len(spots) < 256
     Pb = lo + qp[spots] / 65535 * (hi - lo)
     Ub = qu[spots] * d_step
     peak_nodes = [[round(float(v), 4) for v in Pb[k]] + [float(f"{v:.6g}") for v in Ub[k]] for k in range(len(spots))]
@@ -265,7 +286,7 @@ def main() -> None:
     blob = b"".join(blocks)
     data = gzip.compress(blob, compresslevel=9, mtime=0)
     tag = hashlib.sha256(data).hexdigest()[:10]
-    for stale in a.out.glob(f"{a.name}.*.bin.gz"):
+    for stale in list(a.out.glob(f"{a.name}.*.bin.gz")) + list(a.out.glob(f"{a.name}.peaks.*.json")):
         stale.unlink()
     path = a.out / f"{a.name}.{tag}.bin.gz"
     path.write_bytes(data)
@@ -273,11 +294,23 @@ def main() -> None:
     print(f"{path.name}: {len(data) / 1000:.0f} KB gzipped, {len(blob) / 1000:.0f} KB raw; "
           + ", ".join(f"{k} {v / 1000:.0f}" for k, v in sizes.items()))
 
+    # the peak table: hundredths of an MPa at load_N, and the index of the peak's node, azimuth major
+    peaks = {
+        "grid_deg": g, "azimuths": len(az_grid), "elevations": len(el_grid),
+        "mpa_x100": np.round(g_web * F * 100).astype(int).tolist(), "node": at.ravel().tolist(),
+    }
+    text = json.dumps(peaks, separators=(",", ":"))
+    ptag = hashlib.sha256(text.encode()).hexdigest()[:10]
+    ppath = a.out / f"{a.name}.peaks.{ptag}.json"
+    ppath.write_text(text)
+    print(f"{ppath.name}: {len(text) / 1000:.0f} KB, {len(gzip.compress(text.encode(), 9)) / 1000:.0f} KB gzipped")
+
     outcome = json.loads((a.example / "output" / "outcome.json").read_text())
     acc = json.loads((a.cases / "accuracy.json").read_text()) if (a.cases / "accuracy.json").exists() else []
     manifest = {
         "name": a.name,
         "file": path.name,
+        "peaks": ppath.name,
         "bytes_gzip": len(data),
         "load_N": F,
         "allowable_MPa": outcome["allowable_MPa"],
@@ -287,17 +320,18 @@ def main() -> None:
         "governing_MPa": round(float(outcome["governing_MPa"]), 3),
         "governing_xyz": [round(v, 3) for v in outcome["governing_xyz"]],
         "pull": {
-            "point": info["point"], "axis": info["axis"], "e1": info["e1"], "e2": info["e2"],
+            "point": info["point"], "axis": info["axis"], "e1": info["e1"], "e2": info["e2"], "e3": info["e3"],
             "default_deg": round(info["theta0_deg"], 3),
-            "note": "Linear elastic: a pull of F N at angle t is F * (cos t * case1 + sin t * case2).",
+            "note": "Linear elastic: a load of F N along u is F * (u1 * case1 + u2 * case2 + u3 * case3), "
+                    "u in the basis e1, e2 (pulley plane) and e3 (shaft).",
         },
         "mesh": {"triangles": len(tris), "corners": nc, "nodes": n, "bounds_min": lo.round(5).tolist(),
                  "bounds_max": hi.round(5).tolist()},
         "layout": layout,
-        # governing von Mises at each whole degree, MPa at load_N, from the coded data, and where it is:
-        # an index into peak_nodes, each x, y, z in mm, then case 1 and case 2 displacement in mm per newton
-        "peak_by_degree": (g_web * F).round(3).tolist(),
-        "peak_at_degree": at_deg.ravel().tolist(),
+        # the default pull's governing von Mises and the range over every direction, MPa at load_N
+        "default_peak_MPa": round(float(vm0[ok].max()), 3),
+        "peak_range_MPa": [round(float(g_web.min() * F), 3), round(float(g_web.max() * F), 3)],
+        # where the peak can be: x, y, z in mm, then case 1, 2 and 3 displacement in mm per newton
         "peak_nodes": peak_nodes,
         "converged": acc,
     }
