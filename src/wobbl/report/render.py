@@ -190,6 +190,78 @@ def _marker(p, xyz, span, label, color, small=False):
                            show_points=False, always_visible=True, font_family="courier", margin=6)
 
 
+def render_scalar(path: str | Path, X, tets, tris, values, label: str, unit: str, cmap: str = "inferno",
+                  mark_xyz=None, mark_label: str = "", clim=None) -> str:
+    """One heatmap of any nodal field (temperature, current density) with an optional marked point."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        grid = _grid(X, tets)
+        grid.point_data["v"] = values
+        surf = _surface(grid)
+        g = np.asarray(mark_xyz if mark_xyz is not None else X[int(np.argmax(values))], float)
+        view = _view_dir(X, g, _surface_normal_at(X, tris, g))
+        span = float(np.linalg.norm(X.max(0) - X.min(0)))
+        p = _plotter((1600, 1000))
+        p.add_mesh(surf, scalars="v", cmap=cmap, clim=clim or [float(values.min()), float(values.max())],
+                   smooth_shading=True, ambient=0.3, diffuse=0.8, scalar_bar_args=_bar(f"{label}\n{unit}"))
+        if mark_label:
+            _marker(p, g, span, mark_label, MARK)
+        _camera(p, X, view)
+        p.screenshot(str(path))
+        p.close()
+    except Exception:  # noqa: BLE001  matplotlib fallback
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+        t = tris[:, :3]
+        fig = plt.figure(figsize=(10, 6.25), dpi=150, facecolor=BG)
+        ax = fig.add_subplot(111, projection="3d", facecolor=BG)
+        v = values[t].mean(1)
+        lo_, hi_ = clim or (float(values.min()), float(values.max()))
+        norm = plt.Normalize(lo_, hi_)
+        ax.add_collection3d(Poly3DCollection(X[t], facecolors=plt.get_cmap(cmap)(norm(v)), linewidths=0))
+        lo, hi = X.min(0), X.max(0)
+        c, r = (lo + hi) / 2, (hi - lo).max() / 2
+        ax.set_xlim(c[0] - r, c[0] + r)
+        ax.set_ylim(c[1] - r, c[1] + r)
+        ax.set_zlim(c[2] - r, c[2] + r)
+        ax.set_axis_off()
+        fig.savefig(path, facecolor=BG, bbox_inches="tight")
+        plt.close(fig)
+    return str(path)
+
+
+def line_plot(path: str | Path, x, ys: dict, xlabel: str, ylabel: str, hline: float | None = None,
+              hlabel: str = "") -> str:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(8, 4.5), dpi=150, facecolor=BG)
+    ax.set_facecolor(BG)
+    colors = [MARK, "#4a90d9", "#3ccf7a", "#ff6b6b"]
+    for (name, y), col in zip(ys.items(), colors):
+        ax.plot(x, y, color=col, lw=2, label=name)
+    if hline is not None:
+        ax.axhline(hline, color="#ff4d4f", ls="--", lw=1.2, label=hlabel)
+    ax.set_xlabel(xlabel, color=FG)
+    ax.set_ylabel(ylabel, color=FG)
+    ax.tick_params(colors=FG)
+    for sp in ax.spines.values():
+        sp.set_color("#3a3d42")
+    ax.grid(alpha=0.15)
+    ax.legend(facecolor=BG, edgecolor="#3a3d42", labelcolor=FG)
+    fig.tight_layout()
+    fig.savefig(path, facecolor=BG)
+    plt.close(fig)
+    return str(path)
+
+
 def _render_mpl(out, X, tris, measure, U, gxyz, gval, mlabel, allowable, target_sf, spots, unit, reason=""):
     import matplotlib
 
