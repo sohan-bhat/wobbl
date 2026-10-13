@@ -35,6 +35,7 @@ class Refinement:
     radius: float = 0.0          # for points: radius of the fine ball
     grow: float = 0.0            # transition distance (default 6 x size)
     label: str = ""
+    corners_only: bool = False   # size the CAD vertices of the surfaces instead of a distance field (cheap)
 
 
 @dataclass
@@ -188,15 +189,40 @@ def build_mesh(prep: PreparedGeometry, sizing: Sizing, verbose: bool = False, ti
 
 def _add_fields(gmsh, sizing: Sizing):
     fields = []
+    point_size: dict[int, float] = {}
     for r in sizing.refinements:
         grow = r.grow or 6.0 * r.size
+        if r.corners_only:
+            # measure distance to the edges of the faces instead of the faces themselves: gmsh evaluates
+            # the field thousands of times per curve, and edges are far cheaper to sample than surfaces
+            curves = set()
+            for s in r.surfaces:
+                try:
+                    for dim, tag in gmsh.model.getBoundary([(2, int(s))], combined=False, oriented=False):
+                        if dim == 1:
+                            curves.add(abs(int(tag)))
+                except Exception:  # noqa: BLE001
+                    continue
+            if not curves:
+                continue
+            d = gmsh.model.mesh.field.add("Distance")
+            gmsh.model.mesh.field.setNumbers(d, "CurvesList", sorted(curves))
+            gmsh.model.mesh.field.setNumber(d, "Sampling", 20)
+            t = gmsh.model.mesh.field.add("Threshold")
+            gmsh.model.mesh.field.setNumber(t, "InField", d)
+            gmsh.model.mesh.field.setNumber(t, "SizeMin", r.size)
+            gmsh.model.mesh.field.setNumber(t, "SizeMax", sizing.h)
+            gmsh.model.mesh.field.setNumber(t, "DistMin", 0.5 * r.size)
+            gmsh.model.mesh.field.setNumber(t, "DistMax", 0.5 * r.size + grow)
+            fields.append(t)
+            continue
         if r.surfaces or r.curves:
             d = gmsh.model.mesh.field.add("Distance")
             if r.surfaces:
                 gmsh.model.mesh.field.setNumbers(d, "SurfacesList", list(map(int, r.surfaces)))
             if r.curves:
                 gmsh.model.mesh.field.setNumbers(d, "CurvesList", list(map(int, r.curves)))
-            gmsh.model.mesh.field.setNumber(d, "Sampling", 60)
+            gmsh.model.mesh.field.setNumber(d, "Sampling", 20)
             t = gmsh.model.mesh.field.add("Threshold")
             gmsh.model.mesh.field.setNumber(t, "InField", d)
             gmsh.model.mesh.field.setNumber(t, "SizeMin", r.size)
@@ -214,6 +240,11 @@ def _add_fields(gmsh, sizing: Sizing):
             gmsh.model.mesh.field.setNumber(b, "YCenter", float(p[1]))
             gmsh.model.mesh.field.setNumber(b, "ZCenter", float(p[2]))
             fields.append(b)
+    if point_size:
+        gmsh.model.mesh.setSize([(0, t) for _, t in gmsh.model.getEntities(0)], sizing.h)
+        for tag, size in point_size.items():
+            gmsh.model.mesh.setSize([(0, tag)], size)
+        gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 1)
     if fields:
         fm = gmsh.model.mesh.field.add("Min")
         gmsh.model.mesh.field.setNumbers(fm, "FieldsList", fields)

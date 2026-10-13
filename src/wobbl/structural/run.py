@@ -155,7 +155,7 @@ def feature_refinements(features: PartFeatures, h: float) -> list[Refinement]:
     floor, and faces are grouped by size so gmsh evaluates only a handful of fields. The hotspot loop
     later goes below the floor exactly where the stress is.
     """
-    floor = max(h / 8.0, 0.25 * features.thickness_min)
+    floor = max(h / 6.0, 0.4 * features.thickness_min)
     buckets: dict[float, list[int]] = {}
     for f in features.faces.values():
         if f.kind == "plane":
@@ -166,7 +166,7 @@ def feature_refinements(features: PartFeatures, h: float) -> list[Refinement]:
             continue
         key = float(floor * 1.3 ** np.floor(np.log(size / floor) / np.log(1.3)))
         buckets.setdefault(key, []).append(f.id)
-    return [Refinement(size, surfaces=ids, grow=3 * size, label=f"curved features {size:.3g} mm")
+    return [Refinement(size, surfaces=ids, grow=3 * size, label=f"curved features {size:.3g} mm", corners_only=True)
             for size, ids in sorted(buckets.items())]
 
 
@@ -222,7 +222,9 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
             # small features made the first mesh too big to solve quickly: coarsen and try again
             tries += 1
             sizing.h *= 1.3
-            sizing.curvature = max(6, sizing.curvature - 2)
+            for r in sizing.refinements:
+                if r.corners_only:
+                    r.size *= 1.3
             _say(progress, "mesh", f"level 0 had {mesh.n_nodes:,} nodes; coarsening to {sizing.h:.3g} mm")
             mesh = build_mesh(prep, sizing)
         notes += [n for n in mesh.notes if n not in notes]
