@@ -142,7 +142,9 @@ def _render_vtk(out, X, tets, tris, measure, U, gxyz, gval, mlabel, allowable, t
                    scalar_bar_args=_bar(f"{mlabel}\n{unit}"), above_color="#ffffff" if artifacts else None)
         _marker(p, g, mspan, f"{gval:.3g} {unit}", MARK)
         for s in artifacts[:3]:
-            _marker(p, np.asarray(s["xyz"]), mspan, "artifact", ARTIFACT, small=True)
+            xyz = np.asarray(s["xyz"])
+            near = np.linalg.norm(xyz - g) < 0.06 * mspan  # keep the governing label readable
+            _marker(p, xyz, mspan, "" if near else "artifact", ARTIFACT, small=True)
         _camera(p, X, view, focus, zoom)
         p.screenshot(str(path))
         p.close()
