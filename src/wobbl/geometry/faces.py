@@ -80,6 +80,7 @@ class PartFeatures:
     surface_area: float
     volume: float
     bbox: list[list[float]]
+    tangent_pairs: set = field(default_factory=set)
 
     def holes(self) -> list[FaceInfo]:
         """One entry per physical hole (split faces are represented by their first face)."""
@@ -246,8 +247,12 @@ def _exact_normals(face_ids: np.ndarray, pts: np.ndarray, tri_n: np.ndarray, fac
     return out
 
 
-def find_sharp_corners(mesh: Mesh, min_angle_deg: float = 30.0, faces: dict | None = None) -> list[Corner]:
-    """Edges where two faces meet at an inside (re-entrant) angle without a fillet."""
+def find_sharp_corners(mesh: Mesh, min_angle_deg: float = 30.0, faces: dict | None = None,
+                       tangent: set | None = None) -> list[Corner]:
+    """Edges where two faces meet at an inside (re-entrant) angle without a fillet.
+
+    ``tangent`` lists face pairs known from the CAD to meet smoothly; they are never sharp corners.
+    """
     tri = mesh.tris[:, :3]
     k = len(tri)
     e = np.vstack([tri[:, [0, 1]], tri[:, [1, 2]], tri[:, [2, 0]]])
@@ -261,6 +266,10 @@ def find_sharp_corners(mesh: Mesh, min_angle_deg: float = 30.0, faces: dict | No
     i1, i2 = order[pair], order[pair + 1]
     t1, t2 = owner[i1], owner[i2]
     diff = mesh.tri_surf[t1] != mesh.tri_surf[t2]
+    if tangent:
+        a, b = np.minimum(mesh.tri_surf[t1], mesh.tri_surf[t2]), np.maximum(mesh.tri_surf[t1], mesh.tri_surf[t2])
+        smooth = np.array([(int(x), int(y)) in tangent for x, y in zip(a, b)], bool)
+        diff &= ~smooth
     i1, i2, t1, t2 = i1[diff], i2[diff], t1[diff], t2[diff]
     if len(i1) == 0:
         return []
@@ -339,7 +348,8 @@ def wall_thickness(mesh: Mesh, samples: int = 500, seed: int = 0) -> tuple[np.nd
 
 def analyze(mesh: Mesh) -> PartFeatures:
     faces = analyze_faces(mesh)
-    corners = find_sharp_corners(mesh, faces=faces)
+    tangent = getattr(mesh, "tangent_pairs", set())
+    corners = find_sharp_corners(mesh, faces=faces, tangent=tangent)
     fs, th, w = wall_thickness(mesh)
     by_face = {}
     for s in np.unique(fs):
@@ -353,4 +363,4 @@ def analyze(mesh: Mesh) -> PartFeatures:
         typical = tmin = float(np.min(mesh.X.max(0) - mesh.X.min(0)))
     _, a, _ = mesh.tri_geometry()
     return PartFeatures(faces, corners, typical, tmin, by_face, float(a.sum()), mesh.volume(),
-                        [mesh.X.min(0).round(4).tolist(), mesh.X.max(0).round(4).tolist()])
+                        [mesh.X.min(0).round(4).tolist(), mesh.X.max(0).round(4).tolist()], tangent)

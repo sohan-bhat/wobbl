@@ -260,7 +260,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
             stopped_by = f"level {lv} failed"
             break
         measure, mname = failure_measure(res, material, print_axis)
-        corners = find_sharp_corners(mesh, faces=features.faces)
+        corners = find_sharp_corners(mesh, faces=features.faces, tangent=features.tangent_pairs)
         zmap = ZoneMap(mesh, built.zones, built.zone_kind, corners)
         if lv == 0:
             sizes = mesh.node_sizes()
@@ -467,7 +467,7 @@ def _load_path_check(adapter, study, mesh, loads, fixtures, material, features, 
     except Exception as e:  # noqa: BLE001  the comparison is a bonus, never a reason to fail
         return {"error": str(e)[:200]}
     m, _ = failure_measure(res, material, print_axis)
-    zmap = ZoneMap(mesh, built.zones, built.zone_kind, find_sharp_corners(mesh, faces=features.faces))
+    zmap = ZoneMap(mesh, built.zones, built.zone_kind, find_sharp_corners(mesh, faces=features.faces, tangent=features.tangent_pairs))
     ok = ~zmap.excluded_mask(mesh.X, r_ex)
     if not ok.any():
         ok = np.ones(len(m), bool)

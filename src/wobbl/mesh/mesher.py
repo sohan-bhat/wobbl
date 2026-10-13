@@ -358,6 +358,7 @@ class SurfaceMesh:
     surface_types: dict[int, str] = field(default_factory=dict)
     surface_curves: dict[int, list[int]] = field(default_factory=dict)
     t_mesh: float = 0.0
+    tangent_pairs: set = field(default_factory=set)   # surface pairs that meet smoothly (a fillet and its wall)
 
     tri_geometry = Mesh.tri_geometry
     surface_mask = Mesh.surface_mask
@@ -432,7 +433,43 @@ def _surface_from_session(gmsh, h: float, curvature: int = 8, alg: int = 6, diag
         for tt, nn in zip(st, sn):
             if tt == 2:
                 chunks.append((s, np.asarray(nn, dtype=np.int64).reshape(-1, 3)))
-    return _orient_surface(ntags, coords, chunks, stypes, scurves, diag, t0)
+    sm = _orient_surface(ntags, coords, chunks, stypes, scurves, diag, t0)
+    if not is_stl:
+        sm.tangent_pairs = _tangent_pairs(gmsh)
+    return sm
+
+
+def _tangent_pairs(gmsh, cos_limit: float = 0.966) -> set:
+    """Pairs of CAD faces that meet tangentially, judged from the exact CAD normals along their shared edge.
+
+    A fillet, a torus blend or a B-spline round meets its walls without a kink. A coarse mesh facets it so
+    the triangles there look like a sharp corner; the CAD normals do not.
+    """
+    pairs = set()
+    for _, c in gmsh.model.getEntities(1):
+        try:
+            up, _ = gmsh.model.getAdjacencies(1, c)
+        except Exception:  # noqa: BLE001
+            continue
+        if len(up) != 2:
+            continue
+        s1, s2 = int(up[0]), int(up[1])
+        try:
+            lo, hi = gmsh.model.getParametrizationBounds(1, c)
+            dots = []
+            for f in (0.25, 0.5, 0.75):
+                xyz = gmsh.model.getValue(1, c, [lo[0] + f * (hi[0] - lo[0])])
+                n = []
+                for s in (s1, s2):
+                    _, uv = gmsh.model.getClosestPoint(2, s, xyz)
+                    v = np.asarray(gmsh.model.getNormal(s, uv), float)
+                    n.append(v / max(np.linalg.norm(v), 1e-300))
+                dots.append(abs(float(n[0] @ n[1])))
+        except Exception:  # noqa: BLE001
+            continue
+        if min(dots) >= cos_limit:
+            pairs.add((min(s1, s2), max(s1, s2)))
+    return pairs
 
 
 def _orient_surface(ntags, coords, chunks, stypes, scurves, diag, t0) -> SurfaceMesh:
