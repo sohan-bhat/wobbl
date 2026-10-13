@@ -270,10 +270,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         dmag = res.displacement_magnitude()
         di = int(np.argmax(dmag))
         fapp, mapp = built.model.applied_total()
-        cons = np.unique(np.concatenate([c.nodes for c in built.model.constraints] +
-                                        [c.nodes for c in built.model.normal_constraints] or [np.zeros(0, int)]))
-        rf = res.RF[cons].sum(0) if len(cons) else np.zeros(3)
-        rm = np.cross(mesh.X[cons], res.RF[cons]).sum(0) if len(cons) else np.zeros(3)
+        rf, rm = support_reactions(built, res, mesh)
         levels.append(Level(lv, mesh.n_nodes, mesh.n_elems, float(sizing.h),
                             float(np.nanmin(mesh.node_sizes())), mesh.t_mesh, res.t_solve,
                             float(measure[gi]), mesh.X[gi].tolist(), float(measure[ri]), mesh.X[ri].tolist(),
@@ -308,6 +305,26 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
                         measure, excluded, r_ex, work, tol, stopped_by, time.time() - t_start, notes, nonlinear)
     _save_fields(run)
     return run
+
+
+def support_reactions(built: BuiltModel, res: StaticResult, mesh: Mesh) -> tuple[np.ndarray, np.ndarray]:
+    """Total force and moment the supports exert, counting only the directions each support holds.
+
+    CalculiX reports nodal forces for every direction of a constrained node; at a node that is held in one
+    direction and loaded in another, the free direction carries the applied load, not a reaction.
+    """
+    held = np.zeros((mesh.n_nodes, 3), bool)
+    for c in built.model.constraints:
+        for d in c.dofs:
+            held[c.nodes, d - 1] = True
+    for nc in built.model.normal_constraints:
+        nz = np.nonzero(np.abs(np.asarray(nc.normal)) > 1e-9)[0]
+        if len(nz) == 1:
+            held[nc.nodes, nz[0]] = True
+        else:  # an inclined roller carries its reaction along the normal through constraint equations
+            held[nc.nodes, :] = True
+    R = np.where(held, res.RF, 0.0)
+    return R.sum(0), np.cross(mesh.X, R).sum(0)
 
 
 def _pct(levels: list[Level]) -> str:

@@ -74,10 +74,13 @@ def convergence_check(values: list[float], tol: float, label: str, unit: str, st
 def balance_check(applied: np.ndarray, reaction: np.ndarray, applied_m: np.ndarray, reaction_m: np.ndarray,
                   size: float, partial: bool = False) -> Check:
     fa = float(np.linalg.norm(applied))
-    if fa < 1e-12 and np.linalg.norm(applied_m) < 1e-12:
+    ma = float(np.linalg.norm(applied_m))
+    if fa < 1e-12 and ma < 1e-12:
         return Check("force balance", "skip", "no net load to balance")
-    err = float(np.linalg.norm(applied + reaction)) / max(fa, 1e-12)
-    mref = max(float(np.linalg.norm(applied_m)), fa * size, 1e-12)
+    # a pure moment has no net force; judge the force residual against the moment's force scale instead
+    fref = max(fa, ma / max(size, 1e-12), 1e-12)
+    err = float(np.linalg.norm(applied + reaction)) / fref
+    mref = max(ma, fa * size, 1e-12)
     merr = float(np.linalg.norm(applied_m + reaction_m)) / mref
     detail = {"applied_N": applied, "reaction_N": reaction, "force_error": err, "moment_error": merr}
     if partial:
