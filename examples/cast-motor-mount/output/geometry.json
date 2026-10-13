@@ -1,0 +1,22 @@
+{
+ "source": "../../../src/wobbl/validation/parts/cast_motor_mount.step",
+ "path": "work/geometry/prepared.brep",
+ "kind": "cad",
+ "bbox": [
+  [
+   -70.00000023853492,
+   -2.385349204228885e-07,
+   -2.385349204228885e-07
+  ],
+  [
+   70.00000023853492,
+   95.00000023853492,
+   112.00000023853492
+  ]
+ ],
+ "volume": 134157.17867238293,
+ "n_bodies": 1,
+ "n_surfaces": 83,
+ "notes": [],
+ "stl_angle": 30.0
+}

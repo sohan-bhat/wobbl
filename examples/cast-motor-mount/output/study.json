@@ -1,0 +1,44 @@
+{
+ "part": "../../../src/wobbl/validation/parts/cast_motor_mount.step",
+ "material": "custom:E=72400,nu=0.33,yield=165",
+ "loads": [
+  {
+   "kind": "remote",
+   "faces": "holes d=6.6",
+   "magnitude": 2000.0,
+   "direction": [
+    -0.8660254028383291,
+    0.0,
+    -0.5000000016387101
+   ],
+   "point": [
+    0.0,
+    -30.0,
+    66.0
+   ],
+   "coupling": "distributed",
+   "text": "2000 N -0.8660254,0,-0.5 at 0,-30,66 @ holes d=6.6",
+   "imperial": false
+  }
+ ],
+ "fixtures": [
+  {
+   "kind": "fixed",
+   "faces": "z=min",
+   "text": "fixed z=min",
+   "dofs": "xyz"
+  }
+ ],
+ "target_sf": 2.0,
+ "quality": "normal",
+ "budget": 600.0,
+ "max_levels": 4,
+ "question": "Does this cast motor mount meet our safety factor 2 rule under a 2 kN emergency stop belt pull?",
+ "imperial": false,
+ "scale": 1.0,
+ "body": null,
+ "mesh_size": null,
+ "print_direction": null,
+ "assumptions": [],
+ "params": {}
+}
