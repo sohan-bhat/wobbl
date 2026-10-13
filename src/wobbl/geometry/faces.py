@@ -220,7 +220,33 @@ def _group_split_cylinders(faces: dict[int, FaceInfo]):
                 x.group = f.id
 
 
-def find_sharp_corners(mesh: Mesh, min_angle_deg: float = 30.0) -> list[Corner]:
+def _exact_normals(face_ids: np.ndarray, pts: np.ndarray, tri_n: np.ndarray, faces) -> np.ndarray:
+    """CAD normals where the geometry is known: planes have one normal, cylinders point along the radius.
+
+    Coarse meshes facet small fillets so badly that the triangles next to a tangent edge look like a sharp
+    corner; the exact normals of a fillet and its neighbour agree at the tangent line.
+    """
+    out = tri_n.copy()
+    if not faces:
+        return out
+    for k, (fid, p) in enumerate(zip(face_ids, pts)):
+        f = faces.get(int(fid))
+        if f is None:
+            continue
+        if f.kind == "plane" and f.normal is not None:
+            out[k] = f.normal
+        elif f.axis is not None and f.axis_point is not None:
+            a = np.asarray(f.axis)
+            r = p - np.asarray(f.axis_point)
+            r -= (r @ a) * a
+            nr = np.linalg.norm(r)
+            if nr > 0:
+                r /= nr
+                out[k] = -r if f.concave else r
+    return out
+
+
+def find_sharp_corners(mesh: Mesh, min_angle_deg: float = 30.0, faces: dict | None = None) -> list[Corner]:
     """Edges where two faces meet at an inside (re-entrant) angle without a fillet."""
     tri = mesh.tris[:, :3]
     k = len(tri)
@@ -246,6 +272,9 @@ def find_sharp_corners(mesh: Mesh, min_angle_deg: float = 30.0) -> list[Corner]:
     v1 = mesh.X[third[i1]] - mid
     v1 -= np.einsum("ij,ij->i", v1, edir)[:, None] * edir
     v1 /= np.maximum(np.linalg.norm(v1, axis=1), 1e-12)[:, None]
+    if faces:
+        n1 = _exact_normals(mesh.tri_surf[t1], mid, n1, faces)
+        n2 = _exact_normals(mesh.tri_surf[t2], mid, n2, faces)
     concave = np.einsum("ij,ij->i", v1, n2) > 0.15
     ang = np.degrees(np.arccos(np.clip(np.einsum("ij,ij->i", n1, n2), -1, 1)))
     sharp = concave & (ang > min_angle_deg)
@@ -310,7 +339,7 @@ def wall_thickness(mesh: Mesh, samples: int = 500, seed: int = 0) -> tuple[np.nd
 
 def analyze(mesh: Mesh) -> PartFeatures:
     faces = analyze_faces(mesh)
-    corners = find_sharp_corners(mesh)
+    corners = find_sharp_corners(mesh, faces=faces)
     fs, th, w = wall_thickness(mesh)
     by_face = {}
     for s in np.unique(fs):

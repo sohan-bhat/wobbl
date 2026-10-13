@@ -245,7 +245,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         _say(progress, "solve", f"level {lv}: solving {mesh.n_nodes:,} nodes with {adapter.name}")
         res, wall_iters, wall_warm = _solve(adapter, built, work / f"level{lv}", wall_warm)
         measure, mname = failure_measure(res, material, print_axis)
-        corners = find_sharp_corners(mesh)
+        corners = find_sharp_corners(mesh, faces=features.faces)
         zmap = ZoneMap(mesh, built.zones, built.zone_kind, corners)
         if lv == 0:
             sizes = mesh.node_sizes()
