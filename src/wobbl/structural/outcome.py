@@ -236,6 +236,9 @@ def evaluate(run: StructuralRun) -> Outcome:
         else:
             checks.append(Check("load introduction", "pass" if 0.7 <= ratio <= 1.4 else "info",
                                 s + ". The verdict is the same either way", lp))
+    elif lp and "error" in lp:
+        checks.append(Check("load introduction", "info", "the other attachment idealization could not be solved "
+                                                         f"({lp['error'][:120]})"))
     elif lp and "skipped" in lp:
         checks.append(Check("load introduction", "info", "the off part loads were not re-solved with the other "
                                                          f"attachment idealization ({lp['skipped']})"))

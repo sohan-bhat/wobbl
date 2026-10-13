@@ -238,6 +238,16 @@ def build_static(mesh: Mesh, loads: list[tuple[Load, Selection | None]], fixture
         else:
             raise SpecError(f"unknown load type {ld.kind}")
     model.forces = F
+    if model.rigid:
+        # a node cannot be both held by a support and driven by a rigid attachment; the support wins
+        held = [c.nodes for c in model.constraints] + [c.nodes for c in model.normal_constraints]
+        held = np.unique(np.concatenate(held)) if held else np.zeros(0, int)
+        for r in model.rigid:
+            r.nodes = np.setdiff1d(r.nodes, held)
+            if len(r.nodes) < 3:
+                raise SpecError(f"the faces of {r.name} are all held by supports; a rigid attachment needs free faces")
+            if r.name in built.zones:
+                built.zones[r.name] = r.nodes
     _check_held(model, built)
     return built
 

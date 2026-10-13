@@ -463,7 +463,7 @@ def _load_path_check(adapter, study, mesh, loads, fixtures, material, features, 
     _say(progress, "check", f"re-solving with a {other} load attachment to see how much the answer depends on it")
     try:
         built = build_static(mesh, alt, fixtures, material, features.faces)
-        res, _, _ = _solve(adapter, built, work / "load_path")
+        res, _, _ = _solve(adapter, built, work / "load_path", None)
     except Exception as e:  # noqa: BLE001  the comparison is a bonus, never a reason to fail
         return {"error": str(e)[:200]}
     m, _ = failure_measure(res, material, print_axis)
