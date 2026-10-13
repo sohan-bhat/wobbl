@@ -20,7 +20,8 @@ def _run(target: str, params: dict, probes, out, question, as_json, guesses=()):
             for g in guesses:
                 cb("assume", g)
             cb("solve", "running ngspice")
-            if Path(target).exists():
+            # a template name stays a template even when a folder of that name (its own output) sits here
+            if Path(target).is_file():
                 o = run_netlist(target, list(probes), out_dir, question)
             else:
                 o = run_circuit(target, params, out_dir, question)

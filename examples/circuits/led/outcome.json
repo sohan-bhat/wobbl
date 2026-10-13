@@ -85,6 +85,6 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 0.246306,
+ "t_total": 0.135679,
  "solver": "ngspice 41"
 }
