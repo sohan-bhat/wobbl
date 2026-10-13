@@ -50,11 +50,14 @@ def beam_estimate(mesh, measure_at: np.ndarray, loads_force: np.ndarray, loads_m
     lpts += [np.atleast_2d(p) for p in extra_load_points]
     lp = np.vstack(lpts)
     lc = lp.mean(0)
-    axis = lc - fc
+    H = np.asarray(measure_at, float)
+    # the local beam axis runs from the critical point toward the load
+    axis = lc - H
+    if np.linalg.norm(axis) < 1e-6 * np.linalg.norm(X.max(0) - X.min(0)):
+        axis = lc - fc
     if np.linalg.norm(axis) < 1e-9:
         return None, "loads and fixtures coincide"
     axis /= np.linalg.norm(axis)
-    H = np.asarray(measure_at, float)
     s_fix = (X[fixture_nodes] - H) @ axis
     s_load = (lp - H) @ axis
     if not ((s_fix < 0).all() and (s_load > 0).all()):

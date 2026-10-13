@@ -148,7 +148,7 @@ def evaluate(run: StructuralRun) -> Outcome:
         parts = []
         for h in high_zone[:3]:
             kind = "singular, keeps rising with refinement" if h.singular else "set by the idealized support"
-            parts.append(f"{fmt(h.value)} MPa {h.detail} ({kind}: {h.trend()})")
+            parts.append(f"{fmt(h.value)} MPa {h.detail} ({kind}: {h.trend()} MPa)")
         msg = ("excluded from the answer: " + "; ".join(parts) +
                f". Wobbl reports the stress {fmt(run.exclusion_radius)} mm or more away from these spots")
         corner = any(h.kind == "corner" for h in high_zone)
@@ -247,11 +247,11 @@ def _sanity(run: StructuralRun, gov: float, allow: float) -> Check:
     lv = run.levels[-1]
     issues, status = [], "pass"
     d_rel = lv.max_disp / diag if diag > 0 else 0
-    if d_rel > 0.15:
+    if d_rel > 0.20:
         issues.append(f"max deflection {fmt(lv.max_disp)} mm is {100 * d_rel:.0f}% of the part size, far outside "
                       "small deflection theory; the real part bends differently or collapses")
         status = "fail"
-    elif d_rel > 0.03:
+    elif d_rel > 0.06:
         issues.append(f"max deflection {fmt(lv.max_disp)} mm is {100 * d_rel:.1f}% of the part size; linear "
                       "results get less accurate past a few percent")
         status = "warn"

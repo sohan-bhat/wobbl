@@ -43,7 +43,7 @@ class Hotspot:
         return self.kind != "feature"
 
     def trend(self) -> str:
-        return " -> ".join(f"{v:.3g}" for v in self.values)
+        return " -> ".join(f"{v:.3g}" for v in self.values if v == v)
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -132,23 +132,25 @@ def find_hotspots(mesh: Mesh, measure: np.ndarray, zmap: ZoneMap, faces: dict[in
 
 
 def describe_spot(hs: Hotspot, face: FaceInfo | None, zmap: ZoneMap) -> str:
-    where = ""
+    what = ""
     if face is not None:
         if face.role == "fillet":
-            where = f"on the {face.radius:.3g} mm inside fillet (face {face.id})"
+            what = f"the {face.radius:.3g} mm inside fillet (face {face.id})"
         elif face.role == "hole":
-            where = f"at the edge of the {2 * face.radius:.3g} mm hole (face {face.id})"
+            what = f"the {2 * face.radius:.3g} mm hole (face {face.id})"
         elif face.role == "boss":
-            where = f"on the {2 * face.radius:.3g} mm boss (face {face.id})"
+            what = f"the {2 * face.radius:.3g} mm boss (face {face.id})"
         else:
-            where = f"on face {face.id}"
+            what = f"face {face.id}"
     if hs.kind == "corner":
-        return f"sharp inside corner {where}".strip()
+        return f"at a sharp inside corner ({what})" if what else "at a sharp inside corner"
     if hs.kind in ("fixture", "bolt", "wall"):
-        return f"at the edge of fixture {hs.zone} {where}".strip()
+        return f"at the edge of support {hs.zone} ({what})" if what else f"at the edge of support {hs.zone}"
     if hs.kind == "coupling":
-        return f"where the rigid load coupling {hs.zone} grabs the part {where}".strip()
-    return where or "in the body of the part"
+        return f"where the rigid attachment {hs.zone} grabs the part ({what})"
+    if face is not None and face.role in ("fillet", "hole", "boss"):
+        return ("on " if face.role == "fillet" else "at the edge of ") + what
+    return f"on {what}" if what else "in the body of the part"
 
 
 def track(spots: list[Hotspot], mesh: Mesh, measure: np.ndarray):

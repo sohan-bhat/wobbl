@@ -184,7 +184,7 @@ def build_static(mesh: Mesh, loads: list[tuple[Load, Selection | None]], fixture
         else:
             raise SpecError(f"unknown fixture type {fx.kind}")
         built.zones[name] = model.constraints[-1].nodes if fx.kind in ("fixed", "bolt") else nodes
-        built.zone_kind[name] = fx.kind
+        built.zone_kind[name] = {"fixed": "fixture"}.get(fx.kind, fx.kind)
     for k, (ld, sel) in enumerate(loads):
         name = f"load{k + 1}"
         if ld.kind == "gravity":

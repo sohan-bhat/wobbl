@@ -322,23 +322,28 @@ def _solve(adapter, built: BuiltModel, workdir: Path, warm):
             active[w.name] = w.nodes
     res = None
     it = 0
-    for it in range(1, 12):
+    solved = dict(active)
+    for it in range(1, 16):
         model.normal_constraints = base_normals + [NormalConstraint(w.name, active[w.name], w.normal)
                                                    for w in built.walls if len(active[w.name])]
         res = adapter.solve_static(model, workdir)
+        solved = {k: v.copy() for k, v in active.items()}
         changed = False
+        rf_tol = 1e-5 * (1.0 + float(np.abs(res.RF).max()))
+        u_tol = 1e-5 * (1e-12 + float(np.abs(res.U).max()))
         for w in built.walls:
             act = active[w.name]
-            pull = (res.RF[act] @ w.normal) > 1e-9 * (1 + np.abs(res.RF).max())
+            pull = (res.RF[act] @ w.normal) > rf_tol
             inactive = np.setdiff1d(w.nodes, act)
-            pen = inactive[(res.U[inactive] @ w.normal) > 1e-9]
+            pen = inactive[(res.U[inactive] @ w.normal) > u_tol]
             if pull.any() or len(pen):
                 active[w.name] = np.union1d(act[~pull], pen)
                 changed = True
         if not changed:
             break
-    model.normal_constraints = base_normals + [NormalConstraint(w.name, active[w.name], w.normal)
-                                               for w in built.walls if len(active[w.name])]
+    model.normal_constraints = base_normals + [NormalConstraint(w.name, solved[w.name], w.normal)
+                                               for w in built.walls if len(solved[w.name])]
+    active = solved
     for w in built.walls:  # the zone where an idealized support acts is the contact patch
         built.zones[w.name] = active[w.name]
     warm = {w.name: (model.mesh.X[w.nodes], np.isin(w.nodes, active[w.name])) for w in built.walls}
