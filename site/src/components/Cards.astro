@@ -1,0 +1,11 @@
+---
+// A grid of linked cards with a title and one line each, like a "start now" grid.
+import { url } from '../lib/site';
+interface Props { cards: { title: string; href: string; text: string }[] }
+const { cards } = Astro.props;
+---
+<ul class="cards">
+  {cards.map((c) => (
+    <li><a href={c.href.startsWith('http') ? c.href : url(c.href)}><span class="cards-t">{c.title}</span><span>{c.text}</span></a></li>
+  ))}
+</ul>

@@ -1,0 +1,50 @@
+---
+// Every docs page from src/content/docs, in the docs layout. The validation page also
+// gets the results table. Old routes that moved get a static redirect, and an old route
+// whose new page is not written yet gets a short stub, so no public link breaks.
+import { getCollection, type CollectionEntry } from 'astro:content';
+import Docs from '../layouts/Docs.astro';
+import Cards from '../components/Cards.astro';
+import Redirect from '../components/Redirect.astro';
+import ValidationTable from '../components/ValidationTable.astro';
+import { render, esc } from '../lib/markdown';
+import { repoUrl } from '../lib/site';
+import { MOVED } from '../lib/moved';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('docs');
+  const ids = new Set(entries.map((e) => e.id));
+  const paths: { params: { slug: string }; props: Record<string, unknown> }[] =
+    entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+  for (const [route, { to, old }] of Object.entries(MOVED)) {
+    if (ids.has(route)) continue;
+    const target = to.find((t) => ids.has(t));
+    paths.push({ params: { slug: route }, props: target ? { redirect: `${target}/` } : { stub: { route, old } } });
+  }
+  return paths;
+}
+
+const { entry, redirect, stub } = Astro.props as {
+  entry?: CollectionEntry<'docs'>; redirect?: string; stub?: { route: string; old: string };
+};
+let html = '';
+let headings: ReturnType<typeof render>['headings'] = [];
+if (entry) ({ html, headings } = render(entry.body ?? '', entry.filePath ?? entry.id));
+const d = entry?.data;
+const isValidation = entry?.id === 'validation';
+---
+{redirect ? <Redirect to={redirect} /> : entry ? (
+  <Docs title={d!.title} description={d!.description} path={`${entry.id}/`} lead={d!.lead ? esc(d!.lead) : undefined}
+        headings={headings} source={`site/${entry.filePath}`} wide={d!.wide || isValidation}>
+    {isValidation && <ValidationTable />}
+    <Fragment set:html={html} />
+    {d!.cards && <Cards cards={d!.cards} />}
+  </Docs>
+) : (
+  <Docs title="This page is being rewritten" path={`${stub!.route}/`}
+        description="The Wobbl docs are being split into short pages. Until this one is ready, the current version is on GitHub.">
+    {stub!.route === 'validation' && <ValidationTable />}
+    <p>The docs are being split into short pages, and this one is not ready yet. Until it is, you can read
+      <a href={repoUrl(stub!.old, !stub!.old.endsWith('.md'))}>the current version on GitHub</a>.</p>
+  </Docs>
+)}
