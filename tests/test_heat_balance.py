@@ -56,3 +56,26 @@ def test_flow_from_the_start_is_integrated_over_the_first_interval(shape, exact)
     times = np.linspace(0, 600, 41)
     got = heat._integrate_from_start(shape(times[1:]), times)
     assert got == pytest.approx(exact(600.0), rel=0.01)
+
+
+def test_cubic_follows_a_fast_fall_between_spaced_out_saved_times():
+    """Heat through a thin plate's face that has just ramped to a new temperature dies away about as fast as the
+    ramp, and it is saved at times a ratio of 1.3 apart from the ramp's end. The cubic integrates it within 0.3%,
+    where the trapezoid rule overshoots by more than 2%."""
+    ramp = 0.01
+    t = ramp * heat.EARLY_RATIO ** np.arange(25)
+    y = np.exp(-(t - ramp) / ramp)
+    exact = ramp * (1 - np.exp(-(t[-1] - ramp) / ramp))
+    assert heat._integrate(y, t) == pytest.approx(exact, rel=3e-3)
+    assert heat._trapezoid(y, t) > 1.02 * exact
+
+
+def test_cubic_starts_afresh_where_a_ramp_ends():
+    """A flow that rises through the ramp and then holds has a kink at the ramp's end, and integrating each side
+    on its own gets it exactly."""
+    t = np.array([0.0, 0.5, 1.0, 1.3, 1.69, 2.2, 2.86, 3.7])
+    y = np.minimum(t, 1.0)
+    exact = 0.5 + (t[-1] - 1.0)
+    assert heat._integrate(y, t, 1.0) == pytest.approx(exact, rel=1e-12)
+    assert heat._integrate(y, t) != pytest.approx(exact, rel=1e-3)
+    assert heat._integrate(y[:2], t[:2]) == pytest.approx(0.125)     # two points: a straight line

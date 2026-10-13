@@ -70,6 +70,14 @@ def test_deltmx_gives_a_small_jump_as_many_increments_as_a_big_one():
     assert ccx.transient_deltmx(2.0) == 0.25          # but never so small that the run crawls
 
 
+def test_saved_times_follow_the_ramp_and_the_fast_response_after_it():
+    t = heat.early_times(0.01, 7.5)
+    assert t[:2] == [0.005, 0.01]
+    assert np.allclose(np.diff(np.log(t[1:])), np.log(heat.EARLY_RATIO))
+    assert t[-1] < 7.5 and t[-1] * heat.EARLY_RATIO ** 1.5 >= 7.5
+    assert heat.early_times(1.0, 1.2) == [0.5, 1.0]
+
+
 def test_deck_ramps_jumping_faces_and_holds_the_rest(bar, tmp_path):
     m = _model(bar, 60.0, (0.0, 20.0))      # x=min drops to 0 C, x=max stays at the starting 20 C
     m.ramp_time, _ = heat.held_ramp(bar, m)

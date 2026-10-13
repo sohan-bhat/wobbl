@@ -111,12 +111,15 @@ def build_heat(mesh, study: ThermalStudy, faces, bbox, mat) -> tuple[HeatModel, 
         model.time_step = study.duration / 200.0
         model.output_times = list(np.linspace(study.duration / 40, study.duration, 40))
         model.ramp_time, info["ramp_reason"] = held_ramp(mesh, model)
+        if model.ramp_time:
+            model.output_times = early_times(model.ramp_time, model.output_times[0]) + model.output_times
     return model, info
 
 
 RAMP_FRACTION = 0.1       # of the time heat takes to cross the smallest element at a held face that starts away
 RAMP_RUN_FRACTION = 1e-3  # of the run, whichever is shorter
 RAMP_SPARE = 4.0          # times the shortest ramp CalculiX's smallest increments can follow
+EARLY_RATIO = 1.3         # between saved times from the end of the ramp to the first regular one
 
 
 def held_ramp(mesh, model: HeatModel) -> tuple[float, str]:
@@ -164,6 +167,21 @@ def _ramp_assumption(model: HeatModel, reason: str) -> str:
         names = [f"{name} ({fmt(temp)} C)" for name, temp in step]
         what = (f"the held temperatures at {', '.join(names[:-1])} and {names[-1]} ramp to their targets {over}")
     return f"The part starts at {start} C, and {what} instead of jumping at once, {reason}."
+
+
+def early_times(ramp: float, first: float) -> list[float]:
+    """Saved times through the ramp and the fast response after it, before the first regular saved time.
+
+    Heat through a face that steps to a new temperature is fastest just after the step, and a thin part can take
+    in most of its heat before the first regular saved time. The energy balance integrates that flow over the
+    saved times, so it gets two points in the ramp and then points spaced by a constant ratio up to the first
+    regular time, close enough for a cubic through them to follow it within a fraction of a percent.
+    """
+    out, t = [0.5 * ramp, ramp], ramp * EARLY_RATIO
+    while t < first / EARLY_RATIO ** 0.5:
+        out.append(t)
+        t *= EARLY_RATIO
+    return [x for x in out if x < first]
 
 
 def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=None):
@@ -384,9 +402,10 @@ def transient_energy_balance(mesh, model, study: ThermalStudy, info: dict, res) 
 
     The heat made over the run, plus whatever flows in through held temperature faces, has to equal the change in
     heat stored in the part plus the heat its surfaces shed over the run. Stored heat uses the exact weights of the
-    quadratic temperature field, and the heat flows are integrated over the saved time points with the trapezoid
-    rule, starting from the uniform initial temperature at t = 0. CalculiX steps backward in time between those
-    points, so the two sides drift apart by about the error of its time steps, and the check passes within 2%.
+    quadratic temperature field, and the heat flows are integrated over the saved time points through a monotone
+    cubic, starting from the uniform initial temperature at t = 0. CalculiX steps backward in time between those
+    points, so the two sides drift apart by about the error of its time steps, and the check passes within 2% of
+    the largest heat flow in the account.
     """
     if not len(res.history_t) or len(res.history_T) != len(res.history_t):
         return None
@@ -401,67 +420,106 @@ def transient_energy_balance(mesh, model, study: ThermalStudy, info: dict, res) 
         out_rate += h * ((hist - tinf) @ w)
         if study.emissivity > 0:
             out_rate += study.emissivity * SIGMA * (((hist + 273.15) ** 4 - (tinf + 273.15) ** 4) @ w)
-    shed = _trapezoid(out_rate, times)
+    shed = _integrate(out_rate, times, model.ramp_time)
     made = study.power * times[-1]
-    held = 0.0
+    faces = []
     if model.fixed_temps:
         if res.reaction_flux_history is None or len(res.reaction_flux_history) != len(res.history_t):
             return None
-        held = _held_inflow(mesh, model, study, info, res.reaction_flux_history, times, hist, weights)
-    scale = max(abs(made), abs(held), abs(stored), abs(shed))
+        faces = _held_inflow(mesh, model, study, info, res.reaction_flux_history, times, hist, weights)
+    held = sum(faces)
+    # a hot face and a cold one can each move far more heat than their sum, and each carries its own error, so the
+    # balance is judged against the largest flow in the account with each held face counted on its own
+    scale = max(abs(made), sum(abs(q) for q in faces), abs(stored), abs(shed))
     if scale < 1e-9:   # nothing made, held or exchanged: no heat to account for
         return None
     err = abs(made + held - stored - shed) / scale
     st = "pass" if err < 0.02 else ("warn" if err < 0.05 else "fail")
-    src = f"heat in {_energy(made)}" + (f" plus {_energy(held)} through held temperature faces" if model.fixed_temps
-                                        else "")
+    src = f"heat in {_energy(made)}"
+    if model.fixed_temps:
+        src += f" plus {_energy(held)} through held temperature faces"
+        gain, loss = sum(q for q in faces if q > 0), -sum(q for q in faces if q < 0)
+        if min(gain, loss) > 0.01 * max(gain, loss):
+            src += f" ({_energy(gain)} in and {_energy(loss)} out)"
     s = (f"over {fmt(times[-1] / 60)} min, {src}, stored {_energy(stored)}, out through the surfaces "
          f"{_energy(shed)} ({100 * err:.2g}% apart)")
     if st != "pass":
         s += (". The time steps are coarse for how fast this part responds, so treat the temperatures between "
               "them as approximate")
     return Check("energy balance", st, s, {"in_J": made / 1000, "held_J": held / 1000, "stored_J": stored / 1000,
-                                           "out_J": shed / 1000, "error": err, "time_points": len(times)})
+                                           "out_J": shed / 1000, "error": err, "time_points": len(times),
+                                           "held_faces_J": [q / 1000 for q in faces]})
 
 
-def _held_inflow(mesh, model, study, info, rfl_hist, times, hist, weights) -> float:
-    """Heat that entered the part through its held temperature faces over the run, mJ.
+def _held_inflow(mesh, model, study, info, rfl_hist, times, hist, weights) -> list[float]:
+    """Heat that entered the part through each held temperature face over the run, mJ.
 
     CalculiX's RFL is the conduction flow at each node, which sums to zero over the part, so the heat a held face
     supplies is its RFL plus what the held nodes exchange themselves: their share of the consistent heat capacity
-    and of the convection and radiation on faces that touch them, less the heat made at them.
+    and of the convection and radiation on faces that touch them, less the heat made at them. Each face is
+    integrated on its own, because a hot face and a cold one push and pull heat at once, and their sum can change
+    sign where each flow alone does not.
     """
     held = np.zeros(mesh.n_nodes, bool)
+    rho_c, out = model.density * model.specific_heat, []
     for _, nodes, _ in model.fixed_temps:
-        held[nodes] = True
-    inflow = _integrate_from_start(rfl_hist[:, held].sum(1), times)
-    inflow += model.density * model.specific_heat * _held_capacity(mesh, held, hist[-1] - hist[0])
-    surf = np.zeros(len(times))
-    for mask, h, tinf in info["film_masks"]:
-        surf += h * _held_surface(mesh, mask, held, hist - tinf)
-        if study.emissivity > 0:
-            surf += study.emissivity * SIGMA * _held_surface(mesh, mask, held,
-                                                             (hist + 273.15) ** 4 - (tinf + 273.15) ** 4)
-    inflow += _trapezoid(surf, times)
-    made_at_held = model.volumetric * weights[held].sum()
-    for _, mask, q in model.fluxes:
-        w, _ = _tri_weights(mesh, mask)
-        made_at_held += q * w[held].sum()
-    return inflow - made_at_held * times[-1]
+        face = np.zeros(mesh.n_nodes, bool)
+        face[nodes] = True
+        face &= ~held      # a node shared by two held faces counts once
+        held |= face
+        if not face.any():
+            out.append(0.0)
+            continue
+        inflow = _integrate_from_start(rfl_hist[:, face].sum(1), times)
+        inflow += rho_c * _held_capacity(mesh, face, hist[-1] - hist[0])
+        surf = np.zeros(len(times))
+        for mask, h, tinf in info["film_masks"]:
+            surf += h * _held_surface(mesh, mask, face, hist - tinf)
+            if study.emissivity > 0:
+                surf += study.emissivity * SIGMA * _held_surface(mesh, mask, face,
+                                                                 (hist + 273.15) ** 4 - (tinf + 273.15) ** 4)
+        inflow += _integrate(surf, times, model.ramp_time)
+        made_at_face = model.volumetric * weights[face].sum()
+        for _, mask, q in model.fluxes:
+            w, _ = _tri_weights(mesh, mask)
+            made_at_face += q * w[face].sum()
+        out.append(inflow - made_at_face * times[-1])
+    return out
 
 
 def _integrate_from_start(rate, times) -> float:
     """Integral from t = 0 of a heat flow saved at times[1:], for flows through held faces.
 
-    Such a flow can settle within the first saved interval (a thin metal part), grow like sqrt(t) (a thick plastic
-    one) or fall like 1/sqrt(t) (a face held hotter than the part), so the first interval follows a power law fitted
-    to the first two saved points instead of a straight line from zero. The rest uses the trapezoid rule.
+    Such a flow starts at zero from a uniform part, then can settle within the first saved interval (a thin metal
+    part), grow like sqrt(t) (a thick plastic one) or rise through a ramp to a new held temperature, so up to the
+    second saved time it follows a power law through the first two saved points instead of a straight line from
+    zero. A ramp ends on that second time, so the kink where the flow peaks is never inside a stretch of cubic.
     """
     rate, t = np.asarray(rate, float), np.asarray(times[1:], float)
+    if len(rate) < 2:
+        return float(rate[0] * t[0] / 2.0)
     p = 1.0
-    if len(rate) > 1 and rate[0] * rate[1] > 0:
+    if rate[0] * rate[1] > 0:
         p = float(np.clip(np.log(rate[1] / rate[0]) / np.log(t[1] / t[0]), -0.9, 3.0))
-    return rate[0] * t[0] / (p + 1.0) + _trapezoid(rate, t)
+    return rate[1] * t[1] / (p + 1.0) + _integrate(rate[1:], t[1:])
+
+
+def _integrate(y, x, knot: float = 0.0) -> float:
+    """Integral of a flow saved at times x, through a monotone cubic between the saved points (PCHIP).
+
+    It follows the fast fall of the flow through a face that steps to a new temperature, and the slow changes of a
+    long run, without overshooting between points. A knot is a saved time where the flow has a kink, the end of a
+    ramp, and the cubic starts afresh there.
+    """
+    from scipy.interpolate import PchipInterpolator
+
+    y, x = np.asarray(y, float), np.asarray(x, float)
+    cut = int(np.argmin(np.abs(x - knot))) if knot > 0 else 0
+    if 0 < cut < len(x) - 1 and abs(x[cut] - knot) <= 1e-3 * knot:   # the .frd keeps about six digits of time
+        return _integrate(y[:cut + 1], x[:cut + 1]) + _integrate(y[cut:], x[cut:])
+    if len(x) < 3:
+        return _trapezoid(y, x)
+    return float(PchipInterpolator(x, y).integrate(x[0], x[-1]))
 
 
 _TET_EDGES = [(0, 1), (1, 2), (2, 0), (0, 3), (1, 3), (2, 3)]   # midside nodes 4 to 9 of a CalculiX C3D10
