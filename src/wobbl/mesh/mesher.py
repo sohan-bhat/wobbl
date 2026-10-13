@@ -194,6 +194,20 @@ def build_mesh(prep: PreparedGeometry, sizing: Sizing, verbose: bool = False, ti
                     "intersections and gaps, or pass --mesh-size.")
 
 
+def _sampling(gmsh, r: Refinement) -> int:
+    """Distance fields sample their entities on a grid; a long fillet refined to a fine size needs samples
+    closer than the target size, or the fine band breaks up between the samples."""
+    span = 0.0
+    for dim, tags in ((2, r.surfaces), (1, r.curves)):
+        for t in tags:
+            try:
+                bb = gmsh.model.getBoundingBox(dim, int(t))
+                span = max(span, float(np.linalg.norm(np.array(bb[3:]) - np.array(bb[:3]))))
+            except Exception:  # noqa: BLE001
+                pass
+    return int(np.clip(span / max(r.size, 1e-9), 20, 400))
+
+
 def _add_fields(gmsh, sizing: Sizing):
     fields = []
     point_size: dict[int, float] = {}
@@ -229,7 +243,7 @@ def _add_fields(gmsh, sizing: Sizing):
                 gmsh.model.mesh.field.setNumbers(d, "SurfacesList", list(map(int, r.surfaces)))
             if r.curves:
                 gmsh.model.mesh.field.setNumbers(d, "CurvesList", list(map(int, r.curves)))
-            gmsh.model.mesh.field.setNumber(d, "Sampling", 20)
+            gmsh.model.mesh.field.setNumber(d, "Sampling", _sampling(gmsh, r))
             t = gmsh.model.mesh.field.add("Threshold")
             gmsh.model.mesh.field.setNumber(t, "InField", d)
             gmsh.model.mesh.field.setNumber(t, "SizeMin", r.size)
