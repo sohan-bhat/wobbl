@@ -1,0 +1,75 @@
+{
+ "name": "cast-motor-mount",
+ "load_N": 2000.0,
+ "allowable_MPa": 165.0,
+ "target_sf": 2.0,
+ "measure": "von Mises stress",
+ "note": "Linear elastic: stress and displacement scale in proportion to the load.",
+ "loads": [
+  {
+   "kind": "remote",
+   "text": "2000 N -0.8660254,0,-0.5 at 0,-30,66 @ holes d=6.6",
+   "magnitude": 2000.0,
+   "direction": [
+    -0.8660254028383291,
+    0.0,
+    -0.5000000016387101
+   ],
+   "point": [
+    0.0,
+    -30.0,
+    66.0
+   ],
+   "coupling": "distributed"
+  }
+ ],
+ "fixtures": [
+  "fixed z=min"
+ ],
+ "variants": {
+  "distributed": {
+   "file": "cast-motor-mount-distributed.bin.gz",
+   "bytes_gzip": 551434,
+   "bytes_raw": 1013492,
+   "vertices": 33462,
+   "triangles": 62952,
+   "index_type": "uint16",
+   "layout": {
+    "position": 0,
+    "normal": 200772,
+    "disp": 334620,
+    "stress": 535392,
+    "excluded": 602316,
+    "index": 635780
+   },
+   "bounds_min": [
+    -70.0,
+    0.0,
+    0.0
+   ],
+   "bounds_max": [
+    70.0,
+    95.0,
+    112.0
+   ],
+   "disp_max_mm": 0.256932,
+   "stress_max_MPa": 123.44349753109559,
+   "surface_peak_MPa": 123.443,
+   "surface_peak_xyz": [
+    43.845,
+    8.897,
+    79.733
+   ],
+   "governing_MPa": 123.443,
+   "governing_xyz": [
+    43.845,
+    8.897,
+    79.733
+   ],
+   "max_disp_mm": 0.2642,
+   "verdict": "marginal",
+   "confidence": "medium",
+   "source": "examples/cast-motor-mount/output"
+  }
+ }
+}
