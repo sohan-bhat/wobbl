@@ -24,8 +24,9 @@ never write your own finite element code.
      `"wall x=min"` (can push, can lift off), `"roller y=0"`, `"fixed-z faces 7"` (only some directions).
    - selectors: `top`, `bottom`, `x=min`, `z>10`, `normal -z`, `holes d<6`, `hole near 55,0,10`,
      `fillets`, `face 12`, `within 15 of 50,-25,35` (a circular patch), combined with `and` / `or`.
-   Parts can also be parametric Python files (`PARAMS` plus `build(occ, **params)`); pass
-   `--param thickness=6` to change them, and `wobbl fix --apply` edits those parameters directly.
+   Parts can also be parametric Python files (`PARAMS` plus `build(occ, **params)`). Pass
+   `--param thickness=6` to change them, and `wobbl fix --apply` changes their thickness and
+   fillet parameters directly.
 3. **Run the study.**
    `wobbl run part.step -m 6061-t6 --fix "bolt holes d=6.6" --load "200 N down @ top" --target-sf 2 --json`
    (MCP: `solve_structural`). Materials: `wobbl materials` (pla, petg, abs, asa, nylon, pa12, pc,
@@ -33,16 +34,18 @@ never write your own finite element code.
 4. **Read the verification before the number.** Every result has `confidence` (high, medium, low),
    `confidence_reasons` and `checks`. Look at the `stress` image (`images.stress`) to confirm the
    peak is where you expect.
-5. **If it fails or is marginal,** read `fixes` and run `wobbl fix <result dir> --apply`
-   (MCP: `suggest_fix` with `apply=true`) to re-run with fillets, gussets or another material and
-   show before and after.
+5. **If it fails or is marginal,** read `fixes` and run `wobbl fix wobbl-out/part --apply` with the
+   result folder the run printed (MCP: `suggest_fix` with `apply=true`) to re-run with fillets,
+   gussets, thicker walls or another material and show before and after.
 6. **Report** to the user: the verdict, the governing number with units and location, the safety
    factor against the target, the confidence and its reasons, the key assumptions, the image path and
    the HTML report path.
 
-Heat: `wobbl thermal part.step --power "12 W" --film "5 W/m2K @ all" --ambient 25` (MCP: `solve_thermal`).
-Circuits: `wobbl circuit led --supply 5V --resistor 150 --led red` or `wobbl circuit board.cir`
-(MCP: `solve_circuit`).
+For heat, run `wobbl thermal part.step -m 6061-t6 --power "12 W" --film "5 W/m2K @ all" --ambient "25 C"`
+(MCP `solve_thermal`). The material is required, and adding `--duration "30 min"` makes the run transient.
+For circuits, give each template value its own `--set`, as in
+`wobbl circuit led --set supply=5V --set resistor=150 --set led=red`, or run your own netlist with
+`wobbl circuit board.cir --probe "v(out)"` (MCP `solve_circuit`).
 
 ## Never skip
 
