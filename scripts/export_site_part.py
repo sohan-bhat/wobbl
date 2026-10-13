@@ -12,7 +12,10 @@ and writes it as one gzipped binary file plus the numbers the page needs.
 
 Each ``--variant`` is a result folder (with ``result.vtu`` and
 ``outcome.json``). Variants are separate meshes because each study refines
-its own mesh; nothing is interpolated.
+its own mesh; nothing is interpolated. When the gzipped file would pass
+``--max-kb`` (900 KB), vertices are removed from the flattest regions in 5%
+steps until it fits; the ones that stay keep their exact values, so the
+peak shown is still the solver's.
 
 Binary layout of ``<name>-<variant>.bin.gz`` after gunzip, little endian,
 every block padded to 4 bytes, offsets listed in the JSON manifest:
@@ -28,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 import warnings
 from pathlib import Path
@@ -37,13 +41,19 @@ import numpy as np
 warnings.filterwarnings("ignore")
 
 
-def surface(result_vtu: Path, feature_angle: float):
+def surface(result_vtu: Path, feature_angle: float, reduction: float = 0.0):
     import pyvista as pv
+    import vtk
 
+    vtk.vtkObject.GlobalWarningDisplayOff()
     grid = pv.read(result_vtu)
     # One level of subdivision keeps the mid edge nodes of the quadratic
     # elements, so fillets read smooth and the peak is not averaged away.
-    surf = grid.extract_surface(nonlinear_subdivision=1).triangulate()
+    surf = grid.extract_surface(nonlinear_subdivision=1, algorithm="dataset_surface").triangulate()
+    if reduction > 0:
+        # remove vertices where the surface is flattest; kept vertices keep their own values
+        surf = surf.decimate_pro(reduction, feature_angle=feature_angle, preserve_topology=True,
+                                 boundary_vertex_deletion=False)
     # Split vertices along sharp CAD edges so flat faces shade flat and
     # fillets shade smooth.
     surf = surf.compute_normals(split_vertices=True, feature_angle=feature_angle,
@@ -55,8 +65,16 @@ def pad4(b: bytes) -> bytes:
     return b + b"\0" * (-len(b) % 4)
 
 
-def export_variant(name: str, folder: Path, out: Path, feature_angle: float) -> dict:
-    surf = surface(folder / "result.vtu", feature_angle)
+def export_variant(name: str, folder: Path, out: Path, feature_angle: float, max_kb: float) -> dict:
+    for step in range(10):
+        info = _export(name, folder, out, feature_angle, 0.05 * step)
+        if info["bytes_gzip"] <= max_kb * 1000:
+            return info
+    return info
+
+
+def _export(name: str, folder: Path, out: Path, feature_angle: float, reduction: float) -> dict:
+    surf = surface(folder / "result.vtu", feature_angle, reduction)
     outcome = json.loads((folder / "outcome.json").read_text())
 
     X = np.asarray(surf.points, float)
@@ -88,16 +106,19 @@ def export_variant(name: str, folder: Path, out: Path, feature_angle: float) -> 
     blob = b"".join(blocks)
     path = out / f"{name}.bin.gz"
     path.write_bytes(gzip.compress(blob, compresslevel=9, mtime=0))
+    # the content hash in the link makes browsers fetch a new mesh instead of a cached old one
+    tag = hashlib.sha1(path.read_bytes()).hexdigest()[:10]
 
     allowed = ~E
     gov = float(S[allowed].max()) if allowed.any() else stress_max
     gov_i = int(np.flatnonzero(allowed)[np.argmax(S[allowed])]) if allowed.any() else int(np.argmax(S))
     return {
-        "file": path.name,
+        "file": f"{path.name}?v={tag}",
         "bytes_gzip": path.stat().st_size,
         "bytes_raw": len(blob),
         "vertices": int(len(X)),
         "triangles": int(len(T)),
+        "decimated": round(reduction, 2),
         "index_type": index_type,
         "layout": layout,
         "bounds_min": lo.round(4).tolist(),
@@ -122,6 +143,7 @@ def main() -> None:
     ap.add_argument("--load-n", type=float, required=True, help="load the study was solved at, in N")
     ap.add_argument("--out", type=Path, default=Path("site/data"))
     ap.add_argument("--feature-angle", type=float, default=35.0)
+    ap.add_argument("--max-kb", type=float, default=900.0, help="largest gzipped file, in KB (1000 bytes)")
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
 
@@ -129,7 +151,7 @@ def main() -> None:
     for spec in a.variant:
         key, folder = spec.split("=", 1)
         folder = Path(folder)
-        variants[key] = export_variant(f"{a.name}-{key}", folder, a.out, a.feature_angle)
+        variants[key] = export_variant(f"{a.name}-{key}", folder, a.out, a.feature_angle, a.max_kb)
         first = first or json.loads((folder / "outcome.json").read_text())
         study = study or json.loads((folder / "study.json").read_text())
 
@@ -147,8 +169,8 @@ def main() -> None:
     }
     (a.out / f"{a.name}.json").write_text(json.dumps(manifest, indent=1) + "\n")
     for k, v in variants.items():
-        print(f"{k}: {v['vertices']} vertices, {v['triangles']} triangles, "
-              f"{v['bytes_gzip'] / 1024:.0f} KB gzipped ({v['bytes_raw'] / 1024:.0f} KB raw), "
+        print(f"{k}: {v['vertices']} vertices, {v['triangles']} triangles ({v['decimated']:.0%} decimated), "
+              f"{v['bytes_gzip'] / 1000:.0f} KB gzipped ({v['bytes_raw'] / 1000:.0f} KB raw), "
               f"surface peak {v['surface_peak_MPa']} MPa, governing {v['governing_MPa']} MPa")
 
 
