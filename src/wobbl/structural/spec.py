@@ -58,6 +58,7 @@ class Fixture:
     kind: str
     faces: str
     text: str = ""
+    dofs: str = "xyz"        # for fixed faces: which directions are held, e.g. "z" or "xy"
 
     def describe(self) -> str:
         return self.text or f"{self.kind} {self.faces}"
@@ -89,7 +90,7 @@ class StructuralStudy:
         d = dict(d)
         loads = [Load(**x) if isinstance(x, dict) and "kind" in x and "magnitude" in x else parse_load(x)
                  for x in d.pop("loads", [])]
-        fixtures = [Fixture(**x) if isinstance(x, dict) and "kind" in x and "faces" in x and len(x) <= 3
+        fixtures = [Fixture(**x) if isinstance(x, dict) and "kind" in x and "faces" in x and len(x) <= 4
                     else parse_fixture(x) for x in d.pop("fixtures", [])]
         known = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
         return cls(loads=loads, fixtures=fixtures, **known)
@@ -211,10 +212,13 @@ def parse_fixture(spec, kind: str | None = None) -> Fixture:
         k = spec.get("kind", spec.get("type", kind or "fixed"))
         return parse_fixture(spec["faces"], k)
     text = str(spec).strip()
+    dofs = "xyz"
     if kind is None:
-        m = re.match(r"^(fixed|fix|roller|slider|symmetry|bolt|bolted|wall|rest|support)\s*[:@]?\s+(.+)$", text, re.I)
+        m = re.match(r"^(fixed|fix|roller|slider|symmetry|bolt|bolted|wall|rest|support)(?:-([xyz]{1,3}))?"
+                     r"\s*[:@]?\s+(.+)$", text, re.I)
         if m:
-            kind, text = m.group(1).lower(), m.group(2)
+            kind, text = m.group(1).lower(), m.group(3)
+            dofs = (m.group(2) or "xyz").lower()
         else:
             kind = "fixed"
     kind = {"fix": "fixed", "slider": "roller", "symmetry": "roller", "bolted": "bolt", "rest": "wall",
@@ -223,7 +227,10 @@ def parse_fixture(spec, kind: str | None = None) -> Fixture:
         raise SpecError(f"unknown fixture type '{kind}' (use {', '.join(FIXTURE_KINDS)})")
     if not text:
         raise SpecError("a fixture needs faces, for example 'holes' or 'x=min'")
-    return Fixture(kind, text.strip(), f"{kind} {text.strip()}")
+    if dofs != "xyz" and kind != "fixed":
+        raise SpecError("only fixed faces can hold some directions, e.g. 'fixed-z x=max'")
+    label = kind if dofs == "xyz" else f"{kind}-{dofs}"
+    return Fixture(kind, text.strip(), f"{label} {text.strip()}", "".join(sorted(set(dofs))))
 
 
 __all__ = ["Load", "Fixture", "StructuralStudy", "parse_load", "parse_fixture", "SpecError", "SelectionError"]

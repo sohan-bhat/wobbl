@@ -150,6 +150,8 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
                 break
     mesh, model, info, res = last
     T = res.T
+    np.savez_compressed(out / "fields.npz", X=mesh.X, T=T, tets=mesh.tets, tris=mesh.tris,
+                        hist_t=res.history_t, hist_T=res.history_T)
     tmax = float(T.max())
     hot = mesh.X[int(np.argmax(T))]
     limit = study.limit if study.limit is not None else mat.max_service_temp

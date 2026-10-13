@@ -166,7 +166,8 @@ def build_static(mesh: Mesh, loads: list[tuple[Load, Selection | None]], fixture
             raise SpecError(f"fixture '{fx.describe()}' covers no part of the mesh; widen the selection")
         if fx.kind == "fixed":
             nodes = np.unique(mesh.tris[mask].ravel())
-            model.constraints.append(NodeConstraint(name, nodes))
+            dofs = tuple(" xyz".index(c) for c in getattr(fx, "dofs", "xyz"))
+            model.constraints.append(NodeConstraint(name, nodes, dofs))
         elif fx.kind == "bolt":
             nodes = washer_nodes(mesh, sel, faces)
             model.constraints.append(NodeConstraint(name, nodes))
