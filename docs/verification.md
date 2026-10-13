@@ -1,8 +1,23 @@
-# How Wobbl checks itself
+# How Wobbl checks an answer
 
 A finite element number is only as good as the mesh, the supports and the
 setup behind it. Wobbl runs these checks on every answer and turns them into a
 confidence level. It never reports high confidence after a failed check.
+
+## At a glance
+
+| Check | What it asks | From a real run |
+|---|---|---|
+| Mesh convergence | does the stress stop moving as the mesh refines? | `43 -> 50.9 -> 53 -> 52.3 MPa over 4 meshes` |
+| Force and moment balance | do the reactions cancel the loads? | `reactions balance the loads to 0.00014%` |
+| Hand calculation | is the peak a physical multiple of beam theory? | `15.2 MPa nominal, a stress concentration of about 3.4` |
+| Singularities | is the peak at a sharp corner or an idealized support? | `17.5 -> 24 -> 27.7 MPa and still rising: excluded` |
+| Load introduction | does the answer flip if the attached part is rigid? | `rigid servo: 55 MPa over 3 meshes, safety factor 3.00` |
+| Bolt bearing | what does each bolted hole really carry? | `2.7 N sideways, bearing stress 0.1 MPa` |
+| Units and sanity | are size, strain and deflection plausible? | `peak strain 0.015, deflection 2.8% of size` |
+| Large deflection | does a nonlinear solve agree? | `drone arm: the peak moves +2.3%, linear theory holds` |
+
+![Stress heatmap of a printed motor mount without its ribs. A band of high stress runs along the base of the upright, peak 41.3 MPa, with two spots labeled artifact](../site/img/motor-mount-noribs.webp "Wobbl excludes the spots labeled artifact, where an idealized support or a sharp corner sets the stress, and reports 41.3 MPa from the fillet.")
 
 ## Strength
 
@@ -69,6 +84,13 @@ against the bearing limit.
 mistake), peak strain, stress far above or below the material limit, and
 deflection: over 6% of the part size is a warning (linear theory gets less
 accurate), over 20% is a failure.
+
+**Large deflection.** When a part bends a good fraction of its wall thickness,
+Wobbl solves it again with large deflection theory and reports how far the peak
+and the deflection move. On the drone arm example the peak moves +2.3% and
+linear theory holds. On the enclosure shell in the bake off, large deflection
+theory lowers the peak 11%, so the linear answer is the conservative one and the
+confidence is medium.
 
 **Bounded runtime.** Every study has a time budget (`--budget`, by default
 300 s). Wobbl spends it by a fixed cost model of each mesh and solve, from the
