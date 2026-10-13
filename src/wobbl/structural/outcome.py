@@ -176,7 +176,13 @@ def evaluate(run: StructuralRun) -> Outcome:
     if high_zone:
         parts = []
         for h in high_zone[:3]:
-            kind = "singular, keeps rising with refinement" if h.singular else "set by the idealized support"
+            vals = [v for v in h.values if v == v]
+            rising = len(vals) >= 2 and all(b > a * 1.03 for a, b in zip(vals, vals[1:]))
+            if h.kind == "corner":
+                kind = ("singular, keeps rising with refinement" if rising else
+                        "a sharp corner: singular in theory, so the value depends on the mesh")
+            else:
+                kind = "keeps rising with refinement" if rising else "set by the idealized support"
             parts.append(f"{fmt(h.value)} MPa {h.detail} ({kind}: {h.trend()} MPa)")
         msg = ("excluded from the answer: " + "; ".join(parts) +
                f". Wobbl reports the stress {fmt(run.exclusion_radius)} mm or more away from these spots")
