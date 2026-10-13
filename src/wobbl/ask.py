@@ -116,9 +116,14 @@ def _guess_fixture(q: str, f: PartFeatures) -> tuple[str, str]:
 
 
 def _common_hole(holes) -> float:
-    ds = np.array([2 * h.radius for h in holes])
-    vals, counts = np.unique(np.round(ds, 2), return_counts=True)
-    return float(vals[np.argmax(counts)])
+    """The most common hole size; ties go to the size whose holes sit lowest, since parts usually bolt down."""
+    ds = np.round(np.array([2 * h.radius for h in holes]), 2)
+    vals, counts = np.unique(ds, return_counts=True)
+    best = vals[counts == counts.max()]
+    if len(best) == 1:
+        return float(best[0])
+    low = {v: min(h.axis_point[2] for h, d in zip(holes, ds) if d == v) for v in best}
+    return float(min(best, key=lambda v: low[v]))
 
 
 def _guess_load(q: str, f: PartFeatures, study: StructuralStudy) -> tuple[str, str] | None:
@@ -132,10 +137,10 @@ def _guess_load(q: str, f: PartFeatures, study: StructuralStudy) -> tuple[str, s
         return f"{gm.group(1)} g {direction}", f"{gm.group(1)} g of acceleration, {direction}"
     if not m:
         return None
-    mag = f"{m.group(1)} {m.group(2)}"
     unit = m.group(2).lower()
-    if unit in ("kg", "kgs"):
-        mag = f"{m.group(1)} kgf"
+    nice = {"n": "N", "newton": "N", "newtons": "N", "kn": "kN", "kg": "kgf", "kgs": "kgf", "kgf": "kgf",
+            "lb": "lbf", "lbs": "lbf", "lbf": "lbf", "pound": "lbf", "pounds": "lbf", "kip": "kip", "kips": "kip"}
+    mag = f"{m.group(1)} {nice.get(unit, unit)}"
     sel, why = _far_face(f, study)
     if re.search(r"\b(on|at) (the )?top\b", q):
         sel, why = "top", "the top face"
