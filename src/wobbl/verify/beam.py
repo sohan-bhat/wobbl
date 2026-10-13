@@ -73,21 +73,18 @@ def beam_estimate(mesh, measure_at: np.ndarray, loads_force: np.ndarray, loads_m
     sl = grid.slice(normal=axis, origin=H)
     if sl.n_points == 0:
         return None, "the section plane missed the part"
-    sl = sl.triangulate()
-    try:
-        conn = sl.connectivity("closest", closest_point=H)
-    except TypeError:
-        conn = sl.connectivity(extraction_mode="closest", closest_point=H)
+    # the plane separates every fixture from every load, so all material it cuts carries the load:
+    # the whole cut is the beam section (two chords of a truss, both walls of a channel)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        conn = conn.extract_surface().triangulate()
+        conn = sl.triangulate().extract_surface().triangulate()
     faces = conn.faces.reshape(-1, 4)[:, 1:]
     pts = np.asarray(conn.points)
     props = section_properties(pts[faces], axis)
     if props is None:
         return None, "empty section"
     A, G, I = props
-    if np.linalg.norm((G - H) - ((G - H) @ axis) * axis) > 1.5 * np.sqrt(A):
+    if np.linalg.norm((G - H) - ((G - H) @ axis) * axis) > 3.0 * np.sqrt(A):
         return None, "the cut through the critical point is not a single compact section"
     # resultant of the loads about the section centroid; force F with moment Mo about the origin
     M_G = Mo - np.cross(G, F)
