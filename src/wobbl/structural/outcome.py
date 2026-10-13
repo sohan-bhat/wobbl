@@ -217,7 +217,28 @@ def evaluate(run: StructuralRun) -> Outcome:
             checks.append(Check("large deflection", "warn", s + f". Scaling the converged answer gives about "
                                 f"{fmt(est)} MPa; " + ("linear theory is conservative here" if ps < 0 else
                                                        "linear theory underestimates here"), nl))
-    elif nl and "error" in nl:
+    lp = run.load_path
+    if lp and "alternative_peak" in lp and lp["primary_peak"] > 0:
+        alt = lp["alternative_peak"]
+        ratio = alt / lp["primary_peak"]
+        alt_sf = allow / alt if alt > 0 else float("inf")
+        flips = (alt_sf >= target) != (sf >= target)
+        how = {"rigid": "a rigid attachment (the attached part does not flex)",
+               "distributed": "a distributing coupling (the attached part adds no stiffness)"}
+        s = (f"the off part loads enter through {how[lp['primary']]}. With {how[lp['alternative']]} instead, the "
+             f"governing stress is {fmt(alt)} MPa ({ratio:.2g}x, safety factor {alt_sf:.2f})")
+        if flips:
+            checks.append(Check("load introduction", "warn", s + ". The verdict depends on this assumption: check "
+                                "how the attached part really carries the load", lp))
+            extra.append(("medium", "the verdict depends on how the load enters the part (rigid attachment versus "
+                                    "distributed); the answer assumes " + lp["primary"]))
+        else:
+            checks.append(Check("load introduction", "pass" if 0.7 <= ratio <= 1.4 else "info",
+                                s + ". The verdict is the same either way", lp))
+    elif lp and "skipped" in lp:
+        checks.append(Check("load introduction", "info", "the off part loads were not re-solved with the other "
+                                                         f"attachment idealization ({lp['skipped']})"))
+    if nl and "error" in nl:
         checks.append(Check("large deflection", "info", "deflection is large next to the wall thickness, but the "
                                                         f"large deflection solve did not finish ({nl['error']})"))
 

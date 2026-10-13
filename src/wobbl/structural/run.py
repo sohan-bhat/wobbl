@@ -14,7 +14,9 @@ from ..geometry.cad import PreparedGeometry, prepare, scale_geometry
 from ..geometry.faces import PartFeatures, analyze, find_sharp_corners
 from ..geometry.select import Selection, SelectionError, Selector
 from ..materials import Material, resolve_material
-from ..mesh.mesher import Mesh, Refinement, Sizing, auto_sizing, build_mesh, build_surface_mesh
+from ..mesh.isolate import IsolatedCrash, IsolatedTimeout
+from ..mesh.mesher import Mesh, MeshError, Refinement, Sizing, auto_sizing, build_mesh, build_surface_mesh
+from ..solvers.base import SolverError
 from ..solvers import base as solvers
 from .build import BuiltModel, build_static
 from .hotspots import Hotspot, ZoneMap, classify, find_hotspots, track
@@ -74,6 +76,7 @@ class StructuralRun:
     t_total: float = 0.0
     notes: list[str] = field(default_factory=list)
     nonlinear: dict | None = None
+    load_path: dict | None = None
 
 
 def _say(progress: Progress | None, stage: str, detail: str = ""):
@@ -226,25 +229,36 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         wall_warm = _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter,
                                       work / "contact")
     for lv in range(levels_max):
-        _say(progress, "mesh", f"level {lv}: meshing (element size {sizing.h:.3g} mm)")
-        mesh = build_mesh(prep, sizing)
-        cap = 2.0 * features.thickness_min  # never coarser than this: thin walls and struts need real elements
-        if lv == 0 and mesh.n_nodes > 1.6 * q["nodes"] and not study.mesh_size and sizing.h < cap:
-            # small features made the first mesh too big to solve quickly: coarsen once, by the right amount
-            factor = min((mesh.n_nodes / q["nodes"]) ** (1 / 3), cap / sizing.h)
-            sizing.h *= factor
-            for r in sizing.refinements:
-                if r.corners_only:
-                    r.size *= factor
-            _say(progress, "mesh", f"level 0 had {mesh.n_nodes:,} nodes; coarsening to {sizing.h:.3g} mm")
+        try:
+            _say(progress, "mesh", f"level {lv}: meshing (element size {sizing.h:.3g} mm)")
             mesh = build_mesh(prep, sizing)
-        if lv == 0 and mesh.n_nodes > 2 * q["nodes"]:
-            notes.append(f"Thin walls need a large first mesh ({mesh.n_nodes:,} nodes), so this study takes longer "
-                         "than usual.")
-        notes += [n for n in mesh.notes if n not in notes]
-        built = build_static(mesh, loads, fixtures, material, features.faces)
-        _say(progress, "solve", f"level {lv}: solving {mesh.n_nodes:,} nodes with {adapter.name}")
-        res, wall_iters, wall_warm = _solve(adapter, built, work / f"level{lv}", wall_warm)
+            cap = 2.0 * features.thickness_min  # never coarser than this: thin walls and struts need real elements
+            if lv == 0 and mesh.n_nodes > 1.6 * q["nodes"] and not study.mesh_size and sizing.h < cap:
+                # small features made the first mesh too big to solve quickly: coarsen once, by the right amount
+                factor = min((mesh.n_nodes / q["nodes"]) ** (1 / 3), cap / sizing.h)
+                sizing.h *= factor
+                for r in sizing.refinements:
+                    if r.corners_only:
+                        r.size *= factor
+                _say(progress, "mesh", f"level 0 had {mesh.n_nodes:,} nodes; coarsening to {sizing.h:.3g} mm")
+                mesh = build_mesh(prep, sizing)
+            if lv == 0 and mesh.n_nodes > 2 * q["nodes"]:
+                notes.append(f"Thin walls need a large first mesh ({mesh.n_nodes:,} nodes), so this study takes longer "
+                             "than usual.")
+            notes += [n for n in mesh.notes if n not in notes]
+            built = build_static(mesh, loads, fixtures, material, features.faces)
+            _say(progress, "solve", f"level {lv}: solving {mesh.n_nodes:,} nodes with {adapter.name}")
+            res, wall_iters, wall_warm = _solve(adapter, built, work / f"level{lv}", wall_warm,
+                                                timeout=None if lv == 0 else
+                                                max(120.0, 1.5 * study.budget - (time.time() - t_start)))
+        except (MeshError, SolverError, IsolatedTimeout, IsolatedCrash) as e:
+            if lv == 0:
+                raise
+            # never come back empty handed: the last finished level is still a checked answer
+            notes.append(f"Refinement level {lv} could not finish ({str(e)[:160]}); the answer comes from "
+                         f"level {lv - 1}.")
+            stopped_by = f"level {lv} failed"
+            break
         measure, mname = failure_measure(res, material, print_axis)
         corners = find_sharp_corners(mesh, faces=features.faces)
         zmap = ZoneMap(mesh, built.zones, built.zone_kind, corners)
@@ -301,8 +315,11 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
     mesh, res, built, measure, mname, excluded = last
     nonlinear = _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work,
                                         progress)
+    load_path = _load_path_check(adapter, study, mesh, loads, fixtures, material, features, print_axis, r_ex,
+                                 work, progress, levels[-1].governing, t_start)
     run = StructuralRun(study, material, prep, features, sel_info, levels, spots, mesh, res, built, mname,
-                        measure, excluded, r_ex, work, tol, stopped_by, time.time() - t_start, notes, nonlinear)
+                        measure, excluded, r_ex, work, tol, stopped_by, time.time() - t_start, notes, nonlinear,
+                        load_path)
     _save_fields(run)
     return run
 
@@ -410,14 +427,53 @@ def _large_deflection_check(adapter, first, levels, features, prep, material, pr
         return None
     _say(progress, "check", f"deflection {d:.3g} mm is large next to the {features.thickness_min:.3g} mm wall; "
                             "re-solving with large deflection theory")
+    # a nonlinear solve factorizes the matrix at every load increment; cap it so the check never
+    # dominates the study
+    limit = max(60.0, min(300.0, 10.0 * levels[0].t_solve))
     try:
-        res = adapter.solve_static(built.model, work / "nlgeom", nlgeom=True)
+        res = adapter.solve_static(built.model, work / "nlgeom", nlgeom=True, timeout=limit)
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)[:200]}
     m, _ = failure_measure(res, material, print_axis)
     valid = ~excluded if (~excluded).any() else np.ones(len(m), bool)
     return {"linear_peak": lin_peak, "nonlinear_peak": float(m[valid].max()), "linear_disp": lin_disp,
             "nonlinear_disp": float(res.displacement_magnitude().max()), "nodes": built.model.mesh.n_nodes}
+
+
+def _load_path_check(adapter, study, mesh, loads, fixtures, material, features, print_axis, r_ex, work, progress,
+                     governing, t_start):
+    """Loads that act off the part (a belt pull at a pulley, thrust on a motor) can enter it through a rigid
+    attachment or spread over the faces. The two idealizations can give very different peaks, so solve the
+    other one on the final mesh and report the spread."""
+    import copy
+
+    remote = [i for i, (ld, _) in enumerate(loads) if ld.kind in ("remote", "moment")]
+    if not remote or any(fx.kind == "wall" for fx, _ in fixtures):
+        return None
+    if time.time() - t_start > 1.3 * study.budget:
+        return {"skipped": "time budget"}
+    alt = []
+    for i, (ld, sel) in enumerate(loads):
+        ld2 = copy.copy(ld)
+        if i in remote:
+            ld2.coupling = "distributed" if ld.coupling == "rigid" else "rigid"
+        alt.append((ld2, sel))
+    primary = loads[remote[0]][0].coupling
+    other = alt[remote[0]][0].coupling
+    _say(progress, "check", f"re-solving with a {other} load attachment to see how much the answer depends on it")
+    try:
+        built = build_static(mesh, alt, fixtures, material, features.faces)
+        res, _, _ = _solve(adapter, built, work / "load_path")
+    except Exception as e:  # noqa: BLE001  the comparison is a bonus, never a reason to fail
+        return {"error": str(e)[:200]}
+    m, _ = failure_measure(res, material, print_axis)
+    zmap = ZoneMap(mesh, built.zones, built.zone_kind, find_sharp_corners(mesh, faces=features.faces))
+    ok = ~zmap.excluded_mask(mesh.X, r_ex)
+    if not ok.any():
+        ok = np.ones(len(m), bool)
+    i = np.nonzero(ok)[0][np.argmax(m[ok])]
+    return {"primary": primary, "alternative": other, "primary_peak": governing, "alternative_peak": float(m[i]),
+            "alternative_xyz": mesh.X[i].tolist(), "alternative_raw_max": float(m.max())}
 
 
 def _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter, workdir):
@@ -436,11 +492,12 @@ def _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter
         return None
 
 
-def _solve(adapter, built: BuiltModel, workdir: Path, warm):
+def _solve(adapter, built: BuiltModel, workdir: Path, warm, timeout: float | None = None):
     """Solve, running an active set loop when some faces rest on a wall (compression only)."""
     model = built.model
+    kw = {"timeout": timeout} if timeout else {}
     if not built.walls:
-        return adapter.solve_static(model, workdir), 0, None
+        return adapter.solve_static(model, workdir, **kw), 0, None
     base_normals = list(model.normal_constraints)
     active = {}
     for w in built.walls:
@@ -458,7 +515,7 @@ def _solve(adapter, built: BuiltModel, workdir: Path, warm):
     for it in range(1, 9):
         model.normal_constraints = base_normals + [NormalConstraint(w.name, active[w.name], w.normal)
                                                    for w in built.walls if len(active[w.name])]
-        res = adapter.solve_static(model, workdir)
+        res = adapter.solve_static(model, workdir, **kw)
         solved = {k: v.copy() for k, v in active.items()}
         changed = 0
         total = sum(len(w.nodes) for w in built.walls)
