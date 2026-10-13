@@ -285,8 +285,9 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
                                             progress)
     else:
         nonlinear = None if levels[-1].max_disp < 0.3 * features.thickness_min else {"error": "time budget used up"}
-    load_path = _load_path_check(adapter, study, mesh, loads, fixtures, material, features, print_axis, r_ex,
-                                 work, progress, levels[-1].governing, t_start)
+    load_path = _load_path_check(adapter, study, q, prep, sizing, mesh, loads, fixtures, material, features,
+                                 print_axis, r_ex, tol, work, progress, levels[-1],
+                                 _governing_spot(spots, levels[-1].governing_xyz), t_start)
     run = StructuralRun(study, material, prep, features, sel_info, levels, spots, mesh, res, built, mname,
                         measure, excluded, r_ex, work, tol, stopped_by, time.time() - t_start, notes, nonlinear,
                         load_path)
@@ -439,6 +440,19 @@ def _refine(sizing: Sizing, spots: list[Hotspot], levels: list[Level], tol: floa
     return new
 
 
+def _peak_refinement(mesh: Mesh, spots: list[Hotspot], xyz) -> list[Refinement]:
+    """Refine around a governing point that no tracked feature peak covers, such as one just outside the zone
+    a rigid attachment grabs; the hotspot targets alone would leave it on the coarse far field mesh."""
+    xyz = np.asarray(xyz, float)
+    gs = _governing_spot(spots, xyz)
+    if gs is not None and np.linalg.norm(np.asarray(gs.xyz) - xyz) <= gs.radius:
+        return []
+    h = float(mesh.node_sizes()[int(np.argmin(np.linalg.norm(mesh.X - xyz, axis=1)))])
+    if not np.isfinite(h) or h <= 0:
+        return []
+    return [Refinement(0.5 * h, points=[tuple(xyz)], radius=2.5 * h, grow=3 * h, label="governing point")]
+
+
 def _large_deflection_check(adapter, first, levels, features, prep, material, print_axis, work, progress):
     """When the part deflects a good fraction of its wall thickness, linear theory misses membrane
     stiffening and changing geometry. Re-solve the first mesh with geometric nonlinearity and report
@@ -462,11 +476,31 @@ def _large_deflection_check(adapter, first, levels, features, prep, material, pr
             "nonlinear_disp": float(res.displacement_magnitude().max()), "nodes": built.model.mesh.n_nodes}
 
 
-def _load_path_check(adapter, study, mesh, loads, fixtures, material, features, print_axis, r_ex, work, progress,
-                     governing, t_start):
+def variant_needs_refinement(primary: Level, variant: Level, primary_spot: Hotspot | None, allowable: float,
+                             target: float) -> str:
+    """Why the other load attachment needs refinement of its own, or an empty string when the mesh refined for
+    the main answer already resolves its peak."""
+    def holds(s: float) -> bool:
+        return (allowable / s if s > 0 else float("inf")) >= target
+
+    if holds(variant.governing) != holds(primary.governing):
+        return "the verdict flips"
+    reach = 2.5 * primary_spot.radius if primary_spot is not None else 0.0
+    if np.linalg.norm(np.asarray(variant.governing_xyz) - np.asarray(primary.governing_xyz)) > reach:
+        return "its peak sits away from the converged one"
+    return ""
+
+
+def _load_path_check(adapter, study, q, prep, sizing, mesh, loads, fixtures, material, features, print_axis, r_ex,
+                     tol, work, progress, primary: Level, primary_spot: Hotspot | None, t_start):
     """Loads that act off the part (a belt pull at a pulley, thrust on a motor) can enter it through a rigid
     attachment or spread over the faces. The two idealizations can give very different peaks, so solve the
-    other one on the final mesh and report the spread."""
+    other one too and report the spread.
+
+    The other idealization is first solved on the final mesh. When the verdict flips or its peak sits away from
+    the converged one, that mesh says little about it, so it gets its own refinement loop around its own peaks,
+    with the same stopping rules and time budget as the main study.
+    """
     import copy
 
     remote = [i for i, (ld, _) in enumerate(loads) if ld.kind in ("remote", "moment")]
@@ -480,22 +514,67 @@ def _load_path_check(adapter, study, mesh, loads, fixtures, material, features, 
         if i in remote:
             ld2.coupling = "distributed" if ld.coupling == "rigid" else "rigid"
         alt.append((ld2, sel))
-    primary = loads[remote[0]][0].coupling
     other = alt[remote[0]][0].coupling
     _say(progress, "check", f"re-solving with a {other} load attachment to see how much the answer depends on it")
     try:
-        built = build_static(mesh, alt, fixtures, material, features.faces)
-        res, _, _ = _solve(adapter, built, work / "load_path", None)
+        out = _converge_variant(adapter, study, q, prep, sizing, mesh, alt, fixtures, material, features,
+                                print_axis, r_ex, tol, work / "load_path", progress, primary, primary_spot, t_start,
+                                other)
     except Exception as e:  # noqa: BLE001  the comparison is a bonus, never a reason to fail
         return {"error": str(e)[:200]}
-    m, _ = failure_measure(res, material, print_axis)
-    zmap = ZoneMap(mesh, built.zones, built.zone_kind, find_sharp_corners(mesh, faces=features.faces, tangent=features.tangent_pairs))
-    ok = ~zmap.excluded_mask(mesh.X, r_ex)
-    if not ok.any():
-        ok = np.ones(len(m), bool)
-    i = np.nonzero(ok)[0][np.argmax(m[ok])]
-    return {"primary": primary, "alternative": other, "primary_peak": governing, "alternative_peak": float(m[i]),
-            "alternative_xyz": mesh.X[i].tolist(), "alternative_raw_max": float(m.max())}
+    return {"primary": loads[remote[0]][0].coupling, "alternative": other, "primary_peak": primary.governing, **out}
+
+
+def _converge_variant(adapter, study, q, prep, sizing, mesh, loads, fixtures, material, features, print_axis, r_ex,
+                      tol, work, progress, primary: Level, primary_spot: Hotspot | None, t_start, label: str) -> dict:
+    """Solve a variant of the study on the final mesh, then refine around its own peaks until they settle."""
+    levels_max = min(study.max_levels, q["levels"])
+    target = study.target_sf or material.recommended_sf
+    levels: list[Level] = []
+    spots: list[Hotspot] = []
+    why, stopped_by = "", ""
+    for lv in range(levels_max):
+        try:
+            if lv:
+                _say(progress, "check", f"{label} attachment, level {lv}: meshing (element size {sizing.h:.3g} mm)")
+                mesh = build_mesh(prep, sizing)
+            built = build_static(mesh, loads, fixtures, material, features.faces)
+            res, _, _ = _solve(adapter, built, work / f"level{lv}", None,
+                               timeout=None if lv == 0 else
+                               max(120.0, 1.5 * study.budget - (time.time() - t_start)))
+        except Exception as e:  # noqa: BLE001  a failed refinement keeps the last finished level
+            if lv == 0:
+                raise
+            stopped_by = f"level {lv} failed ({str(e)[:80]})"
+            break
+        measure, _ = failure_measure(res, material, print_axis)
+        zmap = ZoneMap(mesh, built.zones, built.zone_kind,
+                       find_sharp_corners(mesh, faces=features.faces, tangent=features.tangent_pairs))
+        spots = _update_spots(spots, lv, mesh, measure, zmap, features, prep)
+        levels.append(_record_level(lv, mesh, sizing, res, built, measure, zmap.excluded_mask(mesh.X, r_ex)))
+        classify(spots, tol)
+        if lv == 0:
+            why = variant_needs_refinement(primary, levels[0], primary_spot, material.allowable, target)
+            if not why:
+                stopped_by = "not needed"
+                break
+        _say(progress, "check", f"{label} attachment, level {lv}: governing {levels[-1].governing:.4g} MPa"
+                                + (f" ({_pct(levels)} change)" if lv else f" ({why}, refining around it)"))
+        stopped_by = _stop_reason(levels, spots, tol, 2 if study.quality == "fast" else 3, levels_max, q,
+                                  study.budget, time.time() - t_start)
+        if stopped_by:
+            break
+        # lv + 1: only the variant's governing stress is reported, so its idealized zone peaks are not chased
+        sizing = _refine(sizing, spots, levels, tol, lv + 1, features)
+        sizing.refinements += _peak_refinement(mesh, spots, levels[-1].governing_xyz)
+    L = levels[-1]
+    spot = _governing_spot(spots, L.governing_xyz)
+    return {"alternative_peak": L.governing, "alternative_xyz": L.governing_xyz, "alternative_raw_max": L.raw_max,
+            "alternative_spot": {"xyz": spot.xyz, "radius": spot.radius, "detail": spot.detail} if spot else None,
+            "alternative_levels": [{"level": x.level, "n_nodes": x.n_nodes, "h_min": x.h_min,
+                                    "governing": x.governing, "governing_xyz": x.governing_xyz} for x in levels],
+            "refined": bool(why), "refine_reason": why, "converged": stopped_by == "converged",
+            "stopped_by": stopped_by, "tolerance": tol}
 
 
 def _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter, workdir):

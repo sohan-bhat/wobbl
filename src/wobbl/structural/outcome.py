@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -220,22 +221,12 @@ def evaluate(run: StructuralRun) -> Outcome:
                                                        "linear theory underestimates here"), nl))
     lp = run.load_path
     if lp and "alternative_peak" in lp and lp["primary_peak"] > 0:
-        alt = lp["alternative_peak"]
-        ratio = alt / lp["primary_peak"]
-        alt_sf = allow / alt if alt > 0 else float("inf")
-        flips = (alt_sf >= target) != (sf >= target)
-        how = {"rigid": "a rigid attachment (the attached part does not flex)",
-               "distributed": "a distributing coupling (the attached part adds no stiffness)"}
-        s = (f"the off part loads enter through {how[lp['primary']]}. With {how[lp['alternative']]} instead, the "
-             f"governing stress is {fmt(alt)} MPa ({ratio:.2g}x, safety factor {alt_sf:.2f})")
-        if flips:
-            checks.append(Check("load introduction", "warn", s + ". The verdict depends on this assumption: check "
-                                "how the attached part really carries the load", lp))
-            extra.append(("medium", "the verdict depends on how the load enters the part (rigid attachment versus "
-                                    "distributed); the answer assumes " + lp["primary"]))
-        else:
-            checks.append(Check("load introduction", "pass" if 0.7 <= ratio <= 1.4 else "info",
-                                s + ". The verdict is the same either way", lp))
+        spot = lp.get("alternative_spot")
+        where_alt = _where(run, SimpleNamespace(**spot) if spot else None, np.asarray(lp["alternative_xyz"]))
+        c, why = load_introduction_check(lp, allow, target, where_alt)
+        checks.append(c)
+        if why:
+            extra.append(("medium", why))
     elif lp and "error" in lp:
         checks.append(Check("load introduction", "info", "the other attachment idealization could not be solved "
                                                          f"({lp['error'][:120]})"))
@@ -259,6 +250,55 @@ def evaluate(run: StructuralRun) -> Outcome:
         run.features.to_dict(max_faces=60), run.notes, imperial, mass, beam, workdir=str(run.workdir),
         t_total=run.t_total, solver=res.solver)
     return out
+
+
+HOW = {"rigid": "a rigid attachment (the attached part does not flex)",
+       "distributed": "a distributing coupling (the attached part adds no stiffness)"}
+
+
+def load_introduction_check(lp: dict, allow: float, target: float, where: str = "") -> tuple[Check, str]:
+    """Compare the answer with the other load attachment idealization.
+
+    Returns the check and, when the verdict depends on the idealization, the reason that lowers confidence.
+    The other idealization's number is only called a result when its own peak settled; otherwise it is labeled
+    as the best mesh reached.
+    """
+    main, alt = lp["primary_peak"], lp["alternative_peak"]
+    ratio = alt / main
+    alt_sf = allow / alt if alt > 0 else float("inf")
+    flips = (alt_sf >= target) != (allow / main >= target)
+    values = [x["governing"] for x in lp.get("alternative_levels", [])]
+    trend = " -> ".join(fmt(v) for v in values)
+    change = abs(values[-1] - values[-2]) / max(values[-1], 1e-12) if len(values) > 1 else None
+    at = f" {where}" if where else ""
+    s = f"the off part loads enter through {HOW[lp['primary']]}. With {HOW[lp['alternative']]} instead, "
+    settled = True
+    if not lp.get("refined"):
+        s += (f"the governing stress is {fmt(alt)} MPa ({ratio:.2g}x, safety factor {alt_sf:.2f}) at the same spot "
+              "as the main answer, on the mesh already converged there")
+    elif lp.get("converged"):
+        s += (f"the governing stress converges to {fmt(alt)} MPa{at} ({ratio:.2g}x, safety factor {alt_sf:.2f}) "
+              f"over {len(values)} meshes refined around that peak: {trend} MPa, last change {100 * change:.1f}%")
+    else:
+        settled = False
+        s += (f"the governing stress did not converge (stopped by {lp.get('stopped_by') or 'limit'}). The best mesh "
+              f"reached reads {fmt(alt)} MPa{at} (safety factor {alt_sf:.2f}; {trend} MPa"
+              + (f", last change {100 * change:.1f}%" if change is not None else "")
+              + "), a rough figure and not a result")
+    assumes = "; the answer assumes " + lp["primary"]
+    if flips and settled:
+        return (Check("load introduction", "warn", s + ". The verdict depends on this assumption: check how the "
+                      "attached part really carries the load", lp),
+                "the verdict depends on how the load enters the part (rigid attachment versus distributed)" + assumes)
+    if flips:
+        return (Check("load introduction", "warn", s + ". On that mesh the verdict flips, so it may depend on this "
+                      "assumption: check how the attached part really carries the load", lp),
+                "the verdict may depend on how the load enters the part (rigid attachment versus distributed, and "
+                "the other case did not converge)" + assumes)
+    if settled:
+        return Check("load introduction", "pass" if 0.7 <= ratio <= 1.4 else "info",
+                     s + ". The verdict is the same either way", lp), ""
+    return Check("load introduction", "info", s + ". On that mesh the verdict is the same", lp), ""
 
 
 def _headline(verdict, gov, sf, target, mat, where, imperial, level) -> str:
