@@ -1,18 +1,19 @@
-HOLDS. Peak 10.1 MPa on face 17 at (44.7, 7.51, 15.1), safety factor 4.76 against yield (target 3).
+HOLDS. Peak 10 MPa on face 17 at (44.6, 7.46, 15.1), safety factor 4.79 against yield (target 3).
 
-Confidence: high. passed mesh convergence, force balance, hand calculation, bolt bearing, units and sanity
+Confidence: high. passed mesh convergence, force balance, hand calculation, bolt bearing, units and sanity, load introduction
 Max deflection 4.21 mm at (165, -3.67e-15, 0).
 Material Nylon PA12 (SLS or MJF), limit 48 MPa; mass 40.43 g.
 Loads: 25 N up at 150,0,15 @ top and within 15 of 150,0,15 rigid; 0.5 N*m +z at 150,0,15 @ top and within 15 of 150,0,15 rigid. Fixtures: bolt holes d=3.2 and x<0.
 
 Checks:
-  [pass] mesh convergence: von Mises stress settled: 10.3 -> 10 -> 10.1 MPa over 3 meshes, last change 0.5%
-  [pass] force balance: reactions balance the loads to 9.3e-05% (forces) and 9e-06% (moments)
-  [pass] hand calculation: beam theory through the critical section gives 7.11 MPa nominal; FEA peak is 1.42x that, a stress concentration of about 1.4 from the local shape
-  [info] singularities: excluded from the answer: 14.4 MPa at a sharp inside corner (face 17) (a sharp corner: singular in theory, so the value depends on the mesh: 11.5 -> 14.4 -> 14.4 MPa). Wobbl reports the stress 3.2 mm or more away from these spots
-  [pass] bolt bearing: worst hole of fix1 (d 3.2 mm) carries 48.4 N sideways and 28.6 N along its axis; bearing stress 0.756 MPa, safety factor 63.47 on bearing
+  [pass] mesh convergence: von Mises stress settled: 10.3 -> 10.1 -> 10 MPa over 3 meshes, last change 0.4%
+  [pass] force balance: reactions balance the loads to 0.00024% (forces) and 1.5e-05% (moments)
+  [pass] hand calculation: beam theory through the critical section gives 7.11 MPa nominal; FEA peak is 1.41x that, a stress concentration of about 1.4 from the local shape
+  [info] singularities: excluded from the answer: 14.4 MPa at a sharp inside corner (face 17) (a sharp corner: singular in theory, so the value depends on the mesh: 11.5 -> 14.6 -> 14.4 MPa). Wobbl reports the stress 3.19 mm or more away from these spots
+  [pass] bolt bearing: worst hole of fix1 (d 3.2 mm) carries 44.5 N sideways and 32.1 N along its axis; bearing stress 0.696 MPa, safety factor 68.96 on bearing
   [pass] units and sanity: part 188 mm across, peak strain 0.0059, max deflection 4.21 mm (2.2% of size): all plausible
-  [info] large deflection: deflection is large next to the wall thickness, but the large deflection solve did not finish (CalculiX did not finish within 60 s. Use a coarser mesh (--quality fast) or a longer --budget)
+  [pass] load introduction: the off part loads enter through a rigid attachment (the attached part does not flex). With a distributing coupling (the attached part adds no stiffness) instead, the governing stress is 10 MPa (1x, safety factor 4.79). The verdict is the same either way
+  [info] large deflection: deflection is large next to the wall thickness, but the large deflection solve did not finish (CalculiX did not finish within 90 s. Use a coarser mesh (--quality fast) or a longer --budget)
 
 Assumptions:
   - Linear elastic material and small deflections (no yielding redistribution, no buckling).
@@ -24,8 +25,8 @@ Assumptions:
   - Contact between separate parts, friction and preload are not modeled.
 
 Suggested fixes:
-  - Stress piles up in the sharp inside corner. A fillet of 1.49 mm (about half the 2.98 mm wall) spreads it out. With that radius the peak is usually about 1.4x the 7.11 MPa beam stress, roughly 9.96 MPa (safety factor 4.82).
-  - Stress stays about the same for the same shape and load, so PLA (3D printed) (50 MPa) gives safety factor 4.96. It is 2.1x as stiff, so deflection scales by 0.49. Other options: PETG (3D printed) (4.66), ABS (3D printed) (3.28).
+  - Stress piles up in the sharp inside corner. A fillet of 1.43 mm (about half the 2.86 mm wall) spreads it out. With that radius the peak is usually about 1.4x the 7.11 MPa beam stress, roughly 9.95 MPa (safety factor 4.82).
+  - Stress stays about the same for the same shape and load, so PLA (3D printed) (50 MPa) gives safety factor 4.99. It is 2.1x as stiff, so deflection scales by 0.49. Other options: PETG (3D printed) (4.69), ABS (3D printed) (3.30).
 
 Images: stress: images/stress.png, zoom: images/zoom.png, safety: images/safety.png, deformed: images/deformed.png, convergence: images/convergence.png
 Report: report.html
