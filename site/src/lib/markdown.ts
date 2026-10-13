@@ -7,7 +7,7 @@
 import MarkdownIt from 'markdown-it';
 import Token from 'markdown-it/lib/token.mjs';
 import { url } from './site';
-import { publicSize } from './images';
+import { picture, publicSize } from './images';
 
 const LABELS: Record<string, string> = {
   sh: 'Terminal', console: 'Terminal', python: 'Python', text: 'Output', toml: 'TOML', json: 'JSON',
@@ -137,9 +137,13 @@ export function render(body: string, where: string): { html: string; headings: H
         const src = img.attrGet('src') ?? '';
         const size = publicSize(src);
         const dims = size ? ` width="${size[0]}" height="${size[1]}"` : '';
+        // phones get the smaller copy of a site image when there is one (name-800.webp and so on)
+        const name = src.match(/^\/img\/([\w-]+)\.webp$/)?.[1];
+        const set = name ? picture(name) : null;
+        const responsive = set && set.srcset.includes(',') ? ` srcset="${set.srcset}" sizes="(min-width: 1000px) 720px, 100vw"` : '';
         const cap = img.attrGet('title');
         const html = new Token('html_block', '', 0);
-        html.content = `<figure><img src="${esc(siteHref(src, where))}"${dims} loading="lazy" decoding="async" alt="${esc(inlineText(img) || img.content)}">`
+        html.content = `<figure><img src="${esc(siteHref(src, where))}"${responsive}${dims} loading="lazy" decoding="async" alt="${esc(inlineText(img) || img.content)}">`
           + (cap ? `<figcaption>${esc(cap)}</figcaption>` : '') + '</figure>\n';
         out.pop();
         out.push(html);
@@ -157,5 +161,29 @@ export function render(body: string, where: string): { html: string; headings: H
     }
     out.push(tok);
   }
-  return { html: md.renderer.render(out, md.options, {}), headings };
+  return { html: md.renderer.render(sections(out), md.options, {}), headings };
+}
+
+/**
+ * On a long page, wrap each h2 section after the second in <section class="cv">, which the
+ * stylesheet gives content-visibility: auto, so sections far below the screen cost nothing
+ * until they get close. Short pages are left as they are.
+ */
+function sections(tokens: Token[]): Token[] {
+  const starts = tokens.map((t, i) => (t.type === 'heading_open' && t.tag === 'h2' ? i : -1)).filter((i) => i >= 0);
+  if (starts.length < 4) return tokens;
+  const html = (content: string) => Object.assign(new Token('html_block', '', 0), { content });
+  const out: Token[] = [];
+  let open = false;
+  tokens.forEach((t, i) => {
+    const k = starts.indexOf(i);
+    if (k >= 2) {
+      if (open) out.push(html('</section>\n'));
+      out.push(html('<section class="cv">\n'));
+      open = true;
+    }
+    out.push(t);
+  });
+  if (open) out.push(html('</section>\n'));
+  return out;
 }

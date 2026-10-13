@@ -74,8 +74,8 @@ if (spot && spot.group.items[0].href !== here && spot.group.label !== title) {
       <footer class="doc-foot">
         {spot && (spot.prev || spot.next) && (
           <nav class="pager" aria-label="Previous and next">
-            {spot.prev && <a class="pager-prev" href={url(spot.prev.href)}><span>Previous</span>{spot.prev.label}</a>}
-            {spot.next && <a class="pager-next" href={url(spot.next.href)}><span>Next</span>{spot.next.label}</a>}
+            {spot.prev && <a class="pager-prev" href={url(spot.prev.href)} data-astro-prefetch="viewport"><span>Previous</span>{spot.prev.label}</a>}
+            {spot.next && <a class="pager-next" href={url(spot.next.href)} data-astro-prefetch="viewport"><span>Next</span>{spot.next.label}</a>}
           </nav>
         )}
         {source && <p class="edit"><a href={`${REPO}/edit/main/${source}`}>Edit this page on GitHub</a></p>}

@@ -1,4 +1,15 @@
 /* Wobbl site. One dark theme: the lab is dark. */
+/* Fonts, served from the site: Archivo (variable width and weight) and IBM Plex Mono, latin only.
+   Both are under the SIL Open Font License; see public/fonts/OFL-*.txt. Archivo is cut to the
+   weights (400 to 800), widths (100 to 125%) and characters the site uses. */
+@font-face {
+  font-family: "Archivo"; font-style: normal; font-weight: 400 800; font-stretch: 100% 125%; font-display: swap;
+  src: url("/fonts/archivo-latin.woff2") format("woff2");
+}
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/ibm-plex-mono-400-latin.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/ibm-plex-mono-500-latin.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/ibm-plex-mono-600-latin.woff2") format("woff2"); }
+
 :root {
   --bg: #0e1011; /* matches the near black of the renders after WebP encoding */
   --bg-2: #141619;
@@ -447,6 +458,10 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .contents button:hover { color: var(--fg); }
 .contents button[aria-current] { color: var(--fg); border-left-color: var(--yellow); }
 .prose [id] { scroll-margin-top: calc(var(--nav-h) + 20px); }
+/* long docs pages: sections well below the screen are laid out only when they come close */
+.prose section.cv { content-visibility: auto; contain-intrinsic-size: auto 640px; }
+/* counting numbers keep their final width, so nothing beside them moves */
+[data-count] { display: inline-block; text-align: right; font-variant-numeric: tabular-nums; }
 .prose h2:focus, .prose h3:focus { outline: none; }
 
 .doc-foot { margin-top: 72px; }

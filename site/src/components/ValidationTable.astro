@@ -31,7 +31,7 @@ const tol = (x: number) => `${Number((x * 100).toPrecision(3))}%`;
 const passed = cases.filter((c) => c.pass).length;
 ---
 <div class="vtable">
-  <p class="vhead"><span class="vhead-n"><span data-count={passed}>{passed}</span> of {cases.length}</span> within tolerance</p>
+  <p class="vhead"><span class="vhead-n"><span data-count={passed} style={`width: ${String(passed).length}ch`}>{passed}</span> of {cases.length}</span> within tolerance</p>
   <p class="vcap">Each bar runs from 0 to the case’s tolerance, so a shorter bar means a closer answer.</p>
   <div class="table-scroll" role="region" aria-label="Validation results" tabindex="0">
     <table class="data vt">
