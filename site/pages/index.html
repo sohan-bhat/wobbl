@@ -1,12 +1,12 @@
 <!--
 path:
 title: Wobbl: simulate anything before you build it
-description: Open source verified simulation for coding agents and people. Strength with CalculiX, heat, and circuits with ngspice, with every answer checked before you see it.
+description: Verified strength, heat and circuit simulation for Claude Code, Codex, Cursor, Gemini CLI and you. Every answer is checked before you see it. Open source, MIT.
 og_title: Wobbl: simulate anything before you build it
 -->
 <!-- head -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="preload" as="image" href="img/cast-mount-stress.webp?v=2" imagesrcset="img/cast-mount-stress-800.webp?v=2 800w, img/cast-mount-stress.webp?v=2 1170w" imagesizes="(min-width: 1000px) 56vw, 100vw">
+<link rel="preload" as="image" href="{{url:img/cast-mount-stress.webp}}?v=2" imagesrcset="{{url:img/cast-mount-stress-800.webp}}?v=2 800w, {{url:img/cast-mount-stress.webp}}?v=2 1170w" imagesizes="(min-width: 1000px) 56vw, 100vw">
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
@@ -22,65 +22,53 @@ og_title: Wobbl: simulate anything before you build it
         <p class="lede">Ask your agent if a part will crack. Wobbl runs a real solver, then checks the answer before you see it.</p>
         <div class="term install" data-copy-block>
           <div class="term-bar">
-            <span>Install</span>
+            <span>Install <span class="term-note">Python 3.10+</span></span>
             <button class="copy" type="button" data-copy="pipx install &quot;git+https://github.com/sohan-bhat/wobbl&quot;&#10;wobbl setup" aria-label="Copy the install commands">Copy</button>
           </div>
 <pre translate="no"><code><span class="ln"><span class="p">$ </span>pipx install "git+https://github.com/sohan-bhat/wobbl"</span><span class="ln"><span class="p">$ </span>wobbl setup</span></code></pre>
         </div>
-        <p class="hero-meta">Python 3.10 or newer on macOS, Linux and Windows. MIT licensed.</p>
-        <a class="hero-link" href="#install">Read the quick start</a>
+        <p class="hero-cta"><a class="btn" href="{{url:get-started/}}">Get started</a></p>
       </div>
       <figure class="hero-fig">
-        <img src="img/cast-mount-stress.webp?v=2" srcset="img/cast-mount-stress-800.webp?v=2 800w, img/cast-mount-stress.webp?v=2 1170w" sizes="(min-width: 1000px) 56vw, 100vw" width="1170" height="949" alt="Stress heatmap of a sand cast aluminum motor mount. The hottest spot, labeled 124 MPa, is where the rib tip meets the upright." fetchpriority="high">
-        <figcaption><span class="mono">wobbl run cast_motor_mount.step</span> A356 motor mount, 2&nbsp;kN belt pull through 4 bolts. Peak 124&nbsp;MPa at the rib tip.</figcaption>
+        <img src="{{url:img/cast-mount-stress.webp}}?v=2" srcset="{{url:img/cast-mount-stress-800.webp}}?v=2 800w, {{url:img/cast-mount-stress.webp}}?v=2 1170w" sizes="(min-width: 1000px) 56vw, 100vw" width="1170" height="949" alt="Stress heatmap of a sand cast aluminum motor mount. The hottest spot, labeled 124 MPa, is where the rib tip meets the upright." fetchpriority="high">
+        <figcaption><span class="mono">wobbl run cast_motor_mount.step</span> 2&nbsp;kN belt pull. Peak 124&nbsp;MPa at the rib tip.</figcaption>
       </figure>
     </div>
   </div>
 </section>
 
-<section id="bakeoff" class="section" aria-labelledby="bakeoff-title">
+<section class="section demo" aria-labelledby="demo-title">
   <div class="wrap">
-    <h2 id="bakeoff-title">On its own, a coding agent answered 1 time in&nbsp;10.</h2>
-    <p class="lead">Plain Claude Code got a CAD file, a strength question and 15 minutes per trial, across 6 parts. In 9 of 10 trials it started writing its own finite element code and ran out of time with nothing to show.</p>
-    <dl class="stats">
-      <div class="stat"><dt>trials where the agent alone answered within 15 minutes</dt><dd>1<small> of 10</small></dd></div>
-      <div class="stat"><dt>answers on the 2 parts that fail, over 6 trials</dt><dd>0</dd></div>
-      <div class="stat"><dt>the furthest Wobbl landed from the converged reference on those 2 parts</dt><dd>0.5<small>%</small></dd></div>
-      <div class="stat"><dt>Wobbl on the cast motor mount, every check included</dt><dd>6.6<small> min</small></dd></div>
-    </dl>
-    <div class="table-scroll" role="region" aria-labelledby="bakeoff-caption" tabindex="0">
-      <table class="data">
-        <caption id="bakeoff-caption">Wobbl on the bake-off parts, against references converged by hand over four to six meshes of up to 400,000 nodes. Times are for the whole study on a 2018 six core laptop.</caption>
-        <thead><tr><th scope="col">Part</th><th scope="col">Reference</th><th scope="col">Wobbl</th><th scope="col">Off by</th><th scope="col">Wobbl’s confidence</th><th scope="col">Time</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">Cast motor mount, 2&nbsp;kN belt pull through 4 bolts</th><td class="num">124.3&nbsp;MPa</td><td class="num">123.7&nbsp;MPa</td><td class="num">0.5%</td><td>medium: the verdict flips if the servo is rigid, and it says so</td><td class="num">6.6&nbsp;min</td></tr>
-          <tr><th scope="row">ABS enclosure shell, 250&nbsp;N near a corner</th><td class="num">93&nbsp;MPa, 1.93&nbsp;mm</td><td class="num">93.0&nbsp;MPa, 1.92&nbsp;mm</td><td class="num">0.02%, 0.6%</td><td>medium: large deflection theory lowers the peak 11%, and it says so</td><td class="num">6.1&nbsp;min</td></tr>
-          <tr><th scope="row">PA12 truss drone arm, 40&nbsp;N thrust and 0.8&nbsp;N m</th><td class="num">11.5&nbsp;MPa, 4.09&nbsp;mm</td><td class="num">11.49&nbsp;MPa, 4.08&nbsp;mm</td><td class="num">0.1%, 0.3%</td><td>high</td><td class="num">7&nbsp;min</td></tr>
-          <tr><th scope="row">PLA bracket, 0.5&nbsp;mm inside corner, wall contact</th><td class="num">about 78&nbsp;MPa</td><td class="num">80.5&nbsp;MPa</td><td class="num">3.2%</td><td>high</td><td class="num">38&nbsp;s</td></tr>
-          <tr><th scope="row">PLA bracket, 6&nbsp;mm fillet, wall contact</th><td class="num">25.3&nbsp;MPa</td><td class="num">26.4&nbsp;MPa</td><td class="num">4.3%</td><td>medium: the bonded screw bore reads 48.9&nbsp;MPa, excluded and named</td><td class="num">24&nbsp;s</td></tr>
-          <tr><th scope="row">6061 bar arm with root fillet and hole</th><td class="num">165.1&nbsp;MPa</td><td class="num">164.2&nbsp;MPa</td><td class="num">0.5%</td><td>high</td><td class="num">52&nbsp;s</td></tr>
-        </tbody>
-      </table>
+    <h2 id="demo-title" class="h-plain">What a run looks like</h2>
+    <div class="tabs" role="tablist" aria-label="Example runs">
+      <button type="button" role="tab" id="tab-strength" aria-controls="panel-strength" aria-selected="true"><span>Strength</span>Shelf bracket</button>
+      <button type="button" role="tab" id="tab-heat" aria-controls="panel-heat" aria-selected="false" tabindex="-1"><span>Heat</span>Heat sink</button>
+      <button type="button" role="tab" id="tab-circuit" aria-controls="panel-circuit" aria-selected="false" tabindex="-1"><span>Circuits</span>Blue LED</button>
     </div>
-    <p class="note">The agent knew the physics. Asked for hand calculations only, it landed within 1 to 5% on beam like parts. What it lacked was a fast, reliable way to turn that knowledge into a checked number on a real 3D part, and it kept hitting the same traps: meshers folding thin curved walls, singular peaks at bonded bolts, load idealizations that flip the verdict. <a href="https://github.com/sohan-bhat/wobbl/blob/main/docs/bakeoff.md">Full bake-off</a></p>
+    <div class="tab-panel" role="tabpanel" id="panel-strength" aria-labelledby="tab-strength">
+{{run:shelf-bracket/output}}
+    </div>
+    <div class="tab-panel" role="tabpanel" id="panel-heat" aria-labelledby="tab-heat" hidden>
+{{run:heat-sink/output}}
+    </div>
+    <div class="tab-panel" role="tabpanel" id="panel-circuit" aria-labelledby="tab-circuit" hidden>
+{{run:circuits/led}}
+    </div>
   </div>
 </section>
 
 <section id="part" class="section part" aria-labelledby="part-title">
-  <div class="wrap">
-    <h2 id="part-title">124&nbsp;MPa at the rib tip. Drag the belt pull until it&nbsp;yields.</h2>
-    <p class="lead">This is the cast mount result Wobbl wrote, exported straight from its result file: 51,774 surface points, each with its stress and displacement. The model is linear elastic, so both scale exactly with the load. Hover or tap the part to read the stress at a point.</p>
-  </div>
   <div class="wrap viewer-grid">
-    <div class="viewer" id="viewer" data-state="poster" data-part="data/cast-motor-mount" data-v="3">
-      <img class="viewer-poster" src="img/cast-mount-stress-800.webp?v=2" srcset="img/cast-mount-stress-800.webp?v=2 800w, img/cast-mount-stress.webp?v=2 1170w" sizes="(min-width: 1000px) 64vw, 100vw" width="1170" height="949" loading="lazy" decoding="async" alt="Static stress heatmap of the cast motor mount, peak 124 MPa at the rib tip.">
+    <div class="viewer" id="viewer" data-state="poster" data-part="{{url:data/cast-motor-mount}}" data-v="3">
+      <img class="viewer-poster" src="{{url:img/cast-mount-stress-800.webp}}?v=2" srcset="{{url:img/cast-mount-stress-800.webp}}?v=2 800w, {{url:img/cast-mount-stress.webp}}?v=2 1170w" sizes="(min-width: 1000px) 64vw, 100vw" width="1170" height="949" loading="lazy" decoding="async" alt="Static stress heatmap of the cast motor mount, peak 124 MPa at the rib tip.">
       <p class="viewer-status" role="status" aria-live="polite">Loading the 3D part…</p>
       <div class="probe" hidden></div>
       <div class="peak-tag" hidden><span class="target" aria-hidden="true"></span><span class="peak-tag-v"></span></div>
       <div class="load-tag" hidden></div>
     </div>
-    <div class="panel" aria-labelledby="panel-title">
-      <h3 id="panel-title" class="visually-hidden">Load and result</h3>
+    <div class="panel">
+      <h2 id="part-title" class="panel-title">The cast motor mount, in 3D</h2>
+      <p class="panel-sub">Wobbl's own result file. Drag to turn it; hover or tap to read the stress.</p>
       <div class="verdict" data-verdict="marginal">
         <p class="verdict-word" id="verdict-word" aria-live="polite">Marginal</p>
         <p class="verdict-why" id="verdict-why">Survives the load, but the safety factor is below the target of 2.</p>
@@ -108,250 +96,41 @@ og_title: Wobbl: simulate anything before you build it
         <label class="check"><input type="checkbox" id="hatch" name="hatch" autocomplete="off" checked> Hatch excluded zones</label>
         <button type="button" class="btn-ghost" id="reset-view">Reset view</button>
       </div>
-      <p class="panel-note">White is past yield. Hatched zones sit next to the fixed base or where the load enters; Wobbl reports the stress away from them. Treat the servo as a rigid body instead of a bolt group and the peak moves next to a lower bolt hole, where it converges to 55.0&nbsp;MPa, safety factor 3.00, and the part passes. Wobbl solves both, refines each around its own peak, and marks this answer medium confidence for that reason.</p>
+      <p class="panel-note">White is past yield. Confidence is medium: with a rigid servo the peak moves and the part passes at 55&nbsp;MPa.</p>
     </div>
   </div>
 </section>
 
-<section id="ask" class="section" aria-labelledby="ask-title">
+<section class="section bakeoff" aria-labelledby="bake-title">
   <div class="wrap">
-    <h2 id="ask-title">Ask about a printed bracket. Get 52.3&nbsp;MPa and a&nbsp;fix.</h2>
-    <p class="lead">Through the MCP server, your agent inspects the part, picks supports that match the real build, solves, reads the checks before the number and asks for a fix. This is the shelf bracket example, driven through the tools.</p>
-    <div class="ask-grid">
-      <div class="term transcript">
-        <div class="term-bar"><span>Claude Code with Wobbl</span></div>
-        <ol class="log">
-          <li class="you"><span class="who">you</span><p>Will this printed PLA shelf bracket hold its share of an 8 kg shelf?</p></li>
-          <li class="call"><span class="who">tool</span><p>inspect_geometry("bracket.py")</p></li>
-          <li class="call"><span class="who">tool</span><p>solve_structural(path="bracket.py", material="pla", fixtures=["bolt holes d=4.5", "wall x=min"], loads=["40&nbsp;N down @ top and within 12 of 65,12.5,6"])</p></li>
-          <li class="out"><span class="who"></span><p>verdict fails, 52.3&nbsp;MPa on the 0.5&nbsp;mm inside fillet, safety factor 0.96, confidence high</p></li>
-          <li class="call"><span class="who">tool</span><p>suggest_fix(result_dir, apply=true)</p></li>
-          <li class="out"><span class="who"></span><p>3&nbsp;mm fillet: 24.1&nbsp;MPa (2.08); legs at 10&nbsp;mm: 21&nbsp;MPa (2.38); gusset: 9.82&nbsp;MPa (5.09)</p></li>
-          <li class="reply"><span class="who">agent</span><p>It cracks at the inside corner: 52.3&nbsp;MPa against PLA’s 50&nbsp;MPa. A 3&nbsp;mm fillet halves the stress; a gusset brings it to 9.82&nbsp;MPa, safety factor 5.1. The gusset toe is a sharp corner Wobbl excluded as a singularity, so round it too.</p></li>
-        </ol>
-      </div>
-      <figure class="shot">
-        <img src="img/report-bracket.webp?v=2" width="1200" height="1330" loading="lazy" decoding="async" alt="The HTML report Wobbl wrote for the bracket: the word FAILS, peak 52.3 MPa, safety factor 0.96, confidence high, and the stress heatmap.">
-        <figcaption>Every run writes a self contained <span class="mono">report.html</span>, a plain <span class="mono">summary.txt</span> an agent can read, <span class="mono">outcome.json</span>, heatmaps and the full field as <span class="mono">result.vtu</span>.</figcaption>
+    <h2 id="bake-title" class="h-plain">A coding agent alone, against Wobbl</h2>
+    <p class="bake-sub">Six parts, a CAD file and a strength question each, 15 minutes per trial.</p>
+    <div class="versus">
+      <figure class="vs">
+        <figcaption>Agent on its own</figcaption>
+        <ol class="trials" aria-label="10 trials, 1 answered"><li class="hit"></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li></ol>
+        <p class="vs-big">1 <span>of 10 trials answered</span></p>
+        <p class="vs-note">No answer on the two parts that fail.</p>
+      </figure>
+      <figure class="vs vs-wobbl">
+        <figcaption>With Wobbl</figcaption>
+        <ol class="trials" aria-label="6 parts, 6 answered"><li class="hit"></li><li class="hit"></li><li class="hit"></li><li class="hit"></li><li class="hit"></li><li class="hit"></li></ol>
+        <p class="vs-big">6 <span>of 6 parts answered</span></p>
+        <p class="vs-note">0.02 to 4.3% from converged references, 24&nbsp;s to 7&nbsp;min each.</p>
       </figure>
     </div>
+    <p class="bake-more"><a href="{{url:validation/#bake-off}}">The full bake off</a></p>
   </div>
 </section>
 
-<section id="fix" class="section" aria-labelledby="fix-title">
+<section class="section deeper" aria-labelledby="deeper-title">
   <div class="wrap">
-    <h2 id="fix-title">The sharp corner cracks at 52.3&nbsp;MPa. A&nbsp;gusset takes it to&nbsp;9.82.</h2>
-    <p class="lead"><code translate="no">wobbl fix --apply</code> edits the part, runs the whole study again for each version and lines up the numbers. Fillets and gussets go into any STEP file through OpenCASCADE, and the edited file is saved for your CAD tool.</p>
-    <ol class="fixes">
-      <li class="fix" data-verdict="fails">
-        <img src="img/bracket-as-drawn-560.webp?v=2" srcset="img/bracket-as-drawn-560.webp?v=2 560w, img/bracket-as-drawn.webp?v=2 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="777" loading="lazy" decoding="async" alt="Bracket as drawn: a thin red line of stress along the 0.5 mm inside corner, peak 52.3 MPa.">
-        <h3>As drawn, 0.5&nbsp;mm corner</h3>
-        <p class="fix-n"><span>52.3&nbsp;MPa</span><span>SF 0.96</span></p>
-        <p class="fix-v">Fails</p>
-      </li>
-      <li class="fix" data-verdict="marginal">
-        <img src="img/bracket-fillet-560.webp?v=2" srcset="img/bracket-fillet-560.webp?v=2 560w, img/bracket-fillet.webp?v=2 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="777" loading="lazy" decoding="async" alt="Bracket with a 3 mm fillet: the stress spreads over the rounded corner, peak 24.1 MPa.">
-        <h3>3&nbsp;mm fillet</h3>
-        <p class="fix-n"><span>24.1&nbsp;MPa</span><span>SF 2.08</span></p>
-        <p class="fix-v">Marginal</p>
-      </li>
-      <li class="fix" data-verdict="marginal">
-        <img src="img/bracket-thicken-560.webp?v=2" srcset="img/bracket-thicken-560.webp?v=2 560w, img/bracket-thicken.webp?v=2 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="781" loading="lazy" decoding="async" alt="Bracket with legs thickened to 10 mm: the corner still concentrates stress, peak 21 MPa.">
-        <h3>Legs at 10&nbsp;mm</h3>
-        <p class="fix-n"><span>21&nbsp;MPa</span><span>SF 2.38</span></p>
-        <p class="fix-v">Marginal</p>
-      </li>
-      <li class="fix" data-verdict="holds">
-        <img src="img/bracket-gusset-560.webp?v=2" srcset="img/bracket-gusset-560.webp?v=2 560w, img/bracket-gusset.webp?v=2 900w" sizes="(min-width: 1000px) 25vw, 50vw" width="900" height="781" loading="lazy" decoding="async" alt="Bracket with a triangular gusset across the corner: peak 9.82 MPa near the gusset toe.">
-        <h3>Gusset across the corner</h3>
-        <p class="fix-n"><span>9.82&nbsp;MPa</span><span>SF 5.09</span></p>
-        <p class="fix-v">Holds</p>
-      </li>
-    </ol>
-    <p class="note">PLA is judged at 50&nbsp;MPa with a target safety factor of 2.5 for printed parts. Thicker legs barely help, because the sharp corner still multiplies the stress. Each heatmap is scaled to its own peak.</p>
-  </div>
-</section>
-
-<section id="checks" class="section" aria-labelledby="checks-title">
-  <div class="wrap">
-    <h2 id="checks-title">8 checks run on every strength&nbsp;answer.</h2>
-    <p class="lead">They set the confidence, high, medium or low, and the reasons are always printed next to it. A result that failed a check is never reported as high confidence.</p>
-    <div class="checks-grid">
-      <figure class="checks-fig">
-        <img src="img/motor-mount-noribs-800.webp?v=2" srcset="img/motor-mount-noribs-800.webp?v=2 800w, img/motor-mount-noribs.webp?v=2 1200w" sizes="(min-width: 1000px) 44vw, 100vw" width="1200" height="939" loading="lazy" decoding="async" alt="Printed motor mount without ribs. A band of high stress runs along the base of the upright, peak 41.3 MPa, with spots labeled artifact where the rigid motor face grabs the part.">
-        <figcaption>A printed motor mount with its ribs removed. The spots marked artifact sit where an idealized rigid motor face grabs the part, so Wobbl reports 41.3&nbsp;MPa from the fillet instead and lists them. That fillet value still moves about 10% between meshes, and the result says so with medium confidence.</figcaption>
-      </figure>
-      <ul class="checks">
-        <li><h3>Mesh convergence</h3><p>At least three meshes, refined around the peaks that matter, until the stress moves less than 3%.</p><code translate="no">43 -> 50.9 -> 53 -> 52.3 MPa over 4 meshes</code></li>
-        <li><h3>Force and moment balance</h3><p>Reactions at the supports must cancel the applied loads to 0.5%.</p><code translate="no">reactions balance the loads to 0.00014%</code></li>
-        <li><h3>Hand calculation</h3><p>Beam theory through the critical section gives a nominal stress, and the ratio must be physical.</p><code translate="no">15.2 MPa nominal, a stress concentration of about 3.4</code></li>
-        <li><h3>Singularities</h3><p>Sharp inside corners come from exact CAD normals. Peaks there are excluded and named with their trend.</p><code translate="no">17.5, 24, 27.7 MPa and still rising: excluded</code></li>
-        <li><h3>Load introduction</h3><p>Off part loads are solved both rigid and distributed, each converged at its own peak, and the spread is reported.</p><code translate="no">rigid servo: 55 MPa over 3 meshes, safety factor 3.00</code></li>
-        <li><h3>Bolt bearing</h3><p>At bolted holes, reaction force over projected area replaces the idealized peak.</p><code translate="no">2.7 N sideways, bearing stress 0.1 MPa</code></li>
-        <li><h3>Units and sanity</h3><p>Part size, peak strain and deflection have to be plausible for the material.</p><code translate="no">peak strain 0.015, deflection 2.8% of size</code></li>
-        <li><h3>Large deflection</h3><p>When a part bends a good fraction of its wall, a nonlinear re-solve confirms the linear answer.</p><code translate="no">drone arm: the peak moves +2.3%, linear theory holds</code></li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<section id="heat" class="section" aria-labelledby="heat-title">
-  <div class="wrap">
-    <h2 id="heat-title">Heat and circuits come with their own&nbsp;checks.</h2>
-    <p class="lead">Heat answers balance energy and compare with a lumped hand calculation. Circuit answers compare with the textbook and run again at half the time step.</p>
-    <div class="bento">
-      <article class="cell cell-wide">
-        <img src="img/heat-sink-temperature-800.webp?v=2" srcset="img/heat-sink-temperature-800.webp?v=2 800w, img/heat-sink-temperature.webp?v=2 1200w" sizes="(min-width: 1000px) 40vw, 100vw" width="1200" height="835" loading="lazy" decoding="async" alt="Temperature map of an aluminum heat sink seen from below: 70.3 C under the chip, fading to 67.1 C at the fin tips.">
-        <div class="cell-text">
-          <p class="big">70.3<small> C</small></p>
-          <h3>A 15&nbsp;W chip without a fan</h3>
-          <p>Nine fin 6063 heat sink in a 40&nbsp;C cabinet. The hottest point stays under the 85&nbsp;C limit, and the 15&nbsp;W going in leaves through convection and radiation.</p>
-        </div>
-      </article>
-      <article class="cell cell-flag">
-        <p class="big">36.9<small> mA</small></p>
-        <h3>through a 30&nbsp;mA blue LED</h3>
-        <p>On 5&nbsp;V with a 47&nbsp;ohm resistor, it fries. Wobbl suggests 91&nbsp;ohm for about 20&nbsp;mA.</p>
-      </article>
-      <article class="cell">
-        <img src="img/battery-history-800.webp?v=2" srcset="img/battery-history-800.webp?v=2 800w, img/battery-history.webp?v=2 1200w" sizes="(min-width: 1000px) 30vw, 100vw" width="1200" height="675" loading="lazy" decoding="async" alt="Battery pack temperature over a one hour discharge, crossing the 60 C limit just after 20 minutes.">
-        <p class="big">21<small> min</small></p>
-        <h3>until a sealed battery pack passes 60&nbsp;C</h3>
-        <p>A 2S2P pack making 6&nbsp;W in a 35&nbsp;C box. The lumped model gives a 72.2&nbsp;C mean at one hour; the FEA gives 72.8&nbsp;C.</p>
-      </article>
-      <article class="cell">
-        <img src="img/buck-waveform-800.webp?v=2" srcset="img/buck-waveform-800.webp?v=2 800w, img/buck-waveform.webp?v=2 1200w" sizes="(min-width: 1000px) 30vw, 100vw" width="1200" height="675" loading="lazy" decoding="async" alt="Output voltage of a buck converter rippling between about 5.068 and 5.077 volts.">
-        <p class="big">8.56<small> mV</small></p>
-        <h3>of ripple on a 12&nbsp;V to 5&nbsp;V buck</h3>
-        <p>At 2&nbsp;A and 500&nbsp;kHz with ngspice. The ideal formula says 7.95&nbsp;mV, and the switch and diode drops explain the gap.</p>
-      </article>
-    </div>
-  </div>
-</section>
-
-<section id="agents" class="section" aria-labelledby="agents-title">
-  <div class="wrap">
-    <h2 id="agents-title">One command connects it to 4 coding&nbsp;agents.</h2>
-    <p class="lead"><code translate="no">wobbl setup</code> registers an MCP server with 13 tools and installs a skill that teaches the workflow and what never to skip. Every config file it touches is backed up first, and <code translate="no">wobbl uninstall</code> removes exactly what it added.</p>
-    <div class="agents">
-      <div class="agent"><h3>Claude Code</h3><p><span class="k">MCP</span><code translate="no">claude mcp add --scope user wobbl</code></p><p><span class="k">Skill</span><code translate="no">~/.claude/skills/wobbl/SKILL.md</code></p></div>
-      <div class="agent"><h3>Codex</h3><p><span class="k">MCP</span><code translate="no">[mcp_servers.wobbl] in ~/.codex/config.toml</code></p><p><span class="k">Skill</span><code translate="no">~/.codex/skills/wobbl/SKILL.md</code></p></div>
-      <div class="agent"><h3>Cursor</h3><p><span class="k">MCP</span><code translate="no">mcpServers.wobbl in ~/.cursor/mcp.json</code></p><p><span class="k">Skill</span><code translate="no">~/.cursor/skills/wobbl/SKILL.md</code></p></div>
-      <div class="agent"><h3>Gemini CLI</h3><p><span class="k">MCP</span><code translate="no">~/.gemini/extensions/wobbl/</code></p><p><span class="k">Context</span><code translate="no">WOBBL.md in the same extension</code></p></div>
-    </div>
-    <h3 class="sub">The tools your agent gets</h3>
-    <ul class="tools">
-      <li><code translate="no">inspect_geometry</code><span>holes, fillets, sharp corners, thickness, face ids</span></li>
-      <li><code translate="no">mesh</code><span>a first second order mesh and its size</span></li>
-      <li><code translate="no">new_study</code><span>start a study step by step</span></li>
-      <li><code translate="no">set_material</code><span>22 sourced materials or custom values</span></li>
-      <li><code translate="no">apply_load</code><span>forces, pressures, bolts, gravity, remote loads</span></li>
-      <li><code translate="no">add_fixture</code><span>fixed, bolted, roller or wall supports</span></li>
-      <li><code translate="no">solve_structural</code><span>the verified strength study</span></li>
-      <li><code translate="no">verify</code><span>checks, confidence and excluded peaks</span></li>
-      <li><code translate="no">render</code><span>heatmap and report paths</span></li>
-      <li><code translate="no">suggest_fix</code><span>fixes with numbers, applied and re-run on request</span></li>
-      <li><code translate="no">solve_thermal</code><span>steady or transient heat</span></li>
-      <li><code translate="no">solve_circuit</code><span>LED, RC, buck, MOSFET or any netlist</span></li>
-      <li><code translate="no">list_materials</code><span>the materials table</span></li>
+    <h2 id="deeper-title" class="h-label">Go deeper</h2>
+    <ul class="deeper-grid">
+      <li><a href="{{url:guides/strength/}}"><span class="deeper-t">Check a part's strength</span><span>Loads, supports, materials and face selectors.</span></a></li>
+      <li><a href="{{url:guides/fix/}}"><span class="deeper-t">Fix a failing part</span><span>Fillets and gussets go into the part, then it is solved again.</span></a></li>
+      <li><a href="{{url:guides/agents/}}"><span class="deeper-t">Use it from your agent</span><span>Prompts, a full session and the 13 tools.</span></a></li>
+      <li><a href="{{url:guides/checks/}}"><span class="deeper-t">How it checks an answer</span><span>Eight checks set the confidence of every strength result.</span></a></li>
     </ul>
-  </div>
-</section>
-
-<section id="validation" class="section" aria-labelledby="validation-title">
-  <div class="wrap">
-    <h2 id="validation-title">18 cases with known answers. Every exact one lands within&nbsp;2%.</h2>
-    <p class="lead">Textbook solutions, NAFEMS LE1 and LE10, and five real parts against converged reference models, all through the same pipeline you get. Run them yourself with <code translate="no">wobbl validate</code>, about 30 minutes.</p>
-    <div class="table-scroll" role="region" aria-labelledby="validation-caption" tabindex="0">
-      <table class="data validation">
-        <caption id="validation-caption">Validation results from docs/validation.md. Every case passed its tolerance.</caption>
-        <thead><tr><th scope="col">Case</th><th scope="col">Expected</th><th scope="col">Wobbl</th><th scope="col">Error</th><th scope="col">Confidence</th></tr></thead>
-        <tbody>
-          <tr class="group"><th colspan="5" scope="rowgroup">Textbook and benchmark strength</th></tr>
-          <tr><th scope="row">Cantilever tip deflection, Timoshenko</th><td class="num">0.8016&nbsp;mm</td><td class="num">0.7956&nbsp;mm</td><td class="num">0.74%</td><td>high</td></tr>
-          <tr><th scope="row">Cantilever stress at mid span, M c / I</th><td class="num">30&nbsp;MPa</td><td class="num">29.94&nbsp;MPa</td><td class="num">0.21%</td><td>high</td></tr>
-          <tr><th scope="row">Plate with a hole, Kirsch with Peterson</th><td class="num">30.35&nbsp;MPa</td><td class="num">29.89&nbsp;MPa</td><td class="num">1.54%</td><td>high</td></tr>
-          <tr><th scope="row">Thick walled pressure vessel, Lame</th><td class="num">231.3&nbsp;MPa</td><td class="num">232.3&nbsp;MPa</td><td class="num">0.43%</td><td>high</td></tr>
-          <tr><th scope="row">NAFEMS LE1 elliptic membrane</th><td class="num">92.7&nbsp;MPa</td><td class="num">92.92&nbsp;MPa</td><td class="num">0.23%</td><td>high</td></tr>
-          <tr><th scope="row">NAFEMS LE10 thick plate</th><td class="num">-5.38&nbsp;MPa</td><td class="num">-5.412&nbsp;MPa</td><td class="num">0.59%</td><td>medium</td></tr>
-          <tr><th scope="row">Round shaft in torsion</th><td class="num">55.13&nbsp;MPa</td><td class="num">55.6&nbsp;MPa</td><td class="num">0.85%</td><td>high</td></tr>
-          <tr><th scope="row">Cantilever under its own weight</th><td class="num">1.443&nbsp;mm</td><td class="num">1.441&nbsp;mm</td><td class="num">0.16%</td><td>high</td></tr>
-          <tr class="group"><th colspan="5" scope="rowgroup">Real parts against converged reference models</th></tr>
-          <tr><th scope="row">Cast motor mount, belt pull through 4 bolts</th><td class="num">124.3&nbsp;MPa</td><td class="num">123.7&nbsp;MPa</td><td class="num">0.49%</td><td>medium</td></tr>
-          <tr><th scope="row">ABS enclosure shell pressed near a corner</th><td class="num">93&nbsp;MPa</td><td class="num">92.98&nbsp;MPa</td><td class="num">0.02%</td><td>medium</td></tr>
-          <tr><th scope="row">PA12 truss drone arm at full thrust</th><td class="num">11.5&nbsp;MPa</td><td class="num">11.49&nbsp;MPa</td><td class="num">0.11%</td><td>high</td></tr>
-          <tr><th scope="row">PLA shelf bracket, 0.5&nbsp;mm inside corner</th><td class="num">78&nbsp;MPa</td><td class="num">80.48&nbsp;MPa</td><td class="num">3.18%</td><td>high</td></tr>
-          <tr><th scope="row">PLA shelf bracket, 6&nbsp;mm fillet</th><td class="num">25.3&nbsp;MPa</td><td class="num">26.38&nbsp;MPa</td><td class="num">4.26%</td><td>medium</td></tr>
-          <tr class="group"><th colspan="5" scope="rowgroup">Heat</th></tr>
-          <tr><th scope="row">Slab conduction into convection</th><td class="num">97.67&nbsp;C</td><td class="num">97.67&nbsp;C</td><td class="num">0.00%</td><td>high</td></tr>
-          <tr><th scope="row">Aluminum cube cooling in air, lumped</th><td class="num">58.01&nbsp;C</td><td class="num">58.27&nbsp;C</td><td class="num">0.44%</td><td>high</td></tr>
-          <tr class="group"><th colspan="5" scope="rowgroup">Circuits</th></tr>
-          <tr><th scope="row">Red LED on 5&nbsp;V through 150&nbsp;ohm</th><td class="num">20&nbsp;mA</td><td class="num">20&nbsp;mA</td><td class="num">0.00%</td><td>high</td></tr>
-          <tr><th scope="row">RC charging at one time constant</th><td class="num">3.161&nbsp;V</td><td class="num">3.161&nbsp;V</td><td class="num">0.00%</td><td>high</td></tr>
-          <tr><th scope="row">Buck converter output ripple</th><td class="num">7.949&nbsp;mV</td><td class="num">8.561&nbsp;mV</td><td class="num">7.70%</td><td>high</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="note">Medium confidence is Wobbl naming what the number leans on, not a miss. The buck converter’s reference is the ideal waveform, which ignores the switch and diode drops ngspice models, so it gets a wider tolerance. <a href="https://github.com/sohan-bhat/wobbl/blob/main/docs/validation.md">All 18 cases and their setups</a></p>
-  </div>
-</section>
-
-<section id="limits" class="section" aria-labelledby="limits-title">
-  <div class="wrap">
-    <h2 id="limits-title">Where Wobbl stops&nbsp;today.</h2>
-    <ul class="limits">
-      <li><h3>Linear elastic only</h3><p>It tells you whether yield is reached, not what happens after. Large deflection is checked with a nonlinear re-solve.</p></li>
-      <li><h3>Static loads</h3><p>Fatigue, impact and vibration are not modeled yet.</p></li>
-      <li><h3>Rigid wall contact only</h3><p>A part can push on a wall and lift off it. Bolted joints are clamped holes, without preload.</p></li>
-      <li><h3>One material per study</h3><p>Assemblies of touching bodies are bonded together.</p></li>
-      <li><h3>Thin walls are slow</h3><p>2 to 3&nbsp;mm shells on 100&nbsp;mm parts need large tetrahedral meshes and take several minutes. Shell elements are next.</p></li>
-      <li><h3>Printed parts are idealized</h3><p>Isotropic at 100% infill, with a layer strength knockdown when you give the print direction.</p></li>
-    </ul>
-    <p class="note">Next up: shell elements, fatigue estimates and bolt preload in 0.2, CFD with OpenFOAM in 0.3, motion with MuJoCo in 0.4.</p>
-  </div>
-</section>
-
-<section id="install" class="section install-section" aria-labelledby="install-title">
-  <div class="wrap">
-    <h2 id="install-title">4 commands from nothing to a&nbsp;verdict.</h2>
-    <ol class="steps">
-      <li>
-        <h3>Install the CLI</h3>
-        <p>Python 3.10 or newer. It installs from GitHub until it is on PyPI.</p>
-        <div class="term" data-copy-block><div class="term-bar"><span>shell</span><button class="copy" type="button" data-copy="pipx install &quot;git+https://github.com/sohan-bhat/wobbl&quot;" aria-label="Copy the pipx command">Copy</button></div>
-<pre translate="no"><code><span class="ln"><span class="p">$ </span>pipx install "git+https://github.com/sohan-bhat/wobbl"</span><span class="ln"><span class="c"># or: uv tool install "git+https://github.com/sohan-bhat/wobbl"</span></span></code></pre></div>
-      </li>
-      <li>
-        <h3>Install the solvers and connect your agents</h3>
-        <p>CalculiX and ngspice from conda-forge into <code translate="no">~/.wobbl</code>, about 340&nbsp;MB, no admin rights. Then the MCP server and skill for every agent it finds.</p>
-        <div class="term" data-copy-block><div class="term-bar"><span>shell</span><button class="copy" type="button" data-copy="wobbl setup" aria-label="Copy wobbl setup">Copy</button></div>
-<pre translate="no"><code><span class="ln"><span class="p">$ </span>wobbl setup</span></code></pre></div>
-      </li>
-      <li>
-        <h3>Check every piece</h3>
-        <p>Solvers, rendering and each agent’s registration.</p>
-        <div class="term" data-copy-block><div class="term-bar"><span>shell</span><button class="copy" type="button" data-copy="wobbl doctor" aria-label="Copy wobbl doctor">Copy</button></div>
-<pre translate="no"><code><span class="ln"><span class="p">$ </span>wobbl doctor</span></code></pre></div>
-      </li>
-      <li>
-        <h3>Ask about your part</h3>
-        <p>Inspect first to see the holes, fillets and face ids, then ask in plain words or with explicit loads and supports.</p>
-        <div class="term" data-copy-block><div class="term-bar"><span>shell</span><button class="copy" type="button" data-copy="wobbl inspect part.step&#10;wobbl part.step &quot;will this 6061 bracket yield under 50 lbf at the tip?&quot;" aria-label="Copy the first run commands">Copy</button></div>
-<pre translate="no"><code><span class="ln"><span class="p">$ </span>wobbl inspect part.step</span><span class="ln"><span class="p">$ </span>wobbl part.step "will this 6061 bracket yield under 50 lbf at the tip?"</span></code></pre></div>
-      </li>
-    </ol>
-    <div class="table-scroll" role="region" aria-labelledby="platform-caption" tabindex="0">
-      <table class="data platforms">
-        <caption id="platform-caption">What <code translate="no">wobbl setup</code> installs on each platform</caption>
-        <thead><tr><th scope="col">Platform</th><th scope="col">CalculiX</th><th scope="col">ngspice</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">macOS Apple Silicon</th><td>native</td><td>Intel build under Rosetta 2</td></tr>
-          <tr><th scope="row">macOS Intel</th><td>native</td><td>native</td></tr>
-          <tr><th scope="row">Linux x86_64</th><td>native</td><td>native</td></tr>
-          <tr><th scope="row">Linux arm64</th><td>native</td><td>from your package manager; Wobbl finds it</td></tr>
-          <tr><th scope="row">Windows x64</th><td>native</td><td>native</td></tr>
-        </tbody>
-      </table>
-    </div>
   </div>
 </section>

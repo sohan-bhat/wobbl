@@ -90,8 +90,14 @@ def build(out: Path) -> list[str]:
         routes.append(p.path)
     write(out, "guides/", docs.guides_index())
     routes.append("guides/")
+    runs = {r.rel: (ex, r) for ex in found for r in ex.runs}
+
+    def run(rel: str) -> str:  # {{run:shelf-bracket/output}} on a hand written page
+        ex, r = runs[rel]
+        return examples.run_card(r, compact=True, link=(url(f"examples/{ex.name}/"), f"{ex.title} example"))
+
     for src in sorted(PAGES_SRC.glob("*.html")):
-        path, html = hand_page(src, {})
+        path, html = hand_page(src, {"run": run})
         write(out, path, html)
         routes.append(path)
     sitemap(out, routes)
