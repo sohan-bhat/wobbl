@@ -1,0 +1,74 @@
+{
+  "cantilever-tip": {
+    "group": "Textbook formulas",
+    "plain": "A steel bar fixed at one end with a weight at the tip, and how far the tip drops"
+  },
+  "cantilever-stress": {
+    "group": "Textbook formulas",
+    "plain": "The same steel bar, and the bending stress halfway along it"
+  },
+  "plate-hole": {
+    "group": "Textbook formulas",
+    "plain": "A flat plate with a hole in the middle, pulled in tension"
+  },
+  "lame": {
+    "group": "Textbook formulas",
+    "plain": "A thick walled tube holding very high pressure inside"
+  },
+  "nafems-le1": {
+    "group": "Industry benchmarks",
+    "plain": "An oval ring pulled outward around its outer edge, a standard test for stress solvers"
+  },
+  "nafems-le10": {
+    "group": "Industry benchmarks",
+    "plain": "A thick oval plate pressed on its top face, a standard test for 3D stress"
+  },
+  "torsion": {
+    "group": "Textbook formulas",
+    "plain": "A round steel shaft held at one end and twisted at the other"
+  },
+  "self-weight": {
+    "group": "Textbook formulas",
+    "plain": "A one meter steel bar, fixed at one end, sagging under its own weight"
+  },
+  "cast-motor-mount": {
+    "group": "Real parts from the bake off",
+    "plain": "A cast aluminum motor mount pulled by a conveyor belt through four bolts"
+  },
+  "enclosure-shell": {
+    "group": "Real parts from the bake off",
+    "plain": "The molded plastic shell of a device, pressed with 250 N near one corner"
+  },
+  "drone-arm-truss": {
+    "group": "Real parts from the bake off",
+    "plain": "A printed drone arm with truss windows, at full motor thrust and torque"
+  },
+  "bracket-sharp": {
+    "group": "Real parts from the bake off",
+    "plain": "A printed shelf bracket with a sharp inside corner, resting against a wall"
+  },
+  "bracket-fillet": {
+    "group": "Real parts from the bake off",
+    "plain": "The same shelf bracket with its inside corner rounded to 6 mm"
+  },
+  "slab": {
+    "group": "Heat",
+    "plain": "An aluminum bar held at 100 C at one end and cooled by air at the other"
+  },
+  "lumped": {
+    "group": "Heat",
+    "plain": "A small aluminum cube cooling down in air for ten minutes"
+  },
+  "led": {
+    "group": "Circuits",
+    "plain": "A red LED on 5 V through a 150 ohm resistor"
+  },
+  "rc": {
+    "group": "Circuits",
+    "plain": "A capacitor charging through a resistor"
+  },
+  "buck": {
+    "group": "Circuits",
+    "plain": "The output ripple of a 12 V to 5 V buck converter"
+  }
+}
