@@ -205,45 +205,60 @@ def result_visual(run: Run, sizes: str, lazy: bool = True) -> str:
     return f'<div class="run-metric" data-verdict="{COLOR.get(run.verdict, "marginal")}"><p>{escape(v)}</p><p>{escape(k)}</p></div>'
 
 
-def run_card(run: Run, *, compact: bool = False, link: tuple[str, str] | None = None) -> str:
-    """The question, the command, the checks and the result of one run, side by side."""
-    more = ""
-    if not compact:
-        more = (f'<details class="run-summary"><summary>summary.txt</summary>{term(run.summary, "text", "summary.txt")}'
-                f"</details>")
-        if run.report:
-            more += f'<p class="run-files"><a href="{url(run.report)}">Open the full report</a></p>'
-    if link:
-        more += f'<p class="run-files"><a href="{link[0]}">{escape(link[1])}</a></p>'
-    fixed = ""
-    if compact and run.fixes:
-        rows = "".join(f'<li><span class="fx-name">{escape(fix_label(f))}</span><span class="fx-n">'
-                       f'{f["after"]["governing_MPa"]:.3g}\u00a0MPa</span><span class="vword" data-verdict="'
-                       f'{COLOR.get(f["after"]["verdict"], "marginal")}">{escape(f["after"]["verdict"].upper())}</span></li>'
-                       for f in run.fixes)
-        fixed = f'<div class="run-step run-fixed"><p class="run-label">After wobbl fix --apply</p><ol>{rows}</ol></div>'
+def run_card(run: Run) -> str:
+    """The question, the command and the checks of one run beside its result."""
+    more = (f'<details class="run-summary"><summary>summary.txt</summary>{term(run.summary, "text", "summary.txt")}'
+            f"</details>")
+    if run.report:
+        more += f'<p class="run-files"><a href="{url(run.report)}">Open the full report</a></p>'
     sugg = [f["title"] for f in run.outcome.get("fixes", [])][:3] if not run.fixes else []
     if sugg:
         items = "".join(f"<li>{escape(t)}</li>" for t in sugg)
         label = "Suggested fix" if len(sugg) == 1 else "Suggested fixes"
         more = f'<div class="run-sugg"><p class="run-label">{label}</p><ul>{items}</ul></div>' + more
-    extra = ""
-    if not compact:
-        extra = "".join(f'<figure class="run-extra">{picture(n, a, sizes="(min-width: 1000px) 40vw, 100vw")}</figure>'
-                        for n, a in run.images()[1:])
+    checks_step = (f'<div class="run-step"><p class="run-label">Checks</p>{checks(run)}</div>'
+                   if run.outcome.get("checks") else "")
     return f"""<div class="run">
   <div class="run-steps">
     <div class="run-step"><p class="run-label">You ask</p><p class="run-ask">{escape(run.question)}</p></div>
     <div class="run-step"><p class="run-label">Wobbl runs</p>{term(run.command, "sh")}</div>
-    {f'<div class="run-step"><p class="run-label">Checks</p>{checks(run)}</div>' if run.outcome.get("checks") else ""}
-    {fixed}
+    {checks_step}
   </div>
   <div class="run-result">
     {result_visual(run, "(min-width: 1000px) 46vw, 100vw")}
-    {verdict_html(run, headline=not compact)}
+    {verdict_html(run)}
     {readout(run)}
-    {extra}{more}
+    {more}
   </div>
+</div>"""
+
+
+def answer_card(run: Run, answer: str, example: tuple[str, str]) -> str:
+    """The landing page's short form of a run: the question, the result image and one answer line.
+
+    The answer is written by hand, so every number in it must appear in the run's
+    own outputs; the build stops otherwise, and the page cannot drift from them.
+    """
+    texts = run.summary + json.dumps(run.outcome)
+    for f in run.fixes:  # the fixed versions' own summaries
+        fixed = EXAMPLES / run.rel / f["after"]["report"].split("/")[0] / "summary.txt"
+        texts += fixed.read_text(encoding="utf-8") if fixed.exists() else ""
+    for n in re.findall(r"\d+(?:\.\d+)?", answer):
+        if not re.search(rf"(?<![\d.]){re.escape(n)}(?![\d])", texts):
+            raise SystemExit(f"landing answer for {run.rel} says {n}, which is not in its outputs: {answer!r}")
+    passed = sum(c["status"] == "pass" for c in run.outcome.get("checks", []))
+    warned = sum(c["status"] == "warn" for c in run.outcome.get("checks", []))
+    tally = f"{passed} checks passed" + (f", {warned} with a warning" if warned else "")
+    color = COLOR.get(run.verdict, "marginal")
+    return f"""<div class="answer">
+  <div class="answer-text">
+    <p class="answer-ask">“{escape(run.question)}”</p>
+    <p class="answer-line" data-verdict="{color}">{escape(answer)}</p>
+    <p class="answer-checks"><a href="{url('guides/checks/')}">{tally}</a></p>
+  </div>
+  <a class="answer-img" href="{example[0]}" aria-label="{escape(example[1], quote=True)}">
+    {result_visual(run, "(min-width: 1000px) 56vw, 100vw")}
+  </a>
 </div>"""
 
 

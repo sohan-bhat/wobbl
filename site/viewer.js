@@ -110,7 +110,7 @@ function arrow(color) {
 
 export async function start(root, ui) {
   const status = root.querySelector('.viewer-status');
-  status.textContent = 'Loading the 3D part (540 KB)…';
+  status.textContent = 'Loading the 3D part…';
   const P = await loadPart(root.dataset.part || 'data/cast-motor-mount', root.dataset.v || 1);
   const { man, v } = P;
   const n = v.vertices;
@@ -122,7 +122,7 @@ export async function start(root, ui) {
   const canvas = renderer.domElement;
   canvas.setAttribute('role', 'img');
   canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag or use the arrow keys to orbit; scroll, pinch or press plus and minus to zoom. The sliders change the load and the shape exaggeration.');
+  canvas.setAttribute('aria-label', 'Interactive 3D stress map of the cast motor mount. Drag or use the arrow keys to orbit; scroll, pinch or press plus and minus to zoom; double click or double tap to reset the view. The belt pull slider changes the load.');
   root.prepend(canvas);
 
   const scene = new THREE.Scene();
@@ -180,6 +180,9 @@ export async function start(root, ui) {
   const peakVal = P.stress[peakIdx];
 
   const controls = new OrbitControls(camera, canvas);
+  // The part sits in the page's first screen: a vertical swipe still scrolls the page on phones,
+  // a sideways drag turns the part.
+  canvas.style.touchAction = 'pan-y';
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   controls.enableDamping = !reduce;
   controls.dampingFactor = 0.12;
@@ -302,10 +305,22 @@ export async function start(root, ui) {
   canvas.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') probe.hidden = true; });
   let down = null;
   canvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; if (e.pointerType === 'mouse') probe.hidden = true; });
+  // A double click, or two taps in quick succession, puts the camera back.
+  let lastTap = 0;
   canvas.addEventListener('pointerup', (e) => {
-    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) probeAt(e.clientX, e.clientY, true);
+    const tap = down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6;
     down = null;
+    if (!tap) return;
+    if (e.pointerType !== 'mouse' && e.timeStamp - lastTap < 320) {
+      lastTap = 0;
+      probe.hidden = true;
+      resetView();
+      return;
+    }
+    lastTap = e.timeStamp;
+    probeAt(e.clientX, e.clientY, true);
   });
+  canvas.addEventListener('dblclick', () => { probe.hidden = true; resetView(); });
 
   // Keyboard orbit: arrows rotate about the part, plus and minus zoom.
   const Z = new THREE.Vector3(0, 0, 1), off = new THREE.Vector3(), side = new THREE.Vector3();

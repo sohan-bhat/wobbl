@@ -92,12 +92,13 @@ def build(out: Path) -> list[str]:
     routes.append("guides/")
     runs = {r.rel: (ex, r) for ex in found for r in ex.runs}
 
-    def run(rel: str) -> str:  # {{run:shelf-bracket/output}} on a hand written page
-        ex, r = runs[rel]
-        return examples.run_card(r, compact=True, link=(url(f"examples/{ex.name}/"), f"{ex.title} example"))
+    def answer(arg: str) -> str:  # {{answer:shelf-bracket/output|One line answer.}} on a hand written page
+        rel, _, line = arg.partition("|")
+        ex, r = runs[rel.strip()]
+        return examples.answer_card(r, line.strip(), (url(f"examples/{ex.name}/"), f"{ex.title} example"))
 
     for src in sorted(PAGES_SRC.glob("*.html")):
-        path, html = hand_page(src, {"run": run})
+        path, html = hand_page(src, {"answer": answer})
         write(out, path, html)
         routes.append(path)
     sitemap(out, routes)

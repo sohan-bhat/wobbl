@@ -29,9 +29,30 @@ og_title: Wobbl: simulate anything before you build it
         </div>
         <p class="hero-cta"><a class="btn" href="{{url:get-started/}}">Get started</a></p>
       </div>
-      <figure class="hero-fig">
-        <img src="{{url:img/cast-mount-stress.webp}}?v=2" srcset="{{url:img/cast-mount-stress-800.webp}}?v=2 800w, {{url:img/cast-mount-stress.webp}}?v=2 1170w" sizes="(min-width: 1000px) 56vw, 100vw" width="1170" height="949" alt="Stress heatmap of a sand cast aluminum motor mount. The hottest spot, labeled 124 MPa, is where the rib tip meets the upright." fetchpriority="high">
-        <figcaption><span class="mono">wobbl run cast_motor_mount.step</span> 2&nbsp;kN belt pull. Peak 124&nbsp;MPa at the rib tip.</figcaption>
+      <figure class="hero-part">
+        <div class="viewer" id="viewer" data-state="poster" data-part="{{url:data/cast-motor-mount}}" data-v="3">
+          <img class="viewer-poster" src="{{url:img/cast-mount-stress.webp}}?v=2" srcset="{{url:img/cast-mount-stress-800.webp}}?v=2 800w, {{url:img/cast-mount-stress.webp}}?v=2 1170w" sizes="(min-width: 1000px) 56vw, 100vw" width="1170" height="949" fetchpriority="high" alt="Stress heatmap of a sand cast aluminum motor mount. The hottest spot, labeled 124 MPa, is where the rib tip meets the upright.">
+          <p class="viewer-status" role="status" aria-live="polite"></p>
+          <div class="probe" hidden></div>
+          <div class="peak-tag" hidden><span class="target" aria-hidden="true"></span><span class="peak-tag-v"></span></div>
+          <div class="load-tag" hidden></div>
+          <button type="button" class="bend" id="bend" aria-pressed="true">Bend &times;60</button>
+        </div>
+        <div class="part-controls">
+          <div class="control">
+            <label for="load">Belt pull <output id="load-out" for="load">2,000&nbsp;N</output></label>
+            <input type="range" id="load" name="load" autocomplete="off" min="0" max="4000" step="10" value="2000">
+            <div class="legend" aria-hidden="true">
+              <div class="legend-bar"><span class="legend-target"></span><span class="legend-peak" id="legend-peak"></span></div>
+              <div class="legend-ticks"><span>0</span><span>82.5 target</span><span>165&nbsp;MPa yield</span></div>
+            </div>
+          </div>
+          <div class="live">
+            <p class="live-n"><span id="r-peak">123.7</span>&nbsp;MPa</p>
+            <p class="vword" id="verdict-word" data-verdict="marginal" aria-live="polite">Marginal</p>
+          </div>
+        </div>
+        <figcaption>A cast motor mount, from Wobbl’s own result. Drag to turn it; double tap to reset.</figcaption>
       </figure>
     </div>
   </div>
@@ -39,75 +60,30 @@ og_title: Wobbl: simulate anything before you build it
 
 <section class="section demo" aria-labelledby="demo-title">
   <div class="wrap">
-    <h2 id="demo-title" class="h-plain">What a run looks like</h2>
+    <h2 id="demo-title">What a run looks like</h2>
     <div class="tabs" role="tablist" aria-label="Example runs">
       <button type="button" role="tab" id="tab-strength" aria-controls="panel-strength" aria-selected="true"><span>Strength</span>Shelf bracket</button>
       <button type="button" role="tab" id="tab-heat" aria-controls="panel-heat" aria-selected="false" tabindex="-1"><span>Heat</span>Heat sink</button>
       <button type="button" role="tab" id="tab-circuit" aria-controls="panel-circuit" aria-selected="false" tabindex="-1"><span>Circuits</span>Blue LED</button>
     </div>
     <div class="tab-panel" role="tabpanel" id="panel-strength" aria-labelledby="tab-strength">
-{{run:shelf-bracket/output}}
+{{answer:shelf-bracket/output|Fails at 52.3 MPa. With a gusset: 9.82 MPa, holds.}}
     </div>
     <div class="tab-panel" role="tabpanel" id="panel-heat" aria-labelledby="tab-heat" hidden>
-{{run:heat-sink/output}}
+{{answer:heat-sink/output|Peaks at 70.3 C, under the 85 C limit.}}
     </div>
     <div class="tab-panel" role="tabpanel" id="panel-circuit" aria-labelledby="tab-circuit" hidden>
-{{run:circuits/led}}
-    </div>
-  </div>
-</section>
-
-<section id="part" class="section part" aria-labelledby="part-title">
-  <div class="wrap viewer-grid">
-    <div class="viewer" id="viewer" data-state="poster" data-part="{{url:data/cast-motor-mount}}" data-v="3">
-      <img class="viewer-poster" src="{{url:img/cast-mount-stress-800.webp}}?v=2" srcset="{{url:img/cast-mount-stress-800.webp}}?v=2 800w, {{url:img/cast-mount-stress.webp}}?v=2 1170w" sizes="(min-width: 1000px) 64vw, 100vw" width="1170" height="949" loading="lazy" decoding="async" alt="Static stress heatmap of the cast motor mount, peak 124 MPa at the rib tip.">
-      <p class="viewer-status" role="status" aria-live="polite">Loading the 3D part…</p>
-      <div class="probe" hidden></div>
-      <div class="peak-tag" hidden><span class="target" aria-hidden="true"></span><span class="peak-tag-v"></span></div>
-      <div class="load-tag" hidden></div>
-    </div>
-    <div class="panel">
-      <h2 id="part-title" class="panel-title">The cast motor mount, in 3D</h2>
-      <p class="panel-sub">Wobbl’s own result file. Drag to turn it; hover or tap to read the stress.</p>
-      <div class="verdict" data-verdict="marginal">
-        <p class="verdict-word" id="verdict-word" aria-live="polite">Marginal</p>
-        <p class="verdict-why" id="verdict-why">Survives the load, but the safety factor is below the target of 2.</p>
-      </div>
-      <dl class="readout">
-        <div><dt>Peak stress</dt><dd><span id="r-peak">123.7</span> MPa</dd></div>
-        <div><dt>Safety factor</dt><dd id="r-sf">1.33</dd></div>
-        <div><dt>Max deflection</dt><dd><span id="r-defl">0.265</span> mm</dd></div>
-        <div><dt>Target</dt><dd>2</dd></div>
-      </dl>
-      <div class="control">
-        <label for="load">Belt pull <output id="load-out" for="load">2,000&nbsp;N</output></label>
-        <input type="range" id="load" name="load" autocomplete="off" min="0" max="4000" step="10" value="2000">
-        <p class="hint" id="load-hint">Meets the target up to 1,334&nbsp;N. Yields past 2,668&nbsp;N.</p>
-      </div>
-      <div class="control">
-        <label for="exag">Shape exaggeration <output id="exag-out" for="exag">60x</output></label>
-        <input type="range" id="exag" name="exaggeration" autocomplete="off" min="0" max="200" step="5" value="60">
-      </div>
-      <div class="legend" aria-hidden="true">
-        <div class="legend-bar"><span class="legend-target"></span><span class="legend-peak" id="legend-peak"></span></div>
-        <div class="legend-ticks"><span>0</span><span>82.5 target</span><span>165&nbsp;MPa yield</span></div>
-      </div>
-      <div class="control control-row">
-        <label class="check"><input type="checkbox" id="hatch" name="hatch" autocomplete="off" checked> Hatch excluded zones</label>
-        <button type="button" class="btn-ghost" id="reset-view">Reset view</button>
-      </div>
-      <p class="panel-note">White is past yield. Confidence is medium: with a rigid servo the peak moves and the part passes at 55&nbsp;MPa.</p>
+{{answer:circuits/led|36.9 mA. It fries. Use a 91 ohm resistor.}}
     </div>
   </div>
 </section>
 
 <section class="section bakeoff" aria-labelledby="bake-title">
   <div class="wrap">
-    <h2 id="bake-title" class="h-plain">A coding agent alone, against Wobbl</h2>
-    <p class="bake-sub">6 parts, a CAD file and a strength question each, 15 minutes per trial.</p>
+    <h2 id="bake-title">A coding agent alone, against Wobbl</h2>
     <div class="versus">
       <figure class="vs">
-        <figcaption>Agent on its own</figcaption>
+        <figcaption>Agent on its own, 15 minutes per trial</figcaption>
         <div class="trials" role="img" aria-label="10 trials, 1 answered"><i class="hit"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <p class="vs-big">1 <span>of 10 trials answered</span></p>
         <p class="vs-note">No answer on the two parts that fail.</p>
@@ -127,10 +103,10 @@ og_title: Wobbl: simulate anything before you build it
   <div class="wrap">
     <h2 id="deeper-title" class="h-label">Go deeper</h2>
     <ul class="deeper-grid">
-      <li><a href="{{url:guides/strength/}}"><span class="deeper-t">Check a part’s strength</span><span>Loads, supports, materials and face selectors.</span></a></li>
-      <li><a href="{{url:guides/fix/}}"><span class="deeper-t">Fix a failing part</span><span>Fillets and gussets go into the part, then it is solved again.</span></a></li>
-      <li><a href="{{url:guides/agents/}}"><span class="deeper-t">Use it from your agent</span><span>Prompts, a full session and the 13 tools.</span></a></li>
-      <li><a href="{{url:guides/checks/}}"><span class="deeper-t">How it checks an answer</span><span>8 checks set the confidence of every strength result.</span></a></li>
+      <li><a href="{{url:guides/strength/}}">Check a part’s strength</a></li>
+      <li><a href="{{url:guides/fix/}}">Fix a failing part</a></li>
+      <li><a href="{{url:guides/agents/}}">Use it from your agent</a></li>
+      <li><a href="{{url:guides/heat/}}">Heat and circuits</a></li>
     </ul>
   </div>
 </section>

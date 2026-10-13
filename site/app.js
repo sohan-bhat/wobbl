@@ -76,76 +76,62 @@ for (const list of $$('[role="tablist"]')) {
   });
 }
 
-// The cast mount: readouts follow the load slider even without WebGL.
+// The cast mount: the readout follows the load slider even without WebGL.
 const viewer = $('#viewer');
 if (viewer) {
   const fmt = (x, d = 0) => x.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
   const NB = '\u00a0';
-  const loadIn = $('#load'), exagIn = $('#exag'), hatchIn = $('#hatch');
+  const loadIn = $('#load'), bend = $('#bend');
   const listeners = [], resetters = [];
   const part = {
     loadN: 2000, peak: 123.695, allow: 165, target: 2, defl: 0.2649,
   };
-  const current = () => ({ scale: +loadIn.value / part.loadN, exag: +exagIn.value, hatch: hatchIn.checked });
+  const BEND = 60;  // displacement is drawn 60 times larger so the bending shows
+  const current = () => ({
+    scale: +loadIn.value / part.loadN, exag: bend.getAttribute('aria-pressed') === 'true' ? BEND : 0, hatch: true,
+  });
+  const WORD = { holds: 'Holds', marginal: 'Marginal', fails: 'Fails' };
 
   function update() {
-    const { scale, exag } = current();
+    const { scale } = current();
     const peak = part.peak * scale;
     const sf = peak > 0 ? part.allow / peak : Infinity;
     const verdict = sf >= part.target ? 'holds' : sf >= 1 ? 'marginal' : 'fails';
     $('#load-out').textContent = `${fmt(+loadIn.value)}${NB}N`;
-    $('#exag-out').textContent = exag === 0 ? 'true shape' : `${exag}x`;
     $('#r-peak').textContent = fmt(peak, 1);
-    $('#r-sf').textContent = !isFinite(sf) ? 'no load' : sf > 99 ? 'above 99' : fmt(sf, 2);
-    $('#r-defl').textContent = fmt(part.defl * scale, 3);
-    const box = $('.verdict');
-    if (box.dataset.verdict !== verdict || !update.done) {
-      // the word is a live region: only touch it when the verdict changes
-      box.dataset.verdict = verdict;
-      $('#verdict-word').textContent = { holds: 'Holds', marginal: 'Marginal', fails: 'Fails' }[verdict];
-      update.done = true;
+    const word = $('#verdict-word');
+    if (word.dataset.verdict !== verdict) {  // a live region: only touch it when the verdict changes
+      word.dataset.verdict = verdict;
+      word.textContent = WORD[verdict];
     }
-    loadIn.setAttribute('aria-valuetext', `${fmt(+loadIn.value)} newtons, ${box.dataset.verdict}`);
-    $('#verdict-why').textContent = {
-      holds: !isFinite(sf) ? 'No load, no stress.' : `Meets the safety factor ${part.target} rule for castings.`,
-      marginal: `Survives the load, but the safety factor is below the target of ${part.target}.`,
-      fails: `The peak passes the ${part.allow}${NB}MPa yield stress.`,
-    }[verdict];
+    loadIn.setAttribute('aria-valuetext', `${fmt(+loadIn.value)} newtons: peak ${fmt(peak)} megapascals, ${WORD[verdict].toLowerCase()}`);
     const at = Math.min(peak / part.allow, 1) * 100;
     $('#legend-peak').style.left = peak > part.allow ? 'calc(100% + 6px)' : `${at}%`;
     for (const fn of listeners) fn(current());
   }
 
-  function thresholds() {
-    const a = part.loadN * (part.allow / part.target) / part.peak;
-    const b = part.loadN * part.allow / part.peak;
-    $('#load-hint').textContent = `Meets the target up to ${fmt(Math.round(a))}${NB}N. Yields past ${fmt(Math.round(b))}${NB}N.`;
-  }
-
-  // The slider state lives in the URL so a reading can be shared, e.g. ?load=3000
+  // The load lives in the URL so a reading can be shared, e.g. ?load=3000
   const q = new URLSearchParams(location.search);
-  const clampIn = (el, v) => { if (v !== null && v !== '' && isFinite(+v)) el.value = Math.min(+el.max, Math.max(+el.min, +v)); };
-  clampIn(loadIn, q.get('load'));
-  clampIn(exagIn, q.get('exag'));
-  const saveUrl = () => {
+  const v = q.get('load');
+  if (v !== null && v !== '' && isFinite(+v)) loadIn.value = Math.min(+loadIn.max, Math.max(+loadIn.min, +v));
+  loadIn.addEventListener('input', update);
+  loadIn.addEventListener('change', () => {
     const u = new URL(location.href);
     u.searchParams.set('load', loadIn.value);
-    u.searchParams.set('exag', exagIn.value);
     history.replaceState(null, '', u);
-  };
-  for (const el of [loadIn, exagIn, hatchIn]) el.addEventListener('input', update);
-  for (const el of [loadIn, exagIn]) el.addEventListener('change', saveUrl);
-  $('#reset-view').addEventListener('click', () => resetters.forEach((fn) => fn()));
+  });
+  bend.addEventListener('click', () => {
+    bend.setAttribute('aria-pressed', String(bend.getAttribute('aria-pressed') !== 'true'));
+    update();
+  });
 
   // Numbers come from the exported result when it is reachable.
   const base = viewer.dataset.part || 'data/cast-motor-mount';
   fetch(`${base}.json?v=${viewer.dataset.v || 1}`).then((r) => r.json()).then((m) => {
     const v = m.variants.distributed;
     Object.assign(part, { loadN: m.load_N, peak: v.governing_MPa, allow: m.allowable_MPa, target: m.target_sf, defl: v.max_disp_mm });
-    thresholds();
     update();
   }).catch(() => {});
-  thresholds();
   update();
 
   const status = $('.viewer-status', viewer);
@@ -155,19 +141,19 @@ if (viewer) {
   const fallback = (why) => {
     viewer.dataset.state = 'static';
     status.textContent = why;
-    $('#reset-view').hidden = true;
+    bend.hidden = true;
   };
   if (!gl || !('DecompressionStream' in window)) {
-    fallback('This browser cannot draw the 3D part, so this is the static render Wobbl wrote. The sliders still update the numbers.');
+    fallback('This browser cannot draw the 3D part, so this is the static render Wobbl wrote.');
   } else {
     const ui = {
       onChange: (fn) => listeners.push(fn),
       onReset: (fn) => resetters.push(fn),
       current,
     };
-    const go = () => import('./viewer.js?v=3').then((m) => m.start(viewer, ui)).catch((err) => {
+    const go = () => import('./viewer.js?v=4').then((m) => m.start(viewer, ui)).catch((err) => {
       console.error(err);
-      fallback('The 3D part did not load, so this is the static render Wobbl wrote. Reload the page to try again; the sliders still update the numbers.');
+      fallback('The 3D part did not load, so this is the static render Wobbl wrote. Reload the page to try again.');
     });
     if ('IntersectionObserver' in window) {
       const io = new IntersectionObserver((entries) => {
