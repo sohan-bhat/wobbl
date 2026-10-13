@@ -2,8 +2,8 @@
 // so anything tied to a page's elements runs on astro:page-load and cleans up on
 // astro:before-swap. Document level listeners are added once.
 //
-// No behavior here writes a #fragment to the address bar: the skip link and the
-// Contents list move focus and scroll with JS, and state lives in the query string.
+// Nothing here changes the address: the skip link and the Contents list move focus and
+// scroll with JS, and UI state such as the selected tab lives in the page only.
 const $ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => r.querySelector<T>(s);
 const $$ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => [...r.querySelectorAll<T>(s)];
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -183,7 +183,7 @@ function stackTables() {
   }
 }
 
-/** Tabs follow the ARIA tabs pattern; the selected one is kept in the query string as ?run=. */
+/** Tabs follow the ARIA tabs pattern. The selected tab lives in the page only, never in the address. */
 function tabs() {
   for (const list of $$('[role="tablist"]')) {
     const all = $$<HTMLButtonElement>('[role="tab"]', list);
@@ -197,25 +197,16 @@ function tabs() {
       }
       if (focus) tab.focus();
     };
-    const remember = (tab: HTMLButtonElement) => {
-      const u = new URL(location.href);
-      u.searchParams.set('run', tab.id.replace(/^tab-/, ''));
-      history.replaceState(history.state, '', u);
-    };
-    const start = all.find((t) => t.id === `tab-${new URLSearchParams(location.search).get('run')}`);
-    if (start) select(start);
     list.addEventListener('click', (e) => {
       const t = (e.target as Element).closest<HTMLButtonElement>('[role="tab"]');
-      if (t) { select(t); remember(t); }
+      if (t) select(t);
     });
     list.addEventListener('keydown', (e) => {
       const i = all.indexOf(document.activeElement as HTMLButtonElement);
       const step = ({ ArrowRight: 1, ArrowLeft: -1, Home: -i, End: all.length - 1 - i } as Record<string, number>)[e.key];
       if (i < 0 || step === undefined) return;
       e.preventDefault();
-      const next = all[(i + step + all.length) % all.length];
-      select(next, true);
-      remember(next);
+      select(all[(i + step + all.length) % all.length], true);
     });
   }
 }
