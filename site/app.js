@@ -43,7 +43,7 @@ if (viewer) {
   const loadIn = $('#load'), exagIn = $('#exag'), hatchIn = $('#hatch');
   const listeners = [], resetters = [];
   const part = {
-    loadN: 2000, peak: 123.443, allow: 165, target: 2, defl: 0.264235,
+    loadN: 2000, peak: 123.593, allow: 165, target: 2, defl: 0.265249,
   };
   const current = () => ({ scale: +loadIn.value / part.loadN, exag: +exagIn.value, hatch: hatchIn.checked });
 

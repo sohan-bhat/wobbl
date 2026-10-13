@@ -118,7 +118,7 @@
   </div>
   <div class="wrap viewer-grid">
     <div class="viewer" id="viewer" data-state="poster">
-      <img class="viewer-poster" src="img/cast-mount-stress-800.webp" srcset="img/cast-mount-stress-800.webp 800w, img/cast-mount-stress.webp 1170w" sizes="(min-width: 1000px) 64vw, 100vw" width="1170" height="949" loading="lazy" decoding="async" alt="Static stress heatmap of the cast motor mount, peak 123 MPa at the rib tip.">
+      <img class="viewer-poster" src="img/cast-mount-stress-800.webp" srcset="img/cast-mount-stress-800.webp 800w, img/cast-mount-stress.webp 1170w" sizes="(min-width: 1000px) 64vw, 100vw" width="1170" height="949" loading="lazy" decoding="async" alt="Static stress heatmap of the cast motor mount, peak 124 MPa at the rib tip.">
       <p class="viewer-status" role="status" aria-live="polite">Loading the 3D part…</p>
       <div class="probe" hidden></div>
       <div class="peak-tag" hidden><span class="target" aria-hidden="true"></span><span class="peak-tag-v"></span></div>
@@ -131,15 +131,15 @@
         <p class="verdict-why" id="verdict-why">Survives the load, but the safety factor is below the target of 2.</p>
       </div>
       <dl class="readout">
-        <div><dt>Peak stress</dt><dd><span id="r-peak">123.4</span> MPa</dd></div>
+        <div><dt>Peak stress</dt><dd><span id="r-peak">123.6</span> MPa</dd></div>
         <div><dt>Safety factor</dt><dd id="r-sf">1.34</dd></div>
-        <div><dt>Max deflection</dt><dd><span id="r-defl">0.264</span> mm</dd></div>
+        <div><dt>Max deflection</dt><dd><span id="r-defl">0.265</span> mm</dd></div>
         <div><dt>Target</dt><dd>2</dd></div>
       </dl>
       <div class="control">
         <label for="load">Belt pull <output id="load-out" for="load">2,000&nbsp;N</output></label>
         <input type="range" id="load" name="load" autocomplete="off" min="0" max="4000" step="10" value="2000">
-        <p class="hint" id="load-hint">Meets the target up to 1,337&nbsp;N. Yields past 2,673&nbsp;N.</p>
+        <p class="hint" id="load-hint">Meets the target up to 1,335&nbsp;N. Yields past 2,670&nbsp;N.</p>
       </div>
       <div class="control">
         <label for="exag">Shape exaggeration <output id="exag-out" for="exag">60x</output></label>
@@ -153,7 +153,7 @@
         <label class="check"><input type="checkbox" id="hatch" name="hatch" autocomplete="off" checked> Hatch excluded zones</label>
         <button type="button" class="btn-ghost" id="reset-view">Reset view</button>
       </div>
-      <p class="panel-note">White is past yield. Hatched zones sit next to the fixed base or where the load enters; Wobbl reports the stress away from them. Treat the servo as a rigid body instead of a bolt group and the governing stress drops to 47.2&nbsp;MPa, safety factor 3.49, and the part passes. Wobbl solves both and marks this answer medium confidence for that reason.</p>
+      <p class="panel-note">White is past yield. Hatched zones sit next to the fixed base or where the load enters; Wobbl reports the stress away from them. Treat the servo as a rigid body instead of a bolt group and the peak moves next to a lower bolt hole, where it converges to 55.5&nbsp;MPa, safety factor 2.97, and the part passes. Wobbl solves both, refines each around its own peak, and marks this answer medium confidence for that reason.</p>
     </div>
   </div>
 </section>
@@ -231,7 +231,7 @@
         <li><h3>Force and moment balance</h3><p>Reactions at the supports must cancel the applied loads to 0.5%.</p><code translate="no">reactions balance the loads to 0.00011%</code></li>
         <li><h3>Hand calculation</h3><p>Beam theory through the critical section gives a nominal stress, and the ratio must be physical.</p><code translate="no">15.2 MPa nominal, a stress concentration of about 3.5</code></li>
         <li><h3>Singularities</h3><p>Sharp inside corners come from exact CAD normals. Peaks there are excluded and named with their trend.</p><code translate="no">14.8, 20.5, 23.1 MPa and still rising: excluded</code></li>
-        <li><h3>Load introduction</h3><p>Off part loads are solved both rigid and distributed, and the spread is reported.</p><code translate="no">rigid servo: 47.2 MPa, safety factor 3.49</code></li>
+        <li><h3>Load introduction</h3><p>Off part loads are solved both rigid and distributed, each converged at its own peak, and the spread is reported.</p><code translate="no">rigid servo: 55.5 MPa over 3 meshes, safety factor 2.97</code></li>
         <li><h3>Bolt bearing</h3><p>At bolted holes, reaction force over projected area replaces the idealized peak.</p><code translate="no">13.1 N sideways, bearing stress 0.485 MPa</code></li>
         <li><h3>Units and sanity</h3><p>Part size, peak strain and deflection have to be plausible for the material.</p><code translate="no">peak strain 0.015, deflection 2.8% of size</code></li>
         <li><h3>Large deflection</h3><p>When a part bends a good fraction of its wall, a nonlinear re-solve confirms the linear answer.</p><code translate="no">runs only when the deflection calls for it</code></li>

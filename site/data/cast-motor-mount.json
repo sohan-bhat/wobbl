@@ -29,18 +29,18 @@
  "variants": {
   "distributed": {
    "file": "cast-motor-mount-distributed.bin.gz",
-   "bytes_gzip": 551434,
-   "bytes_raw": 1013492,
-   "vertices": 33462,
-   "triangles": 62952,
+   "bytes_gzip": 895487,
+   "bytes_raw": 1698800,
+   "vertices": 55578,
+   "triangles": 107136,
    "index_type": "uint16",
    "layout": {
     "position": 0,
-    "normal": 200772,
-    "disp": 334620,
-    "stress": 535392,
-    "excluded": 602316,
-    "index": 635780
+    "normal": 333468,
+    "disp": 555780,
+    "stress": 889248,
+    "excluded": 1000404,
+    "index": 1055984
    },
    "bounds_min": [
     -70.0,
@@ -52,21 +52,21 @@
     95.0,
     112.0
    ],
-   "disp_max_mm": 0.256932,
-   "stress_max_MPa": 123.44349753109559,
-   "surface_peak_MPa": 123.443,
+   "disp_max_mm": 0.257915,
+   "stress_max_MPa": 123.59333515312386,
+   "surface_peak_MPa": 123.593,
    "surface_peak_xyz": [
-    43.845,
-    8.897,
-    79.733
+    43.821,
+    8.815,
+    79.836
    ],
-   "governing_MPa": 123.443,
+   "governing_MPa": 123.593,
    "governing_xyz": [
-    43.845,
-    8.897,
-    79.733
+    43.821,
+    8.815,
+    79.836
    ],
-   "max_disp_mm": 0.2642,
+   "max_disp_mm": 0.2652,
    "verdict": "marginal",
    "confidence": "medium",
    "source": "examples/cast-motor-mount/output"
