@@ -116,13 +116,14 @@ def evaluate(run: StructuralRun) -> Outcome:
     gov_vals = [L.governing for L in run.levels]
     conv = convergence_check(gov_vals, run.tol, run.measure_name, "MPa", run.stopped_by,
                              [L.max_disp for L in run.levels])
-    bound = max(max(L.raw_max for L in run.levels), max(gov_vals))
-    if conv.status != "pass" and bound > 0 and allow / bound >= target * 1.2:
-        # the number is still moving, but even the highest peak seen on any mesh, artifacts included, leaves
+    swing = abs(gov_vals[-1] - gov_vals[-2]) / max(gov_vals[-1], 1e-12) if len(gov_vals) > 1 else 1.0
+    bound = max(gov_vals) * (1 + swing)
+    if conv.status != "pass" and len(gov_vals) > 1 and bound > 0 and allow / bound >= target * 1.2:
+        # the number is still moving, but even the highest value on any mesh plus the last swing leaves
         # plenty of margin: the verdict does not depend on the unsettled digits
-        conv = Check("mesh convergence", "warn", conv.summary + f". Even the highest peak on any mesh "
-                     f"({fmt(bound)} MPa, artifacts included) leaves safety factor {allow / bound:.2f}, so the "
-                     "verdict holds either way", conv.detail)
+        conv = Check("mesh convergence", "warn", conv.summary + f". Even the highest value on any mesh plus that "
+                     f"swing ({fmt(bound)} MPa) leaves safety factor {allow / bound:.2f}, so the verdict holds "
+                     "either way", conv.detail)
     checks.append(conv)
     dvals = [L.max_disp for L in run.levels]
     if len(dvals) >= 2 and dvals[-1] > 0 and abs(dvals[-1] - dvals[-2]) / dvals[-1] > 0.05:
