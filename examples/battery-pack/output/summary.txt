@@ -1,10 +1,10 @@
-HOT. Hottest point reaches 74.5 C (limit 60 C) at (19, 19.3, 31.5) mm after 60 min. It passes 60 C after about 22.5 min.
+HOT. Hottest point reaches 74.5 C (limit 60 C) at (18.2, 18.6, 34.2) mm after 60 min. It passes 60 C after about 21.1 min.
 
 Confidence: high. passed mesh convergence, hand calculation, units and sanity
 max temperature: 74.5 C
 limit: 60 C
 power: 6 W
-mesh nodes: 9,593
+mesh nodes: 9,833
 
 Checks:
   [pass] mesh convergence: temperature rise at the hottest point settled: 39.5 -> 39.5 C over 2 meshes, last change 0.0%

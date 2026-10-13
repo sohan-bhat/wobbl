@@ -12,7 +12,7 @@ radiates with emissivity 0.9.
 | Result | Value |
 |---|---|
 | Hottest point after 60 min | 74.5 C, over the 60 C limit for Li-ion cells |
-| Time to pass 60 C | about 22.5 minutes |
+| Time to pass 60 C | about 21 minutes |
 | Hand calculation | a lumped model with convection and radiation gives a mean of 72.2 C at 60 min; the FEA mean is 72.8 C |
 
 ![Temperature over the discharge](output/images/history.png)
