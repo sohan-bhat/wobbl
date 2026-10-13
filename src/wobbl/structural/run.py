@@ -130,9 +130,8 @@ def initial_sizing(prep: PreparedGeometry, features: PartFeatures, study: Struct
     if study.mesh_size:
         s.h = float(study.mesh_size)
     h = s.h
-    # fillets and holes get their first refinement from curvature sizing; the hotspot loop does the rest,
-    # so the first mesh stays cheap even on parts with dozens of fillets
-    s.curvature = 10
+    s.curvature = 0
+    s.refinements += feature_refinements(features, h)
     curves = sorted({c for cn in features.corners for c in cn.curves})
     if curves:
         s.refinements.append(Refinement(h / 3.0, curves=curves, grow=2 * h, label="sharp corners"))
@@ -146,6 +145,29 @@ def initial_sizing(prep: PreparedGeometry, features: PartFeatures, study: Struct
                                                 label="load patch"))
     s.h_min = 0.0
     return s
+
+
+def feature_refinements(features: PartFeatures, h: float) -> list[Refinement]:
+    """Resolve curved features on the first mesh, but never finer than a floor tied to the wall thickness.
+
+    Curvature based sizing would mesh every tiny fillet, slot and logo edge finely and blow a thin walled
+    enclosure up to half a million nodes. Here each curved face gets about half its radius, clamped to the
+    floor, and faces are grouped by size so gmsh evaluates only a handful of fields. The hotspot loop
+    later goes below the floor exactly where the stress is.
+    """
+    floor = max(h / 8.0, 0.25 * features.thickness_min)
+    buckets: dict[float, list[int]] = {}
+    for f in features.faces.values():
+        if f.kind == "plane":
+            continue
+        size = 0.5 * f.radius if f.radius else h / 2.0
+        size = float(np.clip(size, floor, h))
+        if size >= 0.95 * h:
+            continue
+        key = float(floor * 1.3 ** np.floor(np.log(size / floor) / np.log(1.3)))
+        buckets.setdefault(key, []).append(f.id)
+    return [Refinement(size, surfaces=ids, grow=3 * size, label=f"curved features {size:.3g} mm")
+            for size, ids in sorted(buckets.items())]
 
 
 def describe_part(path: str, workdir: str | Path, scale: float = 1.0, body: int | None = None):
@@ -286,7 +308,7 @@ def _converged(levels: list[Level], spots: list[Hotspot], tol: float, min_levels
     if a <= 0 or abs(b - a) / a > tol:
         return False
     gs = _governing_spot(spots, levels[-1].governing_xyz)
-    if gs is not None and gs.change is not None and abs(gs.change) > tol:
+    if gs is not None and gs.change is not None and abs(gs.change) > 2 * tol:
         return False
     return True
 
@@ -321,6 +343,9 @@ def _refine(sizing: Sizing, spots: list[Hotspot], levels: list[Level], tol: floa
         h = s.sizes[-1] if s.sizes and np.isfinite(s.sizes[-1]) else sizing.h / 4
         size = 0.5 * h
         face = features.faces.get(s.face) if (features and s.face is not None) else None
+        if face is not None and face.radius and s.kind == "feature":
+            # jump straight toward a size that resolves the curve, at most four times finer per level
+            size = max(min(size, face.radius / 3.0), 0.25 * h)
         tight = face is not None and features is not None and face.role == "fillet" and \
             face.radius < 0.25 * features.thickness_typical
         if tight and s.kind == "feature":
