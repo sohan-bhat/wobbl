@@ -60,7 +60,7 @@ h1, h2, h3 { color: var(--fg); margin: 0; font-family: var(--sans); }
 .nav-row { display: flex; flex-wrap: wrap; align-items: center; column-gap: 32px; padding-top: 10px; }
 .brand { display: block; flex: none; padding: 6px 0; }
 .brand img { height: 22px; width: auto; }
-.nav-links { order: 3; width: 100%; display: flex; gap: 22px; overflow-x: auto; scrollbar-width: none; margin-top: 4px; }
+.nav-links { order: 3; width: 100%; display: flex; gap: 22px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; margin-top: 4px; }
 .nav-links a { flex: none; color: var(--fg-2); text-decoration: none; font-size: 15px; font-weight: 500; padding: 12px 0 13px; box-shadow: inset 0 -2px 0 transparent; }
 .nav-links a:hover { color: var(--fg); }
 .nav-links a[aria-current="page"], .nav-links a.is-here { color: var(--fg); box-shadow: inset 0 -2px 0 var(--yellow); }
@@ -111,15 +111,18 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .hero-cta { margin: 28px 0 0; }
 
 /* What a run looks like: one example at a time */
-.tabs { display: flex; margin-top: 28px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tabs { display: flex; margin-top: 28px; border-bottom: 1px solid var(--line); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+/* swiping still scrolls these strips on phones; they just show no scrollbar */
+.tabs::-webkit-scrollbar, .nav-links::-webkit-scrollbar { display: none; }
+/* the underline is an inset shadow, so nothing hangs past the strip's own border */
 .tabs [role="tab"] {
-  flex: none; margin: 0 28px -1px 0; padding: 10px 0 14px; cursor: pointer; text-align: left;
-  background: none; border: 0; border-bottom: 2px solid transparent;
+  flex: none; margin: 0 28px 0 0; padding: 10px 0 14px; cursor: pointer; text-align: left;
+  background: none; border: 0; box-shadow: inset 0 -2px 0 transparent;
   font: 600 1.02rem/1.25 var(--sans); color: var(--fg-2);
 }
 .tabs [role="tab"] span { display: block; margin-bottom: 4px; font: 500 11px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .tabs [role="tab"]:hover { color: var(--fg); }
-.tabs [role="tab"][aria-selected="true"] { color: var(--fg); border-bottom-color: var(--yellow); }
+.tabs [role="tab"][aria-selected="true"] { color: var(--fg); box-shadow: inset 0 -2px 0 var(--yellow); }
 .tabs [role="tab"][aria-selected="true"] span { color: var(--yellow); }
 .tab-panel { margin-top: 36px; }
 
@@ -174,7 +177,7 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
   min-height: 40px; padding: 0 6px 0 16px; border-bottom: 1px solid var(--line);
   font: 500 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
 }
-.term pre { margin: 0; padding: 16px; overflow-x: auto; font-size: 14px; line-height: 1.7; color: var(--fg); }
+.term pre { margin: 0; padding: 16px; overflow-x: auto; overflow-y: hidden; font-size: 14px; line-height: 1.7; color: var(--fg); }
 .term .ln { display: block; }
 @media (max-width: 719px) {
   .term pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
@@ -188,7 +191,7 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .install .term { border-top: 3px solid var(--yellow); margin-top: 28px; }
 
 /* Tables */
-.table-scroll { margin-top: 48px; overflow-x: auto; }
+.table-scroll { margin-top: 48px; overflow-x: auto; overflow-y: hidden; }
 table.data { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
 table.data caption { caption-side: bottom; text-align: left; color: var(--muted); font-size: 0.88rem; padding-top: 14px; max-width: 80ch; }
 table.data thead th {
@@ -563,7 +566,7 @@ table.vt tbody:first-of-type tr.group th { padding-top: 12px; }
 
 /* Scrollbars: a dark track and a graphite thumb, yellow while dragged */
 html { scrollbar-color: #3a3e45 #0e0f11; scrollbar-width: thin; }
-.term pre, .table-scroll, .docnav, .contents, .search, .tabs { scrollbar-color: #3a3e45 transparent; scrollbar-width: thin; }
+.term pre, .table-scroll, .docnav, .contents, .search { scrollbar-color: #3a3e45 transparent; scrollbar-width: thin; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #0e0f11; }
 ::-webkit-scrollbar-thumb { background: #3a3e45; border: 2px solid #0e0f11; }
