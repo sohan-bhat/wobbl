@@ -260,10 +260,16 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
     times = res.history_t
     t_cross = None
     if model.transient and len(times):
+        # prepend the starting state so the curve and the crossing time begin at t = 0
+        times = np.concatenate([[0.0], np.asarray(times)])
+        hist = np.vstack([np.full((1, hist.shape[1]), model.initial_temp), hist])
         mx = hist.max(axis=1)
         over = np.nonzero(mx > limit)[0]
         if len(over):
-            t_cross = float(times[over[0]])
+            k = over[0]
+            t_cross = float(times[k])
+            if k > 0:  # interpolate between the two output times around the crossing
+                t_cross = float(np.interp(limit, [mx[k - 1], mx[k]], [times[k - 1], times[k]]))
             when = f" It passes {fmt(limit)} C after about {fmt(t_cross / 60)} min."
     head = (f"Hottest point reaches {fmt(tmax)} C (limit {fmt(limit)} C) at "
             f"({', '.join(fmt(v) for v in hot)}) mm" + (f" after {fmt(study.duration / 60)} min" if model.transient
