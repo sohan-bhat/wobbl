@@ -4,58 +4,58 @@
  "material": "PETG (3D printed)",
  "question": "Will this printed PETG motor mount survive a 250 N belt pull?",
  "measure": "von Mises stress (layer pull scaled by layer strength)",
- "governing_MPa": 10.732512,
+ "governing_MPa": 11.015549,
  "governing_xyz": [
-  -25.0,
-  7.878367,
-  6.821097
+  24.734175,
+  6.085757,
+  1.962176
  ],
- "governing_where": "on face 12 at (-25, 7.88, 6.82)",
+ "governing_where": "on face 19 at (24.7, 6.09, 1.96)",
  "allowable_MPa": 47,
- "safety_factor": 4.379217,
+ "safety_factor": 4.266696,
  "target_sf": 2.5,
  "verdict": "holds",
- "headline": "Peak 10.7 MPa on face 12 at (-25, 7.88, 6.82), safety factor 4.38 against yield (target 2.5). Confidence is medium.",
- "max_disp_mm": 0.395197,
+ "headline": "Peak 11 MPa on face 19 at (24.7, 6.09, 1.96), safety factor 4.27 against yield (target 2.5). Confidence is medium.",
+ "max_disp_mm": 0.399139,
  "max_disp_xyz": [
-  25.0,
+  -25.0,
   0.0,
   55.0
  ],
  "confidence": "medium",
  "confidence_reasons": [
-  "mesh convergence: von Mises stress (layer pull scaled by layer strength) still moving: 9.83 -> 10.1 -> 11.7 -> 10.7 MPa, last change 8.6% (stopped by level limit); expect about that much error. Even the highest value on any mesh plus that swing (12.7 MPa) leaves safety factor 3.71, so the verdict holds either way",
-  "singularities: excluded from the answer: 51.9 MPa at the edge of support fix1 (face 1) (keeps rising with refinement: 31.1 -> 38.8 -> 44.2 -> 51.9 MPa); 23.9 MPa at the edge of support fix1 (face 12) (set by the idealized support: 23.2 -> 23 -> 24.6 -> 23.9 MPa); 20 MPa where the rigid attachment load1 grabs the part (face 9) (set by the idealized support: 19.4 -> 15.8 -> 18.2 -> 20 MPa). Wobbl reports the stress 1.83 mm or more away from these spots",
-  "load introduction: the off part loads enter through a rigid attachment (the attached part does not flex). With a distributing coupling (the attached part adds no stiffness) instead, the governing stress is 19.5 MPa (1.8x, safety factor 2.41). The verdict depends on this assumption: check how the attached part really carries the load",
+  "mesh convergence: von Mises stress (layer pull scaled by layer strength) still moving: 9.91 -> 11.1 -> 10.3 -> 11 MPa, last change 6.6% (stopped by level limit); expect about that much error. Even the highest value on any mesh plus that swing (11.8 MPa) leaves safety factor 3.99, so the verdict holds either way",
+  "singularities: excluded from the answer: 53.9 MPa at the edge of support fix1 (face 1) (set by the idealized support: 36 -> 47.7 -> 46.3 -> 53.9 MPa); 26.9 MPa at the edge of support fix1 (face 1) (set by the idealized support: 33.4 -> 23.5 -> 32.6 -> 26.9 MPa); 20.1 MPa where the rigid attachment load1 grabs the part (face 9) (set by the idealized support: 21.1 -> 15.5 -> 20.6 -> 20.1 MPa). Wobbl reports the stress 1.76 mm or more away from these spots",
+  "load introduction: the off part loads enter through a rigid attachment (the attached part does not flex). With a distributing coupling (the attached part adds no stiffness) instead, the governing stress converges to 18.8 MPa on face 5 at (21, 6.94, 37.3) (1.7x, safety factor 2.50) over 3 meshes refined around that peak: 19.2 -> 19.2 -> 18.8 MPa, last change 2.1%. The verdict depends on this assumption: check how the attached part really carries the load",
   "the verdict depends on how the load enters the part (rigid attachment versus distributed); the answer assumes rigid"
  ],
  "checks": [
   {
    "name": "mesh convergence",
    "status": "warn",
-   "summary": "von Mises stress (layer pull scaled by layer strength) still moving: 9.83 -> 10.1 -> 11.7 -> 10.7 MPa, last change 8.6% (stopped by level limit); expect about that much error. Even the highest value on any mesh plus that swing (12.7 MPa) leaves safety factor 3.71, so the verdict holds either way",
+   "summary": "von Mises stress (layer pull scaled by layer strength) still moving: 9.91 -> 11.1 -> 10.3 -> 11 MPa, last change 6.6% (stopped by level limit); expect about that much error. Even the highest value on any mesh plus that swing (11.8 MPa) leaves safety factor 3.99, so the verdict holds either way",
    "detail": {
     "values": [
-     9.830549,
-     10.077628,
-     11.657139,
-     10.732512
+     9.908873,
+     11.063992,
+     10.292489,
+     11.015549
     ],
-    "last_change": 0.086152,
+    "last_change": 0.06564,
     "tolerance": 0.03,
     "stopped_by": "level limit",
     "max_displacement": [
-     0.393942,
-     0.400844,
-     0.397575,
-     0.395197
+     0.395042,
+     0.401464,
+     0.401716,
+     0.399139
     ]
    }
   },
   {
    "name": "force balance",
    "status": "pass",
-   "summary": "reactions balance the loads to 2.3e-05% (forces) and 8.2e-06% (moments)",
+   "summary": "reactions balance the loads to 3.4e-05% (forces) and 1.3e-05% (moments)",
    "detail": {
     "applied_N": [
      0.0,
@@ -63,9 +63,9 @@
      -250.0
     ],
     "reaction_N": [
-     3.1e-05,
-     -3e-05,
-     249.999962
+     3.7e-05,
+     -1.4e-05,
+     249.999924
     ],
     "force_error": 0.0,
     "moment_error": 0.0
@@ -80,152 +80,152 @@
   {
    "name": "singularities",
    "status": "warn",
-   "summary": "excluded from the answer: 51.9 MPa at the edge of support fix1 (face 1) (keeps rising with refinement: 31.1 -> 38.8 -> 44.2 -> 51.9 MPa); 23.9 MPa at the edge of support fix1 (face 12) (set by the idealized support: 23.2 -> 23 -> 24.6 -> 23.9 MPa); 20 MPa where the rigid attachment load1 grabs the part (face 9) (set by the idealized support: 19.4 -> 15.8 -> 18.2 -> 20 MPa). Wobbl reports the stress 1.83 mm or more away from these spots",
+   "summary": "excluded from the answer: 53.9 MPa at the edge of support fix1 (face 1) (set by the idealized support: 36 -> 47.7 -> 46.3 -> 53.9 MPa); 26.9 MPa at the edge of support fix1 (face 1) (set by the idealized support: 33.4 -> 23.5 -> 32.6 -> 26.9 MPa); 20.1 MPa where the rigid attachment load1 grabs the part (face 9) (set by the idealized support: 21.1 -> 15.5 -> 20.6 -> 20.1 MPa). Wobbl reports the stress 1.76 mm or more away from these spots",
    "detail": {
     "spots": [
      {
       "id": 1,
       "xyz": [
-       25.6,
-       7.594,
+       -25.88,
+       7.155,
        5.0
       ],
       "kind": "bolt",
       "zone": "fix1",
       "detail": "at the edge of support fix1 (face 1)",
       "face": 1,
-      "radius": 2.86122,
+      "radius": 2.255247,
       "values": [
-       31.0959,
-       38.7728,
-       44.2222,
-       51.8939
+       36.026,
+       47.7316,
+       46.2803,
+       53.8959
       ],
       "sizes": [
-       1.4175,
-       0.6759,
-       0.7032,
-       0.651
+       1.5035,
+       0.7047,
+       0.7605,
+       0.696
       ],
-      "singular": true,
+      "singular": false,
       "converged": false,
-      "change": 0.173481,
+      "change": 0.164553,
       "excluded": true
      },
      {
       "id": 2,
       "xyz": [
-       -25.0,
-       8.346,
-       5.682
+       25.44,
+       7.553,
+       5.0
       ],
       "kind": "bolt",
       "zone": "fix1",
-      "detail": "at the edge of support fix1 (face 12)",
-      "face": 12,
-      "radius": 2.546857,
+      "detail": "at the edge of support fix1 (face 1)",
+      "face": 1,
+      "radius": 2.476685,
       "values": [
-       23.2408,
-       22.9844,
-       24.6315,
-       23.9292
+       33.37,
+       23.4561,
+       32.6116,
+       26.9113
       ],
       "sizes": [
-       1.4754,
-       1.4756,
-       1.2671,
-       1.2676
+       1.4164,
+       1.4166,
+       1.4363,
+       1.4367
       ],
       "singular": false,
-      "converged": true,
-      "change": -0.028511,
+      "converged": false,
+      "change": -0.174793,
       "excluded": true
      },
      {
       "id": 3,
       "xyz": [
        -21.0,
-       5.436,
-       9.198
+       5.438,
+       9.181
       ],
       "kind": "coupling",
       "zone": "load1",
       "detail": "where the rigid attachment load1 grabs the part (face 9)",
       "face": 9,
-      "radius": 2.727848,
+      "radius": 2.768131,
       "values": [
-       19.4355,
-       15.8042,
-       18.2346,
-       19.9611
+       21.0807,
+       15.5033,
+       20.5998,
+       20.1093
       ],
       "sizes": [
-       1.3152,
-       1.2984,
-       1.2096,
-       1.1971
+       1.2323,
+       1.0208,
+       0.9988,
+       1.0031
       ],
       "singular": false,
-      "converged": false,
-      "change": 0.094678,
+      "converged": true,
+      "change": -0.023812,
       "excluded": true
      },
      {
       "id": 4,
       "xyz": [
-       21.0,
-       5.436,
-       9.198
-      ],
-      "kind": "coupling",
-      "zone": "load1",
-      "detail": "where the rigid attachment load1 grabs the part (face 5)",
-      "face": 5,
-      "radius": 2.537759,
-      "values": [
-       18.92,
-       15.3283,
-       18.0332,
-       17.9464
-      ],
-      "sizes": [
-       1.2822,
-       1.0438,
-       1.0599,
-       0.9475
-      ],
-      "singular": false,
-      "converged": true,
-      "change": -0.004817,
-      "excluded": true
-     },
-     {
-      "id": 5,
-      "xyz": [
-       -26.656,
-       5.97,
+       -25.12,
+       7.163,
        0.0
       ],
       "kind": "bolt",
       "zone": "fix1",
       "detail": "at the edge of support fix1 (face 19)",
       "face": 19,
-      "radius": 3.291352,
+      "radius": 2.845093,
       "values": [
-       14.3468,
-       19.4795,
-       20.4068,
-       18.3696
+       19.1262,
+       21.1107,
+       23.3163,
+       24.8501
       ],
       "sizes": [
-       1.5641,
-       1.5369,
-       1.5294,
-       1.5226
+       1.4935,
+       0.8674,
+       0.8684,
+       0.8336
+      ],
+      "singular": true,
+      "converged": false,
+      "change": 0.065783,
+      "excluded": true
+     },
+     {
+      "id": 5,
+      "xyz": [
+       21.0,
+       5.438,
+       9.181
+      ],
+      "kind": "coupling",
+      "zone": "load1",
+      "detail": "where the rigid attachment load1 grabs the part (face 5)",
+      "face": 5,
+      "radius": 2.525268,
+      "values": [
+       17.7221,
+       15.045,
+       19.6085,
+       17.7457
+      ],
+      "sizes": [
+       1.1614,
+       1.2588,
+       1.3433,
+       1.3334
       ],
       "singular": false,
       "converged": false,
-      "change": -0.099826,
+      "change": -0.094998,
       "excluded": true
      }
     ]
@@ -234,40 +234,81 @@
   {
    "name": "bolt bearing",
    "status": "pass",
-   "summary": "worst hole of fix1 (d 5.5 mm) carries 78.4 N sideways and 179 N along its axis; bearing stress 2.83 MPa, safety factor 16.59 on bearing",
+   "summary": "worst hole of fix1 (d 5.5 mm) carries 68 N sideways and 147 N along its axis; bearing stress 2.46 MPa, safety factor 19.11 on bearing",
    "detail": {
     "fixture": "fix1",
-    "bearing_MPa": 2.832842,
-    "shear_N": 78.360329,
-    "axial_N": 178.903231,
-    "sf": 16.59111
+    "bearing_MPa": 2.459614,
+    "shear_N": 68.036326,
+    "axial_N": 146.77868,
+    "sf": 19.108686
    }
   },
   {
    "name": "units and sanity",
    "status": "pass",
-   "summary": "part 102 mm across, peak strain 0.0051, max deflection 0.395 mm (0.39% of size): all plausible",
+   "summary": "part 102 mm across, peak strain 0.0052, max deflection 0.399 mm (0.39% of size): all plausible",
    "detail": {
     "diag_mm": 102.10289,
-    "strain": 0.005111,
-    "deflection_ratio": 0.003871
+    "strain": 0.005245,
+    "deflection_ratio": 0.003909
    }
   },
   {
    "name": "load introduction",
    "status": "warn",
-   "summary": "the off part loads enter through a rigid attachment (the attached part does not flex). With a distributing coupling (the attached part adds no stiffness) instead, the governing stress is 19.5 MPa (1.8x, safety factor 2.41). The verdict depends on this assumption: check how the attached part really carries the load",
+   "summary": "the off part loads enter through a rigid attachment (the attached part does not flex). With a distributing coupling (the attached part adds no stiffness) instead, the governing stress converges to 18.8 MPa on face 5 at (21, 6.94, 37.3) (1.7x, safety factor 2.50) over 3 meshes refined around that peak: 19.2 -> 19.2 -> 18.8 MPa, last change 2.1%. The verdict depends on this assumption: check how the attached part really carries the load",
    "detail": {
     "primary": "rigid",
     "alternative": "distributed",
-    "primary_peak": 10.732512,
-    "alternative_peak": 19.464509,
+    "primary_peak": 11.015549,
+    "alternative_peak": 18.801228,
     "alternative_xyz": [
-     -21.0,
-     6.893751,
-     37.348748
+     21.0,
+     6.940199,
+     37.283722
     ],
-    "alternative_raw_max": 53.244571
+    "alternative_raw_max": 48.693405,
+    "alternative_spot": null,
+    "alternative_levels": [
+     {
+      "level": 0,
+      "n_nodes": 43872,
+      "h_min": 0.673356,
+      "governing": 19.216904,
+      "governing_xyz": [
+       21.0,
+       6.893751,
+       37.348748
+      ]
+     },
+     {
+      "level": 1,
+      "n_nodes": 53902,
+      "h_min": 0.593468,
+      "governing": 19.198357,
+      "governing_xyz": [
+       -21.0,
+       6.860596,
+       37.395165
+      ]
+     },
+     {
+      "level": 2,
+      "n_nodes": 66848,
+      "h_min": 0.563926,
+      "governing": 18.801228,
+      "governing_xyz": [
+       21.0,
+       6.940199,
+       37.283722
+      ]
+     }
+    ],
+    "refined": true,
+    "refine_reason": "the verdict flips",
+    "converged": true,
+    "stopped_by": "converged",
+    "tolerance": 0.03
    }
   }
  ],
@@ -284,180 +325,180 @@
   {
    "id": 1,
    "xyz": [
-    25.6,
-    7.594,
+    -25.88,
+    7.155,
     5.0
    ],
    "kind": "bolt",
    "zone": "fix1",
    "detail": "at the edge of support fix1 (face 1)",
    "face": 1,
-   "radius": 2.86122,
+   "radius": 2.255247,
    "values": [
-    31.0959,
-    38.7728,
-    44.2222,
-    51.8939
+    36.026,
+    47.7316,
+    46.2803,
+    53.8959
    ],
    "sizes": [
-    1.4175,
-    0.6759,
-    0.7032,
-    0.651
+    1.5035,
+    0.7047,
+    0.7605,
+    0.696
    ],
-   "singular": true,
+   "singular": false,
    "converged": false,
-   "change": 0.173481,
+   "change": 0.164553,
    "excluded": true
   },
   {
    "id": 2,
    "xyz": [
-    -25.0,
-    8.346,
-    5.682
+    25.44,
+    7.553,
+    5.0
    ],
    "kind": "bolt",
    "zone": "fix1",
-   "detail": "at the edge of support fix1 (face 12)",
-   "face": 12,
-   "radius": 2.546857,
+   "detail": "at the edge of support fix1 (face 1)",
+   "face": 1,
+   "radius": 2.476685,
    "values": [
-    23.2408,
-    22.9844,
-    24.6315,
-    23.9292
+    33.37,
+    23.4561,
+    32.6116,
+    26.9113
    ],
    "sizes": [
-    1.4754,
-    1.4756,
-    1.2671,
-    1.2676
+    1.4164,
+    1.4166,
+    1.4363,
+    1.4367
    ],
    "singular": false,
-   "converged": true,
-   "change": -0.028511,
+   "converged": false,
+   "change": -0.174793,
    "excluded": true
   },
   {
    "id": 3,
    "xyz": [
     -21.0,
-    5.436,
-    9.198
+    5.438,
+    9.181
    ],
    "kind": "coupling",
    "zone": "load1",
    "detail": "where the rigid attachment load1 grabs the part (face 9)",
    "face": 9,
-   "radius": 2.727848,
+   "radius": 2.768131,
    "values": [
-    19.4355,
-    15.8042,
-    18.2346,
-    19.9611
+    21.0807,
+    15.5033,
+    20.5998,
+    20.1093
    ],
    "sizes": [
-    1.3152,
-    1.2984,
-    1.2096,
-    1.1971
+    1.2323,
+    1.0208,
+    0.9988,
+    1.0031
    ],
    "singular": false,
-   "converged": false,
-   "change": 0.094678,
+   "converged": true,
+   "change": -0.023812,
    "excluded": true
   },
   {
    "id": 4,
    "xyz": [
-    21.0,
-    5.436,
-    9.198
-   ],
-   "kind": "coupling",
-   "zone": "load1",
-   "detail": "where the rigid attachment load1 grabs the part (face 5)",
-   "face": 5,
-   "radius": 2.537759,
-   "values": [
-    18.92,
-    15.3283,
-    18.0332,
-    17.9464
-   ],
-   "sizes": [
-    1.2822,
-    1.0438,
-    1.0599,
-    0.9475
-   ],
-   "singular": false,
-   "converged": true,
-   "change": -0.004817,
-   "excluded": true
-  },
-  {
-   "id": 5,
-   "xyz": [
-    -26.656,
-    5.97,
+    -25.12,
+    7.163,
     0.0
    ],
    "kind": "bolt",
    "zone": "fix1",
    "detail": "at the edge of support fix1 (face 19)",
    "face": 19,
-   "radius": 3.291352,
+   "radius": 2.845093,
    "values": [
-    14.3468,
-    19.4795,
-    20.4068,
-    18.3696
+    19.1262,
+    21.1107,
+    23.3163,
+    24.8501
    ],
    "sizes": [
-    1.5641,
-    1.5369,
-    1.5294,
-    1.5226
+    1.4935,
+    0.8674,
+    0.8684,
+    0.8336
+   ],
+   "singular": true,
+   "converged": false,
+   "change": 0.065783,
+   "excluded": true
+  },
+  {
+   "id": 5,
+   "xyz": [
+    21.0,
+    5.438,
+    9.181
+   ],
+   "kind": "coupling",
+   "zone": "load1",
+   "detail": "where the rigid attachment load1 grabs the part (face 5)",
+   "face": 5,
+   "radius": 2.525268,
+   "values": [
+    17.7221,
+    15.045,
+    19.6085,
+    17.7457
+   ],
+   "sizes": [
+    1.1614,
+    1.2588,
+    1.3433,
+    1.3334
    ],
    "singular": false,
    "converged": false,
-   "change": -0.099826,
+   "change": -0.094998,
    "excluded": true
   }
  ],
  "levels": [
   {
    "level": 0,
-   "n_nodes": 23993,
-   "n_elems": 13010,
+   "n_nodes": 24962,
+   "n_elems": 13590,
    "h_global": 4.5,
-   "h_min": 1.243054,
-   "t_mesh": 1.074414,
-   "t_solve": 6.046863,
-   "governing": 9.830549,
+   "h_min": 1.161413,
+   "t_mesh": 0.881932,
+   "t_solve": 3.614331,
+   "governing": 9.908873,
    "governing_xyz": [
-    -24.046767,
-    6.663508,
-    3.398521
+    24.191435,
+    7.303112,
+    2.449343
    ],
-   "raw_max": 31.095857,
+   "raw_max": 36.026,
    "raw_max_xyz": [
-    25.599926,
-    7.594338,
+    -25.880325,
+    7.154505,
     5.0
    ],
-   "max_disp": 0.393942,
+   "max_disp": 0.395042,
    "max_disp_xyz": [
-    22.916667,
+    -22.916667,
     0.0,
     55.0
    ],
    "reaction": [
-    5e-06,
-    3.7e-05,
-    249.999859
+    -2.2e-05,
+    -0.00014,
+    250.000054
    ],
    "applied": [
     0.0,
@@ -465,9 +506,9 @@
     -250.0
    ],
    "reaction_moment": [
-    -3750.001581,
-    -0.003112,
-    0.003713
+    -3750.000634,
+    -0.000919,
+    0.002103
    ],
    "applied_moment": [
     3750.0,
@@ -478,34 +519,34 @@
   },
   {
    "level": 1,
-   "n_nodes": 30803,
-   "n_elems": 17292,
+   "n_nodes": 31922,
+   "n_elems": 17976,
    "h_global": 3.825,
-   "h_min": 0.675901,
-   "t_mesh": 1.722597,
-   "t_solve": 9.786184,
-   "governing": 10.077628,
+   "h_min": 0.704741,
+   "t_mesh": 0.893649,
+   "t_solve": 4.833638,
+   "governing": 11.063992,
    "governing_xyz": [
-    24.433018,
-    7.071633,
-    3.096228
+    25.252972,
+    5.847203,
+    3.092062
    ],
-   "raw_max": 38.772803,
+   "raw_max": 47.731571,
    "raw_max_xyz": [
-    25.0,
-    8.269186,
-    5.304536
+    -25.348735,
+    7.788396,
+    5.0
    ],
-   "max_disp": 0.400844,
+   "max_disp": 0.401464,
    "max_disp_xyz": [
-    25.0,
+    -25.0,
     0.0,
     55.0
    ],
    "reaction": [
-    2e-06,
-    4.8e-05,
-    249.999876
+    1e-05,
+    -4.8e-05,
+    249.999978
    ],
    "applied": [
     0.0,
@@ -513,9 +554,9 @@
     -250.0
    ],
    "reaction_moment": [
-    -3750.001323,
-    -0.000207,
-    0.000744
+    -3749.999453,
+    0.002807,
+    -0.000512
    ],
    "applied_moment": [
     3750.0,
@@ -526,34 +567,34 @@
   },
   {
    "level": 2,
-   "n_nodes": 35647,
-   "n_elems": 20249,
+   "n_nodes": 36581,
+   "n_elems": 20806,
    "h_global": 3.25125,
-   "h_min": 0.703161,
-   "t_mesh": 2.154298,
-   "t_solve": 17.506062,
-   "governing": 11.657139,
+   "h_min": 0.702653,
+   "t_mesh": 0.981649,
+   "t_solve": 7.286465,
+   "governing": 10.292489,
    "governing_xyz": [
-    -24.867323,
-    5.966475,
-    1.969882
+    -25.425419,
+    6.4981,
+    1.717834
    ],
-   "raw_max": 44.222154,
+   "raw_max": 46.280286,
    "raw_max_xyz": [
-    25.0,
-    8.297126,
-    5.305762
+    -25.9188,
+    7.383325,
+    5.0
    ],
-   "max_disp": 0.397575,
+   "max_disp": 0.401716,
    "max_disp_xyz": [
-    25.0,
+    -25.0,
     0.0,
     55.0
    ],
    "reaction": [
-    6.1e-05,
-    -3.3e-05,
-    249.999769
+    2.9e-05,
+    1e-06,
+    249.999886
    ],
    "applied": [
     0.0,
@@ -561,9 +602,9 @@
     -250.0
    ],
    "reaction_moment": [
-    -3750.002059,
-    -0.000561,
-    -0.000539
+    -3750.001826,
+    -0.001579,
+    -0.003722
    ],
    "applied_moment": [
     3750.0,
@@ -574,34 +615,34 @@
   },
   {
    "level": 3,
-   "n_nodes": 41861,
-   "n_elems": 24020,
+   "n_nodes": 43872,
+   "n_elems": 25303,
    "h_global": 2.763562,
-   "h_min": 0.650987,
-   "t_mesh": 2.061089,
-   "t_solve": 16.606316,
-   "governing": 10.732512,
+   "h_min": 0.673356,
+   "t_mesh": 1.126091,
+   "t_solve": 8.465629,
+   "governing": 11.015549,
    "governing_xyz": [
-    -25.0,
-    7.878367,
-    6.821097
+    24.734175,
+    6.085757,
+    1.962176
    ],
-   "raw_max": 51.893857,
+   "raw_max": 53.895857,
    "raw_max_xyz": [
-    25.281756,
-    7.727317,
+    -25.235266,
+    7.813851,
     5.0
    ],
-   "max_disp": 0.395197,
+   "max_disp": 0.399139,
    "max_disp_xyz": [
-    25.0,
+    -25.0,
     0.0,
     55.0
    ],
    "reaction": [
-    3.1e-05,
-    -3e-05,
-    249.999962
+    3.7e-05,
+    -1.4e-05,
+    249.999924
    ],
    "applied": [
     0.0,
@@ -609,9 +650,9 @@
     -250.0
    ],
    "reaction_moment": [
-    -3750.001517,
-    -0.000467,
-    -0.001367
+    -3750.000601,
+    0.00193,
+    -0.002571
    ],
    "applied_moment": [
     3750.0,
@@ -676,7 +717,7 @@
   "volume_mm3": 31034.015,
   "surface_area_mm2": 15132.259,
   "thickness_typical_mm": 5.0,
-  "thickness_min_mm": 4.0,
+  "thickness_min_mm": 3.874,
   "n_faces": 24,
   "holes": [
    {
@@ -1317,7 +1358,7 @@
     "normal": null,
     "bbox": [
      [
-      -11.2185,
+      -11.2186,
       0.0,
       19.75
      ],
@@ -1341,7 +1382,7 @@
     "concave": true,
     "length": 5.0,
     "role": "hole",
-    "sweep": 6.133575,
+    "sweep": 6.133573,
     "group": null
    },
    {
@@ -1350,7 +1391,7 @@
     "cad_type": "Plane",
     "area": 350.0,
     "centroid": [
-     0.0,
+     -0.0,
      50.0,
      2.5
     ],
@@ -1601,54 +1642,14 @@
     "group": null
    },
    {
-    "id": 15,
+    "id": 16,
     "kind": "cylinder",
     "cad_type": "Cylinder",
     "area": 84.9302,
     "centroid": [
-     -28.9839,
+     29.0161,
      41.9999,
      2.4983
-    ],
-    "normal": null,
-    "bbox": [
-     [
-      -31.75,
-      39.25,
-      0.0
-     ],
-     [
-      -26.25,
-      44.75,
-      5.0
-     ]
-    ],
-    "radius": 2.7496,
-    "axis": [
-     0.006,
-     0.0013,
-     -1.0
-    ],
-    "axis_point": [
-     -29.0,
-     42.0,
-     2.5
-    ],
-    "concave": true,
-    "length": 5.0329,
-    "role": "hole",
-    "sweep": 6.02193,
-    "group": null
-   },
-   {
-    "id": 16,
-    "kind": "cylinder",
-    "cad_type": "Cylinder",
-    "area": 84.9284,
-    "centroid": [
-     29.0161,
-     41.9998,
-     2.4984
     ],
     "normal": null,
     "bbox": [
@@ -1666,11 +1667,51 @@
     "radius": 2.7496,
     "axis": [
      0.006,
-     0.0014,
+     0.0013,
      -1.0
     ],
     "axis_point": [
      29.0,
+     42.0,
+     2.5
+    ],
+    "concave": true,
+    "length": 5.0329,
+    "role": "hole",
+    "sweep": 6.02193,
+    "group": null
+   },
+   {
+    "id": 15,
+    "kind": "cylinder",
+    "cad_type": "Cylinder",
+    "area": 84.9284,
+    "centroid": [
+     -28.9839,
+     41.9998,
+     2.4984
+    ],
+    "normal": null,
+    "bbox": [
+     [
+      -31.75,
+      39.25,
+      0.0
+     ],
+     [
+      -26.25,
+      44.75,
+      5.0
+     ]
+    ],
+    "radius": 2.7496,
+    "axis": [
+     0.006,
+     0.0014,
+     -1.0
+    ],
+    "axis_point": [
+     -29.0,
      42.0,
      2.5
     ],
@@ -1926,7 +1967,7 @@
   "Built from mount.py with thickness=5, rib=4, fillet=3, height=55."
  ],
  "imperial": false,
- "mass_kg": 0.039358,
+ "mass_kg": 0.039356,
  "beam": null,
  "fixes": [],
  "images": {
@@ -1938,6 +1979,6 @@
  },
  "report": "report.html",
  "workdir": ".",
- "t_total": 81.860322,
+ "t_total": 114.343906,
  "solver": "CalculiX 2.23"
 }
