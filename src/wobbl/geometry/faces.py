@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass, field
 
 import numpy as np
 
-from ..mesh.mesher import Mesh
+from ..mesh.mesher import Mesh, SurfaceMesh
 
 
 @dataclass
@@ -27,6 +27,8 @@ class FaceInfo:
     concave: bool = False         # curves into the material: holes, inside fillets
     length: float | None = None   # extent along the axis for cylinders
     role: str = ""                # hole, boss, fillet, flat, curved
+    sweep: float = 0.0            # angle covered around the axis, radians
+    group: int | None = None      # faces split from one hole or boss (common in STL) share a group id
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -80,7 +82,14 @@ class PartFeatures:
     bbox: list[list[float]]
 
     def holes(self) -> list[FaceInfo]:
-        return [f for f in self.faces.values() if f.role == "hole"]
+        """One entry per physical hole (split faces are represented by their first face)."""
+        out, seen = [], set()
+        for f in self.faces.values():
+            if f.role == "hole" and (f.group is None or f.group not in seen):
+                out.append(f)
+                if f.group is not None:
+                    seen.add(f.group)
+        return out
 
     def fillets(self) -> list[FaceInfo]:
         return [f for f in self.faces.values() if f.role == "fillet"]
@@ -170,7 +179,7 @@ def analyze_faces(mesh: Mesh) -> dict[int, FaceInfo]:
                 axis, center, r, concave, length, sweep = fit
                 info.kind = "cylinder" if cad in ("Cylinder", "Discrete", "BSplineSurface") else cad.lower()
                 info.radius, info.axis, info.axis_point = r, axis.tolist(), center.tolist()
-                info.concave, info.length = concave, length
+                info.concave, info.length, info.sweep = concave, length, sweep
                 if concave and sweep > 1.5 * np.pi:
                     info.role = "hole"
                 elif concave:
@@ -183,7 +192,32 @@ def analyze_faces(mesh: Mesh) -> dict[int, FaceInfo]:
                 info.kind = {"Cone": "cone", "Sphere": "sphere", "Torus": "torus"}.get(cad, "freeform")
                 info.role = "curved"
         out[int(s)] = info
+    _group_split_cylinders(out)
     return out
+
+
+def _group_split_cylinders(faces: dict[int, FaceInfo]):
+    """STL patches and some CAD exports split one hole into several partial cylinders; join them back."""
+    cyl = [f for f in faces.values() if f.radius is not None and f.role in ("fillet", "curved")]
+    used = set()
+    for f in cyl:
+        if f.id in used:
+            continue
+        a0, p0 = np.asarray(f.axis), np.asarray(f.axis_point)
+        same = [f]
+        for g in cyl:
+            if g.id == f.id or g.id in used or g.concave != f.concave:
+                continue
+            a1, p1 = np.asarray(g.axis), np.asarray(g.axis_point)
+            d = p1 - p0
+            off = np.linalg.norm(d - np.dot(d, a0) * a0)
+            if abs(np.dot(a0, a1)) > 0.995 and abs(g.radius - f.radius) < 0.03 * f.radius and off < 0.05 * f.radius:
+                same.append(g)
+        if len(same) > 1 and sum(x.sweep for x in same) > 1.5 * np.pi:
+            for x in same:
+                used.add(x.id)
+                x.role = "hole" if f.concave else "boss"
+                x.group = f.id
 
 
 def find_sharp_corners(mesh: Mesh, min_angle_deg: float = 30.0) -> list[Corner]:
