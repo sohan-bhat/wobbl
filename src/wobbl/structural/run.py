@@ -189,6 +189,10 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
     last = None
     wall_warm = None
     notes: list[str] = list(prep.notes)
+    if any(fx.kind == "wall" for fx, _ in fixtures):
+        _say(progress, "contact", "finding where the part presses on its wall support (coarse pre-solve)")
+        wall_warm = _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter,
+                                      work / "contact")
     for lv in range(levels_max):
         _say(progress, "mesh", f"level {lv}: meshing (element size {sizing.h:.3g} mm)")
         mesh = build_mesh(prep, sizing)
@@ -234,7 +238,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         classify(spots, tol)
         _say(progress, "check", f"level {lv}: governing {measure[gi]:.4g} MPa"
                                 + (f" ({_pct(levels)} change)" if lv else ""))
-        if lv >= 1 and _converged(levels, spots, tol):
+        if lv >= 1 and _converged(levels, spots, tol, 2 if study.quality == "fast" else 3):
             stopped_by = "converged"
             break
         if lv == levels_max - 1:
@@ -268,7 +272,9 @@ def _governing_spot(spots: list[Hotspot], xyz) -> Hotspot | None:
     return min(feats, key=lambda s: float(np.linalg.norm(np.asarray(s.xyz) - np.asarray(xyz))))
 
 
-def _converged(levels: list[Level], spots: list[Hotspot], tol: float) -> bool:
+def _converged(levels: list[Level], spots: list[Hotspot], tol: float, min_levels: int = 3) -> bool:
+    if len(levels) < min_levels:  # two agreeing meshes can both be too coarse; three show the trend
+        return False
     a, b = levels[-2].governing, levels[-1].governing
     if a <= 0 or abs(b - a) / a > tol:
         return False
@@ -322,6 +328,22 @@ def _refine(sizing: Sizing, spots: list[Hotspot], levels: list[Level], tol: floa
     # the far field gets a little finer too, so global load paths converge
     new.h = sizing.h * 0.85
     return new
+
+
+def _contact_presolve(prep, sizing, loads, fixtures, material, features, adapter, workdir):
+    """Find the contact patch on a coarse linear mesh, where each iteration costs a fraction of a second.
+
+    The patch shape depends on the overall stiffness of the part, which a coarse mesh captures well;
+    the real levels then start from it and usually settle in one or two solves.
+    """
+    coarse = Sizing(h=sizing.h * 0.8, order=1, curvature=12)
+    try:
+        mesh = build_mesh(prep, coarse)
+        built = build_static(mesh, loads, fixtures, material, features.faces)
+        _, _, warm = _solve(adapter, built, workdir, None)
+        return warm
+    except Exception:  # noqa: BLE001  the pre-solve is only a head start
+        return None
 
 
 def _solve(adapter, built: BuiltModel, workdir: Path, warm):
