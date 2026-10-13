@@ -47,7 +47,7 @@ Issues = "https://github.com/sohan-bhat/wobbl/issues"
 packages = ["src/wobbl"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["examples/**/*.png", "examples/**/report.html", "docs/img"]
+exclude = ["examples/**/*.png", "examples/**/report.html", "docs/img", "site", "scripts", "npm", ".github", ".claude"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
