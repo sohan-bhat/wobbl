@@ -46,7 +46,15 @@ request. It opens with the verdict and the confidence, then the heatmaps, the ch
 fixes with before and after images when they were applied, a table of every mesh level with
 its node count, element size, stress and solve time, every stress peak Wobbl found with its
 value on each mesh and whether it was counted or excluded, the setup and the assumptions.
-For a strength result, `wobbl report <folder>` rebuilds it from `outcome.json`.
+
+```sh
+wobbl report [RESULT_DIR] [--open]
+```
+
+`wobbl report` finds the report of a finished run, the newest one under `wobbl-out/` when you
+give no folder, and `--open` opens it in your default browser. For a strength result it writes
+the report again from `outcome.json` first, so the page picks up any fixes applied since the
+run, and for heat and circuit results it opens the existing report as it is.
 
 ## outcome.json
 
