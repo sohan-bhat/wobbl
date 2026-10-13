@@ -120,12 +120,15 @@ A transient keeps its own books. Wobbl adds up the heat made over the run and th
 came in or left through held temperature faces, then compares that with how much more heat
 the part holds at the end than at the start plus everything convection and radiation carried
 away along the way. The stored heat uses the exact weights of the quadratic temperature field,
-and the flows are summed over the 40 saved time points. CalculiX moves through time in
-implicit steps about as long as the gaps between those points, so the two sides differ by
-about the error of its time steps, which is why a transient passes within 2% and warns up
-to 5%. The battery pack example
-closes to 1% and the lumped cooling case to 0.9%. A warning says the time steps are coarse for
-how fast the part responds, so the temperatures between them are approximate.
+and the flows are integrated through a smooth curve over the 40 saved time points. A held face
+that jumps to a new temperature adds saved points through its short ramp and the fast flow of
+heat just after it. CalculiX moves through time in implicit steps about as long as the gaps
+between those points, so the two sides differ by about the error of its time steps, which is
+why a transient passes within 2% and warns up to 5%. That is 2% of the largest flow in the
+account, with each held face counted on its own, because a hot face and a cold face can each
+move far more heat than the part keeps. The battery pack example closes to 1%, the lumped
+cooling case to 0.9% and a plate set on a 120 C surface to 0.8%. A warning says the time steps
+are coarse for how fast the part responds, so the temperatures between them are approximate.
 
 ## Circuit checks
 

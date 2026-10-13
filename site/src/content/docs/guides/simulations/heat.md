@@ -39,6 +39,27 @@ verdict is hot.
 
 ![The battery pack temperature over the one hour discharge, crossing the 60 C limit just after 20 minutes](/img/battery-history.webp)
 
+## A part set on a hot surface
+
+```sh
+wobbl thermal plate.step -m 6061-t6 --fixed-temp "120 C @ bottom" \
+  --film "10 W/m2K @ top" --ambient "20 C" --duration "5 min"
+```
+
+The plate starts at the 20 C air temperature, and its bottom is held at 120 C from the start.
+A held face that jumps all at once would move the nodes next to it by a fixed amount however
+short the time step, so Wobbl ramps it in a straight line from the starting temperature to its
+target over a very short time instead. That time is a tenth of the time heat takes to cross the
+smallest element at the face, which is quicker than the mesh can resolve, or a thousandth of
+the run if that is shorter. Over a long run it can be a little longer, because CalculiX never
+takes a time step under a millionth of the run, and the result's assumptions say how long the
+ramp was and why. Here it is 0.06 s of a 5 minute run.
+
+A face that jumps also gets extra saved times through the ramp and the fast flow of heat just
+after it, and smaller time steps when the jump is under 100 C, so a 20 C jump is followed as
+closely as a 100 C one. Several held faces can each jump to their own temperature, such as a
+hot end and a cold end on a part that starts somewhere in between.
+
 ## Choosing the inputs
 
 | Input | How to set it |
@@ -68,8 +89,9 @@ faces as the films. [wobbl thermal](/guides/cli/thermal/) lists every option.
 The hottest point has to settle within 2% between meshes, and two meshes are enough here
 because temperature is a smooth field. In steady state, the heat going in has to match the
 heat leaving by convection, radiation and any held temperature faces to within 1%. In a
-transient, the heat made over the run has to match the heat the part stored plus the heat it
-shed along the way to within 2%, which the battery pack closes to 1%. A lumped
+transient, the heat made over the run and the heat let in or out by held faces have to match
+the heat the part stored plus the heat it shed along the way, to within 2% of the largest of
+those flows. The battery pack closes to 1%, and the plate on the hot surface to 0.8%. A lumped
 hand calculation treats the part as one uniform block and is compared with the surface
 average in steady state, or with the mean temperature over time in a transient. When
 radiation is off but the part runs hot, the result says how much heat radiation could shed.
