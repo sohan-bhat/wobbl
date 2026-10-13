@@ -103,8 +103,11 @@ class Selector:
         result: set[int] | None = None
         for alt in re.split(r"\s+or\s+|\|", text, flags=re.I):
             ids: set[int] | None = None
-            for clause in re.split(r"\s+and\s+|&|;", alt, flags=re.I):
-                got, reg = self._atom(clause.strip())
+            clauses = [c.strip() for c in re.split(r"\s+and\s+|&|;", alt, flags=re.I)]
+            # region clauses go first, so "top and within 14 of P" means the highest face near P
+            clauses.sort(key=lambda c: 0 if re.match(r"(within|box)\b", c, re.I) else 1)
+            for clause in clauses:
+                got, reg = self._atom(clause, restrict=ids)
                 if reg is not None:
                     regions.append(reg)
                 ids = got if ids is None else ids & got
@@ -126,7 +129,7 @@ class Selector:
         return s
 
     # ---- atoms -------------------------------------------------------------
-    def _atom(self, a: str) -> tuple[set[int], tuple | None]:
+    def _atom(self, a: str, restrict: set[int] | None = None) -> tuple[set[int], tuple | None]:
         s = a.lower().strip()
         F = self.faces
         allids = set(F)
@@ -141,9 +144,11 @@ class Selector:
             return ids, None
         if s in _SIDES:
             ax, sign = _SIDES[s]
-            cands = [f for f in F.values() if f.kind == "plane" and f.normal[ax] * sign > 0.98]
+            cands = [f for f in F.values() if f.kind == "plane" and f.normal[ax] * sign > 0.98
+                     and (restrict is None or f.id in restrict)]
             if not cands:
-                raise SelectionError(f"no flat face points {s}. {self.hint()}")
+                raise SelectionError(f"no flat face points {s}" + (" in that region" if restrict else "") +
+                                     f". {self.hint()}")
             ext = max(f.centroid[ax] * sign for f in cands)
             return {f.id for f in cands if abs(f.centroid[ax] * sign - ext) <= self.tol}, None
         m = re.fullmatch(r"([xyz])\s*(=|==|<=|>=|<|>)\s*(min|max|" + _NUM + ")", s)
