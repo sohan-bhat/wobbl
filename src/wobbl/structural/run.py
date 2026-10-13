@@ -15,7 +15,8 @@ from ..geometry.faces import PartFeatures, analyze, find_sharp_corners
 from ..geometry.select import Selection, SelectionError, Selector
 from ..materials import Material, resolve_material
 from ..mesh.isolate import IsolatedCrash, IsolatedTimeout
-from ..mesh.mesher import Mesh, MeshError, Refinement, Sizing, auto_sizing, build_mesh, build_surface_mesh
+from ..mesh.mesher import (Mesh, MeshError, Refinement, Sizing, auto_sizing, build_mesh, build_surface_mesh,
+                           requested_size)
 from ..solvers.base import SolverError
 from ..solvers import base as solvers
 from .build import BuiltModel, build_static
@@ -174,6 +175,17 @@ def feature_refinements(features: PartFeatures, h: float) -> list[Refinement]:
             for size, ids in sorted(buckets.items())]
 
 
+def exclusion_radius(features: PartFeatures, sizing: Sizing, mesh: Mesh, hot: np.ndarray) -> float:
+    """How far from a sharp corner or an idealized support the reported stress is taken.
+
+    A fifth of the typical wall, or one element of the first mesh where the part is most stressed, whichever is
+    larger. The element size is the one the sizing rules ask for there, a property of the geometry, rather than
+    the size of whichever elements gmsh made: a peak that sits at this radius (a rigid attachment beside the
+    hole it grabs) otherwise moves with every small change in the mesh.
+    """
+    return float(max(0.2 * features.thickness_typical, np.median(requested_size(sizing, mesh, hot))))
+
+
 def describe_part(path: str, workdir: str | Path, scale: float = 1.0, body: int | None = None,
                   params: dict | None = None):
     """Prepare the CAD (building parametric .py parts first) and analyze its faces. Returns (prepared, features)."""
@@ -263,8 +275,7 @@ def run_structural(study: StructuralStudy, workdir: str | Path, progress: Progre
         corners = find_sharp_corners(mesh, faces=features.faces, tangent=features.tangent_pairs)
         zmap = ZoneMap(mesh, built.zones, built.zone_kind, corners)
         if lv == 0:
-            sizes = mesh.node_sizes()
-            r_ex = float(max(0.2 * features.thickness_typical, 1.0 * np.nanmedian(sizes[measure > 0.5 * measure.max()])))
+            r_ex = exclusion_radius(features, sizing, mesh, mesh.X[measure > 0.5 * measure.max()])
         spots = _update_spots(spots, lv, mesh, measure, zmap, features, prep)
         excluded = zmap.excluded_mask(mesh.X, r_ex)
         levels.append(_record_level(lv, mesh, sizing, res, built, measure, excluded, wall_iters))

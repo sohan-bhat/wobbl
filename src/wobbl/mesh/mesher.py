@@ -645,3 +645,51 @@ def auto_sizing(prep: PreparedGeometry, thickness: float | None = None, fineness
         h *= (nodes_est / max_nodes) ** (1 / 3)
     h /= fineness
     return Sizing(h=float(h))
+
+
+def requested_size(sizing: Sizing, mesh: Mesh, pts: np.ndarray) -> np.ndarray:
+    """The element size a sizing asks for at each point, evaluated the way gmsh evaluates the fields.
+
+    The global size, lowered by each refinement: a threshold on the distance to its faces or edges, or a ball
+    around its points. Distances to faces and edges are measured to the mesh nodes on them. This is a property
+    of the geometry and the sizing rules, unlike the size of whichever element happens to sit at a point.
+    """
+    from scipy.spatial import cKDTree
+
+    pts = np.atleast_2d(np.asarray(pts, float))
+    h = float(sizing.h)
+    out = np.full(len(pts), h)
+    tris = mesh.tris[:, :3]
+    pairs = np.unique(np.column_stack([tris.ravel(), np.repeat(mesh.tri_surf, 3)]), axis=0)
+    shared = np.bincount(pairs[:, 0], minlength=len(mesh.X)) > 1      # nodes on an edge between faces
+    on = {int(s): np.unique(tris[mesh.tri_surf == s]) for s in np.unique(mesh.tri_surf)}
+
+    def edge_nodes(curve: int) -> np.ndarray:
+        faces = [s for s, cs in mesh.surface_curves.items() if curve in {abs(int(c)) for c in cs} and s in on]
+        if not faces:
+            return np.zeros(0, np.int64)
+        nodes = on[faces[0]]
+        for s in faces[1:]:
+            nodes = np.intersect1d(nodes, on[s])
+        return nodes[shared[nodes]]
+
+    def ramp(d, d0, d1, inner):
+        return np.where(d <= d0, inner, np.where(d >= d1, h, inner + (h - inner) * (d - d0) / max(d1 - d0, 1e-12)))
+
+    for r in sizing.refinements:
+        grow = r.grow or 6.0 * r.size
+        if r.corners_only:
+            nodes = [on[s][shared[on[s]]] for s in r.surfaces if s in on]
+            d0, d1 = 0.5 * r.size, 0.5 * r.size + grow
+        else:
+            nodes = [on[s] for s in r.surfaces if s in on] + [edge_nodes(int(c)) for c in r.curves]
+            d0, d1 = r.radius, r.radius + grow
+        nodes = np.concatenate(nodes) if nodes else np.zeros(0, np.int64)
+        if len(nodes):
+            d, _ = cKDTree(mesh.X[np.unique(nodes)]).query(pts)
+            out = np.minimum(out, ramp(d, d0, d1, r.size))
+        for p in r.points:
+            d = np.linalg.norm(pts - np.asarray(p, float), axis=1)
+            rad = max(r.radius, 2.0 * r.size)
+            out = np.minimum(out, ramp(d, rad, rad + grow, r.size))
+    return out

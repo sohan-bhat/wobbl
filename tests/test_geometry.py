@@ -107,3 +107,17 @@ def test_thin_wall_estimate_moves_smoothly():
     assert typical == 6.0 and thin == pytest.approx(3.6)
     _, thin = thickness_stats(th, np.array([6.0, 94.0]))
     assert thin == pytest.approx(3.0)
+
+
+def test_requested_size_follows_the_sizing_rules(plate):
+    from wobbl.mesh.mesher import Refinement, requested_size
+
+    prep, f = plate
+    hole = f.holes()[0].id
+    m = build_mesh(prep, Sizing(h=4.0))
+    s = Sizing(h=4.0, refinements=[Refinement(0.5, surfaces=[hole], grow=2.0),
+                                   Refinement(1.0, points=[(90, 20, 5)], radius=3.0, grow=4.0)])
+    on_hole = m.X[m.surface_nodes([hole])[0]]
+    got = requested_size(s, m, np.array([on_hole, [90, 20, 5], [95, 20, 5], [20, 5, 2.5]]))
+    # on the hole wall; inside the ball; half way through the ball's 4 mm ramp; far from both
+    assert got == pytest.approx([0.5, 1.0, 2.5, 4.0])
