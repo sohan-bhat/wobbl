@@ -150,21 +150,40 @@ def _boundary(tets: np.ndarray, X: np.ndarray, order: int):
     return tris, E, F, key
 
 
-def build_mesh(prep: PreparedGeometry, sizing: Sizing, verbose: bool = False) -> Mesh:
-    """Mesh the prepared geometry with the given sizing. Retries with safer settings before giving up."""
-    attempts = [dict(alg3d=10, curved=True), dict(alg3d=1, curved=True), dict(alg3d=1, curved=False)]
-    last_err = None
+def estimate_nodes(prep: PreparedGeometry, sizing: Sizing) -> float:
+    vol = max(prep.volume, 1e-9)
+    est = 1.45 * vol / (sizing.h ** 3 / 6.5)
+    for r in sizing.refinements:
+        rad = (r.radius or 0) + (r.grow or 6 * r.size)
+        local = (4 / 3) * np.pi * rad ** 3 * max(1, len(r.points)) if r.points else 0.25 * vol
+        est += 1.45 * min(local, vol) / (r.size ** 3 / 6.5) * 0.3
+    return est
+
+
+def build_mesh(prep: PreparedGeometry, sizing: Sizing, verbose: bool = False, timeout: float | None = None) -> Mesh:
+    """Mesh the prepared geometry with the given sizing.
+
+    Each attempt runs in a child process; if gmsh hangs or crashes, the next, more conservative
+    strategy is tried before giving up.
+    """
+    from .isolate import IsolatedCrash, IsolatedTimeout, run_isolated
+
+    if timeout is None:
+        timeout = 60.0 + estimate_nodes(prep, sizing) / 1500.0
+    attempts = [dict(alg2d=6, alg3d=10, curved=True), dict(alg2d=5, alg3d=1, curved=True),
+                dict(alg2d=1, alg3d=1, curved=False)]
+    errors = []
     for i, att in enumerate(attempts):
         try:
-            mesh = _build(prep, sizing, verbose=verbose, **att)
+            mesh = run_isolated(_build, prep, sizing, verbose, timeout=timeout, **att)
             if i > 0:
                 mesh.notes.append("Meshing needed a fallback strategy" +
                                   ("" if att["curved"] else " (straight sided second order elements)") + ".")
             return mesh
-        except MeshError as e:
-            last_err = e
-    raise MeshError(f"gmsh could not mesh this part: {last_err}. Try a larger --mesh-size, or check the CAD "
-                    "for self intersections and gaps.")
+        except (MeshError, IsolatedCrash, IsolatedTimeout) as e:
+            errors.append(str(e))
+    raise MeshError(f"gmsh could not mesh this part ({'; '.join(errors)}). Try a larger --mesh-size, "
+                    "or check the CAD for self intersections and gaps.")
 
 
 def _add_fields(gmsh, sizing: Sizing):
@@ -201,7 +220,7 @@ def _add_fields(gmsh, sizing: Sizing):
         gmsh.model.mesh.field.setAsBackgroundMesh(fm)
 
 
-def _build(prep: PreparedGeometry, sizing: Sizing, verbose: bool, alg3d: int, curved: bool) -> Mesh:
+def _build(prep: PreparedGeometry, sizing: Sizing, verbose: bool, alg2d: int, alg3d: int, curved: bool) -> Mesh:
     t0 = time.time()
     with gmsh_session(verbose) as gmsh:
         load_into_session(gmsh, prep)
@@ -211,7 +230,7 @@ def _build(prep: PreparedGeometry, sizing: Sizing, verbose: bool, alg3d: int, cu
         opt("Mesh.MeshSizeFromPoints", 0)
         opt("Mesh.MeshSizeFromCurvature", sizing.curvature)
         opt("Mesh.MeshSizeExtendFromBoundary", 1)
-        opt("Mesh.Algorithm", 6)
+        opt("Mesh.Algorithm", alg2d)
         opt("Mesh.Algorithm3D", alg3d)
         opt("Mesh.Optimize", 1)
         opt("Mesh.ElementOrder", 1)
@@ -291,6 +310,110 @@ def _build(prep: PreparedGeometry, sizing: Sizing, verbose: bool, alg3d: int, cu
     if len(tets) == 0:
         raise GeometryError("the mesh is empty")
     return mesh
+
+
+@dataclass
+class SurfaceMesh:
+    """Boundary only mesh with outward oriented triangles. Cheap to build, used to describe a part."""
+    X: np.ndarray
+    tris: np.ndarray
+    tri_surf: np.ndarray
+    surface_types: dict[int, str] = field(default_factory=dict)
+    surface_curves: dict[int, list[int]] = field(default_factory=dict)
+    t_mesh: float = 0.0
+
+    tri_geometry = Mesh.tri_geometry
+    surface_mask = Mesh.surface_mask
+    surface_nodes = Mesh.surface_nodes
+    surfaces = Mesh.surfaces
+
+    def volume(self) -> float:
+        p0, p1, p2 = (self.X[self.tris[:, i]] for i in range(3))
+        return float(abs(np.einsum("ij,ij->i", p0, np.cross(p1, p2)).sum() / 6.0))
+
+
+def _count_hits(o, d, V0, e1, e2):
+    p = np.cross(d, e2)
+    det = np.einsum("tk,tk->t", np.broadcast_to(p, e1.shape), e1)
+    ok = np.abs(det) > 1e-14
+    inv = np.where(ok, 1.0 / np.where(ok, det, 1.0), 0.0)
+    sv = o - V0
+    u = np.einsum("tk,tk->t", sv, np.broadcast_to(p, e1.shape)) * inv
+    q = np.cross(sv, e1)
+    v = (q @ d) * inv
+    t = np.einsum("tk,tk->t", e2, q) * inv
+    return int((ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 1e-9)).sum())
+
+
+def build_surface_mesh(prep: PreparedGeometry, h: float | None = None, curvature: int = 8) -> SurfaceMesh:
+    """Triangulate the boundary only and orient every CAD face outward by ray parity."""
+    from .isolate import IsolatedCrash, IsolatedTimeout, run_isolated
+
+    errors = []
+    for alg in (6, 5, 1):
+        try:
+            return run_isolated(_surface, prep, h, curvature, alg, timeout=90.0)
+        except (MeshError, IsolatedCrash, IsolatedTimeout) as e:
+            errors.append(str(e))
+    raise MeshError(f"could not triangulate the part's surface ({'; '.join(errors)})")
+
+
+def _surface(prep: PreparedGeometry, h: float | None, curvature: int, alg: int) -> SurfaceMesh:
+    t0 = time.time()
+    h = h or prep.diag / 30.0
+    with gmsh_session() as gmsh:
+        load_into_session(gmsh, prep)
+        opt = gmsh.option.setNumber
+        opt("Mesh.MeshSizeMax", h)
+        opt("Mesh.MeshSizeMin", prep.diag / 250.0)
+        opt("Mesh.MeshSizeFromPoints", 0)
+        opt("Mesh.MeshSizeFromCurvature", 0 if prep.kind == "stl" else curvature)
+        opt("Mesh.Algorithm", alg)
+        if prep.kind != "stl":
+            try:
+                gmsh.model.mesh.generate(2)
+            except Exception as e:  # noqa: BLE001
+                raise MeshError(f"surface meshing failed: {e}") from e
+        ntags, coords, _ = gmsh.model.mesh.getNodes()
+        stypes, scurves, chunks = {}, {}, []
+        for _, s in gmsh.model.getEntities(2):
+            stypes[s] = gmsh.model.getType(2, s)
+            scurves[s] = [int(c) for c in gmsh.model.getAdjacencies(2, s)[1]]
+            st, _, sn = gmsh.model.mesh.getElements(2, s)
+            for tt, nn in zip(st, sn):
+                if tt == 2:
+                    chunks.append((s, np.asarray(nn, dtype=np.int64).reshape(-1, 3)))
+    if not chunks:
+        raise MeshError("no surface triangles were generated")
+    ntags = np.asarray(ntags, dtype=np.int64)
+    lut = np.full(int(ntags.max()) + 1, -1, dtype=np.int64)
+    lut[ntags] = np.arange(len(ntags))
+    X = np.asarray(coords).reshape(-1, 3)
+    tris = np.vstack([lut[c] for _, c in chunks])
+    tri_surf = np.concatenate([np.full(len(c), s) for s, c in chunks])
+    used = np.unique(tris)
+    remap = np.full(len(X), -1, dtype=np.int64)
+    remap[used] = np.arange(len(used))
+    X, tris = X[used], remap[tris]
+    # orient each surface outward: a ray leaving outward crosses the boundary an even number of times
+    V0, V1, V2 = X[tris[:, 0]], X[tris[:, 1]], X[tris[:, 2]]
+    e1, e2 = V1 - V0, V2 - V0
+    nrm = np.cross(e1, e2)
+    area = 0.5 * np.linalg.norm(nrm, axis=1)
+    rng = np.random.default_rng(1)
+    for s in np.unique(tri_surf):
+        idx = np.nonzero(tri_surf == s)[0]
+        pick = idx[np.argsort(-area[idx])[:3]]
+        votes = 0
+        for i in pick:
+            n = nrm[i] / max(np.linalg.norm(nrm[i]), 1e-300)
+            d = n + 0.05 * rng.standard_normal(3)
+            d /= np.linalg.norm(d)
+            c = (V0[i] + V1[i] + V2[i]) / 3.0 + d * 1e-7 * prep.diag
+            votes += 1 if _count_hits(c, d, V0, e1, e2) % 2 == 1 else -1
+        if votes > 0:
+            tris[idx] = tris[idx][:, [0, 2, 1]]
+    return SurfaceMesh(X, tris, tri_surf, stypes, scurves, time.time() - t0)
 
 
 def auto_sizing(prep: PreparedGeometry, thickness: float | None = None, fineness: float = 1.0,
