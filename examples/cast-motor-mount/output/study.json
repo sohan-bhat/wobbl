@@ -1,6 +1,6 @@
 {
  "part": "../../../src/wobbl/validation/parts/cast_motor_mount.step",
- "material": "custom:E=72400,nu=0.33,yield=165",
+ "material": "custom:E=72400,nu=0.33,yield=165,process=cast",
  "loads": [
   {
    "kind": "remote",
