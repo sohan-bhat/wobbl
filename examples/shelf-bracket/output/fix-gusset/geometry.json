@@ -1,6 +1,6 @@
 {
- "source": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/work/geometry/bracket-7b2ed894.step",
- "path": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-gusset/geometry/gusset_t6.brep",
+ "source": "../work/geometry/bracket-7b2ed894.step",
+ "path": "geometry/gusset_t6.brep",
  "kind": "cad",
  "bbox": [
   [
@@ -14,7 +14,7 @@
    80.00000015
   ]
  ],
- "volume": 27061.208898860827,
+ "volume": 27061.208898860823,
  "n_bodies": 1,
  "n_surfaces": 16,
  "notes": [

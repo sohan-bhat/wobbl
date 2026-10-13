@@ -1,6 +1,6 @@
 {
- "source": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/work/geometry/bracket-7b2ed894.step",
- "path": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/work/geometry/prepared.brep",
+ "source": "work/geometry/bracket-7b2ed894.step",
+ "path": "work/geometry/prepared.brep",
  "kind": "cad",
  "bbox": [
   [

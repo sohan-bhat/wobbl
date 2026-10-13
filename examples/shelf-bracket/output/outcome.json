@@ -1,25 +1,25 @@
 {
  "domain": "strength",
- "part": "/Users/sohanb/code/wobbl/examples/shelf-bracket/bracket.py",
+ "part": "../bracket.py",
  "material": "PLA (3D printed)",
  "question": "Will this printed PLA shelf bracket hold its share of an 8 kg shelf?",
  "measure": "max principal stress",
- "governing_MPa": 52.69059,
+ "governing_MPa": 52.98784,
  "governing_xyz": [
-  6.285844,
-  10.857815,
-  6.048185
+  6.194707,
+  13.116982,
+  6.115953
  ],
- "governing_where": "on the 0.5 mm inside fillet (face 3)",
+ "governing_where": "on the 0.5 mm inside fillet (face 3) at (6.19, 13.1, 6.12)",
  "allowable_MPa": 50,
- "safety_factor": 0.948936,
+ "safety_factor": 0.943613,
  "target_sf": 2.5,
  "verdict": "fails",
- "headline": "Peak 52.7 MPa on the 0.5 mm inside fillet (face 3). The part cracks at about 0.95x this load.",
- "max_disp_mm": 3.465692,
+ "headline": "Peak 53 MPa on the 0.5 mm inside fillet (face 3) at (6.19, 13.1, 6.12). The part cracks at about 0.94x this load.",
+ "max_disp_mm": 3.454648,
  "max_disp_xyz": [
   90.0,
-  12.5,
+  17.1875,
   6.0
  ],
  "confidence": "high",
@@ -30,29 +30,29 @@
   {
    "name": "mesh convergence",
    "status": "pass",
-   "summary": "max principal stress settled: 43.8 -> 51.5 -> 53.3 -> 52.7 MPa over 4 meshes, last change 1.1%",
+   "summary": "max principal stress settled: 43.1 -> 50.1 -> 52.8 -> 53 MPa over 4 meshes, last change 0.3%",
    "detail": {
     "values": [
-     43.751649,
-     51.543297,
-     53.290579,
-     52.69059
+     43.078736,
+     50.067485,
+     52.805022,
+     52.98784
     ],
-    "last_change": 0.011387,
+    "last_change": 0.00345,
     "tolerance": 0.03,
     "stopped_by": "converged",
     "max_displacement": [
-     3.436609,
-     3.434698,
-     3.477973,
-     3.465692
+     3.418069,
+     3.442015,
+     3.459103,
+     3.454648
     ]
    }
   },
   {
    "name": "force balance",
    "status": "pass",
-   "summary": "reactions balance the loads to 8.8e-05% (forces) and 1.6e-05% (moments)",
+   "summary": "reactions balance the loads to 1.5e-05% (forces) and 1.1e-05% (moments)",
    "detail": {
     "applied_N": [
      0.0,
@@ -60,46 +60,46 @@
      -40.0
     ],
     "reaction_N": [
-     -9e-06,
-     3.3e-05,
-     40.000008
+     -3e-06,
+     4e-06,
+     40.000003
     ],
-    "force_error": 1e-06,
+    "force_error": 0.0,
     "moment_error": 0.0
    }
   },
   {
    "name": "hand calculation",
    "status": "pass",
-   "summary": "beam theory through the critical section gives 15.6 MPa nominal; FEA peak is 3.37x that, a stress concentration of about 3.4 from the local shape",
+   "summary": "beam theory through the critical section gives 15.3 MPa nominal; FEA peak is 3.47x that, a stress concentration of about 3.5 from the local shape",
    "detail": {
     "section_point": [
-     6.285844,
-     10.857815,
-     6.048185
+     6.194707,
+     13.116982,
+     6.115953
     ],
     "axis": [
      1.0,
      0.0,
      0.0
     ],
-    "area_mm2": 151.469001,
+    "area_mm2": 152.987744,
     "centroid": [
-     6.285844,
-     12.497597,
-     3.029389
+     6.194707,
+     12.500224,
+     3.059763
     ],
     "axial_N": 0.0,
-    "bending_Nmm": 2351.475658,
-    "torsion_Nmm": -0.655739,
-    "nominal_peak_MPa": 15.63356,
-    "nominal_at_point_MPa": 15.318757,
-    "shear_from_torsion_MPa": 0.00101,
+    "bending_Nmm": 2351.91572,
+    "torsion_Nmm": -1.073491,
+    "nominal_peak_MPa": 15.286218,
+    "nominal_at_point_MPa": 15.055156,
+    "shear_from_torsion_MPa": 0.001636,
     "I_principal_mm4": [
-     463.358963,
-     7885.700409
+     477.436526,
+     7969.176593
     ],
-    "ratio": 3.370351
+    "ratio": 3.46638
    }
   },
   {
@@ -111,23 +111,23 @@
   {
    "name": "bolt bearing",
    "status": "pass",
-   "summary": "worst hole of fix1 (d 4.5 mm) carries 6.87 N sideways and 57.8 N along its axis; bearing stress 0.254 MPa, safety factor 196.61 on bearing",
+   "summary": "worst hole of fix1 (d 4.5 mm) carries 7.03 N sideways and 58.8 N along its axis; bearing stress 0.26 MPa, safety factor 192.18 on bearing",
    "detail": {
     "fixture": "fix1",
-    "bearing_MPa": 0.254315,
-    "shear_N": 6.866903,
-    "axial_N": 57.797386,
-    "sf": 196.606614
+    "bearing_MPa": 0.260176,
+    "shear_N": 7.025164,
+    "axial_N": 58.810686,
+    "sf": 192.177535
    }
   },
   {
    "name": "units and sanity",
    "status": "pass",
-   "summary": "part 123 mm across, peak strain 0.015, max deflection 3.47 mm (2.8% of size): all plausible",
+   "summary": "part 123 mm across, peak strain 0.015, max deflection 3.45 mm (2.8% of size): all plausible",
    "detail": {
     "diag_mm": 122.983739,
-    "strain": 0.015054,
-    "deflection_ratio": 0.02818
+    "strain": 0.015139,
+    "deflection_ratio": 0.02809
    }
   }
  ],
@@ -146,121 +146,150 @@
    "id": 1,
    "xyz": [
     6.146,
-    12.5,
+    15.909,
     6.146
    ],
    "kind": "feature",
    "zone": null,
    "detail": "on the 0.5 mm inside fillet (face 3)",
    "face": 3,
-   "radius": 3.418917,
+   "radius": 3.132297,
    "values": [
-    43.7516,
-    51.5433,
-    53.2906,
-    52.6906
+    43.0787,
+    49.9761,
+    52.7073,
+    52.9878
    ],
    "sizes": [
-    2.2793,
-    0.729,
-    0.2567,
-    0.2951
+    2.0744,
+    0.648,
+    0.2603,
+    0.2625
    ],
    "singular": false,
    "converged": true,
-   "change": -0.011259,
+   "change": 0.005323,
    "excluded": false
   },
   {
    "id": 2,
    "xyz": [
     6.146,
-    20.455,
+    9.091,
     6.146
    ],
    "kind": "feature",
    "zone": null,
    "detail": "on the 0.5 mm inside fillet (face 3)",
    "face": 3,
-   "radius": 3.597736,
+   "radius": 3.49591,
    "values": [
-    36.4113,
-    41.7312,
-    50.2189,
-    51.2771
+    42.0341,
+    49.4569,
+    52.805,
+    52.689
    ],
    "sizes": [
-    1.5056,
-    0.7149,
-    0.2307,
-    0.2695
+    2.2723,
+    0.6757,
+    0.246,
+    0.2589
    ],
    "singular": false,
    "converged": true,
-   "change": 0.021072,
+   "change": -0.002198,
    "excluded": false
   },
   {
    "id": 3,
    "xyz": [
-    6.146,
-    3.409,
-    6.146
+    6.309,
+    1.136,
+    6.038
    ],
    "kind": "feature",
    "zone": null,
    "detail": "on the 0.5 mm inside fillet (face 3)",
    "face": 3,
-   "radius": 3.649548,
+   "radius": 2.258335,
    "values": [
-    39.4622,
-    43.8482,
-    49.7626,
-    47.5512
+    27.5117,
+    36.5919,
+    38.3093,
+    37.2819
    ],
    "sizes": [
     1.5056,
-    0.5249,
-    0.2041,
-    0.112
+    0.5914,
+    0.1873,
+    0.116
+   ],
+   "singular": false,
+   "converged": true,
+   "change": -0.026818,
+   "excluded": false
+  },
+  {
+   "id": 4,
+   "xyz": [
+    6.309,
+    25.0,
+    6.038
+   ],
+   "kind": "feature",
+   "zone": null,
+   "detail": "on face 9",
+   "face": 9,
+   "radius": 2.258335,
+   "values": [
+    23.195,
+    29.9166,
+    37.5758,
+    35.3114
+   ],
+   "sizes": [
+    1.5056,
+    0.6178,
+    0.1747,
+    0.1144
    ],
    "singular": false,
    "converged": false,
-   "change": -0.04444,
+   "change": -0.060262,
    "excluded": false
   }
  ],
  "levels": [
   {
    "level": 0,
-   "n_nodes": 6202,
-   "n_elems": 3138,
+   "n_nodes": 6269,
+   "n_elems": 3182,
    "h_global": 5.4,
    "h_min": 1.505556,
-   "t_mesh": 0.646999,
-   "t_solve": 1.689541,
-   "governing": 43.751649,
+   "t_mesh": 0.485898,
+   "t_solve": 1.143951,
+   "governing": 43.078736,
    "governing_xyz": [
     6.146447,
-    12.5,
+    15.909091,
     6.146447
    ],
-   "raw_max": 43.751649,
+   "raw_max": 43.078736,
    "raw_max_xyz": [
     6.146447,
-    12.5,
+    15.909091,
     6.146447
    ],
-   "max_disp": 3.436609,
+   "max_disp": 3.418069,
    "max_disp_xyz": [
     90.0,
-    7.5,
+    12.5,
     6.0
    ],
    "reaction": [
-    -0.000149,
-    -0.0,
-    39.99994
+    -2.3e-05,
+    8e-06,
+    39.999979
    ],
    "applied": [
     0.0,
@@ -268,47 +297,47 @@
     -40.0
    ],
    "reaction_moment": [
-    499.966173,
-    -2611.207426,
-    0.002059
+    502.095297,
+    -2602.476,
+    0.0005
    ],
    "applied_moment": [
-    -499.96715,
-    2611.207453,
+    -502.095891,
+    2602.47535,
     0.0
    ],
-   "wall_iterations": 3
+   "wall_iterations": 4
   },
   {
    "level": 1,
-   "n_nodes": 10458,
-   "n_elems": 5458,
+   "n_nodes": 10784,
+   "n_elems": 5624,
    "h_global": 4.59,
-   "h_min": 0.524884,
-   "t_mesh": 1.040283,
-   "t_solve": 5.806193,
-   "governing": 51.543297,
+   "h_min": 0.591382,
+   "t_mesh": 0.792089,
+   "t_solve": 2.518452,
+   "governing": 50.067485,
    "governing_xyz": [
-    6.308253,
-    10.968532,
-    6.038228
+    6.304258,
+    12.663977,
+    6.039907
    ],
-   "raw_max": 51.543297,
+   "raw_max": 50.067485,
    "raw_max_xyz": [
-    6.308253,
-    10.968532,
-    6.038228
+    6.304258,
+    12.663977,
+    6.039907
    ],
-   "max_disp": 3.434698,
+   "max_disp": 3.442015,
    "max_disp_xyz": [
     90.0,
-    0.0,
+    18.75,
     6.0
    ],
    "reaction": [
-    -3.2e-05,
-    1e-05,
-    40.000033
+    4.8e-05,
+    4e-05,
+    39.999991
    ],
    "applied": [
     0.0,
@@ -316,47 +345,47 @@
     -40.0
    ],
    "reaction_moment": [
-    497.651292,
-    -2592.576151,
-    0.000315
+    500.75985,
+    -2594.245177,
+    -0.000409
    ],
    "applied_moment": [
-    -497.650867,
-    2592.576781,
+    -500.760951,
+    2594.245964,
     0.0
    ],
-   "wall_iterations": 2
+   "wall_iterations": 1
   },
   {
    "level": 2,
-   "n_nodes": 20698,
-   "n_elems": 11220,
+   "n_nodes": 20044,
+   "n_elems": 10853,
    "h_global": 3.9015,
-   "h_min": 0.166514,
-   "t_mesh": 3.234122,
-   "t_solve": 7.757251,
-   "governing": 53.290579,
+   "h_min": 0.174685,
+   "t_mesh": 1.372548,
+   "t_solve": 6.053434,
+   "governing": 52.805022,
    "governing_xyz": [
-    6.180813,
-    15.404006,
-    6.115137
+    6.165497,
+    9.827828,
+    6.137116
    ],
-   "raw_max": 53.290579,
+   "raw_max": 52.805022,
    "raw_max_xyz": [
-    6.180813,
-    15.404006,
-    6.115137
+    6.165497,
+    9.827828,
+    6.137116
    ],
-   "max_disp": 3.477973,
+   "max_disp": 3.459103,
    "max_disp_xyz": [
     90.0,
-    12.5,
+    0.0,
     6.0
    ],
    "reaction": [
-    -9.5e-05,
-    5e-06,
-    39.999956
+    -9e-06,
+    -1.9e-05,
+    40.000025
    ],
    "applied": [
     0.0,
@@ -364,47 +393,47 @@
     -40.0
    ],
    "reaction_moment": [
-    499.222581,
-    -2608.821259,
-    0.00135
+    496.509251,
+    -2600.735171,
+    0.000897
    ],
    "applied_moment": [
-    -499.223223,
-    2608.821297,
+    -496.508087,
+    2600.735468,
     0.0
    ],
    "wall_iterations": 1
   },
   {
    "level": 3,
-   "n_nodes": 23064,
-   "n_elems": 12812,
+   "n_nodes": 21061,
+   "n_elems": 11649,
    "h_global": 3.316275,
-   "h_min": 0.111987,
-   "t_mesh": 1.361307,
-   "t_solve": 6.349925,
-   "governing": 52.69059,
+   "h_min": 0.114437,
+   "t_mesh": 1.549536,
+   "t_solve": 6.915875,
+   "governing": 52.98784,
    "governing_xyz": [
-    6.285844,
-    10.857815,
-    6.048185
+    6.194707,
+    13.116982,
+    6.115953
    ],
-   "raw_max": 52.69059,
+   "raw_max": 52.98784,
    "raw_max_xyz": [
-    6.285844,
-    10.857815,
-    6.048185
+    6.194707,
+    13.116982,
+    6.115953
    ],
-   "max_disp": 3.465692,
+   "max_disp": 3.454648,
    "max_disp_xyz": [
     90.0,
-    12.5,
+    17.1875,
     6.0
    ],
    "reaction": [
-    -9e-06,
-    3.3e-05,
-    40.000008
+    -3e-06,
+    4e-06,
+    40.000003
    ],
    "applied": [
     0.0,
@@ -412,13 +441,13 @@
     -40.0
    ],
    "reaction_moment": [
-    500.558857,
-    -2602.909238,
-    1.1e-05
+    501.082457,
+    -2599.703954,
+    0.000523
    ],
    "applied_moment": [
-    -500.559601,
-    2602.909404,
+    -501.082444,
+    2599.703998,
     0.0
    ],
    "wall_iterations": 1
@@ -934,62 +963,64 @@
   ]
  },
  "notes": [
-  "Built from bracket.py with thickness=6, width=25, height=80, depth=90, fillet=0.5, hole=4.5."
+  "Built from bracket.py with thickness=6, width=25, height=80, depth=90, fillet=0.5, hole=4.5.",
+  "1 curved elements folded on thin walls, so this mesh uses straight sided second order elements.",
+  "2 curved elements folded on thin walls, so this mesh uses straight sided second order elements."
  ],
  "imperial": false,
  "mass_kg": 0.030291,
  "beam": {
   "section_point": [
-   6.285844,
-   10.857815,
-   6.048185
+   6.194707,
+   13.116982,
+   6.115953
   ],
   "axis": [
    1.0,
    0.0,
    0.0
   ],
-  "area_mm2": 151.469001,
+  "area_mm2": 152.987744,
   "centroid": [
-   6.285844,
-   12.497597,
-   3.029389
+   6.194707,
+   12.500224,
+   3.059763
   ],
   "axial_N": 0.0,
-  "bending_Nmm": 2351.475658,
-  "torsion_Nmm": -0.655739,
-  "nominal_peak_MPa": 15.63356,
-  "nominal_at_point_MPa": 15.318757,
-  "shear_from_torsion_MPa": 0.00101,
+  "bending_Nmm": 2351.91572,
+  "torsion_Nmm": -1.073491,
+  "nominal_peak_MPa": 15.286218,
+  "nominal_at_point_MPa": 15.055156,
+  "shear_from_torsion_MPa": 0.001636,
   "I_principal_mm4": [
-   463.358963,
-   7885.700409
+   477.436526,
+   7969.176593
   ],
-  "ratio": 3.370351
+  "ratio": 3.46638
  },
  "fixes": [
   {
    "kind": "fillet",
    "title": "Round the 0.5 mm fillet to a 3 mm radius",
-   "summary": "Stress piles up in the 0.5 mm fillet. A fillet of 3 mm (about half the 6 mm wall) spreads it out. With that radius the peak is usually about 1.4x the 15.6 MPa beam stress, roughly 21.9 MPa (safety factor 2.28).",
+   "summary": "Stress piles up in the 0.5 mm fillet. A fillet of 3 mm (about half the 6 mm wall) spreads it out. With that radius the peak is usually about 1.4x the 15.3 MPa beam stress, roughly 21.4 MPa (safety factor 2.34).",
    "params": {
     "radius": 3.0,
     "point": [
-     6.285844,
-     10.857815,
-     6.048185
+     6.194707,
+     13.116982,
+     6.115953
     ],
     "face": 3
    },
    "auto": true,
    "after": {
-    "governing_MPa": 24.43151,
-    "safety_factor": 2.046537,
+    "governing_MPa": 23.894981,
+    "safety_factor": 2.09249,
     "verdict": "marginal",
     "confidence": "high",
-    "report": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/report.html",
-    "stress_image": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/images/stress.png",
-    "max_disp_mm": 3.243583,
+    "report": "fix-fillet/report.html",
+    "stress_image": "fix-fillet/images/stress.png",
+    "max_disp_mm": 3.225709,
     "params": {
      "fillet": 3.0
     }
@@ -997,26 +1028,26 @@
   },
   {
    "kind": "thicken",
-   "title": "Thicken the wall at the peak from 6 to 9.74 mm",
-   "summary": "The wall through the peak is 6 mm. To reach safety factor 2.5 it needs 9.74 mm (+62%), because bending stress falls with thickness squared.",
+   "title": "Thicken the wall at the peak from 6 to 9.77 mm",
+   "summary": "The wall through the peak is 6 mm. To reach safety factor 2.5 it needs 9.77 mm (+63%), because bending stress falls with thickness squared.",
    "params": {
-    "thickness": 9.73874,
+    "thickness": 9.766172,
     "from": 6.0,
     "point": [
-     6.285844,
-     10.857815,
-     6.048185
+     6.194707,
+     13.116982,
+     6.115953
     ]
    },
    "auto": true,
    "after": {
-    "governing_MPa": 22.20521,
-    "safety_factor": 2.251724,
+    "governing_MPa": 22.137313,
+    "safety_factor": 2.25863,
     "verdict": "marginal",
     "confidence": "medium",
-    "report": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/report.html",
-    "stress_image": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/stress.png",
-    "max_disp_mm": 0.677089,
+    "report": "fix-thicken/report.html",
+    "stress_image": "fix-thicken/images/stress.png",
+    "max_disp_mm": 0.679608,
     "params": {
      "thickness": 10.0
     }
@@ -1028,9 +1059,9 @@
    "summary": "The peak sits where two walls meet and bend. A gusset as thick as the wall, with legs about half as long as the shorter wall, ties them together and usually cuts the corner stress by half or more.",
    "params": {
     "point": [
-     6.285844,
-     10.857815,
-     6.048185
+     6.194707,
+     13.116982,
+     6.115953
     ],
     "thickness": 6.0,
     "face": 3,
@@ -1038,38 +1069,38 @@
    },
    "auto": true,
    "after": {
-    "governing_MPa": 10.278657,
-    "safety_factor": 4.864449,
+    "governing_MPa": 10.142799,
+    "safety_factor": 4.929606,
     "verdict": "holds",
     "confidence": "medium",
-    "report": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-gusset/report.html",
-    "stress_image": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-gusset/images/stress.png",
-    "max_disp_mm": 0.944524,
-    "step": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-gusset/geometry/gusset_t6.step"
+    "report": "fix-gusset/report.html",
+    "stress_image": "fix-gusset/images/stress.png",
+    "max_disp_mm": 0.930967,
+    "step": "fix-gusset/geometry/gusset_t6.step"
    }
   },
   {
    "kind": "lever",
-   "title": "Shorten the lever arm from 58.8 to 22.3 mm",
-   "summary": "The load acts 58.8 mm from the critical section. Moving a support or the load to within 22.3 mm brings the bending stress to the target.",
+   "title": "Shorten the lever arm from 58.8 to 22.2 mm",
+   "summary": "The load acts 58.8 mm from the critical section. Moving a support or the load to within 22.2 mm brings the bending stress to the target.",
    "params": {
-    "arm": 58.786891,
-    "new_arm": 22.314
+    "arm": 58.797893,
+    "new_arm": 22.192976
    },
    "auto": false
   }
  ],
  "images": {
-  "stress": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/stress.png",
-  "zoom": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/zoom.png",
-  "safety": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/safety.png",
-  "deformed": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/deformed.png",
-  "convergence": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/convergence.png",
-  "fix_before": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/images/stress.png",
-  "fix_after": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-gusset/images/stress.png"
+  "stress": "images/stress.png",
+  "zoom": "images/zoom.png",
+  "safety": "images/safety.png",
+  "deformed": "images/deformed.png",
+  "convergence": "images/convergence.png",
+  "fix_before": "images/stress.png",
+  "fix_after": "fix-gusset/images/stress.png"
  },
- "report": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/report.html",
- "workdir": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output",
- "t_total": 49.755743,
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 34.551226,
  "solver": "CalculiX 2.23"
 }

@@ -1,17 +1,17 @@
-MARGINAL. Peak 22.2 MPa on the 0.5 mm inside fillet (face 3). It survives the load, but the safety factor 2.25 is below the 2.5 target. Confidence is medium.
+MARGINAL. Peak 22.1 MPa on the 0.5 mm inside fillet (face 3) at (10.2, 9.88, 10.2). It survives the load, but the safety factor 2.26 is below the 2.5 target. Confidence is medium.
 
-Confidence: medium. hand calculation: beam theory through the critical section gives 5.2 MPa nominal; FEA peak is 4.27x that; that is far from beam theory, so check the loads, units and fixtures
-Max deflection 0.677 mm at (90, 0, 10).
+Confidence: medium. hand calculation: beam theory through the critical section gives 5.15 MPa nominal; FEA peak is 4.30x that; that is far from beam theory, so check the loads, units and fixtures
+Max deflection 0.68 mm at (90, 25, 10).
 Material PLA (3D printed), limit 50 MPa; mass 49.25 g.
 Loads: 40 N down @ top and within 12 of 65,12.5,6. Fixtures: bolt holes d=4.5; wall x=min.
 
 Checks:
-  [pass] mesh convergence: max principal stress settled: 13.1 -> 19.9 -> 22.2 -> 22.2 MPa over 4 meshes, last change 0.1%
-  [pass] force balance: reactions balance the loads to 5.6e-05% (forces) and 8.6e-06% (moments)
-  [warn] hand calculation: beam theory through the critical section gives 5.2 MPa nominal; FEA peak is 4.27x that; that is far from beam theory, so check the loads, units and fixtures
+  [pass] mesh convergence: max principal stress settled: 14.3 -> 20 -> 21.6 -> 22.1 MPa over 4 meshes, last change 2.6%
+  [pass] force balance: reactions balance the loads to 3.3e-05% (forces) and 6.1e-06% (moments)
+  [warn] hand calculation: beam theory through the critical section gives 5.15 MPa nominal; FEA peak is 4.30x that; that is far from beam theory, so check the loads, units and fixtures
   [pass] singularities: no sharp corner or support artifact is above the reported stress
-  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 21.3 N sideways and 77.4 N along its axis; bearing stress 0.474 MPa, safety factor 105.40 on bearing
-  [pass] units and sanity: part 123 mm across, peak strain 0.0063, max deflection 0.677 mm (0.55% of size): all plausible
+  [pass] bolt bearing: worst hole of fix1 (d 4.5 mm) carries 19.8 N sideways and 76.8 N along its axis; bearing stress 0.441 MPa, safety factor 113.37 on bearing
+  [pass] units and sanity: part 123 mm across, peak strain 0.0063, max deflection 0.68 mm (0.55% of size): all plausible
 
 Assumptions:
   - Linear elastic material and small deflections (no yielding redistribution, no buckling).
@@ -23,5 +23,5 @@ Assumptions:
   - Wall supports push but cannot pull (frictionless contact, solved iteratively).
   - Contact between separate parts, friction and preload are not modeled.
 
-Images: stress: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/stress.png, zoom: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/zoom.png, safety: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/safety.png, deformed: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/deformed.png, convergence: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/images/convergence.png
-Report: /Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-thicken/report.html
+Images: stress: images/stress.png, zoom: images/zoom.png, safety: images/safety.png, deformed: images/deformed.png, convergence: images/convergence.png
+Report: report.html

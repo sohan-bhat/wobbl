@@ -1,5 +1,5 @@
 {
- "part": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-gusset/geometry/gusset_t6.step",
+ "part": "geometry/gusset_t6.step",
  "material": "pla",
  "loads": [
   {

@@ -1,5 +1,5 @@
 {
- "part": "/Users/sohanb/code/wobbl/examples/shelf-bracket/bracket.py",
+ "part": "../../bracket.py",
  "material": "pla",
  "loads": [
   {

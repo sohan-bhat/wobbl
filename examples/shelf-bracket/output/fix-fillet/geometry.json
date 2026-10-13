@@ -1,6 +1,6 @@
 {
- "source": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/work/geometry/bracket-fa0629c0.step",
- "path": "/Users/sohanb/code/wobbl/examples/shelf-bracket/output/fix-fillet/work/geometry/prepared.brep",
+ "source": "work/geometry/bracket-fa0629c0.step",
+ "path": "work/geometry/prepared.brep",
  "kind": "cad",
  "bbox": [
   [

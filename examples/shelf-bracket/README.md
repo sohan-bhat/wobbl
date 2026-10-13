@@ -10,19 +10,21 @@ printer leaves on a "sharp" corner: a 0.5 mm radius.
 
 | Version | Peak stress | Safety factor (PLA, 50 MPa) | Verdict |
 |---|---|---|---|
-| As drawn, 0.5 mm corner | 52.7 MPa | 0.95 | fails |
-| 3 mm fillet | 24.4 MPa | 2.05 | marginal (target 2.5) |
-| Legs thickened to 10 mm | 22.2 MPa | 2.25 | marginal |
-| Gusset across the corner | 10.3 MPa | 4.86 | holds |
+| As drawn, 0.5 mm corner | 53.0 MPa | 0.94 | fails |
+| 3 mm fillet | 23.9 MPa | 2.09 | marginal (target 2.5) |
+| Legs thickened to 10 mm | 22.1 MPa | 2.26 | marginal |
+| Gusset across the corner | 10.1 MPa | 4.93 | holds |
 
 What Wobbl checked on the original:
 
-- mesh convergence over four meshes: 43.8, 51.5, 53.3, 52.7 MPa
-- reactions balance the 40 N load to 0.0001%
-- beam theory through the corner gives 15.6 MPa nominal, so the corner multiplies stress by about 3.4
+- mesh convergence over four meshes: 43.1, 50.1, 52.8, 53.0 MPa
+- reactions balance the 40 N load to 0.00002%
+- beam theory through the corner gives 15.3 MPa nominal, so the corner multiplies stress by about 3.5
 - the screws are modeled as bolted holes and the back of the upright can push on the wall but not pull,
   solved as contact
 
 The thicker legs barely help because the sharp corner still multiplies the stress;
-rounding the corner or bracing it is what works. Files: `output/report.html`,
+rounding the corner or bracing it is what works. The gusset's own toe is a sharp
+corner, which Wobbl excludes as a singularity and flags (medium confidence); give
+it a small fillet in the real part. Files: `output/report.html`,
 `output/images/stress.png`, and the re-simulated versions in `output/fix-*/`.
