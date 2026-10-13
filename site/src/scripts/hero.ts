@@ -158,13 +158,28 @@ export function initHero(viewer: HTMLElement): () => void {
     status.textContent = why;
     bend.hidden = true;
   };
+  // WebGL drawn in software, with no graphics card behind it, would hold the page up on every frame,
+  // so it counts as no WebGL: the browser says so when asked to fail on a major performance caveat.
+  // Where WebGL works on an OffscreenCanvas, the part is drawn in a worker, off the main thread.
+  let inWorker = false;
   const gl = (() => {
-    try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; }
+    const o = { failIfMajorPerformanceCaveat: true };
+    const release = (ctx: unknown) => (ctx as WebGLRenderingContext | null)?.getExtension('WEBGL_lose_context')?.loseContext();
+    try {
+      if ('transferControlToOffscreen' in HTMLCanvasElement.prototype && typeof OffscreenCanvas !== 'undefined') {
+        const ctx = new OffscreenCanvas(1, 1).getContext('webgl2', o);
+        if (ctx) { release(ctx); inWorker = true; return true; }
+      }
+      const c = document.createElement('canvas');
+      const ctx = c.getContext('webgl2', o) || c.getContext('webgl', o);
+      release(ctx);
+      return !!ctx;
+    } catch { return false; }
   })();
   let io: IntersectionObserver | null = null;
   let idleId = 0;
   if (!gl || !('DecompressionStream' in window) || !('Worker' in window)) {
-    fallback('This browser cannot draw the 3D part, so this is the static render Wobbl wrote. The numbers still follow the controls.');
+    fallback('This browser cannot draw the 3D part quickly here, so this is the static render Wobbl wrote. The numbers still follow the controls.');
   } else {
     const ui = {
       data: man,
@@ -173,6 +188,7 @@ export function initHero(viewer: HTMLElement): () => void {
       onChange: (fn: Listener) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
       onReset: (fn: () => void) => { resetters.add(fn); return () => { resetters.delete(fn); }; },
       setAngle,
+      worker: inWorker,
     };
     const go = () => import('./viewer.js').then((m) => m.start(viewer, ui)).then((v: Viewer) => {
       if (abort.signal.aborted) { v.dispose(); return; }
