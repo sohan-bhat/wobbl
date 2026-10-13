@@ -10,16 +10,16 @@ one corner.
 
 | Result | Value |
 |---|---|
-| Peak stress away from sharp corners | 8.85 MPa on the top skin next to the press, safety factor 7.0 against PC's 62 MPa yield |
+| Peak stress away from sharp corners | 8.68 MPa on the top skin under the press, safety factor 7.1 against PC's 62 MPa yield |
 | Dent under the thumb | 0.22 mm |
-| Mesh convergence | 8.57, 8.82, 8.85 MPa over three meshes (73k to 110k nodes) |
-| Equilibrium | reactions balance the 120 N to 0.00003% |
+| Mesh convergence | 8.59, 8.70, 8.68 MPa over three meshes (72k to 102k nodes) |
+| Equilibrium | reactions balance the 120 N to 0.00001% |
 
 Confidence is medium for a clear reason: the bosses meet the underside of the
-top with no fillet, and Wobbl flags those sharp corners as singular (14.9, 18.2,
-18.6 MPa and still rising as the mesh refines). The shell holds this press with
+top with no fillet, and Wobbl flags those sharp corners as singular (14.8, 20.5,
+23.1 MPa and still rising as the mesh refines). The shell holds this press with
 a wide margin either way, but a 0.5 to 1 mm fillet at the boss roots is the cheap
 change that makes the corner stress finite and trustworthy.
 
-This is the slowest example: thin walls on a box need around 100k nodes per
-mesh, and the study takes about four minutes.
+Thin walls on a box need around 100k nodes per mesh; the study takes about two
+minutes.

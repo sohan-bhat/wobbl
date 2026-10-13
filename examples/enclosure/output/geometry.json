@@ -1,6 +1,6 @@
 {
- "source": "/Users/sohanb/code/wobbl/examples/enclosure/output/work/geometry/enclosure-c8b03b2a.step",
- "path": "/Users/sohanb/code/wobbl/examples/enclosure/output/work/geometry/prepared.brep",
+ "source": "work/geometry/enclosure-c8b03b2a.step",
+ "path": "work/geometry/prepared.brep",
  "kind": "cad",
  "bbox": [
   [

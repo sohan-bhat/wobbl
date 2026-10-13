@@ -1,5 +1,5 @@
 {
- "part": "/Users/sohanb/code/wobbl/examples/enclosure/enclosure.py",
+ "part": "../enclosure.py",
  "material": "pc",
  "loads": [
   {
