@@ -3,17 +3,59 @@
 ## Unreleased
 
 **Fixed**
+- The same study on the same input now gives the same numbers on every run.
+  Before, the cast motor mount's rigid servo case came out at 55.5 MPa on one
+  run and 44.2 MPa on another, its main answer moved between 123.4 and 123.9
+  MPa, the enclosure shell between 92.5 and 89.8 MPa and the shelf bracket
+  between 52.8 and 51.8 MPa. Four sources, all fixed:
+  - gmsh meshed faces on parallel threads, which moved nodes from run to run;
+    it now runs on one thread with a fixed seed, and OpenCASCADE booleans run
+    serially;
+  - the thinnest wall estimate drew random triangles from that mesh, weighted
+    them by area twice and took a quantile that jumped between 3 and 5.5 mm;
+    it now casts rays from points laid out on the CAD faces and averages the
+    thinnest 5% of the surface;
+  - the exclusion radius around singular spots came from the first mesh's
+    element sizes; it now comes from the sizes the sizing rules ask for;
+  - refinement stopped when the clock said the next mesh would not fit; the
+    time budget is now spent by a cost model of each mesh and solve, with the
+    clock only as a backstop at three times the budget.
+  A test runs a study twice and compares every number. The cast motor mount
+  gave 123.7 MPa and 55.0 MPa for the rigid servo case on four runs back to
+  back.
+- The large deflection re-solve runs on a coarse mesh of its own in two load
+  steps. On the 77k node drone arm truss it was still running after 17
+  minutes, and a 90 s timeout made it finish on some runs and not others. It
+  now takes 75 s there.
 - The load introduction check converges the other attachment idealization at
   its own peak. It used to solve it only on the mesh refined for the main
   answer, so a peak somewhere else came from a coarse mesh. When the verdict
   flips or the peak moves, Wobbl now refines around that peak with the main
   study's convergence rule and time budget and reports the trend; if the budget
   runs out first, the best mesh reached is labeled as not converged. On the cast
-  motor mount the rigid servo case now converges to 55.5 MPa (54.6, 56.8, 55.5
-  MPa over three meshes, safety factor 2.97); before, it read 47.2 MPa on the
+  motor mount the rigid servo case now converges to 55.0 MPa (54.2, 54.3, 55.0
+  MPa over three meshes, safety factor 3.00); before, it read 47.2 MPa on the
   mesh refined for the distributed case.
+- Custom materials no longer inherit printed PLA's properties. A custom cast
+  aluminum listed a printed part assumption and PLA's density. Materials now say
+  how they are made (`process=printed`, `molded`, `cast`, `wrought`), the
+  assumptions follow it, and what a custom material leaves out comes from the
+  nearest library material made the same way.
+- When coarsening the first mesh folds a thin wall, the study keeps the first
+  mesh instead of failing, and mesh fallbacks shrink the refinements along with
+  the global size.
+- Material swaps respect a safety factor target the user set.
+- `wobbl circuit led` works when a folder named `led` sits in the current
+  directory.
 - Meshes with flat sliver elements (all four corners in one plane) are rejected
   and remeshed with the next strategy instead of failing in CalculiX.
+
+**Added**
+- Sand cast aluminum A356-T6 in the materials library.
+
+**Docs**
+- The validation suite takes about 30 minutes (29 on a 2018 six core laptop),
+  not 7. All 18 cases pass on the repeatable engine.
 
 ## 0.1.0
 
