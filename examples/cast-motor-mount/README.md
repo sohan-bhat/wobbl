@@ -14,18 +14,21 @@ parts a coding agent working alone could not answer in 15 minutes
 
 | Result | Value |
 |---|---|
-| Peak stress | 123.4 MPa where the +X rib tip meets the upright (reference model: 124.3 MPa, same spot) |
+| Peak stress | 123.6 MPa where the +X rib tip meets the upright (reference model: 124.3 MPa, same spot) |
 | Safety factor | 1.34, below the required 2, so the casting **fails the rule** (it does not yield) |
-| Mesh convergence | 121.9, 123.5, 123.4 MPa over three meshes, about 1.5 minutes in all |
-| Equilibrium | forces balance to 0.00002%, moments to 0.000003% |
+| Mesh convergence | 121.6, 123.2, 123.6 MPa over three meshes |
+| Rigid servo case | 54.6, 56.8, 55.5 MPa over three meshes refined around its own peak, safety factor 2.97 |
+| Equilibrium | forces balance to 0.00002%, moments to 0.000001% |
+| Time | 6.4 minutes in all, the rigid servo case included |
 
 **The answer depends on how the servo carries the load, and Wobbl says so.** The
 belt pull is a force at a point off the part. Wobbl's default spreads it over the
 four bolt holes without adding stiffness (a distributing coupling, like a bolt
-group sharing load). Treating the servo body as rigid instead moves the load
-into the bolt holes and leaves the rib at 47 MPa, safety factor 3.5, which
-passes. Wobbl solves both, reports the spread, and marks the result medium
-confidence with that reason. A plain number would have hidden that the verdict
+group sharing load). Treating the servo body as rigid instead moves the peak to
+the face the servo bolts against, about 2 mm outside a lower bolt hole, where it
+converges to 55.5 MPa, safety factor 2.97, which passes. Wobbl solves both,
+refines the rigid case around its own peak until it settles, reports the
+spread, and marks the result medium confidence with that reason. A plain number would have hidden that the verdict
 flips with the assumption; in practice a servo flange on four bolts behaves much
 closer to the bolt group, so the part should be redesigned (thicker ribs or a
 larger blend at the rib tip).

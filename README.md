@@ -25,9 +25,9 @@
   <a href="examples">Examples</a>
 </p>
 
-![Stress heatmap of a cast aluminum motor mount under a 2 kN belt pull, peak 123 MPa marked where the rib tip meets the upright](examples/cast-motor-mount/output/images/stress.png)
+![Stress heatmap of a cast aluminum motor mount under a 2 kN belt pull, peak 124 MPa marked where the rib tip meets the upright](examples/cast-motor-mount/output/images/stress.png)
 
-<p align="center"><sub>A real Wobbl output: a sand cast motor mount under a 2 kN belt pull. Peak 123 MPa at the rib tip, safety factor 1.34 against a target of 2.</sub></p>
+<p align="center"><sub>A real Wobbl output: a sand cast motor mount under a 2 kN belt pull. Peak 124 MPa at the rib tip, safety factor 1.34 against a target of 2.</sub></p>
 
 ## What it is
 
@@ -158,7 +158,7 @@ Wobbl answers those parts in minutes with the trap handling built in:
 
 | Part | Converged reference | Wobbl | Confidence |
 |---|---|---|---|
-| Cast motor mount, belt pull through four bolts | 124.3 MPa at the rib tip | 123.9 MPa, same spot | medium, and it says why: the verdict flips if the servo is treated as rigid (47 versus 124 MPa) |
+| Cast motor mount, belt pull through four bolts | 124.3 MPa at the rib tip | 123.9 MPa, same spot | medium, and it says why: the verdict flips if the servo is treated as rigid (55.5 versus 124 MPa) |
 | ABS enclosure shell pressed near a corner | 93 MPa, 1.93 mm deflection | 89.8 MPa, 1.91 mm | high |
 | PA12 truss drone arm, thrust and torque | 11.5 MPa, 4.09 mm rise | 11.53 MPa, 4.08 mm | high |
 | PLA bracket, sharp inside corner | about 78 MPa | 80.0 MPa | high |
