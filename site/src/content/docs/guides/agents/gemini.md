@@ -18,7 +18,7 @@ strength study can finish.
 ```json
 {
   "name": "wobbl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Verified engineering simulation",
   "mcpServers": {
     "wobbl": {

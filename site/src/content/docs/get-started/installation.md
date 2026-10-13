@@ -33,7 +33,7 @@ Check that the command is there.
 wobbl --version
 ```
 
-It prints `wobbl, version 0.1.0`.
+It prints `wobbl, version 0.1.1`.
 
 ## Update or remove
 

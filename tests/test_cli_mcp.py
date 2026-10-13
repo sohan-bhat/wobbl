@@ -18,7 +18,8 @@ def test_help_and_version():
     assert r.exit_code == 0
     for cmd in ("run", "inspect", "check", "report", "fix", "setup", "doctor", "thermal", "circuit", "mcp"):
         assert cmd in r.output
-    assert CliRunner().invoke(cli, ["--version"]).output.strip().endswith("0.1.0")
+    version = re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M).group(1)
+    assert CliRunner().invoke(cli, ["--version"]).output.strip().endswith(version)
 
 
 def test_materials_command():

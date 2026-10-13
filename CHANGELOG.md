@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.1.1 (2026-10-13)
+
+**Heat**
+- A transient study whose held temperature differs from the part's starting
+  temperature now runs. A plate at 20 C set on a surface held at 120 C used to
+  stop CalculiX with "increment size smaller than minimum", because a face that
+  jumps all at once moves its neighbors by a fixed amount however short the time
+  step. The held temperature now ramps in a straight line from the starting
+  temperature to its target over a tenth of the time heat takes to cross the
+  smallest element at that face, or a thousandth of the run if that is shorter,
+  and never quicker than CalculiX's shortest time steps can follow. The result's
+  assumptions say how long the ramp was and why.
+- A face that jumps gets extra saved times through the ramp and the fast flow of
+  heat just after it, and a jump under 100 C gets smaller time steps in
+  proportion, so a 20 C jump is followed as closely as a 100 C one.
+- The transient energy balance integrates heat flows through a monotone cubic
+  instead of straight lines between saved times, counts each held face on its
+  own and is judged against the largest flow in the account. A hot face and a
+  cold face pushing heat through a part now close within 2%, and the plate on
+  the hot surface closes to 0.8%.
+- A study that makes no heat says so in its assumptions, instead of saying the
+  heat is spread through the part.
+- A new validation case, `sudden-face`, compares the temperature 10 mm into an
+  aluminum bar whose end jumps to 120 C with the erfc solution for a semi
+  infinite solid. Two new end to end tests compare every node with the erfc
+  solution and with the Fourier series for a bar between a hot face and a cold
+  one.
+- The battery pack example was run again, so its result shows the transient
+  energy balance.
+
+**Install**
+- Installing on an Intel Mac no longer needs Rust and a C compiler, because
+  cryptography stays below 49 there, the first version with no Intel Mac
+  wheels.
+
 ## 0.1.0 (2026-10-13)
 
 First release.
