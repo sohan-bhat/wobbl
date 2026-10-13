@@ -14,17 +14,21 @@ The rule for printed parts that vibrate here is a safety factor of 3.
 
 | Result | Value |
 |---|---|
-| Peak stress | 10.0 MPa at the top edge of the first window, safety factor 4.8 against 48 MPa (meets the rule of 3) |
+| Peak stress | 9.46 MPa on the underside of the arm below the first window, safety factor 5.1 against 48 MPa (meets the rule of 3) |
 | Tip deflection | 4.2 mm |
-| Mesh convergence | 10.3, 10.1, 10.0 MPa over three meshes |
-| Hand calculation | beam theory through the critical section gives 7.1 MPa; the window corner concentrates it 1.4x |
-| Equilibrium | force and moment balance to 0.0001% |
+| Mesh convergence | 9.44, 9.53, 9.46 MPa over three meshes |
+| Hand calculation | beam theory through the critical section gives 6.69 MPa; the local shape concentrates it 1.4x |
+| Equilibrium | force and moment balance to 0.0002% |
+| Large deflection | the arm bends a good share of its wall, so Wobbl solves it with large deflection theory too: the peak moves +2.3%, and linear theory holds |
+| Load attachment | spread over the pad instead of rigid, the peak is the same 9.46 MPa at the same spot |
 
 The windows are cut with square corners, and Wobbl excludes those corners from
 the answer as singular (they read 14.4 MPa on the finest mesh and depend on the
-mesh). Even that value meets the rule, but a 1 to 2 mm radius in the window
-corners is cheap in a printed part and makes the number trustworthy.
+mesh). Even that value meets the rule, but because it is more than one and a
+half times the answer the result is marked medium confidence. A 1 to 2 mm radius
+in the window corners is cheap in a printed part and makes the number
+trustworthy.
 
 For a harder version of this question (a Warren truss arm), see the
 `drone-arm-truss` validation case, which matches a converged reference model
-to within 0.4%.
+to within 0.2%.

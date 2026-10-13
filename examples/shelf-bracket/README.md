@@ -10,16 +10,16 @@ printer leaves on a "sharp" corner: a 0.5 mm radius.
 
 | Version | Peak stress | Safety factor (PLA, 50 MPa) | Verdict |
 |---|---|---|---|
-| As drawn, 0.5 mm corner | 52.8 MPa | 0.95 | fails |
-| 3 mm fillet | 24.5 MPa | 2.04 | marginal (target 2.5) |
-| Legs thickened to 10 mm | 21.5 MPa | 2.32 | marginal |
-| Gusset across the corner | 10.3 MPa | 4.84 | holds |
+| As drawn, 0.5 mm corner | 52.3 MPa | 0.96 | fails |
+| 3 mm fillet | 24.1 MPa | 2.08 | marginal (target 2.5) |
+| Legs thickened to 10 mm | 21.0 MPa | 2.38 | marginal |
+| Gusset across the corner | 9.82 MPa | 5.09 | holds |
 
 What Wobbl checked on the original:
 
-- mesh convergence over four meshes: 44.2, 51.1, 53.4, 52.8 MPa
+- mesh convergence over four meshes: 43.0, 50.9, 53.0, 52.3 MPa
 - reactions balance the 40 N load to 0.0001%
-- beam theory through the corner gives 15.2 MPa nominal, so the corner multiplies stress by about 3.5
+- beam theory through the corner gives 15.2 MPa nominal, so the corner multiplies stress by about 3.4
 - the screws are modeled as bolted holes and the back of the upright can push on the wall but not pull,
   solved as contact
 
