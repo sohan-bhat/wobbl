@@ -111,10 +111,8 @@ wobbl fix wobbl-out/bracket --apply    # apply the automatic ones and re-run eac
 wobbl fix wobbl-out/bracket --apply --only fillet,gusset
 ```
 
-Fillet radius, wall thickness, a corner gusset, a stronger material and a
-shorter lever arm, each with the number it needs. Applied automatically:
-fillets and gussets on any STEP (OpenCASCADE edits; the edited STEP is saved),
-thickness and fillet parameters of parametric parts, and material swaps.
+What each fix does and which ones are applied automatically:
+[Fix a failing part](fix.md).
 
 ## wobbl thermal
 
@@ -127,7 +125,7 @@ wobbl thermal pack.step -m li-ion-cell --power "12 W" --film "5 W/m2K @ all" \
 |---|---|
 | `--power` | heat made inside the part (spread through the volume) |
 | `--heat-faces` | put the power on these faces instead (a chip on a heat sink) |
-| `--film` | convection, repeatable: `5 W/m2K @ all`, `25 W/m2K at 30 C @ top`. Still air in a box about 5, open air 10, a small fan 25, strong forced air 60, water 500 |
+| `--film` | convection, repeatable: `5 W/m2K @ all`, `25 W/m2K at 30 C @ top`; typical values are in the [heat guide](heat.md#choosing-the-inputs) |
 | `--fixed-temp` | held temperature: `40 C @ bottom` |
 | `--duration` | transient run length; omit for steady state |
 | `--limit` | temperature limit (default: the material's service limit) |
@@ -144,9 +142,8 @@ wobbl circuit mosfet --set current=15 --set rds_on=8m --set frequency=20k --set 
 wobbl circuit board.cir --probe "v(out)" --probe "i(V1)"
 ```
 
-LED colors: red, orange, yellow, green, blue, white, uv, ir, power-white,
-power-red; override with `vf=` and `imax=`. Any netlist with a `.tran` is
-re-run at half the time step to check convergence.
+LED colors, what each template checks and example results:
+[Circuits](circuits.md).
 
 ## Other commands
 
