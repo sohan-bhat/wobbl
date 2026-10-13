@@ -361,6 +361,27 @@ def materials():
 
 
 @cli.command()
+@click.option("--only", default=None, help="Comma list of case ids.")
+@click.option("--out", "-o", default="wobbl-out/validation", show_default=True)
+@click.option("--markdown", default=None, help="Also write the results table to this Markdown file.")
+def validate(only, out, markdown):
+    """Run the validation suite: textbook and NAFEMS cases with known answers."""
+    from ..validation.cases import CASES, markdown_table, run_cases
+
+    ids = only.split(",") if only else None
+    ui.console.print(f"  running {len([c for c in CASES if not ids or c.id in ids])} cases into {out}")
+    res = run_cases(out, ids, log=lambda m: ui.console.print("  " + m))
+    table = markdown_table(res)
+    (Path(out) / "results.md").write_text(table)
+    if markdown:
+        Path(markdown).write_text(table)
+    passed = sum(r["pass"] for r in res)
+    ui.console.print(f"\n  {passed} of {len(res)} cases within tolerance\n")
+    if passed != len(res):
+        sys.exit(1)
+
+
+@cli.command()
 def mcp():
     """Run the MCP server on stdio (agents start this; 'wobbl setup' registers it)."""
     from ..mcp.server import main as serve

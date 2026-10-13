@@ -129,8 +129,11 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
         say("geometry", f"reading {Path(study.part).name}")
         pre = describe_part(study.part, out / "work")
     prep, feats = pre
-    s0 = auto_sizing(prep, thickness=feats.thickness_typical, fineness=0.8, max_nodes=25000)
-    factors = [1.0, 0.7, 0.5] if study.quality != "fast" else [1.0, 0.7]
+    transient = study.duration > 0
+    # a transient run factorizes the matrix at every time step, so it gets a smaller mesh budget
+    s0 = auto_sizing(prep, thickness=feats.thickness_typical, fineness=0.8,
+                     max_nodes=8000 if transient else 25000)
+    factors = [1.0, 0.7] if (study.quality == "fast" or transient) else [1.0, 0.7, 0.5]
     levels, last = [], None
     for k, f in enumerate(factors):
         sz = Sizing(h=s0.h * f)
