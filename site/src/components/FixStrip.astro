@@ -1,0 +1,31 @@
+---
+// A part and each of its fixed versions, side by side.
+import { picture } from '../lib/images';
+import { COLOR, RUN_IMAGES, fixLabel, fmt3, type Run } from '../lib/examples';
+interface Props { run: Run }
+const { run } = Astro.props;
+const o = run.outcome;
+const cells = [
+  { name: 'As drawn', mpa: o.governing_MPa!, sf: o.safety_factor!, verdict: o.verdict, rel: run.rel },
+  ...run.fixes.map((f) => ({ name: fixLabel(f), mpa: f.after!.governing_MPa, sf: f.after!.safety_factor,
+    verdict: f.after!.verdict, rel: `${run.rel}/${f.after!.report.split('/')[0]}` })),
+];
+---
+<section class="ex-fixes" aria-labelledby="fixes-title">
+  <h2 class="ex-h" id="fixes-title">After <code translate="no">wobbl fix --apply</code></h2>
+  <ol class="fixes">
+    {cells.map((c) => {
+      const name = RUN_IMAGES[c.rel]?.stress;
+      const p = name ? picture(name) : null;
+      return (
+        <li class="fix" data-verdict={COLOR[c.verdict] ?? 'marginal'}>
+          {p && <img src={p.src} srcset={p.srcset} sizes="(min-width: 1000px) 25vw, 50vw" width={p.width} height={p.height}
+                     loading="lazy" decoding="async" alt={`${c.name}, ${fmt3(c.mpa)} MPa, ${c.verdict}`} />}
+          <h3>{c.name}</h3>
+          <p class="fix-n"><span>{fmt3(c.mpa)}&nbsp;MPa</span><span>SF {c.sf.toFixed(2)}</span></p>
+          <p class="fix-v">{c.verdict[0].toUpperCase() + c.verdict.slice(1)}</p>
+        </li>
+      );
+    })}
+  </ol>
+</section>

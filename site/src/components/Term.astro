@@ -1,0 +1,7 @@
+---
+// A terminal block with a label and a copy button (see lib/markdown.ts).
+import { term } from '../lib/markdown';
+interface Props { code: string; lang?: string; label?: string }
+const { code, lang = 'sh', label } = Astro.props;
+---
+<Fragment set:html={term(code, lang, label)} />

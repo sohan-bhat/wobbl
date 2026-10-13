@@ -1,0 +1,35 @@
+---
+// One run on an example page: the question, the command and the checks beside the result,
+// its verdict and numbers, the suggested fixes, summary.txt folded away and the full report.
+import RunImage from './RunImage.astro';
+import Term from './Term.astro';
+import { COLOR, metrics, type Run } from '../lib/examples';
+import { url } from '../lib/site';
+interface Props { run: Run }
+const { run } = Astro.props;
+const checks = (run.outcome.checks ?? []).filter((c) => c.status !== 'skip');
+const sugg = run.fixes.length ? [] : (run.outcome.fixes ?? []).slice(0, 3).map((f) => f.title);
+---
+<div class="run">
+  <div class="run-steps">
+    <div class="run-step"><p class="run-label">You ask</p><p class="run-ask">{run.question}</p></div>
+    <div class="run-step"><p class="run-label">Wobbl runs</p><Term code={run.command} /></div>
+    {checks.length > 0 && (
+      <div class="run-step"><p class="run-label">Checks</p>
+        <ul class="run-checks">{checks.map((c) => <li data-status={c.status}><span class="st">{c.status}</span>{c.name}</li>)}</ul>
+      </div>
+    )}
+  </div>
+  <div class="run-result">
+    <RunImage run={run} sizes="(min-width: 1000px) 46vw, 100vw" />
+    <p class="run-verdict"><span class="vword" data-verdict={COLOR[run.outcome.verdict] ?? 'marginal'}>{run.outcome.verdict.toUpperCase()}</span><span class="run-said" translate="no">{run.outcome.headline}</span></p>
+    <dl class="readout">{metrics(run).map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+    {sugg.length > 0 && (
+      <div class="run-sugg"><p class="run-label">{sugg.length === 1 ? 'Suggested fix' : 'Suggested fixes'}</p>
+        <ul>{sugg.map((t) => <li>{t}</li>)}</ul>
+      </div>
+    )}
+    <details class="run-summary"><summary>summary.txt</summary><Term code={run.summary} lang="text" label="summary.txt" /></details>
+    {run.report && <p class="run-files"><a href={url(run.report)}>Open the full report</a></p>}
+  </div>
+</div>

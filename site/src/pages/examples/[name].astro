@@ -1,0 +1,50 @@
+---
+// One page per example: each run with its question, command, checks, result and report,
+// the fixed versions when there are some, the example's README, and how to run it.
+import Base from '../../layouts/Base.astro';
+import RunCard from '../../components/RunCard.astro';
+import FixStrip from '../../components/FixStrip.astro';
+import Term from '../../components/Term.astro';
+import { examples, readmeBody } from '../../lib/examples';
+import { render } from '../../lib/markdown';
+import { repoUrl, url } from '../../lib/site';
+
+export function getStaticPaths() {
+  const all = examples();
+  return all.map((ex, i) => ({ params: { name: ex.name }, props: { ex, prev: all[i - 1] ?? null, next: all[i + 1] ?? null } }));
+}
+const { ex, prev, next } = Astro.props;
+const notes = render(readmeBody(ex), `examples/${ex.name}/README.md`).html;
+const first = ex.runs[0];
+---
+<Base title={`${ex.title} example | Wobbl`} path={`examples/${ex.name}/`} search
+      description={`${first.question} ${first.outcome.headline.replace(/[:;] /g, ', ')}`}>
+  <div class="wrap page">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <ol><li><a href={url()}>Home</a></li><li><a href={url('examples/')}>Examples</a></li><li aria-current="page">{ex.title}</li></ol>
+    </nav>
+    <header class="page-head">
+      <h1>{ex.title}</h1>
+      {ex.subtitle && <p class="page-lead">{ex.subtitle}</p>}
+    </header>
+    <div class="ex-runs">
+      {ex.runs.map((r) => (
+        <>
+          <RunCard run={r} />
+          {r.fixes.length > 0 && <FixStrip run={r} />}
+        </>
+      ))}
+    </div>
+    <div class="ex-notes prose">
+      <h2>About this example</h2>
+      <Fragment set:html={notes} />
+      <h2>Run it yourself</h2>
+      <Term code={`git clone https://github.com/sohan-bhat/wobbl\ncd wobbl/examples/${ex.name} && ./run.sh`} />
+      <p>The part, the script and every output are in <a href={repoUrl(`examples/${ex.name}`, true)}>examples/{ex.name}</a> on GitHub.</p>
+    </div>
+    <nav class="pager" aria-label="More examples">
+      {prev && <a class="pager-prev" href={url(`examples/${prev.name}/`)}><span>Previous</span>{prev.title}</a>}
+      {next && <a class="pager-next" href={url(`examples/${next.name}/`)}><span>Next</span>{next.title}</a>}
+    </nav>
+  </div>
+</Base>
