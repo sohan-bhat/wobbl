@@ -127,6 +127,8 @@ function arrow(color) {
   return g;
 }
 
+const SIZES = { position: 3, normal: 3, stressA: 4, stressB: 4, shear: 4, dispA: 4, dispB: 3 };
+const idle = () => new Promise((r) => ('requestIdleCallback' in window ? requestIdleCallback(() => r(), { timeout: 600 }) : setTimeout(r, 50)));
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
 const COLD = 0xffd400;
@@ -166,8 +168,15 @@ async function build(root, ui, trash) {
   worker.postMessage({ file: new URL(root.dataset.file, document.baseURI).href, man });
 
   status.textContent = 'Loading the 3D part…';
-  const px = Math.min(window.devicePixelRatio || 1, 2);
-  const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+  // one step per idle moment, so none of them holds the page up for long
+  await idle();
+  alive();
+
+  // Phones get at most 1.5 device pixels per CSS pixel, desktops 2; multisampling only below 2.
+  const coarse = matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 600;
+  const fullPx = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
+  let px = fullPx;
+  const renderer = new WebGLRenderer({ antialias: fullPx < 2, alpha: true, powerPreference: 'default' });
   trash.push(() => { renderer.dispose(); renderer.forceContextLoss(); });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(px);
@@ -179,6 +188,8 @@ async function build(root, ui, trash) {
   root.prepend(canvas);
   trash.push(() => canvas.remove());
 
+  await idle();
+  alive();
   const scene = new Scene();
   const camera = new PerspectiveCamera(30, 1, 1, 5000);
   camera.up.set(0, 0, 1);
@@ -228,14 +239,13 @@ async function build(root, ui, trash) {
   scene.add(pull);
   trash.push(() => scene.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); }));
 
+  // No damping: the part stops when the pointer stops, so nothing keeps drawing after a drag.
   const controls = new OrbitControls(camera, canvas);
   trash.push(() => controls.dispose());
   // The part sits in the page's first screen: a vertical swipe still scrolls the page on phones,
   // a sideways drag turns the part.
   canvas.style.touchAction = 'pan-y';
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  controls.enableDamping = !reduce;
-  controls.dampingFactor = 0.12;
+  controls.enableDamping = false;
   controls.rotateSpeed = 0.8;
   const radius = size.length() / 2;
   controls.minDistance = radius * 1.3;
@@ -249,18 +259,38 @@ async function build(root, ui, trash) {
     requestRender();
   }
 
+  // Compile the shaders before the mesh arrives; with KHR_parallel_shader_compile it does not block.
+  await idle();
+  alive();
+  await Promise.all([renderer.compileAsync(scene, camera), renderer.compileAsync(pickScene, camera)]);
+  alive();
+  // first use of the probe's target and shader, on the still empty mesh
+  await idle();
+  alive();
+  renderer.setRenderTarget(pickTarget);
+  renderer.render(pickScene, camera);
+  renderer.setRenderTarget(null);
   const { arrays: m, range } = await got;
   alive();
   worker.terminate();
-  for (const [name, size] of [['position', 3], ['normal', 3], ['stressA', 4], ['stressB', 4], ['shear', 4], ['dispA', 4], ['dispB', 3]]) {
-    geo.setAttribute(name, new BufferAttribute(m[name], size, name !== 'position'));
-  }
-  geo.setIndex(new BufferAttribute(m.index, 1));
   uniforms.uRA.value.fromArray(range.stressA);
   uniforms.uRB.value.fromArray(range.stressB);
   uniforms.uRS.value.fromArray(range.shear);
   uniforms.uRDA.value.fromArray(range.dispA);
   uniforms.uRDB.value.fromArray(range.dispB);
+  // Send the mesh to the GPU a few attributes at a time, each in its own idle moment, by drawing
+  // it into the probe's one pixel target; the first frame on screen then has nothing left to send.
+  geo.setIndex(new BufferAttribute(m.index, 1));
+  for (const group of [['position', 'normal'], ['stressA', 'stressB'], ['shear', 'dispA', 'dispB']]) {
+    for (const name of group) geo.setAttribute(name, new BufferAttribute(m[name], SIZES[name], name !== 'position'));
+    await idle();
+    alive();
+    renderer.setRenderTarget(pickTarget);
+    renderer.render(pickScene, camera);
+    renderer.setRenderTarget(null);
+  }
+  await idle();
+  alive();
 
   const state = { ...ui.state() };
   const peakTag = root.querySelector('.peak-tag');
@@ -324,22 +354,66 @@ async function build(root, ui, trash) {
     }
   }
 
-  let pending = false, raf = 0;
-  function frame() {
+  // Draw on demand, at most once a frame, and not at all while the part is off screen. While the
+  // visitor drags, a slow frame lowers the pixel ratio a step; it comes back when they let go.
+  let pending = false, raf = 0, visible = true, dirty = false, busyUntil = 0, last = 0;
+  const gaps = [];
+  function frame(now) {
     pending = false;
     raf = 0;
-    const moving = controls.enableDamping && controls.update();
+    dirty = false;
+    if (now < busyUntil && last) {
+      gaps.push(now - last);
+      if (gaps.length > 6) gaps.shift();
+      if (gaps.length === 6 && gaps.filter((g) => g > 24).length >= 4 && px > 1) {
+        px = Math.max(1, px - 0.25);
+        gaps.length = 0;
+        renderer.setPixelRatio(px);
+        renderer.setSize(vw, vh, false);
+        uniforms.uPx.value = px;
+      }
+    }
+    last = now;
     renderer.render(scene, camera);
     overlays();
-    if (moving) requestRender();
+  }
+  function restore() {
+    if (performance.now() < busyUntil || px === fullPx) return;
+    px = fullPx;
+    renderer.setPixelRatio(px);
+    renderer.setSize(vw, vh, false);
+    uniforms.uPx.value = px;
+    requestRender();
+  }
+  // The page updates inside an animation frame, so draw right there instead of a frame later.
+  function drawNow() {
+    if (!visible) { dirty = true; return; }
+    if (pending) { cancelAnimationFrame(raf); pending = false; }
+    frame(performance.now());
   }
   function requestRender() {
-    if (!pending) { pending = true; raf = requestAnimationFrame(frame); }
+    dirty = true;
+    if (!visible || pending) return;
+    pending = true;
+    raf = requestAnimationFrame(frame);
   }
+  let restoreTimer = 0;
+  const busy = () => {
+    busyUntil = performance.now() + 300;
+    clearTimeout(restoreTimer);
+    if (px < fullPx) restoreTimer = window.setTimeout(restore, 350);
+  };
+  trash.push(() => clearTimeout(restoreTimer));
   trash.push(() => cancelAnimationFrame(raf));
-  controls.addEventListener('change', requestRender);
+  controls.addEventListener('change', () => { busy(); requestRender(); });
+  const seen = new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible && dirty) requestRender(); });
+  seen.observe(root);
+  trash.push(() => seen.disconnect());
 
+  // the canvas's place on the page, read again only after a scroll or a resize, never per move
+  let rect = null;
   function resize() {
+    rect = null;
     const w = root.clientWidth, h = root.clientHeight;
     if (!w || !h) return;
     vw = w;
@@ -355,11 +429,15 @@ async function build(root, ui, trash) {
 
   // Listeners on elements outside the canvas, so dispose can take them off again.
   const on = (el, type, fn, opts) => { el.addEventListener(type, fn, opts); trash.push(() => el.removeEventListener(type, fn, opts)); };
+  const where = () => rect || (rect = canvas.getBoundingClientRect());
+  const moved = () => { rect = null; };
+  on(window, 'scroll', moved, { passive: true });
+  on(window, 'resize', moved, { passive: true });
 
   // The probe reads the stress under the pointer from a one pixel render, at most once a frame.
   const px1 = new Uint8Array(4);
   function probeAt(clientX, clientY, sticky) {
-    const r = canvas.getBoundingClientRect();
+    const r = where();
     const x = clientX - r.left, y = clientY - r.top;
     camera.setViewOffset(vw, vh, x, y, 1, 1);
     renderer.setRenderTarget(pickTarget);
@@ -438,7 +516,7 @@ async function build(root, ui, trash) {
     controls.update();
   });
 
-  trash.push(ui.onChange((s) => { Object.assign(state, s); apply(); }));
+  trash.push(ui.onChange((s) => { Object.assign(state, s); busy(); apply(); drawNow(); }));
   trash.push(ui.onReset(resetView));
   Object.assign(state, ui.state());
   resize();
