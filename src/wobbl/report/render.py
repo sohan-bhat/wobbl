@@ -84,7 +84,7 @@ def _plotter(size):
     return p
 
 
-def _camera(p, X, view: np.ndarray, focus=None, zoom=1.3):
+def _camera(p, X, view: np.ndarray, focus=None, zoom=1.15):
     c = X.mean(0) if focus is None else np.asarray(focus)
     span = float(np.linalg.norm(X.max(0) - X.min(0)))
     up = np.array([0, 0, 1.0]) if abs(view[2]) < 0.95 else np.array([0, 1.0, 0])
