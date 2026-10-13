@@ -106,10 +106,13 @@ class Selector:
             clauses = [c.strip() for c in re.split(r"\s+and\s+|&|;", alt, flags=re.I)]
             # region clauses go first, so "top and within 14 of P" means the highest face near P
             clauses.sort(key=lambda c: 0 if re.match(r"(within|box)\b", c, re.I) else 1)
+            self._focus = None
             for clause in clauses:
                 got, reg = self._atom(clause, restrict=ids)
                 if reg is not None:
                     regions.append(reg)
+                    self._focus = np.asarray(reg[1], float) if reg[0] == "sphere" else \
+                        0.5 * (np.asarray(reg[1], float) + np.asarray(reg[2], float))
                 ids = got if ids is None else ids & got
             result = ids if result is None else result | ids
         faces = sorted(result or [])
@@ -149,8 +152,19 @@ class Selector:
             if not cands:
                 raise SelectionError(f"no flat face points {s}" + (" in that region" if restrict else "") +
                                      f". {self.hint()}")
-            ext = max(f.centroid[ax] * sign for f in cands)
-            return {f.id for f in cands if abs(f.centroid[ax] * sign - ext) <= self.tol}, None
+            focus = getattr(self, "_focus", None) if restrict is not None else None
+
+            def height(f):
+                # inside a region, compare the planes where they pass the region, not at their centroids,
+                # so a gently sloped long face does not outrank the pad the region points at
+                if focus is None:
+                    return f.centroid[ax] * sign
+                n, c = np.asarray(f.normal), np.asarray(f.centroid)
+                other = [i for i in range(3) if i != ax]
+                h = c[ax] - sum(n[i] * (focus[i] - c[i]) for i in other) / n[ax]
+                return h * sign
+            ext = max(height(f) for f in cands)
+            return {f.id for f in cands if abs(height(f) - ext) <= self.tol}, None
         m = re.fullmatch(r"([xyz])\s*(=|==|<=|>=|<|>)\s*(min|max|" + _NUM + ")", s)
         if m:
             ax = _AX[m.group(1)]
