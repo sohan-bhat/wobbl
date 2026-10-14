@@ -77,17 +77,18 @@ def gci(values: list[float], sizes: list[float], formal: float = 2.0) -> GCI:
 
 
 def gci_check(g: GCI | None, label: str, unit: str, tol: float = 0.03, values_only: list[float] | None = None,
-              what: str = "grids") -> Check:
+              what: str = "grids", digits: int = 4) -> Check:
     if g is None:
         v = values_only or []
         return Check("grid convergence", "warn", f"{label} from {len(v)} grid{'s' if len(v) != 1 else ''} only, so "
                                                  "there is no grid convergence index and the number is unverified",
                      {"values": v})
-    trend = " -> ".join(fmt(v) for v in reversed(g.values))
+    trend = " -> ".join(fmt(v, digits) for v in reversed(g.values))
+    unit = f" {unit}" if unit else ""
     d = {"values_fine_to_coarse": g.values, "sizes": g.sizes, "order": g.order, "extrapolated": g.extrapolated,
          "gci_fine": g.gci_fine, "kind": g.kind}
-    base = (f"{label} {trend} {unit} over {len(g.values)} {what}, grid convergence index {100 * g.gci_fine:.2g}% "
-            f"(observed order {g.order:.2g}, extrapolated {fmt(g.extrapolated)} {unit})")
+    base = (f"{label} {trend}{unit} over {len(g.values)} {what}, grid convergence index {100 * g.gci_fine:.2g}% "
+            f"(observed order {g.order:.2g}, extrapolated {fmt(g.extrapolated, digits)}{unit})")
     if g.kind == "diverging":
         return Check("grid convergence", "fail", base + ", and the grids move apart, so the answer is not converged", d)
     if g.gci_fine <= tol:
@@ -145,7 +146,8 @@ def yplus_check(stats: dict[str, tuple[float, float, float]], treatment: str) ->
     mean = max(v[2] for v in stats.values())
     top = max(v[1] for v in stats.values())
     d = {"patches": {k: {"min": a, "max": b, "mean": c} for k, (a, b, c) in stats.items()}, "treatment": treatment}
-    s = f"y+ on the walls averages {fmt(mean)}, at most {fmt(top)}, with {treatment}"
+    s = f"y+ on the walls averages {fmt(mean)}, at most {fmt(top)}, " + (
+        "so the grid resolves the wall" if treatment == "resolved" else "for wall functions")
     if treatment == "resolved":
         st = "pass" if top <= 2.5 else ("warn" if mean <= 5 else "fail")
         why = "" if st == "pass" else ", too tall for the first cells to resolve the wall, so refine near it"

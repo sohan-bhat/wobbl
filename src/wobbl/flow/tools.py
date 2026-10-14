@@ -54,7 +54,8 @@ def build(kind: str, params: dict):
                          _num(p, "temp", "temperature", 20.0), str(p.get("material") or "pvc").lower(),
                          _num(p, "roughness", "length") if p.get("roughness") not in (None, "") else None,
                          parse_fittings(str(p.get("fittings") or "")), _num(p, "rise", "length"),
-                         _num(p, "max_dp", "pressure"), str(p.get("question", ""))), run_pipe
+                         _num(p, "max_dp", "pressure"), cfd=str(p.get("cfd") or "auto"),
+                         keep=bool(p.get("keep", False)), question=str(p.get("question", ""))), run_pipe
     raise ValueError(f"unknown flow study '{kind}'; use one of {', '.join(KINDS)}")
 
 

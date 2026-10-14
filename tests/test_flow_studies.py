@@ -1,4 +1,4 @@
-"""Pipe and drag studies from start to finish, without a CFD solver: the numbers against hand calculations, the
+"""Pipe and drag studies from start to finish with the CFD check off: the numbers against hand calculations, the
 verdicts, the checks that should fire and the fixes."""
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from wobbl.flow.tools import build
 
 
 def _run(kind, params, tmp_path):
-    st, run = build(kind, params)
+    st, run = build(kind, {"cfd": "off", **params})
     return run(st, tmp_path / kind)
 
 

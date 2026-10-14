@@ -42,7 +42,7 @@ class Fluid:
         return self.mu * self.cp / self.k
 
     def summary(self) -> str:
-        return (f"{self.name} at {self.T:g} C: density {self.rho:.4g} kg/m3, viscosity {self.mu:.4g} Pa s, "
+        return (f"{self.name} at {self.T:g} C, density {self.rho:.4g} kg/m3, viscosity {self.mu:.4g} Pa s, "
                 f"conductivity {self.k:.3g} W/(m K), Prandtl {self.Pr:.3g}")
 
 

@@ -4,8 +4,7 @@ the friction factor.
 "Can a 25 mm PVC line carry 30 L/min over 40 m with three elbows?" becomes: the Reynolds number says laminar or
 turbulent, Colebrook (or 64/Re) gives the friction factor for the wall's roughness, the fittings add their loss
 coefficients, and the total is judged against the pressure the pump or supply can give. When OpenFOAM is there, a
-short periodic slice of the pipe can be solved on three grids, and its friction factor has to agree with the
-chart.
+short periodic slice of the pipe is solved on three grids, and its friction factor has to agree with the chart.
 """
 from __future__ import annotations
 
@@ -14,6 +13,8 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import numpy as np
 
 from ..outcome_generic import GenericOutcome
 from ..units import fmt
@@ -41,6 +42,8 @@ class PipeStudy:
     fittings: list[tuple[int, str]] = field(default_factory=list)
     rise: float = 0.0               # m the outlet sits above the inlet
     max_dp: float = 0.0             # Pa the supply can give, 0 when not judged
+    cfd: str = "auto"               # auto runs the CFD check when OpenFOAM is here or can be installed, or off
+    keep: bool = False              # keep the CFD case folders
     question: str = ""
 
 
@@ -94,10 +97,11 @@ def solve_pipe(st: PipeStudy, diameter: float | None = None) -> PipeResult:
     return PipeResult(re, v, dh, f, src, f * st.length / dh * q, k_total(st.fittings) * q, fl.rho * G * st.rise)
 
 
-def run_pipe(st: PipeStudy, out_dir: str | Path) -> GenericOutcome:
-    from .render import moody
+def run_pipe(st: PipeStudy, out_dir: str | Path, progress=None) -> GenericOutcome:
+    from .render import chart, moody
 
     t0 = time.time()
+    say = progress or (lambda a, b: None)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     if st.material not in ROUGHNESS and st.roughness is None:
@@ -127,7 +131,10 @@ def run_pipe(st: PipeStudy, out_dir: str | Path) -> GenericOutcome:
         checks.append(Check("entrance length", "warn" if reg == "laminar" else "info",
                             f"the flow takes about {fmt(le)} m to develop, {100 * le / st.length:.0f}% of the pipe, "
                             "where the wall loses more than the fully developed friction factor allows"))
-    cfd_f = None
+    cfd_f, cfd = None, cfd_check(r.re, rel, out, st, say) if st.cfd != "off" else None
+    if cfd and "f" in cfd:
+        cfd_f = cfd["f"]
+        checks += cfd["checks"]
     if cfd_f is None and (reg == "transitional" or (reg == "turbulent" and rel >= 1e-5)):
         extra.append(("medium", "the Moody chart is good to about 10 to 15% on rough walls, as Moody himself said, "
                                 "and no CFD check was run"))
@@ -165,6 +172,16 @@ def run_pipe(st: PipeStudy, out_dir: str | Path) -> GenericOutcome:
     imgs = {}
     try:
         imgs["moody"] = moody(out / "images" / "moody.png", r.re, r.f, rel, cfd_f)
+        if cfd_f:
+            rr, uu = (np.asarray(x) for x in cfd["profile"])
+            k = np.argsort(rr)
+            rr, uu = rr[k] / 0.5, uu[k]
+            theory = (2 * (1 - rr ** 2), "Hagen Poiseuille") if reg == "laminar" else \
+                (1.224 * np.clip(1 - rr, 0, 1) ** (1 / 7), "1/7 power law")
+            imgs["profile"] = chart(out / "images" / "profile.png", {"CFD, finest grid": (rr, uu),
+                                                                      theory[1]: (rr, theory[0])},
+                                    "radius / pipe radius", "velocity / mean velocity", None,
+                                    f"Fully developed velocity at Re {fmt(r.re)}")
     except Exception as e:  # noqa: BLE001
         imgs["error"] = str(e)
     metrics = [("pressure drop", fmt_pressure(total)), ("Reynolds number", fmt(r.re)),
@@ -178,15 +195,40 @@ def run_pipe(st: PipeStudy, out_dir: str | Path) -> GenericOutcome:
                     f"{fmt_pressure(r.dp_fittings)}." if st.fittings else ""),
                    "Steady, incompressible flow at one temperature." if fl.rho > 100 else
                    "Steady flow with the air's density held constant, fine below about 5% pressure change."]
+    if cfd and "skipped" in cfd:
+        assumptions.append(f"No CFD check of the friction factor, because {cfd['skipped']}.")
+    elif cfd_f:
+        assumptions.append("The CFD check solves a fully developed slice of the pipe, so it confirms the friction "
+                           "factor and leaves entrance and fitting losses to the correlations.")
     if st.rise:
         assumptions.append(f"The outlet sits {fmt(st.rise)} m above the inlet, which costs {fmt_pressure(r.dp_rise)}.")
     values = {"dp_Pa": total, "dp_friction_Pa": r.dp_friction, "dp_fittings_Pa": r.dp_fittings,
               "dp_rise_Pa": r.dp_rise, "re": r.re, "f": r.f, "f_cfd": cfd_f, "velocity_m_s": r.velocity,
-              "pump_power_W": st.flow * total, "_figures": [["moody", "The Moody chart with this pipe marked"]]}
+              "pump_power_W": st.flow * total,
+              "cfd_levels": cfd.get("levels") if cfd else None,
+              "_figures": [["moody", "The Moody chart with this pipe marked"],
+                           ["profile", "Velocity across the pipe from CFD against theory"]]}
     o = GenericOutcome("flow", "pipe", st.question, verdict, head, metrics, level, reasons, checks, assumptions,
                        values, imgs, fixes, solver="Darcy Weisbach" + (" and OpenFOAM" if cfd_f else ""),
                        t_total=time.time() - t0)
     return o.write(out)
+
+
+def cfd_check(re_: float, rel: float, out: Path, st: PipeStudy, say) -> dict | None:
+    """The CFD friction factor check, installing OpenFOAM first if this is the first flow study, or the reason it
+    was skipped."""
+    from ..solvers.base import SolverNotFound
+    from .install import ensure
+    from .pipecfd import friction, skip_reason
+
+    why = skip_reason(re_, rel)
+    if why:
+        return {"skipped": why}
+    try:
+        ensure(lambda m: say("setup", m))
+    except SolverNotFound as e:
+        return {"skipped": f"OpenFOAM is not available ({e.hint or e})"}
+    return friction(re_, rel, out, st.keep, say)
 
 
 def _diameter_for(st: PipeStudy, dp: float) -> float | None:
