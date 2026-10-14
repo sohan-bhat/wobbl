@@ -27,6 +27,13 @@ What each kind of run plays, and why it is exact:
   temperature rise by the lumped rise at each moment; with a Biot number of 3e-5 the sink
   stays within a few degrees of uniform all the way.
 
+Where a heat run's hottest point is inside the part (the battery pack's is in the middle
+of the block), the surface alone looks one temperature, so the file also holds a section:
+the corner of the part toward the camera is cut away at the hottest point, and the three
+cut faces carry the run's own volume field, sampled on a grid with the elements' second
+order shape functions at every saved time. Every heat run also gets an isotherm spacing,
+about a tenth of its final spread, so the page can draw the gradient as lines.
+
 A surface with more than --max-nodes second order nodes keeps its corner nodes only,
 as flat triangles; the parts here are mostly flat faces, so they look the same.
 
@@ -249,6 +256,54 @@ def lumped_warmup(folder: Path, argv: list[str], X: np.ndarray, tets: np.ndarray
     return {"t_s": ts, "theta": theta, "lumped_C": round(steady, 4), "tau_s": round(cap / (h * area), 1)}
 
 
+def locate(X: np.ndarray, tets: np.ndarray, P: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """For each point, the second order tet that holds it and the ten shape function weights there (VTK node
+    order: four corners, then the midsides of 01, 12, 20, 03, 13 and 23); tet -1 for a point outside the part."""
+    x0 = X[tets[:, 0]]
+    M = np.stack([X[tets[:, k]] - x0 for k in (1, 2, 3)], axis=2)        # columns are the edges from corner 0
+    Minv = np.linalg.inv(M)
+    owner = np.full(len(P), -1, np.int64)
+    bary = np.zeros((len(P), 4))
+    for a in range(0, len(tets), 400):
+        b = min(a + 400, len(tets))
+        L = np.einsum("tij,tpj->tpi", Minv[a:b], P[None, :, :] - x0[a:b, None, :])
+        L4 = np.concatenate([1 - L.sum(2, keepdims=True), L], axis=2)
+        inside = (L4 >= -1e-7).all(2)
+        for t, pt in zip(*np.nonzero(inside)):
+            if owner[pt] < 0:
+                owner[pt], bary[pt] = a + t, L4[t, pt]
+    l0, l1, l2, l3 = bary.T
+    W = np.stack([l0 * (2 * l0 - 1), l1 * (2 * l1 - 1), l2 * (2 * l2 - 1), l3 * (2 * l3 - 1),
+                  4 * l0 * l1, 4 * l1 * l2, 4 * l2 * l0, 4 * l0 * l3, 4 * l1 * l3, 4 * l2 * l3], axis=1)
+    return owner, W
+
+
+def section(X: np.ndarray, tets: np.ndarray, hist: np.ndarray, at, view, spacing: float):
+    """Cut away the corner of the part on the camera's side of the point at, and sample the volume field on the
+    three cut faces: a regular grid on each, values for every frame of hist (frames by nodes)."""
+    p = np.asarray(at, float)
+    sign = np.where(np.asarray(view) >= 0, 1, -1)
+    lo, hi = X.min(0), X.max(0)
+    faces, pts = [], []
+    for a in range(3):
+        b, c = [k for k in range(3) if k != a]
+        span = lambda k: (p[k], hi[k]) if sign[k] > 0 else (lo[k], p[k])  # noqa: E731
+        (u0, u1), (v0, v1) = span(b), span(c)
+        nu, nv = max(2, math.ceil((u1 - u0) / spacing) + 1), max(2, math.ceil((v1 - v0) / spacing) + 1)
+        U, V = np.meshgrid(np.linspace(u0, u1, nu), np.linspace(v0, v1, nv), indexing="ij")
+        G = np.empty((nu * nv, 3))
+        G[:, a], G[:, b], G[:, c] = p[a], U.ravel(), V.ravel()
+        faces.append({"axis": a, "at": round(float(p[a]), 4), "u": [b, round(float(u0), 4), round(float(u1), 4), nu],
+                      "v": [c, round(float(v0), 4), round(float(v1), 4), nv]})
+        pts.append(G)
+    P = np.concatenate(pts)
+    owner, W = locate(X, tets, P)
+    ok = owner >= 0
+    vals = np.zeros((len(hist), len(P)))
+    vals[:, ok] = np.einsum("pk,fpk->fp", W[ok], hist[:, tets[owner[ok]]])
+    return {"point": p.round(4).tolist(), "sign": sign.tolist(), "faces": faces, "points": len(P)}, P, vals, ok
+
+
 def heat_run(folder: Path, argv: list[str], rel: str, out: Path, stem: str, max_nodes: int, label: str) -> dict:
     o = json.loads((folder / "outcome.json").read_text())
     z = np.load(folder / "fields.npz")
@@ -269,10 +324,24 @@ def heat_run(folder: Path, argv: list[str], rel: str, out: Path, stem: str, max_
            "verdict": o["verdict"], "camera": camera(X, tets, v["hot_xyz"]),
            # the hottest point gets a marker only where it is on the surface the page draws
            "marker": bool(np.linalg.norm(X[old] - np.asarray(v["hot_xyz"]), axis=1).min() < 1e-3)}
+    # the run's own history: the starting state, then every saved time, as its history plot has it
+    times = np.concatenate([[0.0], z["hist_t"]])
+    hist = np.vstack([np.full((1, len(X)), start), z["hist_T"]]) if transient else T[None, :]
+    spread = float(T.max() - T.min())
+    run["iso_C"] = next(n for n in (0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 50) if n >= spread / 10)
+    if not run["marker"]:
+        # the hottest point is inside: cut the corner away there and carry the field on the cut faces
+        cut, P, vals, ok = section(X, tets, hist, v["hot_xyz"], run["camera"]["view"], run["camera"]["radius"] / 45)
+        # the cut faces meet at the hottest point, where they must read what the run found
+        corner = vals[-1, np.argmin(np.linalg.norm(P - np.asarray(v["hot_xyz"]), axis=1))]
+        if abs(corner - v["t_max_C"]) > 0.01:
+            raise SystemExit(f"{rel}: the cut reads {corner:.4f} C at the hottest point, the run {v['t_max_C']:.4f} C")
+        qc = np.round((vals.T - air) / step).astype(np.int64)
+        blob.add("cut_frames", planes(np.diff(qc, axis=1, prepend=0)), count=cut["points"], channels=len(hist), step=step)
+        blob.add("cut_inside", ok.astype(np.uint8).tobytes(), count=cut["points"])
+        run["cut"] = cut
+        run["marker"] = True
     if transient:
-        # the run's own history: the starting state, then every saved time, as its history plot has it
-        times = np.concatenate([[0.0], z["hist_t"]])
-        hist = np.vstack([np.full((1, len(X)), start), z["hist_T"]])
         q = np.round((hist[:, old].T - air) / step).astype(np.int64)
         dq = np.diff(q, axis=1, prepend=0)  # each frame as its change from the one before
         blob.field("frames", dq, s, step=step, base=air)
