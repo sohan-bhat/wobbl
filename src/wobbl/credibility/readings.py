@@ -119,8 +119,10 @@ def read_tests(path) -> tuple[list[Reading], dict]:
         missing = [c for c in ("name", "quantity", "value") if not row.get(c, "").strip()]
         if missing:
             raise ReadingError(f"row {k} has no {' or '.join(missing)}")
-        q = row["quantity"].strip().lower()
-        q = QUANTITY_ALIASES.get(q, q)
+        q = row["quantity"].strip()
+        low = QUANTITY_ALIASES.get(q.lower(), q.lower())
+        if low in ("strain", "displacement", "temperature"):   # a gauge; any other quantity keeps its case,
+            q = low                                           # since it names a value such as i_led_A
         try:
             scale, offset = _scale(q, row.get("unit", ""))
             r = Reading(row["name"].strip(), q, _num(row, "value") * scale + offset, None, row.get("unit", "").strip(),

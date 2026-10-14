@@ -336,10 +336,18 @@ def headline(r: dict) -> str:
     if mf:
         other = next(x["idealization"] for x in mf["idealizations"] if x["idealization"] != mf["favours"])
         out += f" The readings favour {mf['favours']} over {other} {ratio_words(mf)}, with the modulus fitted to each."
+    learned, flat = [], []
     for c in (r.get("calibration") or {}).get("inputs", []):
+        (learned if c["narrowed"] >= 1.2 else flat).append(c)
+    for c in learned:
         u = f" {c['unit']}" if c["unit"] and c["unit"] != "x" else ""
         out += (f" Calibration puts {c['input']} at {fmt(c['mean'])}{u} (95% interval {fmt(c['ci95'][0])} to "
                 f"{fmt(c['ci95'][1])}{u}, {c['narrowed']:.2g}x narrower than before the test).")
+    if flat:
+        names = [c["input"] for c in flat]
+        lead = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+        out += (f" The readings say little about {lead}, whose interval{'s' if len(names) > 1 else ''} stayed "
+                "about as wide as before.")
     return out
 
 

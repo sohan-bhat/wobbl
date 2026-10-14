@@ -68,8 +68,12 @@ def headline(r: dict) -> str:
     """One plain paragraph: the failure odds, the spread of the answer and what drives it."""
     out = r["outputs"][r["decision"]]
     unit = f" {out['unit']}" if out["unit"] else ""
+    from .domains import unit_of
+
+    key = r["decision"]
+    words = key.rsplit("_", 1)[0] if unit_of(key) and "_" in key else key
     name = {"safety_factor": "The safety factor", "t_max_C": "The hottest point"}.get(
-        r["decision"], f"The {r['decision'].replace('_', ' ')}")
+        key, f"The {words.replace('_', ' ')}")
     s = (f"{name} averages {fmt(out['mean'])}{unit} with a standard deviation of {fmt(out['sd'])}{unit}, and 90% "
          f"of samples fall between {fmt(out['p05'])} and {fmt(out['p95'])}{unit}.")
     pf = r["probability"].get("failure")
