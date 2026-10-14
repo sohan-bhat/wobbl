@@ -412,12 +412,25 @@ def read_spec(source: str | Path, question: str = "") -> MotionStudy:
 
 
 def _motor(m: dict, base: Path) -> Motor:
-    _check_keys(m, {"name", "eng", "thrust", "thrust_units", "propellant", "loaded_mass", "length"}, "motor")
-    if "eng" in m:
+    _check_keys(m, {"name", "eng", "design", "thrust", "thrust_units", "propellant", "loaded_mass", "length"},
+                "motor")
+    if "design" in m:              # a solid motor design (wobbl motor's TOML), burned back to its thrust curve
+        from ..chem.curves import motion_motor
+        try:
+            mo = motion_motor(base / m["design"], m.get("name", ""))
+        except ValueError as e:
+            raise SpecError(f"motor.design: {e}", getattr(e, "hint", "")) from None
+        if "loaded_mass" in m:
+            mo.loaded_mass = quantity(m["loaded_mass"], "mass", "motor.loaded_mass")
+            if mo.loaded_mass <= mo.propellant:
+                raise SpecError("motor.loaded_mass has to be more than the design's propellant mass, "
+                                f"{mo.propellant:.4g} kg")
+    elif "eng" in m:
         mo = read_eng(base / m["eng"], m.get("name", ""))
     else:
         if "thrust" not in m:
-            raise SpecError("[motor] needs a thrust curve", "Give thrust = [[s, N], ...] or eng = 'motor.eng'.")
+            raise SpecError("[motor] needs a thrust curve", "Give thrust = [[s, N], ...], eng = 'motor.eng' or "
+                                                            "design = 'motor.toml'.")
         curve = _table(m["thrust"], ("time", "force"), m.get("thrust_units"), "motor.thrust")
         mo = Motor(str(m.get("name", "motor")), curve, quantity(m.get("propellant", ""), "mass", "motor.propellant"),
                    quantity(m.get("loaded_mass", ""), "mass", "motor.loaded_mass"))

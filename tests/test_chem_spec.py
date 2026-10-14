@@ -54,9 +54,18 @@ def test_bad_specs_say_what_is_wrong(bad, match):
         read_spec(bad)
 
 
-def test_the_motion_domain_takes_a_simulated_motor():
+def test_the_motion_domain_takes_a_simulated_motor(tmp_path):
     pytest.importorskip("wobbl.motion.spec")
+    from wobbl.motion.spec import read_spec as read_motion
+
     mo = motion_motor(EXAMPLE)
     assert mo.propellant == pytest.approx(1.0556, rel=0.01) and mo.loaded_mass > mo.propellant
     assert 1100 < mo.impulse < 1400 and mo.length == pytest.approx(0.4)
     assert mo.curve[-1][1] == 0.0
+    rocket = (ROOT / "examples" / "rocket-launch" / "rocket.toml").read_text()
+    start, end = rocket.index("[motor]"), rocket.index("[launch]")
+    spec = rocket[:start] + f'[motor]\ndesign = "{EXAMPLE.as_posix()}"\nloaded_mass = "2.1 kg"\n\n' + rocket[end:]
+    st = read_motion(spec)
+    assert st.motor.impulse == pytest.approx(mo.impulse) and st.motor.loaded_mass == pytest.approx(2.1)
+    with pytest.raises(Exception, match="loaded_mass"):
+        read_motion(spec.replace('loaded_mass = "2.1 kg"', 'loaded_mass = "0.5 kg"'))
