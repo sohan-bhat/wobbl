@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..report.render import BG, FG, MARK, _camera, _grid, _plotter, _surface
+from ..report.render import BG, FG, MARK
 
 
 def _ribbon(fronts: list[np.ndarray], k: int = 25) -> np.ndarray:
@@ -28,56 +28,70 @@ def path_image(path: str | Path, X, tets, fronts: list[list[np.ndarray]], cycles
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        return _path_vtk(path, X, tets, fronts, cycles, origin, label, starts)
-    except Exception as e:  # noqa: BLE001  no OpenGL: draw it with matplotlib
+        return _path_numpy(path, np.asarray(X, float), np.asarray(tets), fronts, cycles, origin, label, starts)
+    except Exception as e:  # noqa: BLE001  a picture is never a reason to lose a result: draw it plainly
         if os.environ.get("WOBBL_DEBUG"):
             raise
         return _path_mpl(path, X, fronts, cycles, origin, label, str(e))
 
 
-def _path_vtk(path, X, tets, fronts, cycles, origin, label, starts=None):
-    import pyvista as pv
+def _strip(rows: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Points and triangles of a strip through rows of equally many points, (rows, k, 3)."""
+    n, k = rows.shape[:2]
+    i, j = np.meshgrid(np.arange(n - 1), np.arange(k - 1), indexing="ij")
+    a = (i * k + j).ravel()
+    return rows.reshape(-1, 3), np.vstack([np.column_stack([a, a + k, a + k + 1]),
+                                           np.column_stack([a, a + k + 1, a + 1])])
 
-    surf = _surface(_grid(X, tets))
-    p = _plotter((1500, 950))
-    p.add_mesh(surf, color="#8a9099", opacity=0.22, smooth_shading=True)
-    p.add_mesh(surf.extract_feature_edges(35), color="#6b7078", line_width=1.2, opacity=0.5)
-    pts_all = []
-    lim = [0.0, max(float(np.nanmax(cycles)), 1.0)] if len(cycles) else [0.0, 1.0]
+
+def _path_numpy(path, X, tets, fronts, cycles, origin, label, starts=None):
+    """Three layers: the crack surface and its fronts, the part over them at 22% opacity, and the part's sharp
+    edges drawn through it all, as the eye sees a crack inside a part made of tinted glass."""
+    from matplotlib.colors import ListedColormap
+
+    from ..mesh.mesher import _boundary
+    from ..report import render as R
+
+    size = (1500, 950)
+    lim = (0.0, max(float(np.nanmax(cycles)), 1.0) if len(cycles) else 1.0)
+    pts, tris, vals, segs, crack_pts = [], [], [], [], []
     for n, side in enumerate(fronts):
         if starts is not None and n < len(starts) and len(side):
-            flaw = _ribbon([starts[n], side[0]])
-            p.add_mesh(pv.StructuredGrid(*(flaw[:, :, i].T for i in range(3))), color="#9aa0a6")
+            P, T = _strip(_ribbon([np.asarray(starts[n], float), np.asarray(side[0], float)]))
+            pts.append(P), tris.append(T + sum(len(q) for q in pts[:-1])), vals.append(np.full(len(P), np.inf))
         if len(side) < 2:
             continue
         rib = _ribbon(side)
-        n_f, k = rib.shape[:2]
-        grid = pv.StructuredGrid(*(rib[:, :, i].T for i in range(3)))
-        grid.point_data["cycles"] = np.repeat(np.asarray(cycles[:n_f], float)[None, :], k, axis=0).ravel(order="F")
-        p.add_mesh(grid, scalars="cycles", cmap="plasma", clim=lim, show_scalar_bar=True,
-                   scalar_bar_args=dict(title="cycles when the front passed", color=FG, vertical=True, fmt="%.3g",
-                                        title_font_size=18, label_font_size=15, position_x=0.86, position_y=0.12,
-                                        height=0.72, width=0.045, font_family="courier", n_labels=5))
-        for f in side:
-            p.add_mesh(pv.lines_from_points(f), color="#f2f2ee", line_width=2)
-        pts_all.append(rib.reshape(-1, 3))
+        P, T = _strip(rib)
+        pts.append(P), tris.append(T + sum(len(q) for q in pts[:-1]))
+        vals.append(np.repeat(np.asarray(cycles[:len(rib)], float), rib.shape[1]))
+        segs += [np.stack([f[:-1], f[1:]], axis=1) for f in map(np.asarray, side)]
+        crack_pts.append(P)
     o = np.asarray(origin, float)
-    pts = np.vstack(pts_all) if pts_all else o[None, :]
+    crack = np.vstack(crack_pts) if crack_pts else o[None, :]
     span = float(np.linalg.norm(X.max(0) - X.min(0)))
-    extent = float(np.linalg.norm(pts.max(0) - pts.min(0))) + 1e-9
-    p.add_mesh(pv.Sphere(radius=min(0.008 * span, 0.04 * extent), center=o), color=MARK)
-    p.add_point_labels(np.atleast_2d(o), [label], font_size=18, text_color="#111111", shape_color=MARK,
-                       shape="rounded_rect", shape_opacity=0.95, point_size=1, show_points=False,
-                       always_visible=True, font_family="courier", margin=6)
-    nrm = np.cross(pts[len(pts) // 3] - pts[0], pts[-1] - pts[0]) if len(pts) > 2 else np.array([1.0, -1.0, 1.0])
+    extent = float(np.linalg.norm(crack.max(0) - crack.min(0))) + 1e-9
+    nrm = np.cross(crack[len(crack) // 3] - crack[0], crack[-1] - crack[0]) if len(crack) > 2 else np.array([1.0, -1, 1])
     view = nrm / max(np.linalg.norm(nrm), 1e-12)
     view = 0.8 * view + 0.35 * np.array([0.0, 0.0, 1.0]) + 0.2 * np.array([1.0, -1.0, 0.0])
-    view /= np.linalg.norm(view)
-    zoom = float(np.clip(0.55 * span / extent, 1.2, 6.0))
-    _camera(p, X, view, focus=pts.mean(0), zoom=zoom)
-    p.screenshot(str(path))
-    p.close()
-    return str(path)
+    cam = R.camera(view, X, size, focus=crack.mean(0), zoom=float(np.clip(0.55 * span / extent, 1.2, 6.0)), span=span)
+    bg = R._rgb(BG)
+    if pts:
+        surf = R.surface(np.vstack(pts), np.vstack(tris), {"c": np.concatenate(vals)})
+        # the starting flaw has no cycle count, so it reads as above the scale and is drawn gray
+        img = R.draw(size, cam, surf, surf.fields["c"], R.Look("plasma", lim, above="#9aa0a6"),
+                     R.Lines(np.vstack(segs), color=FG, alpha=1.0, width=2.0) if segs else None, two_sided=True)
+    else:
+        img = np.broadcast_to(bg, (size[1], size[0], 3)).copy()
+    part_tris = _boundary(tets, X, 2 if tets.shape[1] == 10 else 1)[0]
+    part = R.surface(X, part_tris)
+    shade, cover = R.draw(size, cam, part, np.zeros(len(part.P)), R.Look(ListedColormap(["#8a9099"])), coverage=True)
+    img = img * (1 - 0.22 * cover[..., None]) + 0.22 * (shade - (1 - cover)[..., None] * bg)
+    empty = R.Surface(np.zeros((0, 3)), np.zeros((0, 3), int), np.zeros((0, 3)))
+    _, lines = R.draw(size, cam, empty, np.zeros(0), R.Look(),
+                      R.Lines(R.feature_edges(X, part_tris), alpha=1.0, width=1.2, depth_test=False), coverage=True)
+    img = img * (1 - 0.5 * lines[..., None]) + 0.5 * lines[..., None] * R._rgb(R.EDGE)
+    return R.compose(path, [R.Panel(img, cam, ("plasma", lim, "cycles when the front passed"), [R.Mark(o, label)])])
 
 
 def _path_mpl(path, X, fronts, cycles, origin, label, reason):

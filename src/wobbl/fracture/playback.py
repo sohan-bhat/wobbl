@@ -27,23 +27,31 @@ def _finite(x):
     return x if np.isfinite(x) else None
 
 
+def _sharp_edges(pts: np.ndarray, faces: np.ndarray, angle: float = 35.0) -> np.ndarray:
+    """Vertex pairs along the edges where two triangles meet at more than angle degrees."""
+    e = np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]])
+    key = np.sort(e, axis=1)
+    order = np.lexsort((key[:, 1], key[:, 0]))
+    same = np.all(key[order][1:] == key[order][:-1], axis=1)
+    f, g = order[:-1][same] % len(faces), order[1:][same] % len(faces)
+    n = np.cross(pts[faces[:, 1]] - pts[faces[:, 0]], pts[faces[:, 2]] - pts[faces[:, 0]])
+    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-300)
+    return key[order][:-1][same][np.einsum("ij,ij->i", n[f], n[g]) < np.cos(np.radians(angle))]
+
+
 def part_surface(X: np.ndarray, tris: np.ndarray, target: int = 3000) -> dict:
     """The part's outer surface as a triangle mesh, decimated to about ``target`` triangles, and its sharp edges."""
-    import pyvista as pv
+    from ..life.playback import decimate
 
-    t = tris[:, :3]
-    faces = np.hstack([np.full((len(t), 1), 3), t]).ravel()
-    surf = pv.PolyData(X, faces).clean()
-    if surf.n_cells > target:
-        try:
-            surf = surf.triangulate().decimate(1.0 - target / surf.n_cells, preserve_topology=True)
-        except Exception:  # noqa: BLE001  keep the full surface rather than none
-            pass
-    edges = surf.extract_feature_edges(35, boundary_edges=False, non_manifold_edges=False, manifold_edges=False)
-    lines = edges.lines.reshape(-1, 3)[:, 1:] if edges.n_lines else np.zeros((0, 2), int)
-    tri = surf.faces.reshape(-1, 4)[:, 1:]
-    return {"vertices": _r(surf.points, 2), "triangles": tri.astype(int).tolist(),
-            "edge_vertices": _r(edges.points, 2), "edges": lines.astype(int).tolist()}
+    nodes, inv = np.unique(np.asarray(tris)[:, :3].ravel(), return_inverse=True)
+    faces, pts = inv.reshape(-1, 3), np.asarray(X, float)[nodes]
+    if len(faces) > target:
+        used, faces = np.unique(decimate(pts, faces, target // 2), return_inverse=True)
+        faces, pts = faces.reshape(-1, 3), pts[used]
+    sharp = _sharp_edges(pts, faces)
+    ev, lines = np.unique(sharp, return_inverse=True)
+    return {"vertices": _r(pts, 2), "triangles": faces.astype(int).tolist(),
+            "edge_vertices": _r(pts[ev], 2), "edges": lines.reshape(-1, 2).astype(int).tolist()}
 
 
 def write(path: Path, *, part: dict, origin, normal, steps: list[dict], starts: list, growth: tuple,
