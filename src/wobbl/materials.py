@@ -249,3 +249,71 @@ SWAP_ORDER = ["pla", "petg", "abs", "asa", "pc", "nylon", "pa12", "6063-t5", "50
               "ss304", "7075-t6", "4140", "ti-6al-4v"]
 PRINTABLE = {"pla", "petg", "abs", "asa", "nylon", "pa12", "pc"}
 
+
+@dataclass(frozen=True)
+class FatigueData:
+    """High cycle fatigue strength of smooth, polished specimens in fully reversed loading (R = -1).
+
+    ``strength`` is the fatigue strength at ``cycles``. Steels and titanium flatten into an endurance limit there
+    (``knee``); aluminum, plastics and wood keep weakening, so beyond ``cycles`` their curve is an extrapolation.
+    ``estimated`` marks a rule of thumb rather than a test of this material.
+    """
+    strength: float               # MPa
+    cycles: float
+    knee: bool
+    family: str                   # steel, aluminum, titanium, plastic, wood: sets the notch sensitivity
+    source: str
+    estimated: bool = False
+
+
+_SHIGLEY = "estimate: S'e = 0.5 Sut for steels up to 1400 MPa (Shigley's Mechanical Engineering Design, 10th ed., Eq. 6-8)"
+_RR_MOORE = "R.R. Moore rotating beam, completely reversed, 5e8 cycles"
+_PLASTIC = ("estimate: unfilled thermoplastics reach about 20 to 30% of their tensile strength at 1e7 cycles "
+            "(for example Crawford, Plastics Engineering); Wobbl takes 25%")
+
+FATIGUE: dict[str, FatigueData] = {
+    "6061-t6": FatigueData(96.5, 5e8, False, "aluminum", f"ASM Aerospace Specification Metals, 6061-T6, {_RR_MOORE}"),
+    "7075-t6": FatigueData(159.0, 5e8, False, "aluminum", f"ASM Aerospace Specification Metals, 7075-T6, {_RR_MOORE}"),
+    "6063-t5": FatigueData(68.9, 5e8, False, "aluminum", f"ASM Aerospace Specification Metals, 6063-T5, {_RR_MOORE}"),
+    "5052-h32": FatigueData(117.0, 5e8, False, "aluminum",
+                            f"ASM Aerospace Specification Metals, 5052-H32, {_RR_MOORE}"),
+    "a356-t6": FatigueData(59.0, 5e8, False, "aluminum", f"MatWeb Aluminum A356.0-T6, sand cast, {_RR_MOORE}"),
+    "mild-steel": FatigueData(200.0, 1e6, True, "steel", _SHIGLEY, estimated=True),
+    "4140": FatigueData(510.0, 1e6, True, "steel", _SHIGLEY, estimated=True),
+    "ss304": FatigueData(252.0, 1e6, True, "steel", _SHIGLEY + ", applied to an austenitic stainless steel",
+                         estimated=True),
+    "ti-6al-4v": FatigueData(510.0, 1e7, True, "titanium",
+                             "ASM Aerospace Specification Metals, Ti-6Al-4V, unnotched (Kt = 1), 1e7 cycles"),
+    "pla": FatigueData(12.5, 1e7, False, "plastic", _PLASTIC, estimated=True),
+    "petg": FatigueData(12.5, 1e7, False, "plastic", _PLASTIC, estimated=True),
+    "abs": FatigueData(9.25, 1e7, False, "plastic", _PLASTIC, estimated=True),
+    "asa": FatigueData(10.0, 1e7, False, "plastic", _PLASTIC, estimated=True),
+    "nylon": FatigueData(15.0, 1e7, False, "plastic", _PLASTIC, estimated=True),
+    "pa12": FatigueData(12.0, 1e7, False, "plastic", _PLASTIC, estimated=True),
+    "pc": FatigueData(16.25, 1e7, False, "plastic", _PLASTIC, estimated=True),
+    "hdpe": FatigueData(7.5, 1e7, False, "plastic", _PLASTIC, estimated=True),
+    "wood": FatigueData(23.8, 3e7, False, "wood",
+                        "USDA Wood Handbook FPL-GTR-282: clear wood in fully reversed bending keeps about 28% of its "
+                        "85 MPa modulus of rupture at 3e7 cycles"),
+}
+
+
+def fatigue_data(mat: Material) -> FatigueData | None:
+    """The S-N anchor of a material: its own entry (scaled with the tensile strength when a library material is
+    modified), or for a custom metal a rule of thumb picked by stiffness, steel near 200 GPa and aluminum near
+    70 GPa. None when nothing applies."""
+    key = mat.key.rstrip("*")
+    if key in FATIGUE and mat.key != "custom":
+        base = FATIGUE[key]
+        scale = mat.tensile_strength / LIBRARY[key].tensile_strength
+        return base if abs(scale - 1) < 1e-9 else replace(
+            base, strength=base.strength * scale, source=base.source + ", scaled with the modified tensile strength",
+            estimated=True)
+    if mat.category == "metal" and 150000 <= mat.E <= 230000:
+        return FatigueData(min(0.5 * mat.tensile_strength, 700.0), 1e6, True, "steel", _SHIGLEY, estimated=True)
+    if mat.category == "metal" and 60000 <= mat.E <= 80000:
+        return FatigueData(0.3 * mat.tensile_strength, 5e8, False, "aluminum",
+                           "estimate: 0.3 Sut at 5e8 cycles, close to the wrought aluminum alloys in this table",
+                           estimated=True)
+    return None
+
