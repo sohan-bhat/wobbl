@@ -65,6 +65,13 @@ def trajectory(job):
         for k in ("name", "mass", "density", "diameter", "cd", "height", "speed", "angle"):
             if k in r and not job.options.get(k):
                 job.use(k, r[k])
+        ball = next((b for b in BALLS if b.replace(" ", "-") == r.get("name")), None)
+        if ball and not job.options.get("mass"):
+            m, d, cd = BALLS[ball]
+            job.assume(f"a {ball} of regulation size, {m} and {d} across with a drag coefficient of {cd}",
+                       f"--mass '{m}' --diameter '{d}' --cd {cd}")
+        elif r.get("density") and not r.get("mass") and not job.options.get("density"):
+            job.assume(f"a solid {r['name']} of {r['density']}", f"--density '{r['density']}'")
         get = lambda k: job.value(k) or r.get(k, "")  # noqa: E731
         diameter = get("diameter") or job.value("diameter", "10 cm", "size not given")
         mass, density = get("mass"), get("density")

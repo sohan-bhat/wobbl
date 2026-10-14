@@ -20,8 +20,8 @@ def test_mcp_tools_are_listed():
     from wobbl.mcp.server import INSTRUCTIONS, build_server
 
     names = {t.name for t in asyncio.run(build_server().list_tools())}
-    assert {"solve_buckling", "solve_vibration", "fatigue_life"} <= names
-    assert all(n in INSTRUCTIONS for n in ("solve_buckling", "solve_vibration", "fatigue_life"))
+    assert {"solve_buckling", "solve_vibration", "fatigue_life"} <= names   # kept as deprecated aliases
+    assert "simulate(thing, question)" in INSTRUCTIONS
 
 
 def test_fatigue_from_the_command_line(tmp_path):

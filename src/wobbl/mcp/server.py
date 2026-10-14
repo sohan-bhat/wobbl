@@ -6,32 +6,28 @@ import sys
 
 from . import tools
 
-INSTRUCTIONS = """Wobbl runs verified engineering simulations. Typical flow for a strength question:
-1. inspect_geometry(path) to see faces, holes, fillets and thickness (mm).
-2. solve_structural(path, material, loads, fixtures, target_sf) with loads like "200 N down @ top" and
-   fixtures like "bolt holes d=6.6"; it refines the mesh until converged and checks itself.
-3. Read confidence, confidence_reasons and checks before quoting any number. Never quote a low
-   confidence result as final, and never quote peaks listed as excluded artifacts.
-4. Open images.stress to see where the peak is. If the verdict is fails or marginal, call
-   suggest_fix(result_dir, apply=true) for before and after numbers.
-Heat questions: solve_thermal. Circuits: solve_circuit. Falling, thrown and rocket flights: solve_motion.
-Pipe pressure drop, drag, propellers, drones and boat hulls: solve_flow.
-Solid rocket motor designs: solve_motor. Flame temperatures: solve_flame. Propellant c* and Isp: solve_propellant.
-Lithium ion cell thermal runaway onset: solve_runaway.
-Buckling of struts, plates and shells: solve_buckling. Natural frequencies against motor or propeller speed, sine
-sweeps and random vibration: solve_vibration. Fatigue life of a finished strength or vibration result: fatigue_life.
-Odds of failure under scatter, comparison with test readings, credibility evidence and a test plan for a
-finished study: quantify_uncertainty, validate_against_tests, assess_credibility and plan_tests. Wobbl
-supplies evidence and never certifies a model.
-Metal parts loaded past yield (permanent set, collapse load): solve_plastic.
-Robot arms and servos, linkages, gear trains, impacts and tipping: solve_mechanism.
-Solenoids, electromagnets and magnets: solve_magnetic. Capacitance and breakdown: solve_electric. Trace
-impedance, crosstalk and board parasitics: solve_board. Antennas and wireless range: solve_antenna. Room modes,
-mufflers and panel noise: solve_sound.
-Big problems: estimate_cost before any long solve, and solve_submodel to refine only around a peak. start_job,
-job_status, job_logs, cancel_job and resume_job run a deck in the background or on a remote machine. A cloud run
-starts only after the user agrees to its plan.
-Where a fatigue crack goes, when it fails the part and how lives spread over many parts: grow_crack."""
+INSTRUCTIONS = """Wobbl runs verified simulations of anything a person is about to build. Use one tool for all of it.
+1. Call simulate(thing, question). thing is whatever describes it, a CAD file (STEP, STL or a parametric .py), a
+   SPICE netlist, a mechanism spec, URDF or MJCF, a rocket or motor spec, a fluid case, a molecule, element,
+   material or reaction as a name, formula, SMILES or equation, or a sentence describing it. Wobbl works out the
+   domain and the physics from the question, runs several physics in one call when the question needs them,
+   and checks each answer.
+2. Open the 3D view for the user straight away. The result's view is an HTML page of their own scenario playing
+   out with the result on it (open on macOS, xdg-open on Linux, start on Windows). Tell them what they are watching.
+3. Read decisions and assumptions. Each one carries the override that replaces it. When a guess does not match
+   what the user said or built, call simulate again with physics and options set from those overrides, or
+   reuse explicit.options, which holds every value the run used. Fill material, loads, fixtures and options
+   precisely when you know them rather than leaving Wobbl to guess.
+4. Read confidence, confidence_reasons and checks before quoting any number. Never quote a low confidence result
+   as final, and never quote peaks listed as excluded artifacts.
+5. physics() lists every domain, its physics and their options. plan_only=True shows the route and the guesses
+   without running, and estimate=True predicts time, memory and disk first for anything big.
+After a run, the general tools work on any result folder. inspect_geometry describes a CAD part with face ids
+for loads and fixtures, verify and render reread a result, suggest_fix gives fixes with numbers and applies
+strength fixes, quantify_uncertainty, validate_against_tests, assess_credibility and plan_tests build
+credibility evidence (Wobbl never certifies a model), estimate_cost and the job tools run big problems in the
+background or on a remote machine, and list_materials gives the material data. The older solve_* tools remain
+as deprecated aliases of simulate."""
 
 
 def _protect_stdout():
@@ -44,12 +40,64 @@ def _protect_stdout():
         pass
 
 
+# the tools agents should reach for; every other tool is a deprecated alias of simulate and says so
+GENERAL = {"simulate", "physics", "inspect_geometry", "verify", "render", "suggest_fix", "quantify_uncertainty",
+           "validate_against_tests", "assess_credibility", "plan_tests", "estimate_cost", "start_job", "job_status",
+           "job_logs", "cancel_job", "resume_job", "list_materials", "solve_submodel"}
+
+
+def _deprecate(srv) -> None:
+    """Mark each scenario tool registered after this point as a deprecated alias, so the tool list leads agents
+    to simulate while older calls keep working."""
+    import inspect
+    plain = srv.tool
+
+    def tool(*args, **kw):
+        def deco(fn):
+            if fn.__name__ not in GENERAL and not kw.get("description"):
+                doc = inspect.cleandoc(fn.__doc__ or "")
+                kw["description"] = ("Deprecated alias of simulate, which reads the same study from a thing and a "
+                                     "question. " + doc)
+            return plain(*args, **kw)(fn)
+        return deco
+    srv.tool = tool
+
+
 def build_server():
     try:
         from mcp.server.mcpserver import MCPServer as Server
     except ImportError:  # mcp 1.x
         from mcp.server.fastmcp import FastMCP as Server
     srv = Server("wobbl", instructions=INSTRUCTIONS)
+
+    @srv.tool()
+    def simulate(thing: str = "", question: str = "", physics: list[str] | None = None, domain: str = "",
+                 kind: str = "", material: str = "", loads: list[str] | None = None,
+                 fixtures: list[str] | None = None, options: dict | None = None, plan_only: bool = False,
+                 quick: bool = False, estimate: bool = False, background: bool = False, remote: str = "") -> dict:
+        """Simulate anything from what describes it and the question in plain words. thing is a CAD file, a
+        netlist, a spec, a URDF or MJCF model, a fluid case folder, a finished result folder, a name, formula,
+        SMILES or equation, or a sentence. Wobbl picks the domain and the physics (several when the question needs
+        them, as in "will it survive a drop and stay under 60 C"), runs each with its checks and returns view, the
+        3D page of the scenario to open for the user at once, then verdict, plan, decisions and assumptions each
+        with its override, explicit (every value used, ready to pass back), steps with each physics' result, and
+        result_dir. Set physics (e.g. ["stress", "heat"]), domain and kind to override the reading. material,
+        loads (e.g. "200 N down @ top") and fixtures (e.g. "bolt holes d=4.5") are for parts, and options holds
+        any other value a physics reads, as {"power": "12 W", "rpm": "6000"}. A CLI override '--name value' is
+        options[name]. plan_only shows the route and guesses without running, estimate predicts cost, quick
+        skips images and fixes, and background or remote run it as a job."""
+        from .simulate import simulate_tool
+        return simulate_tool(thing, question, physics, domain, kind, material, loads, fixtures, options, plan_only,
+                             quick, estimate, background, remote)
+
+    @srv.tool()
+    def physics(domain: str = "") -> dict:
+        """Every domain simulate reads (part, circuit, mechanism, flight, fluid, field, chemistry and any added
+        since), the kinds of thing each takes, and each physics with its aliases and options."""
+        from .simulate import physics_tool
+        return physics_tool(domain)
+
+    _deprecate(srv)
 
     @srv.tool()
     def inspect_geometry(path: str, scale: float = 1.0) -> dict:
