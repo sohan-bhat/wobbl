@@ -77,11 +77,14 @@ def column_info(mesh, built, prep) -> Column | None:
     end_lo, end_hi = s <= lo[ax] + tol, s >= hi[ax] - tol
     at_lo = lambda nodes: bool(end_lo[nodes].all())   # noqa: E731
     at_hi = lambda nodes: bool(end_hi[nodes].all())   # noqa: E731
-    if at_hi(load_nodes) and at_lo(hn):
+    if at_hi(load_nodes):
         loaded, base_end = end_hi, end_lo
-    elif at_lo(load_nodes) and at_hi(hn):
+    elif at_lo(load_nodes):
         loaded, base_end = end_lo, end_hi
     else:
+        return None
+    # supports at the far end, and perhaps sideways at the loaded end, but none along the length
+    if not (end_lo[hn] | end_hi[hn]).all() or not base_end[hn].any():
         return None
     push = float(F @ axis) * (1 if loaded is end_hi else -1)
     if push >= 0:            # the load pulls the column: it cannot buckle as a column

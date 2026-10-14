@@ -170,7 +170,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
          "_tables": [["Buckling factors", ["mode", "factor", "load N"],
                       [[i + 1, fmt(f), fmt(f * load)] for i, f in enumerate(factors)],
                       "Negative factors buckle the part only with every load reversed."]]},
-        images, fixes(shape, design, target, col, mat, p.features), deck.notes + p.prep.notes,
+        images, fixes(shape, design, target, col, mat, p.features, lam), deck.notes + p.prep.notes,
         solver=f"CalculiX {adapter.version()}", t_total=time.time() - t0)
     if _playback(out / "playback.json", mesh, mode1, lam, design, yield_factor, col, p):
         o.values["playback"] = "playback.json"
@@ -208,22 +208,31 @@ def _assumptions(mat, shape, why_shape, kd_why, interaction, base) -> list[str]:
     return a + list(base.assumptions)
 
 
-def fixes(shape: str, design: float, target: float, col: Column | None, mat, features) -> list[dict]:
+def fixes(shape: str, design: float, target: float, col: Column | None, mat, features, lam: float) -> list[dict]:
     if design >= target or design <= 0:
         return []
     need = target / design
     out = []
     if shape == "column" and col is not None:
-        out.append({"kind": "stiffen", "title": f"Raise the column's second moment of area {need:.2g} times",
-                    "summary": f"The elastic buckling load scales with I, now {fmt(col.i_min)} mm4 about the weak "
-                               f"axis. A solid section {need ** 0.25:.2f} times as wide gets there, and a tube of the "
-                               "same weight does better because it puts the material far from the axis.",
-                    "params": {"i_min": col.i_min * need}, "auto": False})
-        out.append({"kind": "brace", "title": f"Shorten the unbraced length to {fmt(col.length / math.sqrt(need))} mm",
-                    "summary": f"The buckling load scales with 1/L^2. Bracing the {fmt(col.length)} mm column "
-                               f"sideways at mid length halves its buckling length and raises the elastic load four "
-                               "times, as long as the brace stops sideways motion.",
-                    "params": {"length": col.length / math.sqrt(need)}, "auto": False})
+        k = _column_stiffening(lam, col, mat, target)
+        if k is None:
+            out.append({"kind": "section", "title": "Use a larger section",
+                        "summary": f"Even a column too stiff to buckle would squash at {fmt(mat.allowable * col.area)} "
+                                   f"N, short of {target:g} times the load, so it needs more area as well as more "
+                                   "stiffness.", "auto": False})
+        else:
+            out.append({"kind": "stiffen", "title": f"Raise the column's second moment of area {k:.2g} times",
+                        "summary": f"The elastic buckling load scales with I, now {fmt(col.i_min)} mm4 about the "
+                                   f"weak axis. On the column curve the design factor reaches {target:g} at {k:.2g} "
+                                   f"times that, a section {k ** 0.25:.2f} times as wide in every direction, or a "
+                                   "larger tube of the same weight, which puts the material farther from the axis.",
+                        "params": {"i_min": col.i_min * k}, "auto": False})
+            out.append({"kind": "brace", "title": f"Shorten the unbraced length to {fmt(col.length / math.sqrt(k))} mm",
+                        "summary": f"The elastic buckling load scales with 1/L^2, so {fmt(col.length / math.sqrt(k))} "
+                                   f"mm of the {fmt(col.length)} mm column reaches the target. A brace that stops "
+                                   "sideways motion at mid length halves the buckling length and does far more.",
+                        "params": {"length": col.length / math.sqrt(k)}, "auto": False})
+        need = k or need
     else:
         p = {"plate": 1 / 3, "cylinder": 1 / 2, "dome": 1 / 2}.get(shape, 1 / 3)
         t = features.thickness_typical
@@ -240,6 +249,23 @@ def fixes(shape: str, design: float, target: float, col: Column | None, mat, fea
                                f"{need:.2g} times as stiff reaches the target if it is also strong enough not to "
                                "yield first.", "params": {"E": mat.E * need}, "auto": False})
     return out
+
+
+def _column_stiffening(lam: float, col, mat, target: float) -> float | None:
+    """The factor on the elastic buckling load (on I, E or 1/L^2) that brings the column curve's design factor to
+    the target, or None when even an infinitely stiff column would squash first."""
+    if column_curve(1e9 * lam, col, mat)[0] < target:
+        return None
+    lo, hi = 1.0, 1e9
+    for _ in range(200):
+        mid = math.sqrt(lo * hi)
+        if column_curve(lam * mid, col, mat)[0] >= target:
+            hi = mid
+        else:
+            lo = mid
+        if hi / lo < 1.0001:
+            break
+    return hi
 
 
 def _playback(path: Path, mesh, mode1, lam, design, yield_factor, col, p) -> str | None:
