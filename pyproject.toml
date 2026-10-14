@@ -37,9 +37,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-timeout>=2", "cantera>=3.1"]
+dev = ["pytest>=7", "pytest-timeout>=2", "cantera>=3.1", "mujoco>=3.3,<3.11"]
 # Cantera otherwise installs itself into ~/.wobbl the first time a combustion or motor study runs
 chem = ["cantera>=3.1"]
+# MuJoCo likewise arrives with the first mechanism study; 3.10 is the last release with Intel Mac wheels
+mechanism = ["mujoco>=3.3,<3.11"]
 
 [project.scripts]
 wobbl = "wobbl.cli.main:main"

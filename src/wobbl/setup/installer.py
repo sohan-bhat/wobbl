@@ -370,6 +370,18 @@ register(Recipe("cantera", ("combustion", "motor"), (), check=_chem("check"), in
                 present=_chem("available")))
 
 
+def _mech(name: str):
+    """A function of wobbl.mechanism.install, imported only when the registry calls it."""
+    def call(*args):
+        from ..mechanism import install as mech_install
+        return getattr(mech_install, name)(*args)
+    return call
+
+
+register(Recipe("mujoco", ("mechanism",), (), check=_mech("check"), installer=_mech("install"),
+                present=_mech("available")))
+
+
 def remove_all(log: Log = print) -> None:
     home = wobbl_home()
     if home.exists():
