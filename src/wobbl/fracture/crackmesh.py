@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 
@@ -145,7 +146,7 @@ def _build(prep: PreparedGeometry, crack: Crack, sizing: Sizing, alg3d: int, cur
                 continue
             gaps = _nearest(gmsh, 2, [copies[o] for o in cands], pts)
             k = int(np.argmin(gaps))
-            to_orig[s] = cands[k] if gaps[k] < 1e3 * tol else -1
+            to_orig[s] = cands[k] if gaps[k] < 10 * tol else -1
         occ.remove([(2, c) for c in copies.values()], recursive=True)
         occ.synchronize()
         # the crack's edges: mouths lie on the part's faces and go into their meshes, the rest is the front
@@ -158,7 +159,7 @@ def _build(prep: PreparedGeometry, crack: Crack, sizing: Sizing, alg3d: int, cur
             pts = _probe_points(gmsh, 1, c, 3)
             gaps = _nearest(gmsh, 2, bound, pts)
             k = int(np.argmin(gaps))
-            if gaps[k] < 1e3 * tol:
+            if gaps[k] < 10 * tol:
                 gmsh.model.mesh.embed(1, [c], 2, bound[k])
                 mouths.append(c)
             elif sum(1 for s in up if s in cracks) == 1:
@@ -244,11 +245,18 @@ def _fields(gmsh, sizing: Sizing, front: list[int], cracks: list[int]):
 
 
 def build_cracked_mesh(prep: PreparedGeometry, crack: Crack, sizing: Sizing, quarter: bool = True,
-                       timeout: float | None = None) -> CrackedMesh:
-    """Mesh the part with the crack in it, open the crack and move the front's midside nodes to quarter points."""
+                       timeout: float = 180.0, dump: Path | None = None) -> CrackedMesh:
+    """Mesh the part with the crack in it, open the crack and move the front's midside nodes to quarter points.
+
+    A cracked part meshes in seconds, so an attempt that runs for minutes has stalled in gmsh's boundary recovery,
+    and the next algorithm takes over. ``dump`` keeps the inputs in a file for a crack that will not mesh.
+    """
     from ..mesh.isolate import IsolatedCrash, IsolatedTimeout, run_isolated
 
-    timeout = timeout or 600.0
+    if dump is not None:
+        import pickle
+        dump.parent.mkdir(parents=True, exist_ok=True)
+        dump.write_bytes(pickle.dumps((prep, crack, sizing)))
     errors = []
     for alg3d, curved in ((1, True), (10, True), (4, False)):
         try:
@@ -320,7 +328,7 @@ def _orient(X: np.ndarray, tris: np.ndarray, ent: np.ndarray, normal: np.ndarray
     edges they share."""
     nrm = np.cross(X[tris[:, 1]] - X[tris[:, 0]], X[tris[:, 2]] - X[tris[:, 0]])
     ids = list(np.unique(ent))
-    flip = {ids[0]: False}
+    links: dict[int, dict[int, bool]] = {e: {} for e in ids}   # neighbor face -> whether it already agrees
     edge_owner: dict[tuple[int, int], int] = {}
     for i, t in enumerate(tris[:, :3]):
         for a, b in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
@@ -328,21 +336,26 @@ def _orient(X: np.ndarray, tris: np.ndarray, ent: np.ndarray, normal: np.ndarray
             j = edge_owner.get(key)
             if j is None:
                 edge_owner[key] = i
-            elif ent[j] != ent[i]:
-                ei, ej = ent[i], ent[j]
+            elif ent[j] != ent[i] and ent[j] not in links[ent[i]]:
                 same = float(nrm[i] @ nrm[j]) > 0
-                if ej in flip and ei not in flip:
-                    flip[ei] = flip[ej] ^ (not same)
-                elif ei in flip and ej not in flip:
-                    flip[ej] = flip[ei] ^ (not same)
-    for e in ids:
-        flip.setdefault(e, False)
+                links[ent[i]][ent[j]] = links[ent[j]][ent[i]] = same
+    flip = {}
+    for root in ids:   # walk out from each face not reached yet, flipping neighbors to agree
+        if root in flip:
+            continue
+        flip[root] = False
+        todo = [root]
+        while todo:
+            e = todo.pop()
+            for nb, same in links[e].items():
+                if nb not in flip:
+                    flip[nb] = flip[e] ^ (not same)
+                    todo.append(nb)
     out = tris.copy()
     turn = np.array([flip[e] for e in ent])
     out[turn] = out[turn][:, [0, 2, 1, 5, 4, 3]]
     nrm[turn] *= -1
-    first = ent == ids[0]
-    if float(nrm[first].sum(0) @ np.asarray(normal, float)) < 0:
+    if float(nrm.sum(0) @ np.asarray(normal, float)) < 0:
         out = out[:, [0, 2, 1, 5, 4, 3]]
     return out
 

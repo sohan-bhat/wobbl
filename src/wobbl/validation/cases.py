@@ -813,6 +813,31 @@ from .fields_cases import FIELD_CASES  # noqa: E402
 
 CASES += FIELD_CASES
 
+
+def _fracture(name: str) -> Callable[[Path], tuple[float, float, dict]]:
+    """A case from wobbl.fracture.benchmarks, imported only when it runs."""
+    def run(out: Path):
+        from ..fracture import benchmarks
+        return getattr(benchmarks, name)(out)
+    return run
+
+
+CASES += [
+    Case("center-crack", "Center crack in a finite plate, 2a / W = 0.3", "fracture",
+         "Tada, Paris and Irwin, Feddersen secant with Tada's correction", "K_I at the middle of the front",
+         "MPa sqrt(m)", 0.03, True, _fracture("center_crack")),
+    Case("edge-crack", "Edge crack in a strip free to bend, a / W = 0.3", "fracture", "Tada, Paris and Irwin, page 2.10",
+         "K_I at the middle of the front", "MPa sqrt(m)", 0.03, True, _fracture("edge_crack")),
+    Case("surface-crack", "Semi elliptical surface crack, a / c = 0.5, a / t = 0.25", "fracture",
+         "Newman and Raju (1981), within 5% of their analyses", "K_I at the deepest point", "MPa sqrt(m)", 0.06,
+         False, _fracture("surface_crack")),
+    Case("paris-life", "Paris law life at constant beta", "fracture", "closed form integral of C (beta S sqrt(pi a))^m",
+         "cycles from 1 to 10 mm", "cycles", 0.001, True, _fracture("paris_life")),
+    Case("kink-angle", "Crack at 45 degrees to the pull", "fracture", "maximum tangential stress, K_I = K_II",
+         "turning angle", "deg", 0.03, True, _fracture("kink_angle")),
+]
+
+
 def run_cases(out_dir: str | Path, ids: list[str] | None = None, log=print) -> list[dict]:
     out = Path(out_dir)
     results = []
