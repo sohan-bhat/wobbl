@@ -98,7 +98,7 @@ def check_values(name: str, p: dict):
 
 def test_the_skill_names_every_kind_of_command():
     names = {dry_parse(shlex.split(c)[1:])[0] for c in skill_commands()}
-    assert {"inspect", "run", "materials", "fix", "thermal", "circuit", "motion", "motor", "flame",
+    assert {"inspect", "run", "materials", "fix", "thermal", "circuit", "motion", "motor", "flame", "runaway",
             "propellant", "mechanism"} <= names, names
 
 
