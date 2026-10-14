@@ -19,6 +19,19 @@
   bracket's goes from 6.9 MB to 4.4 MB. ParaView opens it as before.
 
 **Mechanisms**
+- Any URDF, MJCF or spec runs through `wobbl simulate`, which picks the physics from
+  the question: torque against each drive's limits, kinematics (reach and range),
+  collision, stability, contact and dynamics. Each searches the whole joint range
+  for its worst pose, closes loops by Newton steps and checks itself against a hand
+  calculation, and a model left to itself is checked for balance by linearizing
+  gravity against its mass matrix.
+- Model files load the way people share them: `package://` meshes are found,
+  unreadable or missing meshes are dropped with their mass kept, links with no mass
+  take it from their shape, ROS and Drake extras are ignored and a home keyframe is
+  the starting pose, each written down in the report.
+- 27 public robot models, from MuJoCo Menagerie, MuJoCo and DeepMind Control,
+  Gymnasium, PyBullet, the ROS URDF tutorials and Drake, run and pass their own
+  checks in a test anyone can run with `WOBBL_ZOO=1`.
 - `wobbl mechanism` runs robot arms, four bar linkages, gear trains, impacts and
   things that tip in MuJoCo, from a template with `--set` values, a TOML spec of
   bodies, joints, drives, couplings, loops, loads and a move, or an MJCF or URDF

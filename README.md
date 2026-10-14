@@ -55,8 +55,9 @@ point marked and fixes with numbers.
   flame temperatures and CEA style propellant performance, and solid rocket motors
   from their grains, propellant and nozzle to a thrust curve, with the casing
   checked against the peak chamber pressure.
-- Mechanisms with [MuJoCo](https://mujoco.org), for robot arms against their servos'
-  torque speed lines, four bar linkages, gear trains, impacts and things that tip.
+- Mechanisms with [MuJoCo](https://mujoco.org), for any URDF, MJCF or spec: whether its
+  motors hold and move it, how far it reaches, what collides, what tips and what each
+  foot carries, plus ready made arms, linkages, gear trains and impacts.
 
 `wobbl fix --apply` edits the part, adding fillets and gussets to any STEP file,
 and runs the whole study again. The same tools work from your terminal and from
@@ -260,28 +261,46 @@ indicative, and agents get the same as `solve_runaway`.
 
 ## Mechanisms
 
-`wobbl mechanism` runs linkages, gear trains, robot arms and parts that collide in
-MuJoCo, with each motor held to its torque speed line. The arm template answers the
-question every desktop arm build starts with, whether its hobby servos can carry
-the payload through the move.
+`wobbl simulate` takes any URDF or MJCF model, a TOML spec of bodies, joints, drives
+and a move, or a mechanism described in words, and runs it in
+[MuJoCo](https://mujoco.org) with each drive held to its torque and speed limit. The
+question picks the physics: torque (whether the motors hold and move it), kinematics
+(reach and range), collision (parts running into each other or the floor), stability
+(tipping), contact (what each foot or wheel carries) and dynamics (the model run as
+written). A question that names none gets torque, reach and collisions for a fixed
+base, or contact, stability and stance torque for a robot that stands.
 
 ```console
-$ wobbl mechanism arm --set servo=mg996r --set wrist_servo=mg90s --set payload=500g
-FAILS. The shoulder servo stalls. Carrying 500 g through this move needs 1.35 N m (13.7 kg cm) almost at rest, where the TowerPro MG996R at 6 V gives 1.07 N m (11 kg cm). The hand hits the table at 0.241 s.
+$ wobbl simulate kuka_iiwa/model.urdf "can it hold a 5 kg payload anywhere in its range?"
+torque      MARGINAL  Every joint holds the mechanism with 5000 g at the lbr_iiwa_link_7, but moving at full speed the lbr_iiwa_joint_2 needs 300% of what its drive gives at that speed.
+kinematics  OK        The lbr_iiwa_link_7 reaches up to 1326 mm from the base, 957 mm out sideways and from -318 to 1316 mm in height.
 ```
 
-The torque and speed each servo needs come from MuJoCo's inverse dynamics along
-the move, set against the servo's line for a stall and its RMS over the repeating
-cycle against what it can carry continuously for heat. A second run with every
-servo held to its line shows what really happens, here the arm sagging onto the
-table. Each fix, a belt or gear stage, a stronger servo, a spring or counterweight,
-a lighter payload or ballast for a base that tips, is solved again before it is
-suggested. The four bar template gives a linkage's swing, toggle positions,
-transmission angle and mechanical advantage and whether its motor keeps up, the
-gear template gives output speed and torque with mesh losses, and the impact and
-tip templates give peak contact force and tipping. Anything else is a TOML spec of
-bodies, joints, drives, gear and belt couplings, loops, loads and a move, or an
-MJCF or URDF model.
+Each analysis searches the whole joint range for its worst pose, closing any loops by
+Newton steps, and checks itself: a second search from another start, a moment sum
+over every body a joint carries, the straight line through the joints that bounds
+reach, a second set of random poses for collisions, the floor's push against the
+weight once a robot settles, and the linearized balance against the run for a model
+left to itself. Every fix is solved again before it is suggested. Model files are
+read the way people share them. Meshes behind `package://` paths are found, meshes
+MuJoCo cannot read are dropped with their mass kept, a link with no mass takes it
+from its shape, a home keyframe is the starting pose, and every such guess is written
+into the report.
+
+To show this works on models nobody tuned for, 27 public ones run in
+`tests/test_mechanism_zoo.py` with `WOBBL_ZOO=1`, each asked a plain question: from
+MuJoCo Menagerie the SO-101, Dynamixel 2R, Unitree Go1, UR5e and Franka Panda, MuJoCo's
+car, slider crank and tendon arm, DeepMind Control's acrobot, finger, manipulator,
+walker and quadruped, Gymnasium's ant, humanoid, pusher, double pendulum and half
+cheetah, PyBullet's KUKA iiwa, xArm 6, R2-D2, Husky, two joint robot and cartpole, the
+ROS URDF tutorials and Drake's acrobot. All 27 run and pass their own checks.
+
+A mechanism described in words runs a ready made study, which goes deeper on one
+question. A desktop arm on hobby servos gets inverse dynamics along a pick and place,
+judged against each servo's line for a stall and its RMS for heat, as in
+`wobbl simulate "can two mg996r servos lift 500 g with a robot arm?"`. A four bar gets
+its swing, toggle positions and transmission angle, a gear train its output speed with
+mesh losses, an impact its peak force and a stand its tipping point.
 
 | Run | Answer | Checked against |
 |---|---|---|
@@ -292,14 +311,14 @@ MJCF or URDF model.
 
 Every run writes `trajectory.csv` and `playback.json`, which holds the bodies as
 simple shapes with their poses through the run and each joint's torque beside its
-motor's limit, so the run can be played back as it happened. Bodies are rigid, so a
-long printed link that flexes is not modeled, and contacts are stiff springs whose
-depth is checked. An impact's bounce and momentum do not depend on that stiffness
-but its peak force does, so Wobbl tunes the contact to Hertz theory for the two
-materials and reports the force at medium confidence. Agents get `solve_mechanism`.
-MuJoCo installs itself the first time a mechanism study runs, a 7.8 MB download
-that takes 18.3 MB once Wobbl leaves out its headers, plugins, viewer and renderers,
-or straight away with `wobbl setup --only mujoco`.
+motor's limit. When an answer comes from searching poses rather than one run, a short
+run drives the mechanism through the worst poses found with its real limits, so the
+playback shows them. Bodies are rigid and contacts are stiff springs whose depth is
+checked. An impact's bounce does not depend on that stiffness but its peak force
+does, so Wobbl tunes the contact to Hertz theory for the two materials and reports the
+force at medium confidence. MuJoCo installs itself the first time a mechanism runs, a
+7.8 MB download that takes 18.3 MB once Wobbl leaves out its headers, plugins, viewer
+and renderers, or straight away with `wobbl setup --only mujoco`.
 
 ## Buckling, vibration and fatigue
 
