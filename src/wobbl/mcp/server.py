@@ -285,31 +285,37 @@ def build_server():
                         rpm: list[str] | None = None, blades: int = 2, frequencies: list[str] | None = None,
                         sine: str = "", psd: str = "", axis: str = "z", duration: str = "",
                         damping: float | None = None, modes: int = 15, target_sf: float | None = None,
-                        quality: str = "normal") -> dict:
-        """Natural frequencies and mode shapes with CalculiX, judged against what shakes the part. masses are
+                        quality: str = "normal", loads: list[str] | None = None) -> dict:
+        """Natural frequencies and mode shapes of any part with CalculiX, judged against what shakes it. masses are
         parts it carries, e.g. ['60 g at 150,0,25 @ top and within 15 of 150,0,15']. rpm like ['4000-9000 rpm']
-        with blades checks rotor and blade pass resonance; frequencies adds tones to avoid. sine='2 g z 10-500 Hz'
-        gives the peak stress of a base sweep (CalculiX steady state dynamics), psd='gevs-qual' or breakpoints the 3
-        sigma stress of random input along axis, with a fatigue estimate over duration. Returns frequencies,
-        effective mass, the resonance table, stresses, checks and fixes."""
+        with blades checks rotor and blade pass resonance, and frequencies adds tones to avoid. sine='2 g z 10-500 Hz'
+        gives the peak stress of a base sweep, and with loads like ['5 N z @ top'] a band alone, sine='10-500 Hz',
+        sweeps those loads as harmonic forces (both checked against CalculiX steady state dynamics). psd='gevs-qual'
+        or breakpoints gives the 3 sigma stress of random input along axis, with a fatigue estimate over duration.
+        Returns frequencies, effective mass, the resonance table, stresses, checks and fixes."""
         from ..life.tools import solve_vibration_tool
         return solve_vibration_tool(path, material, fixtures, masses, rpm, blades, frequencies, sine, psd, axis,
-                                    duration, damping, modes, target_sf, quality)
+                                    duration, damping, modes, target_sf, quality, loads)
 
     @srv.tool()
     def fatigue_life(result_dir: str = "", material: str = "", amplitude: str = "", mean: str = "",
                      kt: float | None = None, radius: str = "", ratio: float = 0.0, cycles: str = "1e7",
                      blocks: list[str] | None = None, repeats: float = 1.0, duration: str = "",
                      surface: str = "auto", reliability: float = 0.9, mean_stress: str = "goodman",
-                     target_sf: float | None = None) -> dict:
+                     target_sf: float | None = None, history: str = "", path: str = "",
+                     fixtures: list[str] | None = None, loads: list[str] | None = None,
+                     quality: str = "normal") -> dict:
         """Stress life fatigue: cycles to crack initiation and the safety factor on stress at the required cycles.
-        From a strength result_dir the load cycles at load ratio ratio (0 on and off, -1 reversed) or through blocks
-        like ['100% x 2e4', '60% x 1e6'] repeated repeats times; from a vibration result its random or sine response
-        over duration; or from material with amplitude, mean and kt given directly. Uses sourced S-N data, Marin
-        factors, Peterson notch sensitivity, Goodman (or gerber, soderberg) and Miner's rule."""
+        Works from a strength result_dir, from any part path with its fixtures and loads (solved first), from a
+        vibration result over duration, or from material with amplitude, mean and kt given directly. The load
+        cycles at load ratio ratio (0 on and off, -1 reversed), through blocks like ['100% x 2e4', '60% x 1e6'], or
+        through a measured history (a file or numbers, multiples of the studied load) counted by rainflow, repeated
+        repeats times. Uses sourced S-N data, Marin factors, Peterson notch sensitivity, Goodman (or gerber,
+        soderberg) and Miner's rule."""
         from ..life.tools import fatigue_life_tool
         return fatigue_life_tool(result_dir, material, amplitude, mean, kt, radius, ratio, cycles, blocks, repeats,
-                                 duration, surface, reliability, mean_stress, target_sf)
+                                 duration, surface, reliability, mean_stress, target_sf, history, path, fixtures,
+                                 loads, quality)
 
     @srv.tool()
     def solve_plastic(path: str, material: str, loads: list[str], fixtures: list[str], target: float | None = None,

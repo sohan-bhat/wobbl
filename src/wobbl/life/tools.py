@@ -12,14 +12,6 @@ def _out(path: str, what: str) -> Path:
     return wobbl_home() / "results" / f"{stem}-{what}-{uuid.uuid4().hex[:6]}"
 
 
-def _base(path, material, fixtures, loads=(), quality="normal"):
-    from ..structural.spec import StructuralStudy, parse_fixture, parse_load
-
-    return StructuralStudy(part=str(Path(path).expanduser().resolve()), material=material, quality=quality,
-                           loads=[parse_load(x) for x in loads or []],
-                           fixtures=[parse_fixture(x) for x in fixtures or []])
-
-
 def _common(o) -> dict:
     return {"verdict": o.verdict, "headline": o.headline, "confidence": o.confidence,
             "confidence_reasons": o.confidence_reasons,
@@ -29,35 +21,38 @@ def _common(o) -> dict:
             "images": o.images, "report": o.report, "result_dir": o.workdir, "time_s": round(o.t_total, 1)}
 
 
+def _r(v, n=4):
+    return None if v is None or v != v or v in (float("inf"), float("-inf")) else round(float(v), n)
+
+
 def solve_buckling_tool(path: str, material: str, loads: list[str], fixtures: list[str],
                         target_sf: float | None = None, shape: str = "auto", quality: str = "normal") -> dict:
-    from ..life.buckling import BucklingStudy, run_buckling
+    from . import api
 
     try:
-        o = run_buckling(BucklingStudy(_base(path, material, fixtures, loads, quality), target_sf, shape),
-                         _out(path, "buckling"))
+        o = api.buckling(path, material, fixtures, loads, target_sf=target_sf, shape=shape, quality=quality,
+                         out=_out(path, "buckling"))
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)}
     v = o.values
-    return {**_common(o), "load_factor": round(v["load_factor"], 4), "critical_load_N": round(v["critical_load_N"], 2),
-            "shape": v["shape"], "knockdown": round(v["knockdown"], 3), "design_factor": round(v["design_factor"], 4),
-            "yield_factor": round(v["yield_factor"], 4) if v["yield_factor"] != float("inf") else None,
-            "target_safety_factor": v["target_sf"], "all_load_factors": [round(f, 4) for f in v["load_factors"]]}
+    return {**_common(o), "load_factor": _r(v.get("load_factor")), "critical_load_N": _r(v.get("critical_load_N"), 2),
+            "shape": v.get("shape"), "knockdown": _r(v.get("knockdown"), 3), "design_factor": _r(v.get("design_factor")),
+            "yield_factor": _r(v.get("yield_factor")), "target_safety_factor": v["target_sf"],
+            "all_load_factors": [round(f, 4) for f in v["load_factors"]]}
 
 
 def solve_vibration_tool(path: str, material: str, fixtures: list[str], masses: list[str] | None = None,
                          rpm: list[str] | None = None, blades: int = 2, frequencies: list[str] | None = None,
                          sine: str = "", psd: str = "", axis: str = "z", duration: str = "",
                          damping: float | None = None, modes: int = 15, target_sf: float | None = None,
-                         quality: str = "normal") -> dict:
-    from ..life.vibration import run_vibration
-    from ..life.vibspec import VibrationStudy
+                         quality: str = "normal", loads: list[str] | None = None) -> dict:
+    from . import api
 
     try:
-        st = VibrationStudy(_base(path, material, fixtures, quality=quality), list(masses or []), modes,
-                            list(rpm or []), blades, list(frequencies or []), 0.2, sine, psd, axis, duration, damping,
-                            target_sf)
-        o = run_vibration(st, _out(path, "vibration"))
+        o = api.vibration(path, material, fixtures, loads=loads or [], masses=masses or [], rpm=rpm or [],
+                          blades=blades, frequencies=frequencies or [], sine=sine, psd=psd, axis=axis,
+                          duration=duration, damping=damping, modes=modes, target_sf=target_sf, quality=quality,
+                          out=_out(path, "vibration"))
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)}
     v = o.values
@@ -74,13 +69,20 @@ def solve_vibration_tool(path: str, material: str, fixtures: list[str], masses: 
 def fatigue_life_tool(result_dir: str = "", material: str = "", amplitude: str = "", mean: str = "",
                       kt: float | None = None, radius: str = "", ratio: float = 0.0, cycles: str = "1e7",
                       blocks: list[str] | None = None, repeats: float = 1.0, duration: str = "", surface: str = "auto",
-                      reliability: float = 0.9, mean_stress: str = "goodman", target_sf: float | None = None) -> dict:
-    from ..life.fatigue_study import FatigueStudy, run_fatigue
+                      reliability: float = 0.9, mean_stress: str = "goodman", target_sf: float | None = None,
+                      history: str = "", path: str = "", fixtures: list[str] | None = None,
+                      loads: list[str] | None = None, quality: str = "normal") -> dict:
+    from . import api
 
+    kw = dict(material=material, amplitude=amplitude, mean=mean, kt=kt, radius=radius, ratio=ratio, cycles=cycles,
+              blocks=blocks or [], history=history, repeats=repeats, duration=duration, surface=surface,
+              reliability=reliability, mean_stress=mean_stress, target_sf=target_sf)
     try:
-        st = FatigueStudy(result_dir, material, amplitude, mean, kt, radius, ratio, cycles, list(blocks or []),
-                          repeats, duration, surface, "", "auto", reliability, mean_stress, target_sf)
-        o = run_fatigue(st, _out(result_dir.rstrip("/") if result_dir else "", "fatigue"))
+        if path:
+            o = api.fatigue(part=path, fixtures=fixtures or [], loads=loads or [], quality=quality,
+                            out=_out(path, "fatigue"), **kw)
+        else:
+            o = api.fatigue(result_dir, out=_out(result_dir.rstrip("/") if result_dir else "", "fatigue"), **kw)
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)}
     v = o.values
@@ -88,7 +90,7 @@ def fatigue_life_tool(result_dir: str = "", material: str = "", amplitude: str =
     return {**_common(o), "life": round(life, 1) if life != float("inf") else "infinite",
             "required": v["required"], "safety_factor": round(v["sf"], 3), "damage": v["damage"],
             "mean_stress_model": v["mean_model"], "kt": v["kt"], "kf": v["kf"], "sn_source": v["data_source"],
-            "blocks": v["blocks"]}
+            "blocks": v["blocks"][:50]}
 
 
 def footprint() -> dict:

@@ -30,17 +30,10 @@ def _part_options(f):
     return f
 
 
-def _base(part, kw, loads=()):
-    from ..structural.spec import StructuralStudy, parse_fixture, parse_load
-
-    if not Path(part).exists():
-        ui.fail(f"file not found: {part}")
-    st = StructuralStudy(part=str(Path(part).resolve()), material=kw["material"], quality=kw["quality"],
-                         question=kw["question"], scale=kw["scale"], body=kw["body"], mesh_size=kw["mesh_size"])
-    st.params = dict(p.split("=", 1) for p in kw.get("params", ()) if "=" in p)
-    st.fixtures = [parse_fixture(x) for x in kw["fixes"]]
-    st.loads = [parse_load(x) for x in loads]
-    return st
+def _part_kw(kw) -> dict:
+    """The part options every life command shares, as the entry functions take them."""
+    return {"quality": kw["quality"], "scale": kw["scale"], "body": kw["body"], "mesh_size": kw["mesh_size"],
+            "question": kw["question"], "params": dict(p.split("=", 1) for p in kw.get("params", ()) if "=" in p)}
 
 
 def _finish(run, out_dir, as_json):
@@ -68,17 +61,15 @@ def buckling(part, loads, shape, modes, **kw):
     \b
     wobbl buckling strut.step -m 6061-t6 --fix "z=min" --load "2 kN -z @ z=max" --target-sf 3
     """
-    from ..life.buckling import BucklingStudy, run_buckling
+    from ..life import api
     from .main import _out_dir
 
     if not loads or not kw["fixes"]:
         ui.fail("wobbl buckling needs at least one --load and one --fix",
                 "Example: wobbl buckling strut.step -m 6061-t6 --fix 'z=min' --load '2 kN -z @ z=max'")
-    try:
-        st = BucklingStudy(_base(part, kw, loads), kw["target_sf"], shape, modes, kw["keep"])
-    except Exception as e:  # noqa: BLE001
-        ui.fail(str(e))
-    _finish(lambda out, cb: run_buckling(st, out, cb), _out_dir(part, kw["out"]), kw["as_json"])
+    _finish(lambda out, cb: api.buckling(part, kw["material"], kw["fixes"], loads, target_sf=kw["target_sf"],
+                                         shape=shape, modes=modes, out=out, progress=cb, keep=kw["keep"],
+                                         **_part_kw(kw)), _out_dir(part, kw["out"]), kw["as_json"])
 
 
 @click.command()
@@ -92,32 +83,40 @@ def buckling(part, loads, shape, modes, **kw):
 @click.option("--frequency", "frequencies", multiple=True, help="Other tone or band to avoid, e.g. '120 Hz'.")
 @click.option("--margin", type=float, default=0.2, show_default=True,
               help="Keep natural frequencies this share away from every excitation.")
-@click.option("--sine", default="", help="Shaker sine sweep of the base, e.g. '2 g z 10-500 Hz'.")
+@click.option("--sine", default="",
+              help="Sine sweep: of the base, e.g. '2 g z 10-500 Hz', or a band alone, '10-500 Hz', to sweep the loads.")
+@click.option("--load", "-l", "loads", multiple=True,
+              help="A load that shakes the part as a harmonic force across the --sine band, e.g. '5 N z @ top'.")
 @click.option("--psd", default="", help="Random base input: gevs-qual, gevs-accept or '20:0.01, 80:0.04, 2000:0.01'.")
 @click.option("--axis", default="z", show_default=True, help="Axis of the random input.")
 @click.option("--duration", default="", help="Time at the random or sine input, e.g. '2 min', for fatigue.")
 @click.option("--damping", type=float, default=None, help="Damping ratio, e.g. 0.02 (default by material).")
-def vibration(part, masses, modes, rpm, blades, frequencies, margin, sine, psd, axis, duration, damping, **kw):
+def vibration(part, masses, modes, rpm, blades, frequencies, margin, sine, loads, psd, axis, duration, damping,
+              **kw):
     """Natural frequencies against rotors and tones, and the stress of a sine sweep or random input.
 
     \b
     wobbl vibration arm.py -m pa12 --fix "bolt holes d=3.2" --mass "60 g at 150,0,25 @ top and within 15 of 150,0,15" --rpm "4000-9000 rpm"
     wobbl vibration bracket.step -m 6061-t6 --fix "bolt holes" --psd gevs-qual --axis z
     """
-    from ..life.vibration import run_vibration
+    from ..life import api
     from ..life.vibspec import VibrationStudy
+    from ..structural.spec import StructuralStudy
     from .main import _out_dir
 
     if not kw["fixes"]:
         ui.fail("wobbl vibration needs at least one --fix, the way the part is mounted",
                 "Example: wobbl vibration arm.py -m pa12 --fix 'bolt holes d=3.2' --rpm '6000 rpm'")
-    try:
-        st = VibrationStudy(_base(part, kw), list(masses), modes, list(rpm), blades, list(frequencies), margin, sine,
-                            psd, axis, duration, damping, kw["target_sf"], kw["keep"])
-        st.excitations()
+    try:   # read the speeds and tones before any solving, so a typo fails at once
+        VibrationStudy(StructuralStudy(part=part, material=kw["material"]), rpm=list(rpm), blades=blades,
+                       frequencies=list(frequencies)).excitations()
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e))
-    _finish(lambda out, cb: run_vibration(st, out, cb), _out_dir(part, kw["out"]), kw["as_json"])
+    _finish(lambda out, cb: api.vibration(part, kw["material"], kw["fixes"], loads=loads, masses=masses, rpm=rpm,
+                                          blades=blades, frequencies=frequencies, margin=margin, sine=sine, psd=psd,
+                                          axis=axis, duration=duration, damping=damping, modes=modes,
+                                          target_sf=kw["target_sf"], out=out, progress=cb, keep=kw["keep"],
+                                          **_part_kw(kw)), _out_dir(part, kw["out"]), kw["as_json"])
 
 
 @click.command()
@@ -131,7 +130,13 @@ def vibration(part, masses, modes, rpm, blades, frequencies, margin, sine, psd, 
               help="Load ratio min/max for a strength result: 0 on and off, -1 fully reversed.")
 @click.option("--cycles", default="1e7", show_default=True, help="Life the part needs, in cycles.")
 @click.option("--block", "blocks", multiple=True, help="Duty cycle block, e.g. '100% x 2e4' or '0.6 x 1e6 R=-1'.")
-@click.option("--repeats", type=float, default=1.0, show_default=True, help="Times the duty cycle runs.")
+@click.option("--history", default="",
+              help="A load history to rainflow count: a file or numbers, multiples of the studied load (MPa for --material).")
+@click.option("--repeats", type=float, default=1.0, show_default=True, help="Times the duty cycle or history runs.")
+@click.option("--fix", "-f", "fixes", multiple=True, help="Support, when SOURCE is a part to solve first.")
+@click.option("--load", "-l", "loads", multiple=True, help="Load, when SOURCE is a part to solve first.")
+@click.option("--quality", type=click.Choice(["fast", "normal", "fine"]), default="normal",
+              help="Mesh quality of the strength study, when SOURCE is a part.")
 @click.option("--duration", default="", help="Time at the input, for a vibration result.")
 @click.option("--surface", type=click.Choice(["auto", "polished", "ground", "machined", "cold-drawn", "hot-rolled",
                                               "as-cast", "as-forged"]), default="auto")
@@ -144,21 +149,33 @@ def vibration(part, masses, modes, rpm, blades, frequencies, margin, sine, psd, 
 @click.option("--out", "-o", default=None)
 @click.option("--question", default="")
 @click.option("--json", "as_json", is_flag=True)
-def fatigue(source, material, amplitude, mean, kt, radius, ratio, cycles, blocks, repeats, duration, surface, size,
-            loading, reliability, mean_model, target_sf, out, question, as_json):
-    """Fatigue life from a strength or vibration result, or from stresses you give.
+def fatigue(source, material, amplitude, mean, kt, radius, ratio, cycles, blocks, history, repeats, fixes, loads,
+            quality, duration, surface, size, loading, reliability, mean_model, target_sf, out, question, as_json):
+    """Fatigue life from a strength or vibration result, a part and its loads, or stresses you give.
 
     \b
     wobbl fatigue wobbl-out/bracket --ratio 0 --cycles 1e6
     wobbl fatigue wobbl-out/bracket --block "100% x 2e4" --block "60% x 1e6" --repeats 10
+    wobbl fatigue wobbl-out/bracket --history loads.csv --repeats 1000
+    wobbl fatigue bracket.step -m 6061-t6 --fix "bolt holes" --load "300 N down @ top" --ratio -1
     wobbl fatigue --material 4140 --amplitude "200 MPa" --mean "100 MPa" --kt 2 --radius "1 mm"
     """
-    from ..life.fatigue_study import FatigueStudy, run_fatigue
+    from ..life import api
     from .main import _out_dir
 
+    is_part = bool(source) and Path(source).is_file()
     if source and not Path(source).exists():
-        ui.fail(f"no such result folder: {source}")
-    st = FatigueStudy(source, material, amplitude, mean, kt, radius, ratio, cycles, list(blocks), repeats, duration,
-                      surface, size, loading, reliability, mean_model, target_sf, question)
-    name = (Path(source).name + "-fatigue") if source else "fatigue"
-    _finish(lambda o, cb: run_fatigue(st, o, cb), _out_dir(name, out), as_json)
+        ui.fail(f"no such result folder or part: {source}")
+    if is_part and (not material or not fixes or not loads):
+        ui.fail("fatigue on a part solves it first, so it needs --material, --fix and --load",
+                "Example: wobbl fatigue bracket.step -m 6061-t6 --fix 'bolt holes' --load '300 N down @ top'")
+    kw = dict(material=material, amplitude=amplitude, mean=mean, kt=kt, radius=radius, ratio=ratio, cycles=cycles,
+              blocks=blocks, history=history, repeats=repeats, duration=duration, surface=surface, size=size,
+              loading=loading, reliability=reliability, mean_stress=mean_model, target_sf=target_sf,
+              question=question)
+    if is_part:
+        kw.update(part=source, fixtures=fixes, loads=loads, quality=quality)
+    else:
+        kw["source"] = source
+    name = (Path(source).stem if is_part else Path(source).name) + "-fatigue" if source else "fatigue"
+    _finish(lambda o, cb: api.fatigue(out=o, progress=cb, **kw), _out_dir(name, out), as_json)
