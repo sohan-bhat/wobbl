@@ -4,8 +4,6 @@
 //
 // Nothing here changes the address: the skip link and the Contents list move focus and
 // scroll with JS, and UI state such as the selected tab lives in the page only.
-import { meters, mps, secs } from './flight-format';
-
 const $ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => r.querySelector<T>(s);
 const $$ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => [...r.querySelectorAll<T>(s)];
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -144,7 +142,7 @@ document.addEventListener('astro:page-load', () => {
   tabs();
   contents();
   countUp();
-  flightCharts();
+  flightSims();
   heroPart();
 });
 
@@ -261,60 +259,14 @@ function countUp() {
   cleanups.push(() => io.disconnect());
 }
 
-/**
- * Flight charts. A chart below the screen draws its line in once when it comes into view,
- * left to right in time, with each event showing as the line reaches it; under reduced
- * motion, or when it is already on screen, it is simply there. A pointer over the plot
- * reads the time, height and speed of the nearest row Wobbl wrote.
- */
-function flightCharts() {
-  const figs = $$('[data-flight]');
+/** Motion playback on the landing page and motion examples; it stops when the page is left. */
+function flightSims() {
+  const figs = $$('[data-sim]');
   if (!figs.length) return;
-  if (!reduceMotion() && 'IntersectionObserver' in window) {
-    // the first report on each chart says where it is as the page opens, with no layout read here
-    const seen = new WeakSet<Element>();
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        const fig = e.target;
-        if (!seen.has(fig)) {
-          seen.add(fig);
-          if (e.isIntersecting) io.unobserve(fig); else fig.classList.add('fc-armed');
-        } else if (e.intersectionRatio >= 0.4) {
-          io.unobserve(fig);
-          fig.classList.add('fc-play');
-        }
-      }
-    }, { threshold: [0, 0.45] });
-    figs.forEach((fig) => io.observe(fig));
-    cleanups.push(() => io.disconnect());
-  }
-  for (const fig of figs) {
-    const plot = $('.fc-plot', fig);
-    const cross = $('.fc-cross', fig);
-    const read = $('.fc-read', fig);
-    if (!plot || !cross || !read) continue;
-    const tEnd = Number(plot.dataset.tend), top = Number(plot.dataset.top);
-    let rows: number[][] | null = null;
-    const show = (e: PointerEvent) => {
-      rows ??= (plot.dataset.samples ?? '').split(';').map((r) => r.split(',').map(Number));
-      const box = plot.getBoundingClientRect();
-      const t = Math.min(Math.max((e.clientX - box.left) / box.width, 0), 1) * tEnd;
-      let lo = 0, hi = rows.length - 1;
-      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (rows[mid][0] < t) lo = mid; else hi = mid; }
-      const [rt, alt, v] = t - rows[lo][0] < rows[hi][0] - t ? rows[lo] : rows[hi];
-      const left = (rt / tEnd) * 100;
-      cross.hidden = false;
-      cross.style.left = `${left}%`;
-      cross.style.setProperty('--y', `${(1 - Math.max(alt, 0) / top) * 100}%`);
-      cross.toggleAttribute('data-flip', left > 55);
-      read.textContent = [secs(rt), meters(alt), Number.isFinite(v) ? mps(v) : ''].filter(Boolean).join(', ');
-    };
-    const hide = () => { cross.hidden = true; };
-    plot.addEventListener('pointermove', show);
-    plot.addEventListener('pointerdown', show);
-    plot.addEventListener('pointerleave', hide);
-    plot.addEventListener('pointercancel', hide);
-  }
+  import('./sim').then((m) => {
+    if (!figs[0].isConnected) return;
+    cleanups.push(m.initSims(figs));
+  });
 }
 
 /** The 3D part in the landing page's hero; it is disposed when the page is left. */

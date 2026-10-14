@@ -1,13 +1,13 @@
 ---
-// A run's result picture: its altitude chart for a motion run, its image, or a big number
-// card for a circuit without a plot.
+// A run's result picture: the playback of a motion run, its image, or a big number card for a
+// circuit without a plot.
 import { picture } from '../lib/images';
 import { COLOR, metrics, runImages, type Run } from '../lib/examples';
-import { hasFlight } from '../lib/flight';
-import FlightChart from './FlightChart.astro';
-interface Props { run: Run; sizes: string; eager?: boolean; compact?: boolean; eventsShown?: boolean }
-const { run, sizes, eager = false, compact = false, eventsShown = false } = Astro.props;
-const flight = hasFlight(run);
+import { hasSim } from '../lib/sim';
+import FlightSim from './FlightSim.astro';
+interface Props { run: Run; sizes: string; eager?: boolean; compact?: boolean }
+const { run, sizes, eager = false, compact = false } = Astro.props;
+const flight = hasSim(run);
 const img = runImages(run)[0];
 const kinds: Record<string, string> = {
   stress: 'Stress heatmap', temperature: 'Temperature map', waveform: 'Simulated waveform',
@@ -17,7 +17,7 @@ const pic = img && !flight ? picture(img.name) : null;
 const [k, v] = metrics(run)[0];
 ---
 {flight ? (
-  <FlightChart run={run} compact={compact} spoken={!eventsShown} />
+  <FlightSim run={run} compact={compact} answer={false} />
 ) : pic ? (
   <img class="run-img" src={pic.src} srcset={pic.srcset} sizes={sizes} width={pic.width} height={pic.height}
        loading={eager ? undefined : 'lazy'} decoding="async" alt={`${kinds[img!.kind] ?? img!.kind}. ${run.outcome.headline.replace(/[:;] /g, ', ')}`} />

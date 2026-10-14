@@ -152,83 +152,60 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .answer-img .run-img, .answer-img .run-metric { aspect-ratio: 4 / 3; object-fit: contain; border: 0; }
 .answer-img:hover .run-img { outline: 1px solid var(--line-2); }
 
-/* A dropped rock and a rocket: two motion runs side by side, their rows lined up by a subgrid.
-   Below the hero, the section is laid out only once it comes close to the screen. */
-.flights { content-visibility: auto; contain-intrinsic-block-size: auto 2300px; }
-@media (min-width: 1000px) { .flights { contain-intrinsic-block-size: auto 1150px; } }
-.pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 56px; margin-top: 36px; }
-.flight { display: grid; align-content: start; gap: 24px; min-width: 0; }
-.flight + .flight { padding-top: 48px; border-top: 1px solid var(--line); }
+/* A dropped rock and a rocket: each run's command over its playback, side by side with the
+   rows lined up by a subgrid. Below the hero, the section is laid out only as it nears the screen. */
+.flights { content-visibility: auto; contain-intrinsic-block-size: auto 1500px; }
+@media (min-width: 1000px) { .flights { contain-intrinsic-block-size: auto 900px; } }
+.flights-line { margin: 14px 0 0; max-width: 60ch; color: var(--fg-2); text-wrap: pretty; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; margin-top: 32px; }
+.flight { display: grid; align-content: start; gap: 16px; min-width: 0; }
 @media (min-width: 1000px) {
-  .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(7, auto); gap: 0; margin-top: 44px; }
-  .flight { grid-row: span 7; grid-template-rows: subgrid; row-gap: 24px; padding-right: 44px; }
-  .flight + .flight { padding: 0 0 0 44px; border-top: 0; border-left: 1px solid var(--line); }
+  .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto; gap: 0 32px; margin-top: 40px; }
+  .flight { grid-row: span 2; grid-template-rows: subgrid; row-gap: 16px; }
 }
 .flight > * { margin: 0; min-width: 0; }
-.flight-head h3 { font-size: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem); }
-.flight-head p { margin: 8px 0 0; color: var(--fg-2); text-wrap: pretty; }
 .flight .term { margin-top: 0; align-self: start; }
-.flight .term pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.flight .term pre { white-space: pre-wrap; overflow-wrap: break-word; font-size: 13px; }
 .flight .term .ln { padding-left: 2ch; text-indent: -2ch; }
-.flight .answer-line { margin: 0; font-size: clamp(0.95rem, 0.92rem + 0.15vw, 1.05rem); }
-.flight-meta { display: flex; flex-wrap: wrap; gap: 6px 24px; font: 500 13px/1.4 var(--mono); color: var(--fg-2); }
-.flight-more a { font-weight: 600; text-decoration-color: var(--yellow); display: inline-block; padding: 4px 0; }
 
-/* Altitude over time for a motion run: a stretched SVG line under HTML labels and ticks.
-   A chart is laid out only as it nears the screen, so a page that opens above it skips its work. */
-.fc { margin: 0; min-width: 0; content-visibility: auto; contain-intrinsic-block-size: auto 290px; }
-@media (min-width: 1000px) { .fc { contain-intrinsic-block-size: auto 430px; } }
-.fc-chart { font: 500 12px/1.2 var(--mono); color: var(--muted); }
-.fc-ytitle { margin: 0 0 14px; color: var(--fg-2); }
-.fc-plot { position: relative; aspect-ratio: 16 / 10; margin: 0 6px 34px calc(var(--y-ch) * 1ch + 12px); touch-action: pan-y; }
-/* the SVG sits 6 px inside a clipping box, so the line's own width is never cut at the edges */
-.fc-draw { position: absolute; inset: -6px; overflow: hidden; }
-.fc-draw svg { position: absolute; left: 6px; top: 6px; width: calc(100% - 12px); height: calc(100% - 12px); overflow: visible; }
-.fc-line { fill: none; stroke: var(--yellow); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.fc-area { fill: var(--yellow); fill-opacity: 0.045; }
-.fc-ghost { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
-.fc-grid { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--line); }
-.fc-ground { border-top-color: var(--muted); }
-.fc-yt { position: absolute; right: 100%; top: 0; padding-right: 12px; transform: translateY(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fc-xt { position: absolute; top: 100%; padding-top: 10px; transform: translateX(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fc-xt[data-edge="start"] { transform: none; }
-.fc-xt[data-edge="end"] { transform: translateX(-100%); }
-.fc-xtitle { margin: 0 6px 0 0; text-align: right; color: var(--fg-2); }
-.fc figcaption { margin-top: 10px; }
-/* events: a square on the line, and a name with its time and height beside it */
-.fc-ev { position: absolute; width: 0; height: 0; }
-.fc-ev::before { content: ""; position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; background: var(--yellow); box-shadow: 0 0 0 2px var(--bg); }
-.fc-ev-ghost::before { background: var(--bg); border: 2px solid var(--muted); box-shadow: none; }
-.fc-ev-l {
-  position: absolute; display: grid; gap: 3px; padding: 3px 5px; white-space: nowrap;
-  background: color-mix(in srgb, var(--bg) 84%, transparent); transform: translate(var(--tx, 0), var(--ty, 0));
-}
-.fc-ev-l b { font: 650 13px/1.15 var(--sans); color: var(--fg); }
-.fc-ev-l span { font: 500 11.5px/1.15 var(--mono); color: var(--fg-2); }
-.fc-ev-l[data-align="right"] { text-align: right; }
-.fc-ev-l[data-align="center"] { text-align: center; }
-.fc-ev-l[data-lead]::after { content: ""; position: absolute; background: var(--muted); }
-.fc-ev-l[data-lead="down"]::after { left: var(--lx, 50%); top: 100%; width: 1px; height: var(--lead); }
-.fc-ev-l[data-lead="up"]::after { left: var(--lx, 50%); bottom: 100%; width: 1px; height: var(--lead); }
-.fc-ev-l[data-lead="right"]::after { left: 100%; top: 50%; height: 1px; width: var(--lead); }
-.fc-ev-l[data-lead="left"]::after { right: 100%; top: 50%; height: 1px; width: var(--lead); }
-/* the pointer readout: a hairline at the nearest instant and its time, height and speed */
-.fc-cross { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--fg-2); pointer-events: none; z-index: 2; }
-.fc-cross[hidden] { display: none; }
-.fc-cross::after { content: ""; position: absolute; left: -5px; top: var(--y, 0%); width: 9px; height: 9px; margin-top: -5px; background: var(--fg); box-shadow: 0 0 0 2px var(--bg); }
-.fc-read { position: absolute; top: 0; left: 10px; padding: 6px 8px; background: var(--bg-3); border: 1px solid var(--line-2); color: var(--fg); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fc-cross[data-flip] .fc-read { left: auto; right: 10px; }
-/* the line draws in once, left to right in time, and each event shows as the line reaches it:
-   the clipping box slides in from the left while the SVG inside it slides back, both on transform */
-.fc-armed .fc-draw { transform: translateX(-100%); }
-.fc-armed .fc-draw svg { transform: translateX(calc(100% + 12px)); }
-.fc-armed .fc-ev { opacity: 0; }
-.fc-armed.fc-play .fc-draw, .fc-armed.fc-play .fc-draw svg { transform: none; transition: transform 1.5s linear; }
-.fc-armed.fc-play .fc-ev { opacity: 1; transition: opacity 200ms ease-out calc(var(--at) * 1.5s); }
-/* the small version on example cards: the line and its events, no labels */
-.fc-compact { display: grid; align-content: center; aspect-ratio: 4 / 3; padding: 12% 10%; background: var(--bg); border-bottom: 1px solid var(--line); content-visibility: visible; }
-.fc-compact .fc-plot { margin: 0; }
-.fc-compact .fc-ev::before { left: -4px; top: -4px; width: 8px; height: 8px; }
+/* A motion run played back to scale: the path, the body, its flame and parachutes over the ground,
+   a few readouts under it and the answer at the end */
+.sim { margin: 0; min-width: 0; display: grid; align-content: start; gap: 16px; }
+.sim-stage { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid var(--line); background: var(--bg); container-type: inline-size; }
+.sim-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.sim-earth { fill: var(--bg-2); }
+.sim-ground { fill: none; stroke: var(--line-2); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.sim-cliff { fill: var(--bg-3); stroke: var(--line-2); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.sim-rail { fill: none; stroke: var(--fg-2); stroke-width: 2; }
+.sim-trail { fill: none; stroke: var(--yellow); stroke-opacity: 0.5; stroke-width: 1.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.sim-body { fill: var(--yellow); stroke: var(--ink); stroke-width: 0.8; stroke-linejoin: round; }
+.sim-ghost { fill: none; stroke: var(--fg-2); stroke-width: 1; stroke-linejoin: round; }
+.sim-flame { fill: var(--marginal); }
+.sim-canopy { fill: var(--fg-2); }
+.sim-lines { fill: none; stroke: var(--muted); stroke-width: 0.6; }
+.sim-name, .sim-rate { position: absolute; top: 8px; padding: 6px 0; font: 500 12px/1.3 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
+.sim-name { left: 14px; color: var(--fg); text-decoration-color: var(--yellow); text-underline-offset: 4px; }
+.sim-rate { right: 14px; color: var(--muted); }
+/* the scale bar on the ground: a line as long as the length it names on this stage, ticked at each end */
+.sim-scale { position: absolute; left: 14px; bottom: 4.5cqw; transform: translateY(50%); display: flex; align-items: center; gap: 8px; font: 500 11px/1 var(--mono); color: var(--fg-2); white-space: nowrap; }
+.sim-scale i { position: relative; width: calc(var(--w) * 1cqw); height: 2px; background: var(--fg-2); }
+.sim-scale i::before, .sim-scale i::after { content: ""; position: absolute; top: -3px; width: 2px; height: 8px; background: var(--fg-2); }
+.sim-scale i::before { left: 0; }
+.sim-scale i::after { right: 0; }
+.sim-flag { position: absolute; transform: translate(14px, -50%); padding: 4px 8px; background: var(--bg-3); border: 1px solid var(--line-2); font: 600 12px/1.2 var(--mono); color: var(--fg); white-space: nowrap; pointer-events: none; }
+.sim-flag[data-left] { transform: translate(calc(-100% - 14px), -50%); }
+.sim-flag[hidden] { display: none; }
+.sim-stage .sim-toggle { position: absolute; right: 12px; bottom: 5.1cqw; transform: translateY(50%); }
+.sim-stage .sim-toggle[hidden] { display: none; }
+.sim-read { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 0; }
+.sim-read div { margin: 0; }
+.sim-read dt { font: 500 11px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sim-read dd { margin: 4px 0 0; font: 500 1.1rem/1.2 var(--mono); color: var(--fg); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sim .sim-answer { margin: 0; transition: opacity 300ms ease-out; }
+.sim .sim-answer.is-waiting { opacity: 0; }
+/* the small version on example cards: the last moment of the run, nothing over it */
+.sim-compact { gap: 0; }
+.sim-compact .sim-stage { border: 0; border-bottom: 1px solid var(--line); }
 
 /* Bake off: trials answered, one square each */
 .versus { display: grid; gap: 20px; margin-top: 32px; }

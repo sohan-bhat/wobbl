@@ -4,7 +4,7 @@
 import RunImage from './RunImage.astro';
 import Term from './Term.astro';
 import { COLOR, metrics, type Run } from '../lib/examples';
-import { meters, mps, secs } from '../lib/flight';
+import { meters, mps, secs } from '../scripts/flight-format';
 import { url } from '../lib/site';
 interface Props { run: Run }
 const { run } = Astro.props;
@@ -18,7 +18,7 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
     <div class="run-step"><p class="run-label">You ask</p><p class="run-ask">{run.question}</p></div>
     <div class="run-step"><p class="run-label">Wobbl runs</p><Term code={run.command} /></div>
     {model && (
-      <div class="run-step"><p class="run-label model-label">Modeled<span>{model.states} state variables</span></p>
+      <div class="run-step"><p class="run-label model-label">Modeled <span>{model.states} state variables</span></p>
         <ul class="effects" aria-label="Effects in the model">{model.effects.map((e) => <li>{e}</li>)}</ul>
       </div>
     )}
@@ -44,7 +44,7 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
     )}
   </div>
   <div class="run-result">
-    <RunImage run={run} sizes="(min-width: 1000px) 46vw, 100vw" eventsShown={events.length > 0} />
+    <RunImage run={run} sizes="(min-width: 1000px) 46vw, 100vw" />
     <p class="run-verdict"><span class="vword" data-verdict={COLOR[run.outcome.verdict] ?? 'marginal'}>{run.outcome.verdict.toUpperCase()}</span><samp class="run-said" translate="no">{run.outcome.headline}</samp></p>
     <dl class="readout">{metrics(run).map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
     {sugg.length > 0 && (

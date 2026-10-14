@@ -6,7 +6,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { ROOT } from './site';
-import type { FlightEvent } from './flight';
 
 // The newer kinds of study come first, since the landing page's hero already shows a stress result:
 // motion, then circuits, then chemistry and the rest as they land, with strength and heat after them.
@@ -40,6 +39,8 @@ const DOMAIN: Record<string, string> = {
 };
 export const COLOR: Record<string, string> = { holds: 'holds', ok: 'holds', marginal: 'marginal', fails: 'fails', hot: 'fails' };
 
+/** An event a motion run marks, such as burnout or impact, with where and how fast. */
+export interface FlightEvent { name: string; t_s: number; alt_m: number; x_m?: number; speed_mps?: number }
 export interface Check { name: string; status: string; summary: string; detail?: Record<string, unknown> }
 export interface Fix { kind: string; title: string; after?: { governing_MPa: number; safety_factor: number; verdict: string; report: string; params?: Record<string, number> } }
 export interface Outcome {
