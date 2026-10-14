@@ -26,7 +26,13 @@ manager, as [Platforms](/get-started/platforms/) explains.
 When the install finishes, Wobbl runs each solver on a tiny problem, a single tetrahedron in
 CalculiX and a 1 kilohm resistor in ngspice, so a broken install shows up now rather than in
 your first study. The full log goes to `~/.wobbl/setup.log` and the result to
-`~/.wobbl/config.json`. The whole thing takes about 340 MB.
+`~/.wobbl/config.json`.
+
+Setup then moves aside what no solver run needs, such as headers, static libraries, documentation and
+every program no solver calls, runs each solver on its tiny problem again, and puts the files back
+if one stopped working. It also deletes the packages it downloaded. The whole thing takes about 70 MB,
+and setup prints what the solvers take. Set `WOBBL_KEEP_CACHE=1` to keep the downloads, for a CI
+cache for example.
 
 ## The agents
 

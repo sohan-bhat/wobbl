@@ -75,7 +75,7 @@ wobbl doctor    # check every piece
 ```
 
 `wobbl setup` downloads a pinned micromamba and installs the solvers from
-conda-forge into `~/.wobbl` (about 340 MB, no admin rights). Use
+conda-forge into `~/.wobbl` (about 70 MB, no admin rights). Use
 `wobbl setup --no-agents` for solvers only, or `--agents claude,cursor` to pick.
 
 This first answer needs no files.

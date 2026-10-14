@@ -10,7 +10,7 @@ order: 1
 Wobbl needs Python 3.10 or newer on macOS, Linux or Windows. The package itself brings
 gmsh, which carries OpenCASCADE for reading CAD, along with numpy, scipy, matplotlib and
 the MCP library, so there is no CAD license or compiler involved. The solvers come in the next
-step, `wobbl setup`, which needs about 340 MB of disk and an internet connection once.
+step, `wobbl setup`, which downloads under 100 MB once and leaves about 70 MB on disk.
 
 ## Install
 

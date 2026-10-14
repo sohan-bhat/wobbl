@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+**Lighter install**
+- Wobbl no longer needs pyvista or VTK. Heatmaps, mode shapes, shell and crack
+  pictures come from a small numpy rasterizer with matplotlib labels, so a server
+  with no display or OpenGL draws the same pictures as a laptop, and section cuts,
+  probes, clipping and surface decimation are numpy too. A fresh environment with
+  Wobbl and its dependencies goes from 1006 MB to 392 MB.
+- `wobbl setup` moves aside what no solver run needs, checks the solvers still
+  run, and deletes its downloads, and CalculiX uses the reference BLAS. A fresh
+  `~/.wobbl` goes from 224 MB to 66 MB on an Intel Mac. `WOBBL_KEEP_CACHE=1` keeps
+  the downloads.
+- Reports are set in Archivo and IBM Plex Mono, embedded as 27 kB of subset woff2,
+  and the new pictures are smaller, so the shelf bracket's report goes from
+  1.36 MB to 0.98 MB.
+- `result.vtu` is written by a small XML writer with 32 bit fields, and the shelf
+  bracket's goes from 6.9 MB to 4.4 MB. ParaView opens it as before.
+
 **Mechanisms**
 - `wobbl mechanism` runs robot arms, four bar linkages, gear trains, impacts and
   things that tip in MuJoCo, from a template with `--set` values, a TOML spec of
