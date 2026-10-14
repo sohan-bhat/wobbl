@@ -298,6 +298,65 @@ def quantify_uncertainty(result_dir: str, vary: list[str], samples: int = 200000
                       "report": str(Path(result_dir) / "report.html")}}
 
 
+def validate_against_tests(result_dir: str, tests: str, vary: list[str] | None = None,
+                           load_uncertainty: float = 0.01) -> dict:
+    """Compare a finished study with physical test readings (ASME V&V 20 and the area metric) and calibrate."""
+    from ..credibility.against import run_validation
+
+    try:
+        r = run_validation(result_dir, tests, vary or [], load_uncertainty)
+    except Exception as e:  # noqa: BLE001
+        return _err(e)
+    cal = r.get("calibration") or {}
+    return {"headline": r["headline"], "synthetic": r["tests"]["synthetic"], "summary": r["summary"],
+            "readings": [{k: x[k] for k in ("name", "quantity", "load", "value", "simulation", "error", "u_val",
+                                            "within", "verdict")} for x in r["readings"]],
+            "u_pooled_area": r["u_pooled"],
+            "calibration": [{k: c[k] for k in ("input", "prior_mean", "mean", "sd", "ci95", "narrowed")}
+                            for c in cal.get("inputs", [])],
+            "notes": r["notes"], "files": {"validation": str(Path(result_dir) / "validation.json"),
+                                           "report": str(Path(result_dir) / "report.html")}}
+
+
+def assess_credibility(result_dir: str, influence: str = "medium", consequence: str = "medium",
+                       question: str = "") -> dict:
+    """A V&V 40 style credibility assessment of a finished study, with the test plan and credibility.html."""
+    from ..credibility.assess import run_credibility
+
+    try:
+        r = run_credibility(result_dir, influence, consequence, question)
+        plan = json.loads((Path(result_dir) / "test-plan.json").read_text())
+    except Exception as e:  # noqa: BLE001
+        return _err(e)
+    return {"headline": r["headline"], "model_risk": r["risk"], "goal": r["goal"],
+            "factors": [{k: f[k] for k in ("factor", "level", "goal", "meets", "evidence", "gap")}
+                        for f in r["factors"]],
+            "test_plan": _plan(plan), "disclaimer": r["disclaimer"],
+            "files": {"credibility": str(Path(result_dir) / "credibility.html"),
+                      "report": str(Path(result_dir) / "report.html")}}
+
+
+def plan_tests(result_dir: str) -> dict:
+    """The smallest set of physical tests that most reduce the risk, and which tests simulation can stand in for."""
+    from ..credibility.report import refresh
+    from ..credibility.testplan import plan
+    from ..credibility.uncertainty import _clean
+
+    try:
+        r = _clean(plan(result_dir))
+        (Path(result_dir) / "test-plan.json").write_text(json.dumps(r, indent=1))
+        refresh(result_dir)
+    except Exception as e:  # noqa: BLE001
+        return _err(e)
+    return _plan(r)
+
+
+def _plan(r: dict) -> dict:
+    return {"headline": r["headline"],
+            "tests": [{k: t.get(k) for k in ("order", "kind", "what", "why", "how_many", "gauges")} for t in r["tests"]],
+            "replace": r["replace"]}
+
+
 def list_materials() -> dict:
     from ..materials import all_materials
 

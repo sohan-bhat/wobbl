@@ -159,6 +159,33 @@ def build_server():
         return tools.quantify_uncertainty(result_dir, vary, samples, solves)
 
     @srv.tool()
+    def validate_against_tests(result_dir: str, tests: str, vary: list[str] | None = None,
+                               load_uncertainty: float = 0.01) -> dict:
+        """Compare a finished study with physical test readings. tests is a CSV with columns name, quantity
+        (strain, displacement, temperature or a circuit value), value, unit, uncertainty, x, y, z, direction, load
+        and time. Returns the ASME V&V 20 comparison error and validation uncertainty of each reading, the area
+        metric, and a Bayesian calibration of the uncertain inputs (from quantify_uncertainty or vary, e.g.
+        ['E 5%']). Readings marked synthetic in the file are reported as synthetic."""
+        return tools.validate_against_tests(result_dir, tests, vary, load_uncertainty)
+
+    @srv.tool()
+    def assess_credibility(result_dir: str, influence: str = "medium", consequence: str = "medium",
+                           question: str = "") -> dict:
+        """Map a finished study's evidence to an ASME V&V 40 style credibility assessment. influence (low, medium,
+        high) is how much the decision leans on the model, consequence how bad a wrong decision would be. Returns
+        each factor's level against a proposed goal with its evidence, the test plan and credibility.html for a
+        reviewer. Run quantify_uncertainty and validate_against_tests first for the strongest evidence. Wobbl
+        supplies evidence and does not certify anything."""
+        return tools.assess_credibility(result_dir, influence, consequence, question)
+
+    @srv.tool()
+    def plan_tests(result_dir: str) -> dict:
+        """The smallest set of physical tests that would most reduce the risk of a decision: input measurements by
+        Sobol index, a validation test with gauge positions, load steps and predicted readings, and a gauge where
+        idealizations disagree. Also says which usual tests the simulation evidence can or cannot stand in for."""
+        return tools.plan_tests(result_dir)
+
+    @srv.tool()
     def list_materials() -> dict:
         """Built in materials with stiffness, strength limit, density, conductivity and temperature limit."""
         return tools.list_materials()
