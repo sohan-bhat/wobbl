@@ -121,6 +121,50 @@ def field_map(path: str | Path, X: np.ndarray, tris: np.ndarray, region: np.ndar
     return save(fig, path)
 
 
+def grid_map(path: str | Path, grid: np.ndarray, pl: dict, label: str, title: str = "", lines: np.ndarray | None = None,
+             cmap: str = "inferno", clim: tuple | None = None, marks: list | None = None, solid: np.ndarray | None = None,
+             scale: float = 1e3, unit: str = "mm", signed: bool = False) -> str:
+    """A field sampled on a slice plane (pro3d.slice_plane). NaN cells are inside parts left out of the mesh
+    and show in the part color; solid marks cells inside meshed bodies, whose outlines are drawn."""
+    plt = _mpl()
+    w, h = pl["u1"] - pl["u0"], pl["v1"] - pl["v0"]
+    fig, ax = _axes(plt, (float(np.clip(5.0 * w / h + 1.6, 4.8, 10.5)), 5.2))
+    ext = np.array([pl["u0"], pl["u1"], pl["v0"], pl["v1"]]) * scale
+    ok = np.isfinite(grid)
+    if clim is None:
+        vals = grid[ok] if ok.any() else np.array([0.0, 1.0])
+        if signed:
+            m = float(np.nanpercentile(np.abs(vals), 99))
+            clim = (-m, m)
+        else:
+            clim = (float(np.nanmin(vals)), float(np.nanpercentile(vals, 99.5)))
+    ax.imshow(np.where(ok, 0.0, 1.0), origin="lower", extent=ext, cmap="Greys", vmin=0, vmax=4, aspect="equal",
+              interpolation="nearest")
+    im = ax.imshow(np.ma.masked_invalid(grid), origin="lower", extent=ext, cmap=cmap, vmin=clim[0], vmax=clim[1],
+                   aspect="equal", interpolation="bilinear")
+    gu = np.linspace(ext[0], ext[1], grid.shape[1])
+    gv = np.linspace(ext[2], ext[3], grid.shape[0])
+    if lines is not None and np.isfinite(lines).sum() > 10:
+        lv = np.linspace(np.nanmin(lines), np.nanmax(lines), 22)[1:-1]
+        ax.contour(gu, gv, np.ma.masked_invalid(lines), levels=lv, colors="#e8e8e8", linewidths=0.5, alpha=0.55)
+    if solid is not None and solid.any():
+        ax.contour(gu, gv, solid.astype(float), levels=[0.5], colors=MARK, linewidths=0.9)
+    if (~ok).any():
+        ax.contour(gu, gv, (~ok).astype(float), levels=[0.5], colors=MARK, linewidths=0.9)
+    for x, y, txt in marks or []:
+        ax.plot([x * scale], [y * scale], "o", color="#4a90d9", ms=4)
+        ax.annotate(txt, (x * scale, y * scale), xytext=(6, 6), textcoords="offset points", color=FG, fontsize=8)
+    ax.set_xlabel(f"{pl['u']}, {unit}", color=FG, fontsize=9)
+    ax.set_ylabel(f"{pl['v']}, {unit}", color=FG, fontsize=9)
+    if title:
+        ax.set_title(title, color=FG, fontsize=10)
+    cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02)
+    cb.set_label(label, color=FG, fontsize=9)
+    cb.ax.tick_params(colors=FG, labelsize=8)
+    fig.tight_layout()
+    return save(fig, path)
+
+
 def curve(path: str | Path, x, ys: dict, xlabel: str, ylabel: str, hline: float | None = None, hlabel: str = "",
           marks: list | None = None, logx: bool = False, logy: bool = False) -> str:
     """Curves with dots at the solved points, an optional limit line and labeled marks (x, y, text)."""
