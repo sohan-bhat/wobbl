@@ -181,8 +181,9 @@ def run_flame(fuel: str, oxidizer: str, phi: float, T: float, P: float, out_dir,
                           "after": {"phi": lean_phi, "T_ad_K": t_lean}})
     else:
         verdict = "ok"
+        trace = [f"{_ppm(x)} {n}" for x, n in ((co, "CO"), (no, "NO")) if x > 1e-7]
         head = (f"Adiabatic flame temperature {fmt(st.T)} K ({fmt(st.T - 273.15)} C) for {key} in {oxidizer} at an "
-                f"equivalence ratio of {phi:g}, with {_ppm(co)} CO and {_ppm(no)} NO at equilibrium.")
+                f"equivalence ratio of {phi:g}" + (f", with {' and '.join(trace)} at equilibrium." if trace else "."))
     values = {"fuel": key, "oxidizer": oxidizer, "phi": phi, "T_ad_K": st.T, "T_no_dissociation_K": t_full,
               "T_gri30_K": t_gri, "pressure_Pa": P, "reactant_T_K": T, "products": st.major(1e-5),
               "CO_ppm": co * 1e6, "NO_ppm": no * 1e6, "fuel_fraction": x_fuel}

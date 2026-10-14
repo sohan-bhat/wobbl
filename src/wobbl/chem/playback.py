@@ -237,3 +237,70 @@ def molecule(out: Path, name: str, formula: str, symbols, positions, bonds, mode
         data["properties"] = {k: _r(values[k], 5) for k in ("dipole_D", "gap_eV", "homo_eV", "lumo_eV",
                                                              "solvation_kJ_mol") if values.get(k) is not None}
     return _write(out, data)
+
+
+def _species_3d(sp) -> dict:
+    """A species drawn in 3D: an RDKit structure for molecules and ions, a single atom for metals and elements."""
+    out = {"formula": sp.formula, "name": sp.name, "kind": sp.kind}
+    try:
+        if sp.kind in ("metal", "element") and len(sp.counts) == 1:
+            sym = next(iter(sp.counts))
+            out.update(atoms=atoms_block([sym]), positions=[[0.0, 0.0, 0.0]], bonds=[])
+        elif sp.smiles:
+            from .structure import from_smiles
+            st = from_smiles(sp.smiles, conformers=1)
+            c = st.positions - st.positions.mean(0)
+            out.update(atoms=atoms_block(st.symbols), positions=_pos(c),
+                       bonds=[[int(i), int(j), _r(o, 2)] for i, j, o in st.bonds])
+    except Exception:  # noqa: BLE001  a species that cannot be drawn is listed without atoms
+        pass
+    return out
+
+
+def reaction(out: Path, q, values: dict, quick: bool = False) -> str:
+    """Reactants and products in 3D with their amounts and phases, the energy levels, and how the Gibbs energy
+    and equilibrium constant change with temperature, for a viewer to show the reaction happening."""
+    from .react import thermo
+    sides = {}
+    for key, terms in (("reactants", q.reactants), ("products", q.products)):
+        sides[key] = []
+        for t in terms:
+            d = {"coef": _r(t.coef, 4), "phase": t.phase}
+            d.update(_species_3d(t.species) if not quick else {"formula": t.species.formula, "name": t.species.name})
+            sides[key].append(d)
+    T = values.get("temperature_K", 298.15)
+    aqueous = any(t.phase == "aq" for t in q.reactants + q.products)
+    lo, hi = (275.0, 370.0) if aqueous else (250.0, max(1500.0, T * 1.5))
+    sweep = []
+    for x in np.linspace(lo, hi, 24):
+        th = thermo(q, float(x))
+        sweep.append({"T_K": _r(x, 5), "dG_kJ": _r(th["dG"] / 1000, 5), "log10K": _r(th["log10K"], 4)})
+    ad = values.get("adiabatic") or {}
+    data = {"manifest": {"kind": "reaction", "version": VERSION, "generator": "wobbl chem", "frames": len(sweep),
+                         "units": {"positions": "angstrom", "dH_kJ": "kJ per mole of reaction as written",
+                                   "dG_kJ": "kJ per mole of reaction", "T_K": "K", "gas_L": "L per mole of reaction",
+                                   "rise_K": "K"},
+                         "notes": "Frames step through temperature, each a separate thermochemistry evaluation. "
+                                  "Species structures are RDKit geometries for drawing."},
+            "equation": values.get("equation"), "rule": values.get("rule"), **sides,
+            "energies": {"dH_kJ": _r(values.get("dH_kJ"), 5), "dG_kJ": _r(values.get("dG_kJ"), 5),
+                         "log10K": _r(values.get("log10K"), 4), "barrier_kJ": None},
+            "conditions": {"T_K": _r(T, 5), "P_Pa": _r(values.get("pressure_Pa"), 5)},
+            "gas_L": _r(values.get("gas_L"), 4), "adiabatic": {k: _r(v, 5) for k, v in ad.items()
+                                                               if isinstance(v, (int, float))},
+            "equilibrium_extent": _r((values.get("equilibrium") or {}).get("extent"), 4),
+            "frames": sweep}
+    return _write(out, data)
+
+
+def mixture(out: Path, label: str, values: dict) -> str:
+    """A gas mixture's equilibrium composition as frames through temperature, with its flame point marked."""
+    data = {"manifest": {"kind": "mixture", "version": VERSION, "generator": "wobbl chem",
+                         "frames": len(values.get("sweep", [])),
+                         "units": {"T_K": "K", "x": "mole fraction at equilibrium", "P_Pa": "Pa"},
+                         "notes": "Frames step through temperature at fixed pressure, each a Cantera equilibrium."},
+            "mixture": {"label": label, "start": {k: _r(v, 4) for k, v in values.get("mixture", {}).items()},
+                        "T_K": _r(values.get("temperature_K"), 5), "P_Pa": _r(values.get("pressure_Pa"), 5),
+                        "flame_T_K": _r(values.get("T_ad_K"), 5)},
+            "frames": values.get("sweep", [])}
+    return _write(out, data)
