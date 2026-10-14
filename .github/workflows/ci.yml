@@ -56,6 +56,9 @@ jobs:
 
       - name: wobbl setup (solvers only)
         run: wobbl setup --no-agents
+        env:
+          # setup clears its download cache to save disk; keep it here so the cache step above can reuse it
+          WOBBL_KEEP_CACHE: "1"
 
       - name: wobbl doctor
         run: wobbl doctor

@@ -7,7 +7,10 @@ environment holding the solvers. Nothing touches system folders, and
 Every solver registers a Recipe below: the domains it serves, its conda-forge
 packages, the executables Wobbl runs and a check on a tiny problem. 'wobbl
 setup' installs the core recipes, and any other recipe is installed the first
-time its domain is used.
+time its domain is used. After each install Wobbl deletes micromamba's download
+cache and prunes the environment of headers, static libraries, docs and
+executables no solver runs, and puts them back if a solver stops working
+without them.
 
 Platform notes (conda-forge availability):
   CalculiX  osx-64, osx-arm64, linux-64, linux-aarch64, win-64
@@ -16,6 +19,7 @@ Platform notes (conda-forge availability):
 """
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -32,12 +36,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from ..solvers.locate import env_prefix, platform_tag, wobbl_home
+from ..solvers.locate import bin_dirs, env_prefix, platform_tag, wobbl_home
 
 MICROMAMBA_VERSION = os.environ.get("WOBBL_MICROMAMBA_VERSION", "2.9.0-0")
 MM_URL = "https://github.com/mamba-org/micromamba-releases/releases/download/{v}/micromamba-{p}"
 
 Log = Callable[[str], None]
+
+# what no solver run needs, relative to an environment: headers, static and import libraries, build metadata,
+# documentation, translations, test suites and the libraries only the gettext tools load
+PRUNE = ("include", "share/doc", "share/man", "share/info", "share/locale", "share/gettext", "share/gtk-doc",
+         "lib/*.a", "lib/*.la", "lib/pkgconfig", "lib/cmake", "lib/libgettext*", "lib/libtextstyle*",
+         "lib/libasprintf*", "lib/python*/test", "lib/python*/site-packages/*/tests",
+         "Library/include", "Library/share/doc", "Library/share/man", "Library/share/info", "Library/share/locale",
+         "Library/lib/*.lib", "Library/lib/*.a", "Library/lib/pkgconfig", "Library/lib/cmake")
 
 
 class SetupError(RuntimeError):
@@ -48,7 +60,9 @@ class SetupError(RuntimeError):
 class Recipe:
     """One solver: the conda-forge packages for its domains, what of them to keep and how to check it works.
 
-    ``keep`` matches the names of the executables Wobbl runs (fnmatch patterns, without .exe). ``check`` runs the
+    ``keep`` matches the names of the executables Wobbl runs (fnmatch patterns, without .exe). Every other
+    executable in the environment's bin folder is pruned, so a recipe whose solver starts helper programs or a
+    Python must name them too. ``prune`` adds paths to delete, relative to the environment. ``check`` runs the
     solver on a tiny problem and returns {"path", "version", "works", "error"}, or a string saying why it is
     missing. Core recipes are installed by 'wobbl setup', the others the first time one of their domains is used.
     """
@@ -56,6 +70,7 @@ class Recipe:
     domains: tuple[str, ...]
     packages: tuple[str, ...]
     keep: tuple[str, ...] = ()
+    prune: tuple[str, ...] = ()
     platforms: tuple[str, ...] = ()       # conda platforms with a native build, empty for all
     rosetta: bool = False                 # on Apple Silicon, install the Intel build into env-x86
     core: bool = False
@@ -242,8 +257,12 @@ def install(log: Log = print, force: bool = False, only: list[str] | None = None
         except SetupError as e:
             unavailable[name] = str(e)
     status = verify(log)
+    if p["groups"]:
+        status = prune(status, log)
+        status["cache_freed"] = clean_cache(log)
     status["platform"] = p["platform"]
     status["unavailable"] = {**status.get("unavailable", {}), **unavailable}
+    status["size"] = sizes()
     (home / "config.json").write_text(json.dumps(status, indent=1))
     return status
 
@@ -263,6 +282,96 @@ def install_on_demand(domains: tuple[str, ...] | list[str], log: Log | None = No
     log(f"first {domains[0]} study on this machine, installing {', '.join(todo)} into {wobbl_home()}")
     install(log, only=todo)
     return True
+
+
+# -------------------------------------------------------------------- pruning
+def _envs() -> list[Path]:
+    names = {r.env for r in RECIPES.values()} | {"env-x86"}
+    return [env_prefix(n) for n in sorted(names) if (env_prefix(n) / "conda-meta").is_dir()]
+
+
+def _keeps(name: str) -> bool:
+    stem = name[:-4] if name.lower().endswith(".exe") else name
+    pats = [p for r in RECIPES.values() for p in r.keep]
+    if sys.platform == "win32":
+        stem, pats = stem.lower(), [p.lower() for p in pats]
+    return any(fnmatch.fnmatchcase(stem, p) for p in pats)
+
+
+def prunable(env: Path) -> list[Path]:
+    """Paths in an environment that no solver run needs: the PRUNE patterns, each recipe's own, and every
+    executable no recipe keeps."""
+    found: list[Path] = []
+    for pat in PRUNE + tuple(p for r in RECIPES.values() for p in r.prune):
+        found += sorted(env.glob(pat))
+    for d in bin_dirs(env):
+        if d == env or not d.is_dir():
+            continue
+        for f in sorted(d.iterdir()):
+            exe = f.suffix.lower() == ".exe" if sys.platform == "win32" else not f.is_dir()
+            if exe and not _keeps(f.name):
+                found.append(f)
+    out: list[Path] = []
+    for p in found:   # a file inside a folder that goes anyway is not moved twice
+        if (p.is_symlink() or p.exists()) and not any(q == p or q in p.parents for q in out):
+            out.append(p)
+    return out
+
+
+def prune(before: dict, log: Log = print) -> dict:
+    """Delete what no solver run needs, then check every solver again and put it all back if one stopped working.
+
+    Files are moved aside first, a rename on the same disk, so putting them back costs nothing.
+    """
+    trash = wobbl_home() / "pruned"
+    shutil.rmtree(trash, ignore_errors=True)
+    moved = []
+    for env in _envs():
+        for path in prunable(env):
+            dest = trash / env.name / path.relative_to(env)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(path, dest)
+            moved.append((path, dest))
+    if not moved:
+        return before
+    after = verify(lambda m: None)
+    broke = [n for n, s in before["solvers"].items()
+             if s.get("works") and not after["solvers"].get(n, {}).get("works")]
+    if broke:
+        for path, dest in reversed(moved):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(dest, path)
+        log(f"kept every file, since {', '.join(broke)} stopped working without them")
+        after = before
+    shutil.rmtree(trash, ignore_errors=True)
+    return after
+
+
+def _links_into(env: Path, folder: Path) -> bool:
+    root = folder.resolve()
+    for d, dirs, files in os.walk(env):
+        for f in dirs + files:
+            p = Path(d, f)
+            if p.is_symlink() and root in p.resolve().parents:
+                return True
+    return False
+
+
+def clean_cache(log: Log = print) -> int:
+    """Delete micromamba's package and index cache inside Wobbl's home and return the bytes freed.
+
+    The environments keep working without it, since micromamba links packages in by hard link or copy. Setting
+    WOBBL_KEEP_CACHE keeps it, for CI runners that cache downloads between runs.
+    """
+    pkgs = wobbl_home() / "mamba" / "pkgs"
+    if os.environ.get("WOBBL_KEEP_CACHE") or not pkgs.exists():
+        return 0
+    if any(_links_into(env, pkgs) for env in _envs()):
+        log("kept the download cache, since the solver environment links into it")
+        return 0
+    freed = disk_usage(pkgs, shared=False)
+    shutil.rmtree(pkgs, ignore_errors=True)
+    return freed
 
 
 # ------------------------------------------------------------------- checking
@@ -349,8 +458,10 @@ def verify(log: Log = print) -> dict:
     return out
 
 
-register(Recipe("calculix", ("structural", "thermal"), ("calculix>=2.21",), keep=("ccx*", "calculix*"), core=True,
-                check=check_calculix))
+# CalculiX factors its matrices with SPOOLES, which does not call BLAS, so the reference BLAS gives the same answers
+# as OpenBLAS (within CalculiX's own run to run noise) at the same speed, and saves 60 MB
+register(Recipe("calculix", ("structural", "thermal"), ("calculix>=2.21", "libblas=*=*netlib"),
+                keep=("ccx*", "calculix*"), core=True, check=check_calculix))
 register(Recipe("ngspice", ("circuit",), ("ngspice>=37",), keep=("ngspice*",), core=True,
                 platforms=("osx-64", "linux-64", "win-64"), rosetta=True, check=check_ngspice,
                 missing="conda-forge has no ngspice build for this platform. Install ngspice with your package "
@@ -382,6 +493,7 @@ register(Recipe("mujoco", ("mechanism",), (), check=_mech("check"), installer=_m
                 present=_mech("available")))
 
 
+# ---------------------------------------------------------------------- disk
 def remove_all(log: Log = print) -> None:
     home = wobbl_home()
     if home.exists():
@@ -389,12 +501,27 @@ def remove_all(log: Log = print) -> None:
         log(f"removed {home}")
 
 
-def disk_usage() -> int:
-    total = 0
-    for root, _, files in os.walk(wobbl_home()):
+def disk_usage(path: Path | None = None, shared: bool = True) -> int:
+    """Bytes a folder takes, each hard linked file counted once. shared=False skips files with other links, which
+    deleting the folder would not free."""
+    total, seen = 0, set()
+    for root, _, files in os.walk(path or wobbl_home()):
         for f in files:
             try:
-                total += os.lstat(os.path.join(root, f)).st_size
+                st = os.lstat(os.path.join(root, f))
             except OSError:
-                pass
+                continue
+            if (st.st_dev, st.st_ino) in seen or (not shared and st.st_nlink > 1):
+                continue
+            seen.add((st.st_dev, st.st_ino))
+            total += st.st_size
     return total
+
+
+def sizes() -> dict:
+    """Bytes each solver environment, the download cache and Wobbl's whole home take."""
+    home = wobbl_home()
+    out = {e.name: disk_usage(e) for e in _envs()}
+    out["cache"] = disk_usage(home / "mamba")
+    out["total"] = disk_usage(home)
+    return out

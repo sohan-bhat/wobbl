@@ -48,7 +48,13 @@ def setup(agents, no_agents, no_solvers, only, project, force, dry_run):
                 ui.fail(str(e), "Rerun 'wobbl setup'; details are in ~/.wobbl/setup.log")
             for k, why in st.get("unavailable", {}).items():
                 ui.console.print(f"  [yellow]{k} unavailable: {why}[/yellow]")
-            ui.console.print(f"  disk used {installer.disk_usage() / 1e6:.0f} MB")
+            size = st.get("size", {})
+            envs = sum(v for k, v in size.items() if k.startswith("env"))
+            ui.console.print(f"  solvers take {envs / 1e6:.0f} MB, and all of {wobbl_home()} takes "
+                             f"{size.get('total', 0) / 1e6:.0f} MB")
+            if st.get("cache_freed"):
+                ui.console.print(f"  [dim]cleared {st['cache_freed'] / 1e6:.0f} MB of downloads left over from "
+                                 "the install[/dim]")
         from ..motion.tools import footprint
         ui.console.print(f"  {footprint()['line']}")
     if not no_agents and agents != "none":
