@@ -31,6 +31,7 @@ def test_parse_finds_the_command_its_inputs_and_its_result_folder(tmp_path):
     w = WL.parse(["motion", str(spec), "-o", str(tmp_path / "res")])
     assert w.command == "motion" and w.inputs == [spec] and w.out == str(tmp_path / "res")
     assert WL.parse(["flow", "pipe", "--flow", "2 L/min"]).command == "flow pipe"
+    assert WL.parse(["jobs", "run-plan", str(spec)]).out is None          # its default folder is not a choice
     with pytest.raises(WL.WorkloadError, match="not a Wobbl command"):
         WL.parse(["nosuch", "x"])
     with pytest.raises(WL.WorkloadError):

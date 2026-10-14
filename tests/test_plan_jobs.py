@@ -107,6 +107,7 @@ def test_a_plan_runs_in_the_background_exactly_as_planned(home, parts):
     assert st["results"]["verdict"] and "stress" in manage.logs(r["job_id"], 200)
     job = manage.find(r["job_id"])
     res = Path(job.args[job.args.index("-o") + 1])
+    assert res == job.folder / "result"                 # not a folder named result wherever it was started
     req = json.loads((res / "request.json").read_text())
     assert req["analysis"] == "stress" and req["spec"]["options"]["load"] == ["100 N +x @ x=max"]
     runs = E.load_calibration()["runs"]

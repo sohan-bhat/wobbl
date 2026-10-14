@@ -151,7 +151,9 @@ def parse(argv: list[str]) -> Workload:
     for k, v in params.items():
         if k not in NOT_SIZE and ctx.get_parameter_source(k) == ParameterSource.COMMANDLINE:
             add(v)
-    out = params.get("out")
+    # only a result folder that was typed counts, a default one belongs to wherever the run is started from
+    out = params.get("out") if "out" in params and ctx.get_parameter_source("out") == ParameterSource.COMMANDLINE \
+        else None
     return Workload(list(argv), " ".join(path), params, inputs, str(out) if out else None, tokens)
 
 
