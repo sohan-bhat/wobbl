@@ -94,25 +94,26 @@ def _mid_air(st: MotionStudy, z: float) -> tuple[float, float]:
 
 
 def vacuum_check(st: MotionStudy, fl: Flight) -> tuple[Check, dict]:
-    """The same body flown with the air taken away, against the closed forms for a fall or a throw without air."""
-    vac = fly(replace(st, air="vacuum", wind=0.0))
+    """The same body flown with the air taken away and gravity held at its ground value, which is exactly the
+    closed form for a fall or a throw without air. It checks the integrator and the ground event on this very
+    body, and shows how much the air changes."""
+    vac = fly(replace(st, air="vacuum", wind=0.0, uniform_gravity=True))
     end = vac.end
     a = math.radians(st.angle)
     vs, vh = st.speed * math.sin(a), st.speed * math.cos(a)
-    top = st.height + (vs * vs / (2 * gravity(st.site_altitude)) if vs > 0 else 0.0)
-    _, g = _mid_air(st, 0.5 * (st.height + top) if vs > 0 else 0.5 * st.height)
+    g = gravity(st.site_altitude)
     t_c = (vs + math.sqrt(vs * vs + 2 * g * st.height)) / g
     v_c = math.hypot(vh, vs - g * t_c)
     err = max(abs(end.t - t_c) / t_c, abs(_speed(end.y) - v_c) / v_c)
     drop = st.speed == 0
     form = ("sqrt(2h/g) gives" if drop else "the closed form for a throw without air gives")
-    s = (f"without air the run lands after {end.t:.4g} s at {fmt(_speed(end.y))} m/s, and {form} {t_c:.4g} s and "
-         f"{fmt(v_c)} m/s ({100 * err:.2g}% apart)")
+    s = (f"with the air taken away and gravity held at its ground value the run lands after {end.t:.4g} s at "
+         f"{fmt(_speed(end.y))} m/s, and {form} {t_c:.4g} s and {fmt(v_c)} m/s ({100 * err:.2g}% apart)")
     if fl.study.air != "vacuum":
         dt, dv = fl.end.t - end.t, _speed(end.y) - _speed(fl.end.y)
         s += (f". The air adds {fmt(dt)} s to the {'fall' if drop else 'flight'} and takes {fmt(dv)} m/s off "
               "the impact")
-    st_ = "pass" if err < 1e-3 else ("warn" if err < 1e-2 else "fail")
+    st_ = "pass" if err < 1e-5 else ("warn" if err < 1e-3 else "fail")
     rows = vac.samples(200)
     curve = {"t": [t for t, _, _ in rows], "alt": [y[Z] for _, y, _ in rows], "speed": [_speed(y) for _, y, _ in rows]}
     return Check("vacuum drop" if drop else "vacuum flight", st_, s,
