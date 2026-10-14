@@ -180,9 +180,15 @@ def answer(b, img: Path, say) -> Answer:
         "frames": plots.strobe(img / "frames.png", run, (("x", "z"), ("x", "y")),
                                highlight={"upper arm", "forearm", "hand"} if stall else None),
     }
-    kinds = {J[j]["motor"].name for j in joints}
-    servos = (f"Every joint has a {J[joints[0]]['motor'].describe()}" if len(kinds) == 1 else
-              "The joints have " + ", ".join(f"a {J[j]['motor'].name} at the {j}" for j in joints))
+    groups: dict[str, list[str]] = {}
+    for j in joints:
+        groups.setdefault(J[j]["motor"].name, []).append(j)
+
+    def _list(items):
+        return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+    servos = (f"Every joint has a {J[joints[0]]['motor'].describe()}" if len(groups) == 1 else
+              "The arm has " + _list([f"a {name} at the {_list(js)}" for name, js in groups.items()]))
     assumptions = [
         f"{servos}. Each can carry {100 / 3:.0f}% of its stall torque continuously unless a rating is given.",
         f"The move picks at {_pt(info['targets'][0])} mm, lifts "
@@ -316,10 +322,12 @@ def _fixes(raw: dict, need: dict, info: dict, failing: list[str], tipped: bool) 
     if not _passes(need):
         top = _heaviest(raw, info["payload"], _passes)
         if top > 0.005:
+            once = _heaviest(raw, info["payload"], lambda x: x["worst"] <= 1)
             fixes.append({"kind": "payload", "title": f"Keep the payload under about {fmt(top * 1000)} g",
-                          "summary": "That is the heaviest load these servos carry through the same move without "
-                                     "stalling or running hot, found by solving the move at each weight.",
-                          "auto": False, "after": {"max_payload_kg": top}})
+                          "summary": "That is the heaviest load these servos carry through the same move over and "
+                                     "over without running hot, found by solving the move at each weight. A single "
+                                     f"move without a stall works up to about {fmt(once * 1000)} g.",
+                          "auto": False, "after": {"max_payload_kg": top, "max_single_move_kg": once}})
         else:
             cool = _heaviest(raw, info["payload"], lambda x: x["worst"] <= 1)
             fixes.append({"kind": "payload", "title": "No payload makes these servos safe for this move",
