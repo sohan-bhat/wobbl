@@ -101,6 +101,7 @@ class NonlinearResult:
     increments: int = 0
     iterations: int = 0
     pretension_disp: dict[str, np.ndarray] = field(default_factory=dict)   # name -> (increments,) opening
+    last_attempt: float = float("nan")       # increment of the last attempt, as a fraction of its step
 
 
 def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
@@ -401,7 +402,7 @@ def solve_nonlinear(model: NonlinearModel, workdir: str | Path, job: str = "nonl
         j = idx - n
         pre[name] = np.array([fr["U_extra"][j, 0] if len(fr.get("U_extra", ())) > j else np.nan for fr in frames])
     return NonlinearResult(times, reactions, monitor, frames, finished, log, t, f"CalculiX {_version()}",
-                           incs, iters, pre)
+                           incs, iters, pre, last_attempt(work / f"{job}.sta"))
 
 
 def read_sta(path: Path) -> tuple[int, int, int]:
@@ -417,6 +418,18 @@ def read_sta(path: Path) -> tuple[int, int, int]:
             if not parts[2].endswith("U"):
                 incs += 1
     return incs, iters, step
+
+
+def last_attempt(path: Path) -> float:
+    """The increment, as a fraction of its step, of the last attempt in a .sta file. When a ramp stops because the
+    increments shrank below the smallest allowed, the collapse lies within about this much past the last converged
+    increment."""
+    rows = [ln.split() for ln in path.read_text(errors="replace").splitlines()] if path.exists() else []
+    rows = [r for r in rows if len(r) >= 7 and r[0].isdigit() and r[1].isdigit()]
+    try:
+        return float(rows[-1][6]) if rows else float("nan")
+    except ValueError:
+        return float("nan")
 
 
 _DAT_HEAD = re.compile(r"^\s*(displacements|total force|forces)\s.*?for set (\S+) and time\s+(\S+)")
