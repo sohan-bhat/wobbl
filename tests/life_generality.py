@@ -92,12 +92,11 @@ def _can(o):            # a thin walled can, 100 mm across with a 1 mm wall
     o.cut([(3, o.addCylinder(0, 0, 0, 0, 0, 150, 50))], [(3, o.addCylinder(0, 0, -1, 0, 0, 152, 49))])
 
 
-def _dome(o):           # a 2 mm dome on a short skirt
-    s = o.addSphere(0, 0, 20, 40)
-    c = o.addCylinder(0, 0, 0, 0, 0, 20, 40)
-    shell = o.fuse([(3, s)], [(3, c)])[0]
-    o.cut(shell, [(3, o.addSphere(0, 0, 20, 38)), (3, o.addCylinder(0, 0, -1, 0, 0, 21, 38)),
-                  (3, o.addBox(-50, -50, -10, 100, 100, 10))])
+def _dome(o):           # a 2 mm hemispherical dome on a short skirt
+    shell = o.cut([(3, o.addSphere(0, 0, 20, 40))], [(3, o.addSphere(0, 0, 20, 38))])[0]
+    shell = o.cut(shell, [(3, o.addBox(-50, -50, -30, 100, 100, 50))])[0]      # keep the half above z = 20
+    skirt = o.cut([(3, o.addCylinder(0, 0, 0, 0, 0, 20, 40))], [(3, o.addCylinder(0, 0, -1, 0, 0, 22, 38))])[0]
+    o.fuse(shell, skirt)
 
 
 def _shaft(o):
