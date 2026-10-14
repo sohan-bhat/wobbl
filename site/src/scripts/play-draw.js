@@ -191,11 +191,12 @@ export function createStage({ canvas, w, h, px, kind }) {
     const f = part.run.exag * k;
     at.set(a.point[0] + f * a.disp[0], a.point[1] + f * a.disp[1], a.point[2] + f * a.disp[2]);
     g.quaternion.setFromUnitVectors(Y, dir);
-    const head = Math.min(8, len * 0.5), body = Math.max(len - head, 0.01);
-    const { shaft, head: cone } = g.userData;
     const s = radius / 60; // arrow thickness in proportion to the part
-    shaft.scale.set(s, body, s);
-    cone.scale.set(s, head / 8, s);
+    // the head keeps its shape as the arrow grows: as wide as it is long, in the cone's own proportions
+    const head = Math.min(8 * s, len * 0.45), body = Math.max(len - head, 0.01), hs = head / 8;
+    const { shaft, head: cone } = g.userData;
+    shaft.scale.set(Math.min(s, hs), body, Math.min(s, hs));
+    cone.scale.set(hs, hs, hs);
     if (a.pull) {
       g.position.copy(at);
       shaft.position.set(0, body / 2, 0);

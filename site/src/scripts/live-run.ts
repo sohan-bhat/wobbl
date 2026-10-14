@@ -184,7 +184,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     const [, , vw, vh] = views()[0];
     o.aspect = vw / vh;
     o.update();
-    const tv = Math.tan(Math.PI / 12) * 0.86, th = tv * o.aspect;
+    const tv = Math.tan(Math.PI / 12) * 0.93, th = tv * o.aspect;
     let d = radius * 1.2;
     for (const p of box) {
       const r = [p[0] - o.target[0], p[1] - o.target[1], p[2] - o.target[2]];
