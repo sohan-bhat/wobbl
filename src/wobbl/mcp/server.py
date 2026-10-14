@@ -16,7 +16,9 @@ INSTRUCTIONS = """Wobbl runs verified engineering simulations. Typical flow for 
    suggest_fix(result_dir, apply=true) for before and after numbers.
 Heat questions: solve_thermal. Circuits: solve_circuit. Falling, thrown and rocket flights: solve_motion.
 Pipe pressure drop, drag, propellers, drones and boat hulls: solve_flow.
-Solid rocket motor designs: solve_motor. Flame temperatures: solve_flame. Propellant c* and Isp: solve_propellant."""
+Solid rocket motor designs: solve_motor. Flame temperatures: solve_flame. Propellant c* and Isp: solve_propellant.
+Buckling of struts, plates and shells: solve_buckling. Natural frequencies against motor or propeller speed, sine
+sweeps and random vibration: solve_vibration. Fatigue life of a finished strength or vibration result: fatigue_life."""
 
 
 def _protect_stdout():
@@ -222,6 +224,47 @@ def build_server():
         Sobol index, a validation test with gauge positions, load steps and predicted readings, and a gauge where
         idealizations disagree. Also says which usual tests the simulation evidence can or cannot stand in for."""
         return tools.plan_tests(result_dir)
+
+    @srv.tool()
+    def solve_buckling(path: str, material: str, loads: list[str], fixtures: list[str],
+                       target_sf: float | None = None, shape: str = "auto", quality: str = "normal") -> dict:
+        """Linear buckling with CalculiX: the factor on the loads at which the part buckles, its mode shapes, and a
+        design factor after an imperfection knockdown for the shape (column curve, NASA SP-8007 cylinders, plates,
+        domes) and yielding. Loads and fixtures are written as for solve_structural, e.g. loads=['2 kN -z @ z=max'],
+        fixtures=['z=min']. Checks Euler for columns, force balance and mesh convergence."""
+        from ..life.tools import solve_buckling_tool
+        return solve_buckling_tool(path, material, loads, fixtures, target_sf, shape, quality)
+
+    @srv.tool()
+    def solve_vibration(path: str, material: str, fixtures: list[str], masses: list[str] | None = None,
+                        rpm: list[str] | None = None, blades: int = 2, frequencies: list[str] | None = None,
+                        sine: str = "", psd: str = "", axis: str = "z", duration: str = "",
+                        damping: float | None = None, modes: int = 15, target_sf: float | None = None,
+                        quality: str = "normal") -> dict:
+        """Natural frequencies and mode shapes with CalculiX, judged against what shakes the part. masses are
+        parts it carries, e.g. ['60 g at 150,0,25 @ top and within 15 of 150,0,15']. rpm like ['4000-9000 rpm']
+        with blades checks rotor and blade pass resonance; frequencies adds tones to avoid. sine='2 g z 10-500 Hz'
+        gives the peak stress of a base sweep (CalculiX steady state dynamics), psd='gevs-qual' or breakpoints the 3
+        sigma stress of random input along axis, with a fatigue estimate over duration. Returns frequencies,
+        effective mass, the resonance table, stresses, checks and fixes."""
+        from ..life.tools import solve_vibration_tool
+        return solve_vibration_tool(path, material, fixtures, masses, rpm, blades, frequencies, sine, psd, axis,
+                                    duration, damping, modes, target_sf, quality)
+
+    @srv.tool()
+    def fatigue_life(result_dir: str = "", material: str = "", amplitude: str = "", mean: str = "",
+                     kt: float | None = None, radius: str = "", ratio: float = 0.0, cycles: str = "1e7",
+                     blocks: list[str] | None = None, repeats: float = 1.0, duration: str = "",
+                     surface: str = "auto", reliability: float = 0.9, mean_stress: str = "goodman",
+                     target_sf: float | None = None) -> dict:
+        """Stress life fatigue: cycles to crack initiation and the safety factor on stress at the required cycles.
+        From a strength result_dir the load cycles at load ratio ratio (0 on and off, -1 reversed) or through blocks
+        like ['100% x 2e4', '60% x 1e6'] repeated repeats times; from a vibration result its random or sine response
+        over duration; or from material with amplitude, mean and kt given directly. Uses sourced S-N data, Marin
+        factors, Peterson notch sensitivity, Goodman (or gerber, soderberg) and Miner's rule."""
+        from ..life.tools import fatigue_life_tool
+        return fatigue_life_tool(result_dir, material, amplitude, mean, kt, radius, ratio, cycles, blocks, repeats,
+                                 duration, surface, reliability, mean_stress, target_sf)
 
     @srv.tool()
     def list_materials() -> dict:
