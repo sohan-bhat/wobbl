@@ -48,6 +48,10 @@ point marked and fixes with numbers.
 - Motion with [scipy](https://scipy.org)'s ODE integrators, from a rock falling off
   a cliff to a high power rocket on its thrust curve, through the standard
   atmosphere, wind and dual deploy parachutes.
+- Combustion with [Cantera](https://cantera.org) on NASA's thermodynamic data, for
+  flame temperatures and CEA style propellant performance, and solid rocket motors
+  from their grains, propellant and nozzle to a thrust curve, with the casing
+  checked against the peak chamber pressure.
 
 `wobbl fix --apply` edits the part, adding fillets and gussets to any STEP file,
 and runs the whole study again. The same tools work from your terminal and from
@@ -186,6 +190,57 @@ frequency, which is the depth flights are usually planned at rather than a six
 degree of freedom simulation. Motion needs nothing beyond scipy, so it downloads
 nothing.
 
+## Rocket motors and combustion
+
+`wobbl motor` takes a solid motor design, its propellant, its grains from the
+forward end, its nozzle and its casing, and burns it back to a thrust curve. It
+knows BATES segments, tubes, end burners and star, finocyl, moon and X cores, and
+KNSB, KNDX and KNSU with Nakka's burn rate laws and two MIT APCP propellants, or
+your own burn rate and combustion data. The design is a TOML file, as in
+[`examples/knsb-motor/motor.toml`](examples/knsb-motor/motor.toml), or a line of flags.
+
+```console
+$ wobbl motor examples/knsb-motor/motor.toml
+MARGINAL. Peak chamber pressure 4.14 MPa against a casing that yields at 16.8 MPa, a safety factor of 4.07 (target 2). J602 motor, 1238 N s over 2.06 s at 120 s Isp.
+```
+
+The run integrates chamber pressure, mass flow and thrust from ignition through
+tail off, and checks itself by halving the time step, closing the mass balance,
+landing on the closed form pressure (a rho c* Kn)^(1/(1-n)) at the peak and, with
+Cantera, recomputing the propellant's c* from equilibrium. The verdict comes from
+the casing's hoop stress at peak pressure by Lame's solution, with the thin wall
+hand calculation and Barlow's burst pressure beside it, the port to throat ratio
+and core mass flux that drive erosive burning, and nozzle separation. Each fix,
+a wider throat, a thicker wall, a segment fewer, wider cores or a smaller exit, is
+simulated before it is suggested. The run writes `thrust.csv` and a RASP
+`motor.eng`, and a rocket spec for `wobbl motion` can fly the design directly
+with `design = "motor.toml"` under `[motor]`.
+
+`wobbl flame` finds a fuel's adiabatic flame temperature and equilibrium products
+in air or oxygen, checked against GRI-Mech 3.0's own data, the temperature with no
+dissociation and the flammability limits, and finds the leaner mixture that keeps
+a flame under a limit. `wobbl propellant` gives c* and Isp for shifting and frozen
+expansion the way NASA's CEA does, for a preset or a composition such as
+`ap:70,al:16,htpb:14`.
+
+```console
+$ wobbl flame propane --phi 1
+OK. Adiabatic flame temperature 2266 K (1992 C) for propane in air at an equivalence ratio of 1, with 1.25% CO and 0.234% NO at equilibrium.
+```
+
+| Run | Answer | Checked against |
+|---|---|---|
+| [KNSB motor](examples/knsb-motor) | J602 peaking at 4.14 MPa, a casing safety factor of 4.07, ports too narrow at 1.59 times the throat | the closed form pressure, the mass balance, half the time step and Cantera's c* for KNSB |
+| [Propane flame](examples/propane-flame) | 2266 K with 1.25% CO and 0.234% NO | GRI-Mech 3.0's data, the 2392 K no dissociation bound and the flammability limits |
+
+Agents get `solve_motor`, `solve_flame` and `solve_propellant`. Cantera installs
+itself the first time a combustion or motor study runs, a 6 MB download that takes
+about 16 MB once Wobbl prunes what it never reads, or straight away with
+`wobbl setup --only cantera`. The burning in a motor comes from the propellant's
+burn rate law rather than resolved flame chemistry, and erosive burning, ignition
+delay and throat erosion are flagged rather than modeled. Wobbl models given
+designs only and gives no guidance on making or handling propellants.
+
 ## An agent on its own versus Wobbl
 
 Given a CAD file, a strength question and 15 minutes, a capable coding agent
@@ -271,7 +326,7 @@ explains every [check](https://sohan-bhat.github.io/wobbl/guides/results/checks/
 
 ## Validation
 
-Twenty five cases with known answers run through the same pipeline you get. Every
+Thirty three cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
@@ -282,6 +337,8 @@ modeled setup lands within 2%.
 | Heat (slab conduction, lumped cooling, a bar whose end jumps to 120 C) | 3 | 0.85%, the bar against the erfc solution |
 | Circuits (LED, RC, buck ripple) | 3 | 7.70%, buck ripple against an ideal formula that ignores switch and diode drops |
 | Motion (free fall, drag fall, a throw, a constant thrust rocket's burnout speed and altitude, parachute descent) | 6 | 0.0000014%, the rocket's burnout altitude |
+| Combustion (methane flame against Turns, LOX and LH2 c* and Isp against NASA CEA, KNSU c* against PROPEP) | 4 | 0.05%, the LOX and LH2 c* |
+| Solid motors (steady Kn against the closed form, a neutral grain's web time, two MIT static fires) | 4 | 9.26%, the impulse of the O3800 static fire, whose peak pressure came out 7% low |
 
 The full table is [on the website](https://sohan-bhat.github.io/wobbl/validation/). Run it yourself with
 `wobbl validate`, which takes about 30 minutes.
@@ -302,6 +359,8 @@ reports, heatmaps and summaries, and each has a page [on the website](https://so
 | [battery-pack](examples/battery-pack) | When does a pack in a sealed box pass 60 C? | transient heat |
 | [falling-rock](examples/falling-rock) | How fast does a rock hit the ground after a 300 m fall? | motion |
 | [rocket-launch](examples/rocket-launch) | Will an L class rocket fly straight, reach 11,000 ft and land softly? | motion, rocketry |
+| [knsb-motor](examples/knsb-motor) | Will a 54 mm KNSB motor hold its casing, and what thrust curve does it give? | solid motors |
+| [propane-flame](examples/propane-flame) | How hot does a propane flame get, and how much CO and NO does it make? | combustion |
 | [circuits](examples/circuits) | Will this LED fry? What is the ripple? How hot is the MOSFET? | circuits |
 
 Each folder has a `run.sh` that regenerates its outputs.
@@ -334,6 +393,10 @@ Each folder has a `run.sh` that regenerates its outputs.
 - Motion is a point mass in a vertical plane over a flat Earth, so it has no roll,
   no pitch oscillation and no sideways wind, and Barrowman's stability margin holds
   below about Mach 0.8.
+- Solid motors burn by their published burn rate laws, with every surface lit at
+  once, and erosive burning, throat erosion and slag are flagged but not modeled.
+  Against two MIT static fires the predicted peak pressure was 7% low on one and
+  12% high on the other.
 
 Shell elements, fatigue estimates and bolt preload come next in 0.2, then CFD with
 OpenFOAM in 0.3 and multibody mechanisms with MuJoCo in 0.4.

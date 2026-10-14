@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+**Rocket motors and combustion**
+- `wobbl motor` burns a solid motor design back to its thrust curve, from
+  BATES, tube, end burner, star, finocyl, moon and X core grains, KNSB, KNDX,
+  KNSU and MIT APCP propellants with their published burn rate laws, and a
+  nozzle. It checks the time step, the mass balance, the closed form pressure
+  and the propellant's c* against equilibrium, judges the casing's hoop stress
+  at peak pressure, the port to throat ratio, core mass flux and nozzle
+  separation, simulates each fix and writes `thrust.csv` and a RASP
+  `motor.eng`. A rocket spec for motion flies a design with
+  `design = "motor.toml"`.
+- `wobbl flame` and `wobbl propellant` give flame temperatures and CEA style
+  c* and Isp from Cantera on NASA's thermodynamic data, and agents get
+  `solve_motor`, `solve_flame` and `solve_propellant`.
+- Cantera installs itself on first use from its PyPI wheel, 6.3 MB to fetch
+  and 15.7 MB on disk after pruning, or ahead of time with
+  `wobbl setup --only cantera`.
+- Eight new validation cases, against Turns, NASA CEA, Nakka's PROPEP run,
+  closed forms and two MIT static fires, and two examples, a KNSB motor and a
+  propane flame.
+
 **Motion**
 - A new motion domain flies a body from release or ignition to the ground
   through gravity that falls off with altitude, the 1976 standard atmosphere,
