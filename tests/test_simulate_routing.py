@@ -65,6 +65,14 @@ CASES = [
     Case(str(EX / "motor-mount-fatigue" / "output"), "how long until a crack from the fillet grows critical?",
          "part", "result", ("crack",)),
     Case(str(EX / "battery-pack" / "pack.py"), "", "part", "parametric", ("stress",)),
+    Case(str(EX / "drone-arm" / "arm.py"), "what does the motor unbalance do when it is swept from 10 to 500 Hz?",
+         "part", "parametric", ("vibration",)),
+    Case(str(PARTS / "cast_motor_mount.step"), "how does it respond to a 2 g sine sweep from 20 to 2000 Hz?", "part",
+         "step", ("vibration",)),
+    Case(str(EX / "heat-sink" / "heatsink.py"), "what are the natural frequencies of the fins?", "part",
+         "parametric", ("vibration",)),
+    Case(str(EX / "shelf-bracket" / "output"), "how many repeats of this load history before it cracks?", "part",
+         "result", ("fatigue",)),
     # several asks in one question: each load case gets its own physics, and a drop replaces a strength run only
     # for the clause it was asked in
     Case(str(EX / "shelf-bracket" / "bracket.py"), "will it survive a 1 m drop and hold a 10 kg shelf?", "part",
