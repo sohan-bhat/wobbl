@@ -25,7 +25,7 @@ from ..structural.spec import StructuralStudy
 from ..units import fmt
 from ..verify.checks import Check, balance_check, confidence, convergence_check
 from . import ccx
-from .common import QUALITY, change, excluded_nodes, governing, level_sizes, next_sizing, prepare
+from .common import QUALITY, change, excluded_nodes, fit_first, governing, level_sizes, next_sizing, prepare
 from .knockdown import (Column, classify, column_curve, column_info, euler_check, johnson, knockdown,
                         separation_check)
 from .outcome import LifeOutcome, clean_work, save_study, verdict_for
@@ -71,8 +71,10 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
         if sz is None:
             stopped_by = "node limit"
             break
-        say("mesh", f"level {k}: element size {sz.h:.3g} mm")
         mesh = build_mesh(p.prep, sz)
+        if last is None:
+            sz, mesh = fit_first(p, sz, mesh, q["nodes"])
+        say("mesh", f"level {k}: element size {sz.h:.3g} mm, {mesh.n_nodes:,} nodes")
         built = build_static(mesh, p.loads, p.fixtures, mat, p.features.faces)
         wl = work / f"level{k}"
         if built.walls:

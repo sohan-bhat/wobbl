@@ -29,7 +29,7 @@ from ..structural.build import build_static, tri_area_weights
 from ..structural.spec import SpecError
 from ..units import fmt
 from . import ccx, modal
-from .common import QUALITY, change, excluded_nodes, governing, level_sizes, next_sizing, prepare
+from .common import QUALITY, change, excluded_nodes, fit_first, governing, level_sizes, next_sizing, prepare
 from .outcome import LifeOutcome, clean_work, save_study
 from .vibspec import (VibrationStudy, default_damping, default_duration, parse_mass, parse_sine, seconds,
                       unit_vector)
@@ -76,8 +76,10 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
         if sz is None:
             stopped_by = "node limit"
             break
-        say("mesh", f"level {k}: element size {sz.h:.3g} mm")
         mesh = build_mesh(p.prep, sz)
+        if last is None:
+            sz, mesh = fit_first(p, sz, mesh, q["nodes"])
+        say("mesh", f"level {k}: element size {sz.h:.3g} mm, {mesh.n_nodes:,} nodes")
         built = build_static(mesh, p.loads, p.fixtures, mat, p.features.faces)
         hold_walls(built)
         attached = _attach(masses, sel, mesh)

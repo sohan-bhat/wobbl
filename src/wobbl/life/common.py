@@ -76,16 +76,35 @@ def level_sizes(p: Prepared, quality: str, mesh_size: float | None = None) -> li
     return [Sizing(h=h * REFINE ** k, curvature=CURVATURE) for k in range(q["levels"])]
 
 
+def fit_first(p: Prepared, sz: Sizing, mesh, cap: int):
+    """The first mesh, coarsened when it leaves no room under the node cap for a finer one, so convergence can still
+    be checked. Thin walls are where this happens: the size follows the wall, and a quadratic element still bends
+    well up to about three walls across, so it never goes coarser than that. Nodes on a thin wall grow about as one
+    over the size squared, which sets the step."""
+    from ..mesh.mesher import build_mesh
+
+    room = cap * REFINE ** 3
+    if mesh.n_nodes <= room:
+        return sz, mesh
+    top = 3.0 * p.features.thickness_typical
+    if sz.h >= top:
+        return sz, mesh
+    h = min(top, sz.h * (mesh.n_nodes / room) ** 0.5)
+    coarse = Sizing(h=h, curvature=sz.curvature)
+    m2 = build_mesh(p.prep, coarse)
+    return (coarse, m2) if m2.n_nodes < mesh.n_nodes else (sz, mesh)
+
+
 def next_sizing(planned: Sizing, prev: Sizing, n_prev: int, cap: int) -> Sizing | None:
     """The size for the next level: the planned one when its mesh fits under the node cap, else a smaller step that
     lands near the cap. None when even that step would add too few nodes to say anything about convergence (a
     thin walled part whose first mesh is already large)."""
     if n_prev * (prev.h / planned.h) ** 3 <= cap:
         return planned
-    f = (cap / n_prev) ** (1 / 3)
-    if f > 0.9:
+    f = (cap / n_prev) ** (1 / 3)      # how many times finer the cap lets the next mesh be
+    if f < 1 / 0.9:                    # under 10% finer says nothing about convergence
         return None
-    return Sizing(h=prev.h * f, curvature=prev.curvature)
+    return Sizing(h=prev.h / f, curvature=prev.curvature)
 
 
 def excluded_nodes(mesh, built, features, sizing: Sizing, measure: np.ndarray) -> tuple[np.ndarray, float]:
