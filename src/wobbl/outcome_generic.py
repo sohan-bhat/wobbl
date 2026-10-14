@@ -7,6 +7,9 @@ from pathlib import Path
 
 from .verify.checks import Check, _jsonable
 
+FIELD_TITLES = {"magnetic": "Magnetics report", "electric": "Electric field report", "board": "Board report",
+                "antenna": "Antenna report", "sound": "Sound report"}
+
 
 @dataclass
 class GenericOutcome:
@@ -85,6 +88,7 @@ class GenericOutcome:
         cls = {"ok": "pass", "warm": "warn", "hot": "fail", "fails": "fail"}.get(self.verdict, "warn")
         title = {"thermal": "Heat report", "circuit": "Circuit report", "motion": "Motion report"}.get(self.domain,
                                                                                                     "Report")
+        title = FIELD_TITLES.get(self.domain, title)
         html = page(title, Path(self.part).name if self.part else self.domain, self.question, word, cls,
                     self.headline, self.metrics, self.confidence, self.confidence_reasons, sections,
                     f"Solver {self.solver}. Total time {self.t_total:.0f} s.")
