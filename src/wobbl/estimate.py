@@ -34,8 +34,8 @@ REFERENCE = "a 2018 six core laptop (Intel i7-8750H)"
 # CalculiX on one thread: seconds = T_DOF * dof + T_FLOP * F, bytes = M0 + M_DOF * dof + M_FILL * M, where F and M
 # are the dissection sums of the cut sizes cubed and squared, counted in degrees of freedom. A heat solve has its own
 # time coefficients. The factorization spreads over threads far better than the work per node does.
-CCX = {"t_dof": 1.27e-4, "t_flop": 4.5e-9, "t_dof_heat": 2.46e-4, "t_flop_heat": 2.84e-8, "m0": 3.08e6,
-       "m_dof": 2775.0, "m_fill": 18.9, "m_transient": 7e7, "p_dof": 0.35, "p_flop": 0.95}
+CCX = {"t_dof": 1.30e-4, "t_flop": 5.06e-9, "t_dof_heat": 2.47e-4, "t_flop_heat": 3.0e-8, "m0": 3.54e6,
+       "m_dof": 2667.0, "m_fill": 21.1, "m_transient": 7e7, "p_dof": 0.35, "p_flop": 0.95}
 # bytes CalculiX writes: the .frd holds the mesh, then each saved result set
 FRD_NODE, FRD_ELEMENT = 50.0, 150.0
 FRD_SET = {3: 186.0, 1: 102.0}        # per node per result set: U, RF and S; or NT, RFL and HFL
@@ -53,6 +53,7 @@ CFD = {"per_cell_iteration": 4e-6, "parallel": 0.95, "bytes_cell": 1000.0, "writ
 SPICE = {"t0": 0.3, "per_point_node": 2e-6, "bytes": 6e7}
 
 LEAF = 48            # sample points below which a piece of the mesh is treated as one compact block
+CUTS = (0.35, 0.42, 0.5, 0.58, 0.65)   # where across a piece the candidate cuts go
 LONG_JOB = 600.0     # seconds past which a solve is better run as a background job
 DISK_RESERVE = 2e9   # bytes a run must leave free, since a full disk stops every other program on the machine too
 
@@ -146,10 +147,12 @@ def amdahl(threads: int, parallel: float) -> float:
 def dissection(sample: np.ndarray, n: int) -> tuple[float, float]:
     """The sums of cut sizes cubed and squared over a nested dissection of ``n`` nodes, in nodes.
 
-    ``sample`` is any spread out subset of the node coordinates (every k-th node of a deck works). Each cut is a
-    plane through the median across the widest extent, and its size is the nodes within a thin slab around it,
-    scaled from the sample to the whole mesh. A piece holding fewer than LEAF sample points is counted as a compact
-    block, whose own dissection sums to about twice its first cut cubed.
+    ``sample`` is any spread out subset of the node coordinates (every k-th node of a deck works). Each cut is the
+    smallest of a few planes across each axis near the middle of the piece, as a real ordering looks for a small
+    separator too, and its size is the nodes within a thin slab around it, scaled from the sample to the whole
+    mesh. A plane through the middle of a wall, or along a face full of nodes, is never the one taken. A piece
+    holding fewer than LEAF sample points is counted as a compact block, whose own dissection sums to about twice
+    its first cut cubed.
     """
     from scipy.spatial import cKDTree
 
@@ -171,12 +174,25 @@ def dissection(sample: np.ndarray, n: int) -> tuple[float, float]:
             F += 2.0 * s ** 3
             M += 3.0 * s ** 2
             continue
-        k = int(np.argmax(Q.max(0) - Q.min(0)))
-        x = Q[:, k]
-        mid = float(np.median(x))
-        s = min(np.count_nonzero(np.abs(x - mid) <= w / 2) / phi * a / w, m / 2)
+        best = None
+        for k in range(3):
+            x = Q[:, k]
+            if x.max() - x.min() < 2 * w:
+                continue
+            for mid in np.quantile(x, CUTS):
+                cnt = np.count_nonzero(np.abs(x - mid) <= w / 2)
+                if best is None or cnt < best[0]:
+                    best = (cnt, k, float(mid))
+        if best is None:
+            s = m ** (2 / 3)
+            F += 2.0 * s ** 3
+            M += 3.0 * s ** 2
+            continue
+        cnt, k, mid = best
+        s = min(cnt / phi * a / w, m / 2)
         F += s ** 3
         M += s ** 2
+        x = Q[:, k]
         left, right = Q[x < mid], Q[x >= mid]
         if len(left) and len(right):
             stack += [left, right]

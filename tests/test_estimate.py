@@ -10,12 +10,12 @@ from wobbl.decks import Deck, Step
 
 # CalculiX 2.23 on one thread of an Intel i7-8750H, gmsh tet10 meshes: nodes, dissection sums, cpu s, peak bytes
 MEASURED = {
-    "static": [(3830, 5.256e6, 1.245e5, 2.06, 52.4e6), (15367, 1.670e7, 4.276e5, 7.37, 182.8e6),
-               (8049, 6.358e6, 2.239e5, 3.93, 101.9e6), (10054, 3.511e7, 4.468e5, 8.99, 163.5e6),
-               (27088, 4.075e7, 8.013e5, 15.68, 335.1e6), (21729, 4.242e7, 8.098e5, 14.33, 299.3e6),
-               (22313, 1.734e8, 1.257e6, 31.58, 454.7e6)],
-    "heat-steady": [(10054, 3.511e7, 4.468e5, 3.50, 42.2e6), (27088, 4.075e7, 8.013e5, 7.10, 86.9e6),
-                    (21729, 4.242e7, 8.098e5, 7.59, 76.5e6), (34142, 3.922e8, 2.201e6, 19.29, 173.6e6)],
+    "static": [(3830, 4.598e6, 1.174e5, 2.06, 52.4e6), (15367, 1.609e7, 4.121e5, 7.37, 182.8e6),
+               (8049, 5.424e6, 2.043e5, 3.93, 101.9e6), (10054, 3.274e7, 4.214e5, 8.99, 163.5e6),
+               (27088, 4.104e7, 7.878e5, 15.68, 335.1e6), (21729, 3.567e7, 7.480e5, 14.33, 299.3e6),
+               (22313, 1.624e8, 1.208e6, 31.58, 454.7e6)],
+    "heat-steady": [(10054, 3.274e7, 4.214e5, 3.50, 42.2e6), (27088, 4.104e7, 7.878e5, 7.10, 86.9e6),
+                    (21729, 3.567e7, 7.480e5, 7.59, 76.5e6), (34142, 3.639e8, 2.094e6, 19.29, 173.6e6)],
 }
 
 
@@ -30,7 +30,7 @@ def test_a_compact_block_costs_more_than_a_plate_or_a_bar_with_as_many_nodes():
     plate = grid(80, 64, 2, 400, 320, 8)
     bar = grid(320, 4, 8, 1600, 20, 40)
     sums = {k: E.dissection(p, len(p)) for k, p in (("block", block), ("plate", plate), ("bar", bar))}
-    assert sums["block"][0] > 3 * sums["plate"][0] > 4.5 * sums["bar"][0]
+    assert sums["block"][0] > 5 * sums["plate"][0] and sums["block"][0] > 5 * sums["bar"][0]
     # a spread out eighth of the nodes gives about the same sums as all of them
     full = E.dissection(block, len(block))
     thin = E.dissection(block[np.random.default_rng(1).choice(len(block), len(block) // 8, replace=False)],
@@ -47,8 +47,8 @@ def test_the_fit_reproduces_the_measured_runs(procedure):
 
 
 def test_threads_help_the_factorization_more_than_the_work_per_node():
-    block = E.calculix_cost(22313, sums=(1.734e8, 1.257e6))
-    plate = E.calculix_cost(27088, sums=(4.075e7, 8.013e5))
+    block = E.calculix_cost(22313, sums=(1.624e8, 1.208e6))
+    plate = E.calculix_cost(27088, sums=(4.104e7, 7.878e5))
     assert block.parallel > plate.parallel
     assert E.amdahl(2, block.parallel) > 1.6 and E.amdahl(2, plate.parallel) < 1.5
 
