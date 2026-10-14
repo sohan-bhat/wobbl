@@ -428,3 +428,6 @@ def lookup(name: str) -> Part | None:
 def _suffix_ok(s: str) -> bool:
     """Package and packing suffixes such as PBF, CT, N, DR, -TR, A, but not a different part's digits."""
     return bool(re.match(r"^[-_/]?[A-Z]{0,5}\d?[A-Z]{0,4}(?:[-_/]?[A-Z0-9]{0,4})?$", s)) and not re.match(r"^\d", s)
+
+
+from . import ics  # noqa: E402,F401  the IC, battery and module entries register their own builders
