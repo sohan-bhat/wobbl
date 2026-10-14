@@ -65,8 +65,9 @@ def simulate_tool(thing: str = "", question: str = "", physics: list[str] | None
         opts.setdefault("load", []).extend(loads)
     if fixtures:
         opts.setdefault("fix", []).extend(fixtures)
+    from ..simulate.runner import settle_options
     takes = {o.name for a in plan.analyses for o in a.all_options()}
-    bad = [k for k in opts if k not in takes and "*" not in takes]
+    bad = settle_options(plan, opts)
     if bad:
         return {"error": f"no analysis in this plan reads '{bad[0]}'", "plan": plan.to_dict(),
                 "options_read": sorted(takes)}

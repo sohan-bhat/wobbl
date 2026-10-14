@@ -234,6 +234,21 @@ def run_spec(analysis: Analysis, spec: dict, out: Path, quick: bool = False) -> 
     return _finish(job, o)
 
 
+def settle_options(plan, opts: dict[str, list[str]]) -> list[str]:
+    """Fit the given options to the plan in place, and return the names no analysis of it reads. A plan that
+    reads a 'set' option, as circuits do for part values like R1.power=1W, takes the other names as key=value
+    there, so --set R1.power=1W and --R1.power 1W both reach it."""
+    takes = {o.name for a in plan.analyses for o in a.all_options()}
+    if "*" in takes:
+        return []
+    bad = [k for k in opts if k not in takes]
+    if bad and "set" in takes:
+        for k in bad:
+            opts.setdefault("set", []).extend(f"{k}={v}" for v in opts.pop(k))
+        return []
+    return bad
+
+
 def _jobs(plan, options: dict[str, list[str]], out: Path, log, quick: bool, dry: bool):
     """Each analysis's job in turn. A value a part study settles, such as the material or the supports, carries to
     the analyses after it, so a guess is made once for the whole run."""

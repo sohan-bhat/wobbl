@@ -71,10 +71,9 @@ def options_from(material, loads, fixes, sets, extra) -> dict[str, list[str]]:
 
 
 def check_options(plan, opts: dict) -> None:
+    from ..simulate.runner import settle_options
     takes = {o.name for a in plan.analyses for o in a.all_options()}
-    if "*" in takes:
-        return
-    bad = [k for k in opts if k not in takes]
+    bad = settle_options(plan, opts)
     if bad:
         raise click.UsageError(f"no analysis in this plan reads --{bad[0]}. The plan ({', '.join(plan.names)}) reads "
                                f"{', '.join('--' + t for t in sorted(takes))}")
