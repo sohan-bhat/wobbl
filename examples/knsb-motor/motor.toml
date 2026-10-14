@@ -1,0 +1,32 @@
+# A 54 mm amateur KNSB motor of five BATES segments in a 6061-T6 aluminum casing.
+#
+# Every quantity takes a unit ("48 mm", "1.5 MPa", "12 deg"). Grains are listed from the forward end to the
+# nozzle. Run it with: wobbl motor motor.toml
+
+name = "knsb-54"
+
+[propellant]
+name = "knsb"               # knsb, kndx, knsu, ocean-water or cherry-limeade, or your own density, a, n, T, M and k
+# combustion_efficiency = 0.95
+
+[[grain]]
+shape = "bates"             # bates, tube, endburner, star, finocyl, moon or xcore
+diameter = "48 mm"          # outside, inside a 1.4 mm liner
+core = "16 mm"
+length = "75 mm"
+count = 5
+inhibited_ends = 0          # both ends burn
+
+[nozzle]
+throat = "12.7 mm"
+exit = "32 mm"
+efficiency = 0.85           # sugar propellants lose more to two phase flow than composites
+half_angle = "12 deg"
+
+[casing]
+material = "6061-t6"
+outer_diameter = "54 mm"
+wall = "1.6 mm"
+length = "400 mm"           # inside, between the closures
+target_sf = 2.0             # on yield at peak pressure
+hardware_mass = "0.55 kg"   # forward closure and nozzle, for the motor file
