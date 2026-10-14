@@ -69,6 +69,37 @@ def chart(path: str | Path, series: dict, xlabel: str, ylabel: str, points: dict
     return save(fig, path)
 
 
+def field2d(path: str | Path, x, y, values, label: str, cmap: str = "viridis", vectors=None, mask=None,
+            stretch: float | None = None) -> str:
+    """A 2D field at cell centres, filled by triangulating the centres, with optional velocity arrows. mask(x, y)
+    hides triangles whose centre lies inside a body. stretch draws y that many times taller, for thin gaps."""
+    import matplotlib.tri as mtri
+
+    plt = _plt()
+    x, y, values = np.asarray(x, float), np.asarray(y, float), np.asarray(values, float)
+    tri = mtri.Triangulation(x, y)
+    if mask is not None:
+        cx, cy = x[tri.triangles].mean(1), y[tri.triangles].mean(1)
+        tri.set_mask(mask(cx, cy))
+    span_x, span_y = np.ptp(x), np.ptp(y) * (stretch or 1)
+    fig, ax = plt.subplots(figsize=(9, max(2.6, min(6.0, 9 * span_y / max(span_x, 1e-12)) + 1.2)), facecolor=BG)
+    tc = ax.tricontourf(tri, values, 64, cmap=cmap)
+    if vectors is not None:
+        v = np.asarray(vectors, float)
+        k = np.linspace(0, len(x) - 1, min(len(x), 400)).astype(int)
+        ax.quiver(x[k], y[k], v[k, 0], v[k, 1] / (stretch or 1), color="white", alpha=0.5, width=0.0015)
+    if stretch:
+        ax.set_aspect(stretch)
+    else:
+        ax.set_aspect("equal")
+    cb = fig.colorbar(tc, ax=ax, fraction=0.04, pad=0.02)
+    cb.ax.tick_params(colors=FG)
+    _style(ax, "mm", "mm", label)
+    ax.grid(False)
+    fig.tight_layout()
+    return save(fig, path)
+
+
 def moody(path: str | Path, re: float, f: float, rel_rough: float, f_cfd: float | None = None) -> str:
     """The Moody chart with this pipe's roughness curve, its operating point and the CFD friction factor."""
     from .correlations import churchill, colebrook
