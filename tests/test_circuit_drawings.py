@@ -5,7 +5,8 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 
-from wobbl.circuits import bench, draw
+from wobbl.circuits import bench, draw, schematic
+from wobbl.circuits.templates import TEMPLATES
 
 COLOR = dict(zip(["black", "brown", "red", "orange", "yellow", "green", "blue", "violet", "gray", "white"], bench.BAND),
              gold=bench.GOLD, silver=bench.SILVER)
@@ -101,3 +102,52 @@ def test_mosfet_bench_heats_up_to_the_runs_junction_temperature():
     bare, bare_label = _mosfet("62")
     assert "40 C/W heatsink" in label and "no heatsink" in bare_label and svg.count("data-heat") > \
         bare.count("data-heat")
+
+
+@pytest.mark.parametrize("name,params,expect", [
+    ("led", {"led": "blue", "resistor": "47"}, ["47 Ω", "LEDX", "a 3.27 V"]),
+    ("rc", {}, ["10 kΩ", "10 µF", "pulse 0 to 5 V"]),
+    ("buck", {"current": "2"}, ["10 µH", "22 µF", "SCHOTTKY", "500 kHz, 44% on", "on 50 mΩ"]),
+    ("mosfet", {"current": "15", "rds_on": "8m", "frequency": "20k"}, ["0 V, current sense", "20 kHz, 50% on"]),
+])
+def test_templates_draw_as_schematics(name, params, expect):
+    net = TEMPLATES[name](params).netlist
+    title, parts, _ = schematic.parse(net)
+    assert schematic.ladder(parts) is not None
+    svg = schematic.schematic(net, {"a": "3.27 V"})
+    well_formed(svg)
+    assert "not a simple ladder" not in svg and title in svg
+    for p in parts:
+        assert f">{p.name}<" in svg
+    for e in expect:
+        assert e in svg
+
+
+def test_parallel_branches_and_netlist_syntax():
+    net = """* filter with a load
+V1 in 0 DC 9
+Rs in mid
++ 1k
+C1 mid 0 100n
+Rload mid 0 4.7k
+.subckt unused a b
+R9 a b 1
+.ends
+.tran 1u 1m
+.end
+"""
+    title, parts, _ = schematic.parse(net)
+    assert title == "filter with a load" and [p.name for p in parts] == ["V1", "Rs", "C1", "Rload"]
+    main, spine, series, branches, drives = schematic.ladder(parts)
+    assert spine == ["in", "mid"] and [p.name for p in series] == ["Rs"] and len(branches["mid"]) == 2
+    assert "100 nF" in schematic.schematic(net)
+
+
+def test_anything_else_is_listed_as_parts_and_nets():
+    bridge = "* bridge\nV1 top 0 10\nR1 top a 1k\nR2 top b 1k\nR3 a 0 1k\nR4 b 0 1.2k\nR5 a b 10k\n.end\n"
+    svg = schematic.schematic(bridge)
+    well_formed(svg)
+    assert "not a simple ladder" in svg and "R1, R3, R5" in svg and "ground" in svg
+    sub = schematic.schematic("* amp\nV1 in 0 1\nX1 in out 0 opamp\nR1 out 0 1k\n")
+    assert "not a simple ladder" in sub and "opamp" in sub
+    assert "No parts found" in schematic.schematic("* nothing\n.end\n")
