@@ -188,6 +188,10 @@ def assess(result_dir, influence: str = "medium", consequence: str = "medium", q
                      "the failure probability or the margin leaves too little room, so narrow the dominant input"))
 
     met = sum(f["meets"] for f in F)
+    if src:   # relative to the result folder, as every other path in it is
+        from ..verify.checks import rel_up
+
+        src = rel_up(Path(src).resolve(), d.resolve())
     res = {"kind": "credibility", "domain": dom, "wobbl": __version__,
            "created": _dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "question": question or o.get("question", ""),
            "context_of_use": _context(o), "influence": influence, "consequence": consequence, "risk": risk,
