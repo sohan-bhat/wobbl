@@ -274,7 +274,22 @@ def run_motion(st: MotionStudy, out_dir: str | Path, progress=None) -> MotionOut
             {"name": "rail exit speed", "value": "rail_exit_speed_mps", "limit": st.rail_exit_min, "sense": "min"},
             {"name": "landing speed", "value": "landing_speed_mps", "limit": st.landing_limit, "sense": "max"})
             if isinstance(v.get(c["value"]), (int, float))]
-    return o.write(out)
+    o.write(out)
+    _scene(st, out)
+    return o
+
+
+def _scene(st: MotionStudy, out: Path):
+    """The run's interactive 3D view (wobbl.viz), drawn with the body's real size and shape from the study."""
+    try:
+        from ..viz.adapters.motion import build
+        from ..viz.embed import after_report
+        if build(out, st):
+            after_report(out)
+    except Exception:  # noqa: BLE001  a view that cannot be built never fails the run
+        import os
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
 
 
 def _body_answer(st: MotionStudy, fl: Flight, checks: list[Check]) -> tuple[str, str, list]:
