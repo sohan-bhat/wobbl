@@ -103,3 +103,35 @@ def test_a_model_file_runs_as_written(tmp_path):
     assert not (tmp_path / "out" / "model.xml").exists()
     with pytest.raises(ValueError, match="duration and timestep"):
         run_mechanism(str(xml), {"servo": "sg90"}, tmp_path / "bad")
+
+
+URDF = """<robot name="two_link">
+  <link name="base"><inertial><mass value="1"/><inertia ixx="1e-3" iyy="1e-3" izz="1e-3" ixy="0" ixz="0" iyz="0"/>
+  </inertial></link>
+  <link name="upper"><inertial><origin xyz="0.075 0 0"/><mass value="0.2"/>
+    <inertia ixx="1e-5" iyy="4e-4" izz="4e-4" ixy="0" ixz="0" iyz="0"/></inertial>
+    <collision><origin xyz="0.075 0 0" rpy="0 1.5708 0"/><geometry><cylinder radius="0.01" length="0.15"/></geometry>
+    </collision></link>
+  <link name="fore"><inertial><origin xyz="0.06 0 0"/><mass value="0.3"/>
+    <inertia ixx="1e-5" iyy="4e-4" izz="4e-4" ixy="0" ixz="0" iyz="0"/></inertial></link>
+  <joint name="shoulder" type="revolute"><parent link="base"/><child link="upper"/><origin xyz="0 0 0.1"/>
+    <axis xyz="0 -1 0"/><limit lower="-3" upper="3" effort="0.6" velocity="4"/></joint>
+  <joint name="elbow" type="revolute"><parent link="upper"/><child link="fore"/><origin xyz="0.15 0 0"/>
+    <axis xyz="0 -1 0"/><limit lower="-3" upper="3" effort="2.0" velocity="4"/></joint>
+</robot>
+"""
+
+
+def test_a_spec_over_a_urdf_takes_the_file_s_effort_limits(tmp_path):
+    from wobbl.mechanism.study import run_mechanism
+
+    (tmp_path / "arm.urdf").write_text(URDF)
+    (tmp_path / "spec.toml").write_text('model = "arm.urdf"\nhold = "0.3 s"\n[[drive]]\njoint = "shoulder"\n'
+                                        '[[drive]]\njoint = "elbow"\n[[move]]\nt = 0\nshoulder = 0\nelbow = 0\n'
+                                        '[[move]]\nt = 0.6\nshoulder = 20\nelbow = -20\n')
+    o = run_mechanism(str(tmp_path / "spec.toml"), {}, tmp_path / "out")
+    sh = o.values["drives"]["shoulder"]
+    assert sh["motor"] == "the limits arm.urdf gives shoulder" and sh["peak_usage"] > 1     # 0.6 N m cannot hold it
+    # holding level: 0.2 kg at 75 mm and 0.3 kg at 210 mm from the shoulder
+    assert abs(sh["torque_Nm"]) > 9.80665 * (0.2 * 0.075 + 0.3 * 0.21) * 0.99
+    assert o.values["drives"]["elbow"]["peak_usage"] < 0.5 and o.verdict == "fails"

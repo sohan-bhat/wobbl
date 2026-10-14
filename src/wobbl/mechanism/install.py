@@ -186,8 +186,8 @@ def install(log: Log = print, force: bool = False) -> dict:
                 shutil.rmtree(stage, ignore_errors=True)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)    # the download is not kept
-    log(f"MuJoCo {MUJOCO_VERSION}: {info['download_bytes'] / 1e6:.1f} MB download, "
-        f"{info['unpacked_bytes'] / 1e6:.1f} MB unpacked, {info['installed_bytes'] / 1e6:.1f} MB after pruning")
+    log(f"MuJoCo {MUJOCO_VERSION} is a {info['download_bytes'] / 1e6:.1f} MB download, "
+        f"{info['unpacked_bytes'] / 1e6:.1f} MB unpacked and {info['installed_bytes'] / 1e6:.1f} MB after pruning")
     return info
 
 

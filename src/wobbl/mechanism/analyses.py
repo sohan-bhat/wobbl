@@ -68,9 +68,29 @@ def pendulum(b, img: Path, say) -> Answer:
                   images=images, run=run, model=model_info(m, run))
 
 
+def file_motors(m: Mechanism) -> Mechanism:
+    """A spec over a model file can leave a drive's motor out when the file states it: a URDF joint's effort and
+    velocity limits, or the force range of an MJCF actuator, become a motor with a torque and a speed limit."""
+    if not m.model_file or all(d.motor is not None for d in m.drives):
+        return m
+    from .mjcf import build, file_limits
+    from .motors import Motor
+
+    limits = file_limits(m.model_file, build(m))
+    drives = []
+    for d in m.drives:
+        if d.motor is None and d.joint in limits:
+            effort, speed = limits[d.joint]
+            d = dataclasses.replace(d, motor=Motor("file", f"the limits {Path(m.model_file).name} gives {d.joint}",
+                                                   effort, speed, curve="box"))
+        drives.append(d)
+    return with_(m, drives=drives)
+
+
 def generic(m: Mechanism, img: Path, say) -> Answer:
     """A spec or model file: run it as written, find what each drive needs against its motor, and report contacts
     between parts, anything that tips and the energy account."""
+    m = file_motors(m)
     driven = [d for d in m.drives if d.motor is not None]
     say("solve", "running the mechanism")
     run = simulate(m, frames=9)
@@ -103,8 +123,13 @@ def generic(m: Mechanism, img: Path, say) -> Answer:
     if driven:
         j = max(usage, key=lambda x: usage[x]["peak_usage"])
         c1, c2 = run.col(j), run2.col(j)
-        checks.append(step_check(float(np.max(np.abs(run.tau[:, c1]))), float(np.max(np.abs(run2.tau[:, c2]))),
-                                 f"peak {j} torque", " N m"))
+        if np.any(np.abs(run.tau_need[:, c1]) > np.abs(run.tau[:, c1]) + 1e-6) and np.isfinite(run.q_des[:, c1]).any():
+            # a drive pinned at its limit gives the same peak at any step, so compare how far it falls behind
+            lag = [float(np.nanmax(np.abs(np.degrees(r.q[:, c] - r.q_des[:, c])))) for r, c in ((run, c1), (run2, c2))]
+            checks.append(step_check(lag[0], lag[1], f"how far {j} falls behind", " deg"))
+        else:
+            checks.append(step_check(float(np.max(np.abs(run.tau[:, c1]))),
+                                     float(np.max(np.abs(run2.tau[:, c2]))), f"peak {j} torque", " N m"))
     elif run.joints:
         a, b2 = float(np.max(np.abs(run.q))), float(np.max(np.abs(run2.q)))
         checks.append(step_check(a, b2, "largest joint excursion", " rad"))
@@ -166,6 +191,9 @@ def generic(m: Mechanism, img: Path, say) -> Answer:
                    f"{fmt(run.t[-1])} s at a {fmt(run.dt * 1000)} ms step."]
     if m.drives:
         assumptions.append("Servos follow the move exactly while their motor allows, by computed torque.")
+    if any(d.motor is not None and d.motor.key == "file" for d in m.drives):
+        assumptions.append("Drives with no motor in the spec take the model file's torque and speed limits, with a "
+                           "third of that torque available continuously.")
     return Answer(verdict, head, metrics, checks, assumptions, {"drives": usage, "contacts": hits},
                   fixes, events, figs, images, run, model=model_info(m, run))
 
