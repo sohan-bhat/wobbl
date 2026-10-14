@@ -181,7 +181,8 @@ def solve_structural(study_id: str = "", path: str = "", material: str = "", loa
             from ..structural.shell_path import analyze_shell
             o = analyze_shell(study, out, pre=pre)
         else:
-            o = analyze_strength(study, out, pre=pre)
+            # the agent gets the answer without waiting for the pictures, which follow in report.html
+            o = analyze_strength(study, out, pre=pre, wait=False)
     except Exception as e:  # noqa: BLE001
         return _err(e)
     if guesses:
@@ -203,7 +204,10 @@ def compact(o) -> dict:
         "assumptions": o.assumptions,
         "fixes": [{"kind": f["kind"], "title": f["title"], "summary": f["summary"], "auto": f.get("auto", False)}
                   for f in o.fixes],
-        "images": o.images, "report": o.report, "result_dir": o.workdir, **_view(o.workdir),
+        "images": dict(o.images), "report": o.report, "result_dir": o.workdir, **_view(o.workdir),
+        **({"pictures": "still drawing; report.html, outcome.json and images/ gain them within a minute, and the "
+                        "render tool lists them once they are there"}
+           if getattr(o, "pictures", None) is not None and o.pictures.is_alive() else {}),
         "mesh_levels": [{"nodes": L["n_nodes"], "governing_MPa": round(L["governing"], 4)} for L in o.levels],
         "time_s": round(o.t_total, 1),
     }

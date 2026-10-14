@@ -1,6 +1,7 @@
 """Strength study report: the HTML page and the files saved next to it."""
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from ..report.html import badge, esc, figure, page, table
@@ -98,11 +99,15 @@ def write_report(o: Outcome, out_dir: str | Path) -> str:
     return str(path)
 
 
+_WRITING = threading.Lock()     # the pictures can finish and rewrite the outputs while the run writes them
+
+
 def write_outputs(o: Outcome, out_dir: str | Path) -> Outcome:
     out = Path(out_dir)
-    o.report = write_report(o, out)
     from ..credibility.report import evidence_text
 
-    (out / "summary.txt").write_text(text_summary(o) + evidence_text(out) + "\n", encoding="utf-8")
-    o.save(out / "outcome.json")
+    with _WRITING:
+        o.report = write_report(o, out)
+        (out / "summary.txt").write_text(text_summary(o) + evidence_text(out) + "\n", encoding="utf-8")
+        o.save(out / "outcome.json")
     return o

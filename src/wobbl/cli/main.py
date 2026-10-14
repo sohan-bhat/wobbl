@@ -201,7 +201,9 @@ def _strength(part, question, kw, interpret: bool):
                 from ..structural.shell_path import analyze_shell
                 o = analyze_shell(st, out, cb, render=not kw.get("no_images"), pre=pre)
             else:
-                o = analyze_strength(st, out, cb, render=not kw.get("no_images"), pre=pre)
+                # the answer prints first and the pictures follow; JSON waits for them, for scripts
+                o = analyze_strength(st, out, cb, render=not kw.get("no_images"), pre=pre,
+                                     wait=bool(kw.get("as_json")))
     except (SpecError, SelectionError, GeometryError, MeshError, SolverError, KeyError, ValueError) as e:
         hint = getattr(e, "hint", "")
         ui.fail(str(e).strip("'\""), hint if hint and hint not in str(e) else "")
@@ -220,6 +222,13 @@ def _strength(part, question, kw, interpret: bool):
         click.echo(json.dumps(o.to_dict(), indent=1))
         return
     show_strength(o)
+    pictures = getattr(o, "pictures", None)
+    if pictures is not None:
+        with ui.console.status("  drawing the pictures", spinner="dots"):
+            pictures.wait()
+        if o.images.get("stress"):
+            ui.console.print(f"  heatmap  {o.images['stress']}  [dim](report updated)[/dim]")
+        ui.console.print()
 
 
 def _laminate(st, kw, out, cb, pre):
@@ -259,6 +268,8 @@ def show_strength(o):
     ui.section("files")
     if o.images.get("stress"):
         ui.console.print(f"  heatmap  {o.images['stress']}")
+    elif getattr(o, "pictures", None) is not None:
+        ui.console.print("  heatmap  [dim]drawing now, the report gains it in a moment[/dim]")
     ui.console.print(f"  report   {o.report}")
     ui.console.print(f"  summary  {Path(o.workdir) / 'summary.txt'}")
     ui.console.print()
@@ -352,8 +363,14 @@ def report(result_dir, open_it):
     """Rebuild the self contained HTML report of a finished run."""
     o = _load_outcome(result_dir)
     if o.domain == "strength":
-        from ..structural.report import write_report
-        path = write_report(o, Path(o.workdir))
+        from ..structural.report import write_outputs
+        if not o.images.get("stress"):   # a run made without pictures gets them now, from its saved fields
+            from ..structural.pipeline import pictures_from_fields
+            with ui.console.status("  drawing the pictures", spinner="dots"):
+                got = pictures_from_fields(o, Path(o.workdir))
+            if got:
+                o.images.update(got)
+        path = write_outputs(o, Path(o.workdir)).report
     else:
         path = o.report
     ui.console.print(f"report {path}")

@@ -309,3 +309,22 @@ def test_the_same_study_twice_gives_identical_answers(parts, tmp_path):
     first, second = once(1), once(2)
     assert first == second
     assert first[3][0]["n_nodes"] > 0 and any(c[0] == "load introduction" for c in first[6])
+
+
+@needs_ccx
+def test_pictures_follow_the_answer_and_report_draws_missing_ones(parts, tmp_path):
+    """The verdict prints before the pictures are drawn, the report is rewritten with them, and wobbl report
+    draws them later for a run made without them."""
+    args = ["run", parts["plate_hole"], "-m", "6061-t6", "--fix", "clamp x=max", "--load", "300 N -x bearing @ hole d=8",
+            "--quality", "fast"]
+    r = CliRunner().invoke(cli, args + ["-o", str(tmp_path / "o")])
+    assert r.exit_code == 0, r.output
+    assert r.output.index("drawing now") < r.output.index("report updated")
+    html = (tmp_path / "o" / "report.html").read_text()
+    assert html.count("data:image/png") >= 5 and (tmp_path / "o" / "images" / "stress.png").exists()
+    r = CliRunner().invoke(cli, args + ["--no-images", "-o", str(tmp_path / "n")])
+    assert r.exit_code == 0 and not (tmp_path / "n" / "images").exists()
+    r = CliRunner().invoke(cli, ["report", str(tmp_path / "n")])
+    assert r.exit_code == 0, r.output
+    assert (tmp_path / "n" / "images" / "deformed.png").exists()
+    assert (tmp_path / "n" / "report.html").read_text().count("data:image/png") >= 5
