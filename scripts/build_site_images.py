@@ -39,6 +39,8 @@ IMAGES = {
     "falling-rock-flight": (EX / "falling-rock/output/images/flight.png", False, (1200, 800)),
     "rocket-flight": (EX / "rocket-launch/output/images/flight.png", False, (1200, 800)),
     "rocket-path": (EX / "rocket-launch/output/images/path.png", False, (1200, 800)),
+    "propane-sweep": (EX / "propane-flame/output/images/sweep.png", False, (1200, 800)),
+    "knsb-burn": (EX / "knsb-motor/output/images/burn.png", False, (1200, 800)),
 }
 
 

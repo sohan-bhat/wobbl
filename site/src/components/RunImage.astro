@@ -9,7 +9,10 @@ interface Props { run: Run; sizes: string; eager?: boolean; compact?: boolean; e
 const { run, sizes, eager = false, compact = false, eventsShown = false } = Astro.props;
 const flight = hasFlight(run);
 const img = runImages(run)[0];
-const kinds: Record<string, string> = { stress: 'Stress heatmap', temperature: 'Temperature map', waveform: 'Simulated waveform' };
+const kinds: Record<string, string> = {
+  stress: 'Stress heatmap', temperature: 'Temperature map', waveform: 'Simulated waveform',
+  sweep: 'Flame temperature across mixtures', burn: 'Thrust and chamber pressure over the burn',
+};
 const pic = img && !flight ? picture(img.name) : null;
 const [k, v] = metrics(run)[0];
 ---

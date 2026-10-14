@@ -8,8 +8,10 @@ import { resolve } from 'node:path';
 import { ROOT } from './site';
 import type { FlightEvent } from './flight';
 
-export const ORDER = ['cast-motor-mount', 'shelf-bracket', 'motor-mount', 'enclosure', 'drone-arm', 'heat-sink',
-  'battery-pack', 'circuits', 'falling-rock', 'rocket-launch'];
+// The newer kinds of study come first, since the landing page's hero already shows a stress result:
+// motion, then circuits, then chemistry and the rest as they land, with strength and heat after them.
+export const ORDER = ['rocket-launch', 'falling-rock', 'circuits', 'propane-flame', 'knsb-motor',
+  'cast-motor-mount', 'shelf-bracket', 'motor-mount', 'enclosure', 'drone-arm', 'heat-sink', 'battery-pack'];
 
 const EX = resolve(ROOT, 'examples');
 
@@ -29,9 +31,13 @@ export const RUN_IMAGES: Record<string, Record<string, string>> = {
   'circuits/buck': { waveform: 'buck-waveform' },
   'falling-rock/output': { flight: 'falling-rock-flight' },
   'rocket-launch/output': { flight: 'rocket-flight', path: 'rocket-path' },
+  'propane-flame/output': { sweep: 'propane-sweep' },
+  'knsb-motor/output': { burn: 'knsb-burn' },
 };
 
-const DOMAIN: Record<string, string> = { strength: 'Strength', thermal: 'Heat', circuit: 'Circuits', motion: 'Motion' };
+const DOMAIN: Record<string, string> = {
+  strength: 'Strength', thermal: 'Heat', circuit: 'Circuits', motion: 'Motion', combustion: 'Chemistry', motor: 'Motors',
+};
 export const COLOR: Record<string, string> = { holds: 'holds', ok: 'holds', marginal: 'marginal', fails: 'fails', hot: 'fails' };
 
 export interface Check { name: string; status: string; summary: string; detail?: Record<string, unknown> }
