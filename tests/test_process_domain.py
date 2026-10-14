@@ -9,6 +9,9 @@ import pytest
     ("where should the riser go if I pour at 700 C", ["casting"]),
     ("will this lid short shot in polystyrene", ["molding"]),
     ("does it fill before it freezes with a gate at 50,30,10", ["molding"]),
+    ("will this warp when I print it in ABS", ["print"]),
+    ("will the corners lift off the bed in PETG", ["print"]),
+    ("will this printed PLA bracket hold 50 N", ["stress"]),
 ])
 def test_questions_route_to_the_process(parts, question, names):
     from wobbl.simulate import errors, route

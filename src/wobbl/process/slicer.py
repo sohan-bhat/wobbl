@@ -80,6 +80,28 @@ def _texts(path: Path) -> list[tuple[str, str]]:
     return [(path.name, data.decode("utf-8", errors="replace"))]
 
 
+PROFILE_SUFFIXES = (".curaprofile", ".inst.cfg", ".cfg", ".3mf", ".ini", ".json")
+
+
+def find_profile(part: str | Path) -> Path | None:
+    """A slicer file next to the part that names at least two print settings: one sharing the part's name first,
+    then any other in the folder."""
+    p = Path(part)
+    if not p.parent.is_dir():
+        return None
+    files = sorted(f for f in p.parent.iterdir() if f.is_file() and f.name.lower().endswith(PROFILE_SUFFIXES)
+                   and f.stat().st_size < 5_000_000)
+    files.sort(key=lambda f: (not f.name.lower().startswith(p.stem.lower()), f.name))
+    for f in files:
+        try:
+            got = read_profile(f)
+        except Exception:  # noqa: BLE001  not a slicer file after all
+            continue
+        if len([k for k in got if k not in ("sources", "slicer")]) >= 2:
+            return f
+    return None
+
+
 def read_profile(path: str | Path) -> dict:
     """Settings found in a slicer file: {setting: value}, plus 'sources' {setting: 'file:key'} and 'slicer'."""
     p = Path(path)
