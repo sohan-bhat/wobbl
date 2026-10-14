@@ -253,7 +253,13 @@ def finish(job: Job, st: dict, code, ru, cancelled: bool = False):
     if ru is not None:
         st["cpu_s"] = round(ru.ru_utime + ru.ru_stime, 1)
         st["peak_memory_gb"] = round(ru.ru_maxrss * (1.0 if sys.platform == "darwin" else 1024.0) / 1e9, 3)
-    if cancelled:
+    if st.get("disk_stop") is not None:
+        from ..estimate import DISK_RESERVE, nbytes
+
+        st["state"] = "failed"
+        st["detail"] = (f"Stopped with {nbytes(st['disk_stop'])} left on disk, to keep {nbytes(DISK_RESERVE)} free "
+                        f"for the rest of the machine. Free some space and resume it with wobbl jobs resume {job.id}")
+    elif cancelled:
         st["state"], st["detail"] = "cancelled", f"Cancelled. Resume it with wobbl jobs resume {job.id}"
     elif code == 0 and not errors:
         st["state"], st["progress"], st["eta_s"] = "done", 1.0, 0
@@ -309,6 +315,7 @@ echo $$ > ../watcher.pid
 date +%s > ../started
 {ccx} -i {name} >> ../solver.log 2>&1 &
 echo $! > ../solver.pid
+{guard}
 wait $!
 code=$?
 if command -v python3 > /dev/null 2>&1 && [ -f {name}.frd ]; then
@@ -328,9 +335,45 @@ echo $$ > watcher.pid
 date +%s > started
 {wobbl} {args} >> solver.log 2>&1 < /dev/null &
 echo $! > solver.pid
+{guard}
 wait $!
 echo $? > exit_code
 """
+
+
+def guard(base: str) -> str:
+    """Shell that stops the run's process group when the disk where it writes falls under the reserve, leaving a
+    note that says why. ``base`` is the job folder as seen from where the script runs."""
+    from ..estimate import DISK_RESERVE
+
+    kb = int(DISK_RESERVE / 1024)
+    return (f"( while kill -0 $(cat {base}/solver.pid) 2>/dev/null; do f=$(df -Pk . | awk 'NR==2 {{print $4}}'); "
+            f"if [ -n \"$f\" ] && [ \"$f\" -lt {kb} ]; then echo disk $((f * 1024)) > {base}/disk_stop; "
+            f"kill -TERM -$(cat {base}/pgid); fi; sleep 10; done ) < /dev/null > /dev/null 2>&1 &\n")
+
+
+def _codes(text: str) -> tuple[str, float | None]:
+    """The exit code a remote run wrote, and the free bytes its disk guard saw when it stopped the run."""
+    code, disk = "", None
+    for line in text.split("\n"):
+        line = line.strip()
+        if line.startswith("disk "):
+            try:
+                disk = float(line[5:])
+            except ValueError:
+                disk = 0.0
+        elif line:
+            code = line
+    return code, disk
+
+
+def _disk_stopped(job: Job, st: dict, free: float) -> dict:
+    from ..estimate import DISK_RESERVE, nbytes
+
+    st.update(state="failed", disk_stop=free, detail=f"Stopped on {job.runner} with {nbytes(free)} left on disk, to "
+              f"keep {nbytes(DISK_RESERVE)} free there. Free some space and resume it with wobbl jobs resume {job.id}")
+    write_json(job.folder / "status.json", st)
+    return st
 
 
 def _launch_remote_wobbl(job: Job, entry: dict):
@@ -353,11 +396,11 @@ def _launch_remote_wobbl(job: Job, entry: dict):
         mapping[tok] = f"inputs/{name}"
     args = WL.rewrite(job.args, mapping, out="result")
     (stage / "run.sh").write_text(RUN_WOBBL_SH.format(id=job.id, run=job.restarts, t=job.threads,
-                                                      wobbl=entry["wobbl"], args=shlex.join(args)))
+                                                      wobbl=entry["wobbl"], args=shlex.join(args), guard=guard(".")))
     t.put(stage, job.remote_dir)
     shutil.rmtree(stage, ignore_errors=True)
     d = shlex.quote(job.remote_dir)
-    t.check(f"cd {d} && rm -rf result exit_code solver.pid watcher.pid started && {LAUNCH}")
+    t.check(f"cd {d} && rm -rf result exit_code disk_stop solver.pid watcher.pid started && {LAUNCH}")
     job.pulled = False
     job.save()
     write_json(job.folder / "status.json", {"state": "running", "progress": 0.0, "updated": time.time(),
@@ -371,7 +414,7 @@ def _remote_status_wobbl(job: Job, st: dict, t: R.Transport) -> dict:
     from .watch import eta
 
     d = shlex.quote(job.remote_dir)
-    cmd = (f"cd {d} && cat exit_code 2>/dev/null; echo '@@'; tail -c 6000 solver.log 2>/dev/null; echo '@@'; "
+    cmd = (f"cd {d} && cat exit_code disk_stop 2>/dev/null; echo '@@'; tail -c 6000 solver.log 2>/dev/null; echo '@@'; "
            f"{ALIVE}; echo '@@'; cat started 2>/dev/null")
     try:
         out = t.run(cmd, timeout=60).stdout.split("@@")
@@ -379,7 +422,9 @@ def _remote_status_wobbl(job: Job, st: dict, t: R.Transport) -> dict:
         st["reachable"] = False
         st["detail"] = f"{job.runner} cannot be reached right now ({e}). The job keeps running there."
         return st
-    code_text, log, alive_text = out[0].strip(), out[1], out[2].strip()
+    (code_text, disk), log, alive_text = _codes(out[0]), out[1], out[2].strip()
+    if disk is not None and not code_text:
+        return _disk_stopped(job, st, disk)
     started = float(out[-1].strip() or st.get("started") or time.time())
     elapsed = time.time() - started
     predicted = (job.estimate or {}).get("time_s")
@@ -427,14 +472,14 @@ def _launch_remote(job: Job, entry: dict, resume_deck: str = "", rin_from: str =
     ccx = entry.get("ccx") or "ccx"
     wait = 'while [ ! -f "$HOME/.wobbl-ready" ]; do sleep 10; done\n' if entry.get("cloud") else ""
     (stage / "run.sh").write_text(RUN_SH.format(id=job.id, run=job.restarts, t=job.threads, name=drv.name,
-                                                ccx=shlex.quote(ccx), wait=wait))
+                                                ccx=shlex.quote(ccx), wait=wait, guard=guard("..")))
     if entry.get("cloud"):
         _wait_for_ssh(t)
     t.put(stage, job.remote_dir)
     shutil.rmtree(stage, ignore_errors=True)          # the remote holds the input now
     if rin_from:
         t.check(f"cd {d}/work && mv {shlex.quote(rin_from)} {shlex.quote(drv.name + '.rin')}")
-    t.check(f"cd {d} && rm -f exit_code solver.pid watcher.pid started && {LAUNCH}")
+    t.check(f"cd {d} && rm -f exit_code disk_stop solver.pid watcher.pid started && {LAUNCH}")
     job.save()
     write_json(job.folder / "status.json", {"state": "running", "progress": 0.0, "updated": time.time(),
                                             "started": time.time(), "launched": time.time(),
@@ -469,7 +514,7 @@ def _remote_status(job: Job) -> dict:
         return _remote_status_wobbl(job, st, t)
     d = shlex.quote(job.remote_dir)
     names = ["job"] + [f"job_r{r}" for r in range(1, job.restarts + 1)]
-    cmd = f"cd {d} && cat exit_code 2>/dev/null; echo '@@'; " + " ".join(
+    cmd = f"cd {d} && cat exit_code disk_stop 2>/dev/null; echo '@@'; " + " ".join(
         f"tail -c 6000 work/{n}.sta 2>/dev/null; echo '@@';" for n in names) + \
         f" {ALIVE}; echo '@@'; cat started 2>/dev/null"
     try:
@@ -478,7 +523,9 @@ def _remote_status(job: Job) -> dict:
         st["reachable"] = False
         st["detail"] = f"{job.runner} cannot be reached right now ({e}). The job keeps running there."
         return st
-    code_text, stas, alive_text = out[0].strip(), out[1:1 + len(names)], out[1 + len(names)].strip()
+    (code_text, disk), stas, alive_text = _codes(out[0]), out[1:1 + len(names)], out[1 + len(names)].strip()
+    if disk is not None and not code_text:
+        return _disk_stopped(job, st, disk)
     started = float(out[-1].strip() or st.get("started") or time.time())
     done_before = 0
     for sta in stas[:-1]:

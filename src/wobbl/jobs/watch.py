@@ -22,6 +22,7 @@ from pathlib import Path
 from .store import Job, write_json
 
 INTERVAL = 2.0          # seconds between looks at the solver
+DISK_EVERY = 10.0       # seconds between looks at the free disk
 REPORT_EVERY = 10.0     # seconds between report refreshes
 _cancelled = False
 _proc: subprocess.Popen | None = None
@@ -88,6 +89,17 @@ def _stop(p: subprocess.Popen):
             pass
 
 
+def disk_low(where: str | Path) -> float | None:
+    """Free bytes where a run writes, when they have fallen under the reserve every run must leave."""
+    from ..estimate import DISK_RESERVE
+
+    try:
+        free = float(shutil.disk_usage(where).free)
+    except OSError:
+        return None
+    return free if free < DISK_RESERVE else None
+
+
 def solver_env(argv0: str, threads: int) -> dict:
     from ..solvers.locate import tool_env
 
@@ -123,7 +135,7 @@ def run(job_id: str) -> int:
     awake = keep_awake(p.pid)
     predicted = (job.estimate or {}).get("time_s")
     cache: dict = {}
-    last_report = 0.0
+    last_report = last_disk = 0.0
     code, ru = None, None
     while True:
         code, ru = poll(p)
@@ -131,6 +143,13 @@ def run(job_id: str) -> int:
             _stop(p)
             code, ru = (p.returncode if p.returncode is not None else -15), None
         now = time.time()
+        if code is None and now - last_disk >= DISK_EVERY:
+            last_disk = now
+            free = disk_low(launch["cwd"])
+            if free is not None:      # a full disk stops every other program on the machine too, so stop first
+                st["disk_stop"] = free
+                _stop(p)
+                code, ru = (p.returncode if p.returncode is not None else -15), None
         frac, detail = progress_of(job, now - t0)
         st.update(progress=frac, detail=detail or st["detail"], elapsed_s=round(now - t0, 1), updated=now,
                   eta_s=None if code is not None else eta(now - t0, frac, predicted))

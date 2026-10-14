@@ -55,7 +55,12 @@ SPICE = {"t0": 0.3, "per_point_node": 2e-6, "bytes": 6e7}
 LEAF = 48            # sample points below which a piece of the mesh is treated as one compact block
 CUTS = (0.35, 0.42, 0.5, 0.58, 0.65)   # where across a piece the candidate cuts go
 LONG_JOB = 600.0     # seconds past which a solve is better run as a background job
-DISK_RESERVE = 2e9   # bytes a run must leave free, since a full disk stops every other program on the machine too
+# bytes a run must leave free, since a full disk stops every other program on the machine too. Estimates refuse
+# a run that would cross it and a running job stops before it does. WOBBL_DISK_RESERVE_GB sets another margin.
+try:
+    DISK_RESERVE = float(os.environ.get("WOBBL_DISK_RESERVE_GB") or 2.0) * 1e9
+except ValueError:
+    DISK_RESERVE = 2e9
 
 
 # --------------------------------------------------------------------------------------------------- machine

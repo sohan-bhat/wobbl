@@ -117,6 +117,25 @@ def test_cancelling_a_remote_command_stops_its_whole_process_group(home):
         raise AssertionError("the remote run's processes are still alive")
 
 
+def test_a_job_stops_before_the_disk_fills(home, monkeypatch):
+    monkeypatch.setenv("WOBBL_DISK_RESERVE_GB", "1e9")          # more than any disk, so the watcher stops it at once
+    r = manage.start("", ["motion", "rocket.toml"], force=True)
+    st = wait(r["job_id"])
+    assert st["state"] == "failed" and "left on disk, to keep" in st["detail"] and "wobbl jobs resume" in st["detail"]
+
+
+@posix
+def test_a_remote_run_stops_before_its_disk_fills(home, monkeypatch):
+    fake = home / "fakewobbl.sh"
+    fake.write_text("#!/bin/sh\nsleep 60\n")
+    fake.chmod(0o755)
+    remote.add("box", f"local:{home / 'far'}", wobbl=str(fake))
+    monkeypatch.setattr(E, "DISK_RESERVE", 1e18)
+    r = manage.start("", ["motion", "rocket.toml"], on="box", force=True)
+    st = wait(r["job_id"], timeout=60)
+    assert st["state"] == "failed" and "Stopped on box with" in st["detail"]
+
+
 def test_a_remote_without_wobbl_is_refused_for_commands(home):
     cfg = remote.load()
     cfg["bare"] = {"host": f"local:{home / 'far'}", "root": "wobbl-jobs", "cores": 2, "ram": 4e9}
