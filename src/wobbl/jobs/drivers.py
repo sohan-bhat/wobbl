@@ -157,11 +157,20 @@ def iter_steps(path: Path):
 
 
 # ------------------------------------------------------------------------------------------------- wobbl
-def wobbl_command(job: Job, result: Path) -> list[str]:
-    args = list(job.args)
-    if not any(a in ("-o", "--out") for a in args):
-        args += ["-o", str(result)]
-    return [sys.executable, "-m", "wobbl", *args]
+def wobbl_command(job: Job) -> list[str]:
+    """The job's Wobbl command, whose inputs and result folder were made absolute when it started."""
+    return [sys.executable, "-m", "wobbl", *job.args]
+
+
+def result_folder(job: Job) -> Path:
+    """Where a Wobbl job writes its result."""
+    a = job.args
+    for i, x in enumerate(a):
+        if x in ("-o", "--out") and i + 1 < len(a):
+            return Path(a[i + 1])
+        if x.startswith("--out="):
+            return Path(x[6:])
+    return job.folder / "result"
 
 
 def wobbl_progress(log: str, levels: int = 5) -> tuple[float | None, str]:

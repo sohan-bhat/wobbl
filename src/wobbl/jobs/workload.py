@@ -89,6 +89,7 @@ class Workload:
     params: dict = field(default_factory=dict)
     inputs: list[Path] = field(default_factory=list)
     out: str | None = None            # the result folder it was told to use, if any
+    tokens: list[str] = field(default_factory=list)   # each input as it was typed, in the order of inputs
 
     @property
     def hooks(self) -> Hooks:
@@ -105,7 +106,13 @@ class Workload:
 
     def signature(self) -> str:
         """Same command, same size settings and the same input files give the same signature."""
-        items = {k: v for k, v in sorted(self.params.items()) if k not in NOT_SIZE}
+        typed = set(self.tokens)
+
+        def norm(v):   # an input counts by its file below, not by how its path was typed
+            if isinstance(v, (list, tuple)):
+                return [norm(x) for x in v]
+            return Path(str(v)).name if str(v) in typed else v
+        items = {k: norm(v) for k, v in sorted(self.params.items()) if k not in NOT_SIZE}
         files = []
         for p in self.inputs:
             try:
@@ -147,7 +154,7 @@ def parse(argv: list[str]) -> Workload:
     except click.ClickException as e:
         raise WorkloadError(f"wobbl {' '.join(path)} cannot read these arguments ({e.format_message()})") from None
     params = dict(ctx.params)
-    inputs, seen = [], set()
+    inputs, tokens, seen = [], [], set()
 
     def add(v):
         if isinstance(v, (list, tuple)):
@@ -161,6 +168,7 @@ def parse(argv: list[str]) -> Workload:
                 if p.exists() and p.resolve() not in seen:
                     seen.add(p.resolve())
                     inputs.append(p)
+                    tokens.append(v)
             except OSError:
                 pass
     from click.core import ParameterSource
@@ -169,7 +177,35 @@ def parse(argv: list[str]) -> Workload:
         if k not in NOT_SIZE and ctx.get_parameter_source(k) == ParameterSource.COMMANDLINE:
             add(v)
     out = params.get("out")
-    return Workload(list(argv), " ".join(path), params, inputs, str(out) if out else None)
+    return Workload(list(argv), " ".join(path), params, inputs, str(out) if out else None, tokens)
+
+
+def rewrite(argv: list[str], mapping: dict[str, str], out: str | None = None) -> list[str]:
+    """A command line with each token in ``mapping`` replaced, as a value or as --option=value, and its result
+    folder set to ``out`` when given."""
+    res, skip = [], False
+    for i, a in enumerate(argv):
+        if skip:
+            skip = False
+            continue
+        if out is not None and a in ("-o", "--out") and i + 1 < len(argv):
+            skip = True
+            continue
+        if out is not None and a.startswith("--out="):
+            continue
+        if "=" in a and a.startswith("--"):
+            k, v = a.split("=", 1)
+            res.append(f"{k}={mapping.get(v, v)}")
+        else:
+            res.append(mapping.get(a, a))
+    return res + (["-o", out] if out is not None else [])
+
+
+def absolute(w: Workload, out: str) -> list[str]:
+    """The command line with every input and the result folder as absolute paths, so it runs the same from any
+    folder, and later from another one when it is resumed."""
+    return rewrite(w.argv, {t: str(p.resolve()) for t, p in zip(w.tokens, w.inputs)},
+                   str(Path(w.out).expanduser().resolve()) if w.out else out)
 
 
 # ------------------------------------------------------------------------------------------------- history
