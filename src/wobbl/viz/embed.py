@@ -118,6 +118,18 @@ def attach(out_dir: str | Path, build: bool = True) -> Path | None:
     return page
 
 
+def after_report(out_dir: str | Path) -> Path | None:
+    """The hook every report writer calls once report.html is on disk. It never raises: a view that cannot be
+    built must not cost the user their result."""
+    try:
+        return attach(out_dir)
+    except Exception:  # noqa: BLE001
+        import os
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
+        return None
+
+
 def view_path(out_dir: str | Path) -> Path | None:
     """The page that shows a run's interactive view, if it has one."""
     out = Path(out_dir)

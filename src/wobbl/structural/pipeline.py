@@ -37,7 +37,19 @@ def analyze_strength(study: StructuralStudy, out_dir: str | Path, progress: Prog
                                      else "max principal", o.allowable_MPa, o.target_sf, o.hotspots)
         o.images["convergence"] = convergence_plot(img / "convergence.png", o.levels, o.hotspots)
     _save_vtu(run, out / "result.vtu")
+    _save_scene(run, o, out)
     return write_outputs(o, out)
+
+
+def _save_scene(run, o, out: Path):
+    """The run's interactive 3D view (wobbl.viz). A view that cannot be built never fails the run."""
+    try:
+        from ..viz.adapters.strength import write_scene
+        write_scene(run, o, out)
+    except Exception:  # noqa: BLE001
+        import os
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
 
 
 def _save_vtu(run, path: Path):

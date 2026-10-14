@@ -93,6 +93,8 @@ def write_report(o: Outcome, out_dir: str | Path) -> str:
                      f"Solver {o.solver}. Total time {o.t_total:.0f} s.")
     path = out / "report.html"
     path.write_text(html_text, encoding="utf-8")
+    from ..viz.embed import after_report
+    after_report(out)
     return str(path)
 
 
