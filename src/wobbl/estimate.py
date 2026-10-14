@@ -712,20 +712,6 @@ def study_cost(mesh, domain: str = "strength", quality: str = "normal", transien
                 {"nodes": levels[-1], "levels": levels, "dof": dof * levels[-1]}, basis)
 
 
-def estimate_part(part: str | Path, domain: str = "strength", quality: str = "normal",
-                  mesh_size: float | None = None, scale: float = 1.0, transient: bool = False,
-                  machine: Machine | None = None, max_hours: float | None = None) -> Estimate:
-    """Predict a Wobbl strength or heat study of a CAD part from its first mesh, before anything is solved."""
-    import tempfile
-
-    from .structural.run import describe_part
-
-    with tempfile.TemporaryDirectory() as tmp:
-        prep, features = describe_part(str(part), tmp, scale)
-        mesh = first_mesh(prep, features, domain, quality, mesh_size, transient)
-    return predict(study_cost(mesh, domain, quality, transient), machine or this_machine(), max_hours, str(part))
-
-
 def estimate_command(argv: list[str], machine: Machine | None = None, max_hours: float | None = None) -> Estimate:
     """Predict any Wobbl command line, of any domain, before it runs."""
     from .jobs import workload as WL

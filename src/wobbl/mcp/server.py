@@ -28,8 +28,9 @@ Robot arms and servos, linkages, gear trains, impacts and tipping: solve_mechani
 Solenoids, electromagnets and magnets: solve_magnetic. Capacitance and breakdown: solve_electric. Trace
 impedance, crosstalk and board parasitics: solve_board. Antennas and wireless range: solve_antenna. Room modes,
 mufflers and panel noise: solve_sound.
-Big problems: estimate_cost before any long solve, then start_job, job_status, job_logs, cancel_job and resume_job to
-run a deck in the background or on a remote machine. A cloud run starts only after the user agrees to its plan."""
+Big problems: estimate_cost before any long solve. start_job,
+job_status, job_logs, cancel_job and resume_job run a deck in the background or on a remote machine. A cloud run
+starts only after the user agrees to its plan."""
 
 
 def _protect_stdout():
@@ -377,18 +378,20 @@ def build_server():
         return solve_field_tool("sound", template, params)
 
     @srv.tool()
-    def estimate_cost(path: str = "", solver: str = "", nodes: float = 0, elements: float = 0, end_time: float = 0.0,
-                      time_step: float = 0.0, iterations: int = 0, procedure: str = "static",
-                      domain: str = "strength", quality: str = "normal", remote: str = "", threads: int = 0,
+    def estimate_cost(command: list[str] | None = None, path: str = "", solver: str = "", nodes: float = 0,
+                      elements: float = 0, end_time: float = 0.0, time_step: float = 0.0, iterations: int = 0,
+                      procedure: str = "static", remote: str = "", threads: int = 0,
                       max_hours: float | None = None) -> dict:
-        """Predict run time, peak memory and disk before solving, for a CalculiX .inp deck, an LS-DYNA .k or
-        OpenRadioss .rad deck, an OpenFOAM case folder, a CAD part's strength or heat study, or a run given by
-        size (solver='openradioss', elements=1.5e6, end_time=0.2). Returns the verdict (fits, long, too long,
-        does not fit), the problems and options such as a coarser first pass, a submodel, a remote machine or a
-        priced cloud machine. Call it before any solve that might be big."""
+        """Predict run time, peak memory and disk before anything runs, for any Wobbl command of any domain
+        (command=['run', 'part.step', '-m', 'pla', '--fix', 'x=min', ...], or thermal, flow, mechanism and the
+        rest), a CalculiX .inp, LS-DYNA .k or OpenRadioss .rad deck or an OpenFOAM case (path), or a run given by
+        size (solver='openradioss', elements=1.5e6, end_time=0.2). Returns the verdict (fits, long, too long, does
+        not fit, or unknown before a command's first run here), the problems and options such as a background job,
+        a coarser first pass, a submodel, a remote machine or a priced cloud machine. Call it before any solve that
+        might be big."""
         from ..jobs.tools import estimate_cost as run
-        return run(path, solver, nodes, elements, end_time, time_step, iterations, procedure, domain, quality,
-                   remote, threads, max_hours)
+        return run(command, path, solver, nodes, elements, end_time, time_step, iterations, procedure, remote,
+                   threads, max_hours)
 
     @srv.tool()
     def start_job(path: str = "", command: list[str] | None = None, remote: str = "", threads: int = 0,

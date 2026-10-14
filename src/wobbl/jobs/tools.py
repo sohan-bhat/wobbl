@@ -12,14 +12,13 @@ def _err(e: Exception) -> dict:
     return out
 
 
-def estimate_cost(path: str = "", solver: str = "", nodes: float = 0, elements: float = 0, end_time: float = 0.0,
-                  time_step: float = 0.0, iterations: int = 0, procedure: str = "static", domain: str = "strength",
-                  quality: str = "normal", remote: str = "", threads: int = 0,
+def estimate_cost(command: list[str] | None = None, path: str = "", solver: str = "", nodes: float = 0,
+                  elements: float = 0, end_time: float = 0.0, time_step: float = 0.0, iterations: int = 0,
+                  procedure: str = "static", remote: str = "", threads: int = 0,
                   max_hours: float | None = None) -> dict:
-    """Run time, peak memory and disk for a deck, a CAD part's study or a run given by size, with options when
-    it will not fit."""
+    """Run time, peak memory and disk for any Wobbl command, a solver deck or case, or a run given by size, with
+    options when it will not fit."""
     from .. import estimate as E
-    from ..geometry.cad import SUPPORTED
 
     try:
         machine = None
@@ -31,15 +30,16 @@ def estimate_cost(path: str = "", solver: str = "", nodes: float = 0, elements: 
                 machine.threads = threads
         elif threads:
             machine = E.this_machine(Path(path).expanduser().resolve().parent if path else ".", threads)
-        if path and (Path(path).suffix.lower() in SUPPORTED or Path(path).suffix.lower() == ".py"):
-            est = E.estimate_part(str(Path(path).expanduser()), domain, quality, machine=machine, max_hours=max_hours)
+        if command:
+            est = E.estimate_command([str(c) for c in command], machine, max_hours)
         elif path:
             est = E.estimate_deck(str(Path(path).expanduser()), machine, max_hours)
         elif solver:
             est = E.estimate_size(solver, int(nodes), int(elements), end_time, time_step, iterations, procedure,
                                   machine=machine, max_hours=max_hours)
         else:
-            return {"error": "pass path (a deck, an OpenFOAM case or a CAD part), or solver with a size"}
+            return {"error": "pass command (any Wobbl command line), path (a solver deck or case), or solver with "
+                             "a size"}
     except Exception as e:  # noqa: BLE001
         return _err(e)
     return est.to_dict()

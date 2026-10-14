@@ -36,12 +36,27 @@ def test_estimate_a_deck_and_a_run_given_by_size(home):
     assert r.exit_code != 0 and "--solver" in r.output
 
 
-def test_estimate_a_cad_part_from_its_first_mesh(home, parts):
-    r = CliRunner().invoke(cli, ["estimate", parts["plate_hole"], "--quality", "fast", "--json"])
+def test_estimate_any_command_as_typed(home, parts):
+    r = CliRunner().invoke(cli, ["estimate", "--json", "run", parts["plate_hole"], "-m", "pla", "--quality", "fast",
+                                 "--fix", "x=min", "--load", "10 N down @ x=max"])
     assert r.exit_code == 0, r.output
     e = json.loads(r.output)
-    assert e["procedure"] == "static" and len(e["size"]["levels"]) >= 2 and e["size"]["levels"][0] > 1000
+    assert e["solver"] == "wobbl run" and e["procedure"] == "strength" and e["size"]["levels"][0] > 1000
     assert e["verdict"] == "fits" and e["time_s"] > 0
+    r = CliRunner().invoke(cli, ["estimate", "mechanism", "fourbar", "--set", "crank=80"])
+    assert r.exit_code == 0 and "bundled mechanism example" in r.output, r.output
+    r = CliRunner().invoke(cli, ["estimate", "magnetic", "solenoid"])
+    assert r.exit_code == 0 and "UNKNOWN" in r.output and "wobbl jobs start" in r.output, r.output
+
+
+def test_options_after_the_wrapped_command_stay_with_it():
+    from wobbl.cli.jobs import start
+
+    ctx = start.make_context("start", ["--threads", "2", "run", "part.step", "-o", "res", "--json", "--threads", "8"])
+    assert ctx.params["threads"] == 2 and not ctx.params["as_json"]
+    assert ctx.params["target"] == "run" and ctx.params["args"] == ("part.step", "-o", "res", "--json", "--threads", "8")
+    deck = start.make_context("start", ["deck.inp", "--threads", "3"])
+    assert deck.params["target"] == "deck.inp" and deck.params["threads"] == 3
 
 
 def test_jobs_list_and_unknown_job(home):
@@ -75,7 +90,7 @@ def test_remote_add_list_remove(home):
     r = CliRunner().invoke(cli, ["remote", "add", "box", f"local:{home / 'far'}"])
     assert r.exit_code == 0 and "added box with" in r.output, r.output
     assert "box" in CliRunner().invoke(cli, ["remote", "list"]).output
-    e = tools.estimate_cost(str(deck(home / "cube.inp")), remote="box")
+    e = tools.estimate_cost(path=str(deck(home / "cube.inp")), remote="box")
     assert e["machine"]["name"] == "box"
     assert "removed box" in CliRunner().invoke(cli, ["remote", "remove", "box"]).output
 

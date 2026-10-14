@@ -44,7 +44,7 @@ class CloudError(RuntimeError):
 def machine(row):
     from ..estimate import Machine
 
-    name, vcpus, cores, gb, price = row
+    name, _, cores, gb, price = row
     return Machine(f"an AWS {name}", cores, cores, gb * 1e9, float("inf"), price_per_hour=price)
 
 

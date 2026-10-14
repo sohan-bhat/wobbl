@@ -1,9 +1,11 @@
-"""wobbl estimate, wobbl jobs and wobbl remote: big problems, known before they run and run where they fit.
+"""wobbl estimate, wobbl jobs and wobbl remote: any run, known before it starts and run where it fits.
 
-    wobbl estimate deck.inp                         time, memory and disk before a solve, with options
-    wobbl estimate --solver openradioss --elements 1.5e6 --end-time 0.2
+All three take any Wobbl command as it would be typed, of any domain, as well as solver decks.
+
+    wobbl estimate run part.step -m pla ...         time, memory and disk before it runs, with options
+    wobbl estimate deck.inp
     wobbl estimate --calibrate                      measure this machine
-    wobbl jobs start deck.inp [--on workstation]    run in the background, here or on a remote
+    wobbl jobs start thermal pack.py ...            run in the background, here or with --on a remote
     wobbl jobs status | logs | cancel | resume | pull | list
     wobbl remote add workstation me@box             a machine you own, reached over SSH
 """
@@ -25,13 +27,22 @@ def _show_estimate(d: dict):
     size = d["size"]
     what = ", ".join(f"{v:,} {k.replace('_', ' ')}" for k, v in size.items()
                      if isinstance(v, int) and k in ("nodes", "elements", "cells", "cycles", "solves", "dof"))
-    name = Path(d["target"]).name if d["target"] else "a run given by size"
-    ui.console.print(f"\n[bold]{name}[/bold]  {d['solver']} {d['procedure']}, {what}")
-    style = {"fits": "bold green", "long": "bold yellow", "too long": "bold red", "does not fit": "bold red"}
+    if d["solver"].startswith("wobbl "):
+        name, kind = "wobbl " + (d["target"][:70] + ("..." if len(d["target"]) > 70 else "")), d["procedure"]
+    else:
+        name = Path(d["target"]).name if d["target"] else "a run given by size"
+        kind = f"{d['solver']} {d['procedure']}"
+    ui.console.print(f"\n[bold]{name}[/bold]  {kind}" + (f", {what}" if what else ""))
+    style = {"fits": "bold green", "long": "bold yellow", "too long": "bold red", "does not fit": "bold red",
+             "unknown": "bold yellow"}
     m = d["machine"]
     where = f"{m['threads']} cores of {m['name']}" if m["threads"] > 1 else f"one core of {m['name']}"
-    ui.console.print(f"  [{style.get(d['verdict'], 'bold')}]{d['verdict'].upper()}[/]  about {duration(d['time_s'])} "
-                     f"on {where}, {d['peak_memory_gb']:.3g} GB of memory at the peak, {d['disk_gb']:.3g} GB on disk")
+    if d["verdict"] == "unknown":
+        ui.console.print(f"  [{style['unknown']}]UNKNOWN[/]  no measure of this run yet")
+    else:
+        ui.console.print(f"  [{style.get(d['verdict'], 'bold')}]{d['verdict'].upper()}[/]  about "
+                         f"{duration(d['time_s'])} on {where}, {d['peak_memory_gb']:.3g} GB of memory at the peak, "
+                         f"{d['disk_gb']:.3g} GB on disk")
     for p in d["problems"]:
         ui.console.print(f"  [red]{p}[/red]")
     if d["options"]:
@@ -42,8 +53,47 @@ def _show_estimate(d: dict):
     ui.console.print()
 
 
-@click.command()
+class PassThrough(click.Command):
+    """A command that wraps another Wobbl command. Options before the wrapped command belong to this one, and
+    everything from the wrapped command on is passed through untouched, its own options included."""
+
+    def parse_args(self, ctx, args):
+        from ..jobs.workload import is_command
+
+        takes = {o: not p.is_flag for p in self.params if isinstance(p, click.Option) for o in p.opts}
+        i = 0
+        while i < len(args):
+            a = args[i]
+            if a == "--":
+                break
+            if a.startswith("-"):
+                i += 2 if takes.get(a.split("=", 1)[0]) and "=" not in a else 1
+                continue
+            if is_command(a):
+                return super().parse_args(ctx, args[:i] + ["--"] + args[i:])
+            break
+        return super().parse_args(ctx, args)
+
+
+def _machine(on: str, threads: int, where: str = "."):
+    from .. import estimate as E
+
+    if on:
+        from ..jobs import remote as R
+        try:
+            R.get(on)
+        except R.RemoteError as e:
+            ui.fail(str(e))
+        m = R.machines()[on]
+        if threads:
+            m.threads = threads
+        return m
+    return E.this_machine(where, threads) if threads else None
+
+
+@click.command(cls=PassThrough)
 @click.argument("target", required=False, default="")
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
 @click.option("--solver", default="", help="calculix, openradioss, openfoam or ngspice, for a run given by size.")
 @click.option("--nodes", type=float, default=0, help="Nodes of a model that is not on this machine.")
 @click.option("--elements", type=float, default=0, help="Elements (cells for OpenFOAM).")
@@ -51,28 +101,26 @@ def _show_estimate(d: dict):
 @click.option("--time-step", type=float, default=0.0, help="Explicit time step in seconds (default 1e-6).")
 @click.option("--iterations", type=int, default=0, help="CFD iterations or circuit time points.")
 @click.option("--procedure", default="static", help="CalculiX procedure for a run given by size: static or heat.")
-@click.option("--domain", type=click.Choice(["strength", "heat"]), default="strength",
-              help="For a CAD part, the study to predict.")
-@click.option("--quality", type=click.Choice(["fast", "normal", "fine"]), default="normal")
-@click.option("--mesh-size", type=float, default=None, help="For a CAD part, the global element size in mm.")
-@click.option("--transient", is_flag=True, help="For a heat study, a transient run.")
 @click.option("--on", "on", default="", help="Predict it on a remote added with wobbl remote add.")
 @click.option("--threads", type=int, default=0, help="Cores the run gets (default: as a job would get).")
 @click.option("--max-hours", type=float, default=None, help="Longest acceptable run (default 24).")
 @click.option("--calibrate", is_flag=True, help="Measure this machine with three small CalculiX solves first.")
 @click.option("--json", "as_json", is_flag=True)
-def estimate(target, solver, nodes, elements, end_time, time_step, iterations, procedure, domain, quality, mesh_size,
-             transient, on, threads, max_hours, calibrate, as_json):
-    """Predict run time, peak memory and disk before solving, and what to do when it will not fit.
+def estimate(target, args, solver, nodes, elements, end_time, time_step, iterations, procedure, on, threads,
+             max_hours, calibrate, as_json):
+    """Predict run time, peak memory and disk before anything runs, and what to do when it will not fit.
+
+    Give any Wobbl command as you would type it, a solver deck or case folder, or a size.
 
     \b
+    wobbl estimate run part.step -m pla --fix "x=min" --load "50 N down @ top"
+    wobbl estimate thermal pack.py -m li-ion-cell --power "6 W"
     wobbl estimate deck.inp
-    wobbl estimate part.step --quality fine
-    wobbl estimate car.k --max-hours 12
     wobbl estimate --solver openradioss --elements 1.5e6 --end-time 0.2
     wobbl estimate --calibrate
     """
     from .. import estimate as E
+    from ..jobs.workload import is_command
 
     if calibrate:
         ui.console.print("  calibrating CalculiX on this machine")
@@ -84,31 +132,24 @@ def estimate(target, solver, nodes, elements, end_time, time_step, iterations, p
                          f"{r['memory_factor']:.2f} times the modeled memory, from {r['calibrated_from']} runs\n")
         if not target and not solver:
             return
-    machine = None
-    if on:
-        from ..jobs import remote as R
-        try:
-            R.get(on)
-        except R.RemoteError as e:
-            ui.fail(str(e))
-        machine = R.machines()[on]
-        if threads:
-            machine.threads = threads
-    elif threads:
-        machine = E.this_machine(Path(target).resolve().parent if target else ".", threads)
+    command = bool(target) and is_command(target)
+    if args and not command:
+        ui.fail(f"unexpected {' '.join(args)}", "Put options before the deck, or give a Wobbl command")
+    machine = _machine(on, threads, str(Path(target).resolve().parent) if target and not command else ".")
     try:
         from ..geometry.cad import SUPPORTED
-        if target and (Path(target).suffix.lower() in SUPPORTED or Path(target).suffix.lower() == ".py"):
-            est = E.estimate_part(target, domain, quality, mesh_size, transient=transient, machine=machine,
-                                  max_hours=max_hours)
+        if command:
+            est = E.estimate_command([target, *args], machine, max_hours)
+        elif target and (Path(target).suffix.lower() in SUPPORTED or Path(target).suffix.lower() == ".py"):
+            est = E.estimate_command(["run", target], machine, max_hours)
         elif target:
             est = E.estimate_deck(target, machine, max_hours)
         elif solver:
             est = E.estimate_size(solver, int(nodes), int(elements), end_time, time_step, iterations, procedure,
                                   machine=machine, max_hours=max_hours)
         else:
-            ui.fail("give a deck, an OpenFOAM case folder, or a size with --solver",
-                    "Example: wobbl estimate --solver calculix --nodes 2e6")
+            ui.fail("give a Wobbl command, a solver deck or case folder, or a size with --solver",
+                    "Example: wobbl estimate run part.step -m pla")
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e), getattr(e, "hint", ""))
     d = est.to_dict()
@@ -159,7 +200,7 @@ def _job_error(e):
     ui.fail(str(e), getattr(e, "hint", ""))
 
 
-@jobs.command(context_settings={"ignore_unknown_options": True})
+@jobs.command(cls=PassThrough)
 @click.argument("target")
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 @click.option("--on", "on", default="", help="Run on a remote added with wobbl remote add.")
