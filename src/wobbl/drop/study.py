@@ -278,8 +278,8 @@ def stress_history(model: Model, hist: History, mat: dict, ductile: bool) -> np.
         cw = np.sqrt(mat["E"] / mat["density"])
         k = int(round(2 * model.h / cw / max(step, 1e-30)))
         if k >= 2:
-            ker = np.ones(k) / k
-            S = np.apply_along_axis(lambda s: np.convolve(s, ker, mode="same"), 0, S)
+            from scipy.ndimage import uniform_filter1d
+            S = uniform_filter1d(S, k, axis=0, mode="nearest")
     return np.maximum(S, 0.0)
 
 
@@ -315,7 +315,7 @@ def evaluate(model: Model, hist: History, c: Contact, mat: dict, ductile: bool, 
     fi = int(np.argmax(S[:, gi]))
     up = c.normal
     acc = hist.accel @ up
-    acc_f = lowpass(acc, hist.dt, g_cutoff, before=-G)
+    acc_f = lowpass(acc, hist.dt, g_cutoff, before=-G) if g_cutoff else acc
     m = model.mass.sum()
     vz = hist.com_v @ up
     t0, t1 = hist.t_contact
@@ -376,7 +376,9 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
         say("screen", f"{len(cands)} landings on linear tets")
         screen = screen_landings(lin, cands, v0, floor, mat, lw, ductile, g_cut, say)
         order = np.argsort([-s["governing"] for s in screen])
-        top = [int(i) for i in order[:TOP.get(study.quality, 2)]]
+        best = screen[int(order[0])]["governing"]
+        # the runners up go on to quadratic tets only when the screen puts them within 15% of the worst
+        top = [int(i) for i in order[:TOP.get(study.quality, 2)] if screen[int(i)]["governing"] >= 0.85 * best]
     else:
         top = [0]
     # the worst few again on quadratic tets, then the worst of those refined
@@ -492,7 +494,7 @@ def screen_landings(lin: Model, cands, v0, floor, mat, watch, ductile, g_cut, sa
 def _screen_one(job) -> dict:
     model, name, d, v0, floor, mat, watch, ductile, g_cut = job
     hist, c = simulate(model, d, v0, floor, mat, watch, frames=40, ring=0.0)
-    ev = evaluate(model, hist, c, mat, ductile, v0, watch, g_cut)
+    ev = evaluate(model, hist, c, mat, ductile, v0, watch, None)     # ranked by stress; the g is read later
     return {"name": name, "d": [float(x) for x in d], "governing": ev["governing"], "g_watch": ev["g_watch"],
             "g_rigid": ev["g_rigid"], "pulse_ms": ev["pulse_ms"]}
 
