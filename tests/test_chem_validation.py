@@ -11,6 +11,7 @@ from wobbl.validation.cases import CASES, run_cases
 ROOT = Path(__file__).resolve().parents[1]
 MOTOR = [c.id for c in CASES if c.domain == "motor"]
 COMBUSTION = [c.id for c in CASES if c.domain == "combustion"]
+BATTERY = [c.id for c in CASES if c.domain == "battery"]
 
 
 def test_motor_cases_land_on_their_closed_forms_and_static_fires(tmp_path):
@@ -19,6 +20,12 @@ def test_motor_cases_land_on_their_closed_forms_and_static_fires(tmp_path):
     assert all(r["pass"] for r in rows.values()), rows
     assert rows["steady-kn"]["error"] < 1e-6 and rows["neutral-grain"]["error"] < 0.005
     assert all(r["wall_s"] < 30 for r in rows.values())
+
+
+def test_the_cell_runaway_case_lands_on_the_published_onset(tmp_path):
+    assert BATTERY == ["cell-runaway"]
+    row = run_cases(tmp_path, BATTERY, log=lambda m: None)[0]
+    assert row["pass"] and abs(row["wobbl"] - 155.0) < 3.0 and row["semenov_C"] < row["wobbl"]
 
 
 @pytest.mark.skipif(not install.available(), reason="Cantera not installed")
@@ -30,5 +37,5 @@ def test_combustion_cases_match_cea_and_the_published_values(tmp_path):
 
 def test_published_results_include_the_chemistry_cases():
     rows = {r["id"]: r for r in json.loads((ROOT / "docs" / "validation-results.json").read_text())}
-    assert set(MOTOR + COMBUSTION) <= set(rows) and all(rows[i]["pass"] for i in MOTOR + COMBUSTION)
-    assert all(rows[c.id]["title"] == c.title for c in CASES if c.id in MOTOR + COMBUSTION)
+    assert set(MOTOR + COMBUSTION + BATTERY) <= set(rows) and all(rows[i]["pass"] for i in MOTOR + COMBUSTION + BATTERY)
+    assert all(rows[c.id]["title"] == c.title for c in CASES if c.id in MOTOR + COMBUSTION + BATTERY)

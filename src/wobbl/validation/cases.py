@@ -770,6 +770,18 @@ def _mit(out: Path, throat_mm: float, impulse: float, peak_mpa: float):
                                              "burn_time_s": round(o.values["burn_time_s"], 2)}
 
 
+def cell_runaway(out: Path):
+    """A fully charged LiCoO2 18650 in an oven, cooled at 7.17 W/m2K with an emissivity of 0.8, against the 155 C
+    critical oven temperature of Hu, He, Rein and Restuccia's model, which matches Hatchard's oven tests."""
+    from ..chem.runaway import Cell, critical, semenov
+
+    c = Cell(0.018, 0.065)
+    ta_sem = semenov(c)[0]
+    ta, _, ran = critical(c, ta_sem)
+    return ta - 273.15, 155.0, {"semenov_C": round(ta_sem - 273.15, 2), "minutes_to_trigger":
+                                round(ran.t_runaway / 60, 1), "biot": round(c.biot, 5)}
+
+
 def mit_o3800(out: Path):
     return _mit(out, 29.21, 31540.0, 5.728)
 
@@ -795,6 +807,9 @@ CASES += [
          "total impulse", "N s", 0.10, False, mit_o3800),
     Case("mit-o3100", "MIT O3100 APCP motor static fire, wider throat", "motor", "measured thrust record, 31.0 kN s",
          "total impulse", "N s", 0.10, False, mit_o3100),
+    Case("cell-runaway", "Charged LiCoO2 18650 in an oven", "battery",
+         "Hu et al. 2020 and Hatchard's oven tests, 155 C", "critical oven temperature", "C", 0.03, False,
+         cell_runaway),
 ]
 
 

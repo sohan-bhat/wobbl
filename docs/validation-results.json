@@ -710,5 +710,23 @@
   "static_fire_peak_MPa": 2.79,
   "burn_time_s": 9.75,
   "wall_s": 7.6
+ },
+ {
+  "id": "cell-runaway",
+  "title": "Charged LiCoO2 18650 in an oven",
+  "domain": "battery",
+  "source": "Hu et al. 2020 and Hatchard's oven tests, 155 C",
+  "quantity": "critical oven temperature",
+  "unit": "C",
+  "expected": 155.0,
+  "wobbl": 155.95675048828127,
+  "error": 0.00617258379536305,
+  "tolerance": 0.03,
+  "pass": true,
+  "exact_theory": false,
+  "semenov_C": 108.93,
+  "minutes_to_trigger": 63.2,
+  "biot": 0.00834,
+  "wall_s": 6.3
  }
 ]
