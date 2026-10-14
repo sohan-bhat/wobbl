@@ -398,6 +398,6 @@ def assumptions(spec: MotorSpec, chem_vals: dict) -> list[str]:
         out.append("The casing is checked as a long tube under internal pressure at room temperature strength. "
                    "Closures, retaining rings, bolts and the tube's heating are not checked, so line the casing and "
                    "size those parts on their own.")
-    out.append("In Wobbl's validation the MIT O3800 static fire peaked 8% above its predicted pressure, so keep the "
-               "casing's safety factor margin for what this model leaves out.")
+    out.append("Against two MIT static fires in Wobbl's validation the predicted peak pressure was 7% low on one and "
+               "12% high on the other, so keep the casing's safety factor margin for what this model leaves out.")
     return out

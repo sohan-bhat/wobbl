@@ -547,6 +547,139 @@ CASES = [
 ]
 
 
+# --- chemistry and solid motors -----------------------------------------------------
+# Flames and propellants go through the equilibrium on NASA's data (Cantera), motors through the internal
+# ballistics with the same checks a user's run gets.
+PSIA = 6894.757
+
+
+def methane_flame(out: Path):
+    """Stoichiometric methane in air (O2 + 3.76 N2) at 1 atm and 298 K, equilibrium at constant pressure."""
+    from ..chem.combustion import run_flame
+
+    o = run_flame("methane", "air", 1.0, 298.15, 101325.0, out, render=False)
+    return o.values["T_ad_K"], 2226.0, {"confidence": o.confidence, "gri30_K": round(o.values["T_gri30_K"], 2),
+                                        "no_dissociation_K": round(o.values["T_no_dissociation_K"], 2)}
+
+
+def _lox_lh2():
+    from ..chem.propellants import parse_composition, reactants
+    from ..chem.thermo import Equilibrium, rocket
+
+    eq = Equilibrium(reactants(parse_composition("lox:6,lh2:1")))
+    return rocket(eq, 1000 * PSIA, area_ratio=40.0)
+
+
+def lox_lh2_cstar(out: Path):
+    """LOX and LH2 at 1000 psia, O/F 6, area ratio 40, against NASA CEA's c* of 7560.0 ft/s."""
+    ch, sh = _lox_lh2()
+    return sh.cstar, 7560.0 * 0.3048, {"chamber_K": round(ch.T, 2), "cea_chamber_K": 3483.35}
+
+
+def lox_lh2_isp(out: Path):
+    """The same case, against CEA's shifting vacuum Isp of 451.7 s."""
+    ch, sh = _lox_lh2()
+    return sh.isp_vac, 451.7, {"isp_s": round(sh.isp_opt, 2), "cea_isp_s": 431.2}
+
+
+def knsu_cstar(out: Path):
+    """KNSU (65/35 potassium nitrate and sucrose) at 1000 psia, against the c* of 919 m/s from Nakka's PROPEP run."""
+    from ..chem.propellants import PROPELLANTS, reactants
+    from ..chem.thermo import Equilibrium, rocket
+
+    eq = Equilibrium(reactants(PROPELLANTS["knsu"].composition))
+    ch, fr = rocket(eq, 1000 * PSIA, exit_P=101325.0, mode="frozen")
+    return fr.cstar, 919.0, {"chamber_K": round(ch.T, 1), "propep_chamber_K": 1720.0, "M": round(ch.M, 3)}
+
+
+def _knsu_motor(grain, chamber_volume, kn=150.0):
+    from ..chem.ballistics import Motor, Nozzle
+    from ..chem.propellants import PROPELLANTS
+
+    At = grain.burn_area(0.0) / kn
+    return Motor([grain], PROPELLANTS["knsu"], Nozzle(math.sqrt(4 * At / math.pi), 0.03),
+                 chamber_volume=chamber_volume)
+
+
+def _closed_form(m) -> float:
+    from ..chem.ballistics import steady_pressure
+    return steady_pressure(m, 0.0)
+
+
+def steady_kn(out: Path):
+    """A KNSU end burner at Kn 150 holds (a (rho_p - rho_g) c* Kn)^(1/(1-n)) through its burn."""
+    from ..chem.ballistics import converge
+    from ..chem.grains import make_grain
+
+    m = _knsu_motor(make_grain("end", 0.05, 0.10), math.pi / 4 * 0.05 ** 2 * 0.11)
+    b, runs = converge(m)
+    mid = (b.t > 0.3 * b.t[-1]) & (b.t < 0.7 * b.t[-1])
+    return float(np.median(b.P[mid])), _closed_form(m), {"runs": len(runs), "burn_time_s": round(b.burn_time, 4)}
+
+
+def neutral_grain(out: Path):
+    """A KNSU tube burning inside and out with coated ends keeps its burning area, so its pressure trace is flat and
+    the web burns through in web / r(P) after ignition."""
+    from ..chem.ballistics import converge
+    from ..chem.grains import make_grain
+
+    g = make_grain("tube", 0.04, 0.10, ends=0, core=0.015)
+    m = _knsu_motor(g, math.pi / 4 * 0.05 ** 2 * 0.1)
+    b, _ = converge(m)
+    P = _closed_form(m)
+    t_out = float(b.t[np.argmax(b.x >= g.web)])
+    on = b.t < t_out
+    flat = float(np.std(b.P[on & (b.t > 0.1 * t_out)]) / P)
+    return t_out, g.web / m.propellant.burn_rate.rate(P), {"peak_MPa": round(b.peak_pressure / 1e6, 4),
+                                                            "closed_form_MPa": round(P / 1e6, 4), "spread": flat}
+
+
+def _mit(out: Path, throat_mm: float, impulse: float, peak_mpa: float):
+    """MIT Rocket Team's 4 grain 152 mm BATES motor in Ocean Water APCP, fired with two throats, against the total
+    impulse of each static fire (the thrust records published with openMotor's test data, integrated)."""
+    from ..chem.motor import run_motor
+    from ..chem.spec import read_spec
+
+    spec = read_spec({"name": "mit", "propellant": "ocean-water",
+                      "grain": [{"shape": "bates", "diameter": "127.356 mm", "core": "43.688 mm",
+                                 "length": "209.55 mm", "count": 4}],
+                      "nozzle": {"throat": f"{throat_mm} mm", "exit": "101.6 mm", "efficiency": 0.9,
+                                 "half_angle": "15 deg"}})
+    o = run_motor(spec, out, render=False)
+    return o.values["impulse_Ns"], impulse, {"confidence": o.confidence,
+                                             "peak_MPa": round(o.values["peak_pressure_Pa"] / 1e6, 3),
+                                             "static_fire_peak_MPa": peak_mpa,
+                                             "burn_time_s": round(o.values["burn_time_s"], 2)}
+
+
+def mit_o3800(out: Path):
+    return _mit(out, 29.21, 31540.0, 5.728)
+
+
+def mit_o3100(out: Path):
+    return _mit(out, 34.468, 30967.0, 2.790)
+
+
+CASES += [
+    Case("methane-flame", "Stoichiometric methane in air", "combustion", "Turns, An Introduction to Combustion",
+         "adiabatic flame temperature", "K", 0.005, False, methane_flame),
+    Case("lox-lh2-cstar", "LOX and LH2 at 1000 psia, O/F 6", "combustion", "NASA CEA output, c* 7560.0 ft/s",
+         "characteristic velocity", "m/s", 0.005, False, lox_lh2_cstar),
+    Case("lox-lh2-isp", "LOX and LH2 at 1000 psia, O/F 6, area ratio 40", "combustion", "NASA CEA output",
+         "shifting vacuum Isp", "s", 0.005, False, lox_lh2_isp),
+    Case("knsu-cstar", "KNSU propellant at 1000 psia", "combustion", "Nakka's PROPEP calculation",
+         "characteristic velocity", "m/s", 0.01, False, knsu_cstar),
+    Case("steady-kn", "End burner at a steady Kn of 150", "motor", "(a rho c* Kn)^(1/(1-n))",
+         "chamber pressure", "Pa", 0.005, True, steady_kn),
+    Case("neutral-grain", "Tube burning inside and out", "motor", "web / r(P) at the closed form pressure",
+         "time to burn through the web", "s", 0.01, True, neutral_grain),
+    Case("mit-o3800", "MIT O3800 APCP motor static fire", "motor", "measured thrust record, 31.5 kN s",
+         "total impulse", "N s", 0.10, False, mit_o3800),
+    Case("mit-o3100", "MIT O3100 APCP motor static fire, wider throat", "motor", "measured thrust record, 31.0 kN s",
+         "total impulse", "N s", 0.10, False, mit_o3100),
+]
+
+
 def run_cases(out_dir: str | Path, ids: list[str] | None = None, log=print) -> list[dict]:
     out = Path(out_dir)
     results = []
