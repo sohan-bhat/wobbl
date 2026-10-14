@@ -81,6 +81,27 @@ def test_the_motor_file_reads_back_in_the_motion_domain(tmp_path):
     assert eng.length == pytest.approx(0.4) and eng.propellant == pytest.approx(o.values["propellant_kg"], rel=1e-3)
 
 
+def test_agents_get_the_chemistry_tools(tmp_path, monkeypatch):
+    import asyncio
+
+    from wobbl.chem.tools import solve_motor_tool
+    from wobbl.mcp import tools
+    from wobbl.mcp.server import build_server
+
+    names = {t.name for t in asyncio.run(build_server().list_tools())}
+    assert {"solve_motor", "solve_flame", "solve_propellant"} <= names
+    monkeypatch.setenv("WOBBL_HOME", str(tmp_path))
+    r = solve_motor_tool(propellant="knsb", grains=["bates d=48 core=20 L=75 x4"], throat="12", exit="30",
+                         casing="6061-t6 od=54 wall=1.6")
+    assert "error" not in r, r
+    assert r["verdict"] == "ok" and Path(r["eng"]).exists() and "time_step_runs" not in r["values"]
+    assert "error" in solve_motor_tool(propellant="knsb", throat="12")
+    bad = solve_motor_tool(propellant="knsb", grains=["bates d=48 core=20 L=75 x4"], throat="12", exit="30",
+                           casing="6061-t6 od=54 wall=0.3")
+    fix = tools.suggest_fix(bad["result_dir"])
+    assert fix["domain"] == "motor" and "solve_motor" in fix["note"] and fix["fixes"]
+
+
 @pytest.mark.skipif(not install.available(), reason="Cantera not installed")
 def test_the_chemistry_cross_check_agrees_with_the_published_knsb_data(tmp_path):
     o = run_motor(read_spec(EXAMPLE), tmp_path, render=False)

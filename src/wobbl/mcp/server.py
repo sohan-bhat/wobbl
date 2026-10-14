@@ -15,7 +15,8 @@ INSTRUCTIONS = """Wobbl runs verified engineering simulations. Typical flow for 
 4. Open images.stress to see where the peak is. If the verdict is fails or marginal, call
    suggest_fix(result_dir, apply=true) for before and after numbers.
 Heat questions: solve_thermal. Circuits: solve_circuit. Falling, thrown and rocket flights: solve_motion.
-Pipe pressure drop, drag, propellers, drones and boat hulls: solve_flow."""
+Pipe pressure drop, drag, propellers, drones and boat hulls: solve_flow.
+Solid rocket motor designs: solve_motor. Flame temperatures: solve_flame. Propellant c* and Isp: solve_propellant."""
 
 
 def _protect_stdout():
@@ -137,6 +138,40 @@ def build_server():
         speed, drift, confidence with checks, fixes and the trajectory CSV. Runs take a second or two."""
         from ..motion.tools import solve_motion_tool
         return solve_motion_tool(spec, name, mass, density, diameter, cd, height, speed, angle, wind, question)
+
+    @srv.tool()
+    def solve_motor(spec: str = "", propellant: str = "", grains: list[str] | None = None, throat: str = "",
+                    exit: str = "", casing: str = "", efficiency: float | None = None, question: str = "") -> dict:
+        """Solid rocket motor internal ballistics from a design: chamber pressure, mass flow and thrust over the
+        burn, total impulse and motor class, checked by time step convergence, mass balance, the closed form
+        pressure and a Cantera equilibrium cross check of the propellant. Judges the casing (hoop stress at peak
+        pressure against yield and burst), Kn, erosive burning (port to throat ratio, core mass flux) and nozzle
+        separation, and simulates each fix. Give spec, a TOML path or text as in examples/knsb-motor/motor.toml,
+        or propellant (knsb, kndx, knsu, ocean-water, cherry-limeade), grains like ['bates d=48 core=18 L=80 x4'],
+        throat='13 mm', exit='33 mm' and casing='6061-t6 od=54 wall=1.6 L=400 sf=2' (bare numbers are mm).
+        Returns the thrust curve CSV and a RASP .eng that solve_motion reads. Runs take a few seconds."""
+        from ..chem.tools import solve_motor_tool
+        return solve_motor_tool(spec, propellant, grains, throat, exit, casing, efficiency, question)
+
+    @srv.tool()
+    def solve_flame(fuel: str, oxidizer: str = "air", phi: float = 1.0, pressure: str = "1 atm",
+                    temperature: str = "25 C", limit: str = "", question: str = "") -> dict:
+        """Adiabatic flame temperature and equilibrium products (CO, NO) of methane, propane, butane, hydrogen,
+        ethane, ethylene, acetylene, methanol, carbon monoxide or natural gas in air or oxygen, on NASA's
+        thermodynamic data with Cantera. Checked against GRI-Mech 3.0's data, the no dissociation bound and the
+        flammability limits. limit='1800 C' gets the leaner mixture that keeps the flame under it."""
+        from ..chem.tools import solve_flame_tool
+        return solve_flame_tool(fuel, oxidizer, phi, pressure, temperature, limit, question)
+
+    @srv.tool()
+    def solve_propellant(propellant: str, chamber_pressure: str = "6.895 MPa", area_ratio: float | None = None,
+                         exit_pressure: str = "", ambient: str = "1 atm", question: str = "") -> dict:
+        """Rocket propellant performance, CEA style: chamber temperature, c* and Isp at ambient and in vacuum for
+        shifting and frozen expansion. propellant is knsb, kndx, knsu or a composition by mass of kno3, sorbitol,
+        dextrose, sucrose, ap, al, htpb, lox, lh2, lch4 or rp1, e.g. 'ap:70,al:16,htpb:14' or 'lox:6,lh2:1'.
+        Give area_ratio, or exit_pressure (default the ambient). Matches NASA CEA to about 0.1%."""
+        from ..chem.tools import solve_propellant_tool
+        return solve_propellant_tool(propellant, chamber_pressure, area_ratio, exit_pressure, ambient, question)
 
     @srv.tool()
     def solve_flow(kind: str, params: dict | None = None) -> dict:

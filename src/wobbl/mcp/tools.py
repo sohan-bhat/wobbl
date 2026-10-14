@@ -235,8 +235,9 @@ def render(result_dir: str) -> dict:
 
 
 _RERUN_TOOL = {"thermal": "solve_thermal", "circuit": "solve_circuit", "motion": "solve_motion",
-               "flow": "solve_flow"}
-_DOMAIN_WORD = {"thermal": "heat", "circuit": "circuit", "motion": "motion", "flow": "flow"}
+               "flow": "solve_flow", "motor": "solve_motor", "combustion": "solve_flame or solve_propellant"}
+_DOMAIN_WORD = {"thermal": "heat", "circuit": "circuit", "motion": "motion", "flow": "flow", "motor": "motor",
+                "combustion": "combustion"}
 
 
 def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = None) -> dict:
