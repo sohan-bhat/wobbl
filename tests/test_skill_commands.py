@@ -69,6 +69,14 @@ def check_values(name: str, p: dict):
         else:
             study_from(p["name"], p["mass"], p["density"], p["diameter"], p["cd"], p["height"], p["speed"],
                        p["angle"], p["wind"])
+    elif name == "mechanism":
+        from wobbl.mechanism.templates import is_template, template
+
+        if is_template(p["target"]):
+            assert all("=" in s for s in p["sets"]), p["sets"]
+            template(p["target"], dict(s.split("=", 1) for s in p["sets"]))
+        else:
+            assert p["target"].endswith((".toml", ".json", ".xml", ".urdf")), p["target"]
     elif name.startswith("flow "):
         from wobbl.flow.tools import build
 
@@ -86,7 +94,7 @@ def check_values(name: str, p: dict):
 def test_the_skill_names_every_kind_of_command():
     names = {dry_parse(shlex.split(c)[1:])[0] for c in skill_commands()}
     assert {"inspect", "run", "materials", "fix", "thermal", "circuit", "motion", "motor", "flame",
-            "propellant"} <= names, names
+            "propellant", "mechanism"} <= names, names
 
 
 @pytest.mark.parametrize("command", skill_commands())

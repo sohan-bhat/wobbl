@@ -1,11 +1,11 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice, Cantera or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
+description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, asks whether servos can lift a load or a robot arm can make a move, how far a linkage swings and where it binds, what a gear train gives, how hard two parts hit or whether something tips over, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice, Cantera, MuJoCo or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
 ---
 
 # Wobbl: simulate before you build
 
-Wobbl wraps real solvers (gmsh, CalculiX, ngspice, and scipy for motion) behind
+Wobbl wraps real solvers (gmsh, CalculiX, ngspice, MuJoCo, and scipy for motion) behind
 one CLI and an MCP server. It refines the mesh until the answer stops moving, checks equilibrium,
 compares against beam theory, flags stress singularities and reports a
 confidence level. Use it instead of hand calculations for real geometry, and
@@ -142,6 +142,23 @@ load and the permanent set, not the elastic peak, and check the ductility line, 
 strain near the metal's elongation means it may tear first. Plastics and brittle materials are refused,
 so judge them with a strength run.
 
+For mechanisms, use the mechanism command (MCP `solve_mechanism`) instead of working torques by hand or
+writing a physics loop. It runs MuJoCo with each motor's torque speed line, compares the answer with a
+closed form wherever one exists, runs it again at half the time step, closes an energy account and solves
+every fix again before suggesting it. Whether hobby servos lift a load through a pick and place is
+`wobbl mechanism arm --set servo=mg996r --set payload=500g`, with `shoulder_servo`, `links`, `pick`,
+`place` and `move_time` set to match the build, and `--set mount=free` also checks whether the base tips.
+A four bar linkage such as a wiper is
+`wobbl mechanism fourbar --set ground=120 --set crank=30 --set coupler=125 --set rocker=45 --set load=2`,
+which gives the sweep, the transmission angle, the dead points and the torque at the crank. A gear train is
+`wobbl mechanism gears --set teeth=12:36,10:40 --set motor=fa-130 --set load=0.005`, and impacts and
+tipping are `wobbl mechanism impact --set mass=200g --set drop=500mm --set material=pla --set limit=300`
+and `wobbl mechanism tip --set payload=500g --set reach=120 --set force=3`. Anything else goes in a TOML
+spec with bodies, joints, drives, couplings, loops, loads and a move, or in an MJCF or URDF model, and runs
+as `wobbl mechanism robot.toml`. Bare numbers are mm, g, degrees, N m, rpm and seconds, and servo ratings
+read as written, like `11 kg*cm` or `0.14 s/60deg`. Read the stall and heat numbers joint by joint, since
+a servo that clears a single move can still cook when the move repeats.
+
 ## Never skip
 
 - **Never quote a low confidence number as the answer.** Say what failed and rerun with
@@ -159,6 +176,9 @@ so judge them with a strength run.
   lead with the safety factor on stress and say which S-N data and mean stress model were used.
 - **Never quote a raw linear buckling factor as the margin.** Quote the design factor after the knockdown,
   and say which shape class set it.
+- **Quote an impact's peak force as an estimate.** Rigid parts meet through a contact spring that Wobbl
+  sets from Hertz theory, so the bounce and the momentum hold whatever the stiffness while the force
+  follows it, as the contact softness check shows.
 - **Never call a model validated, certified or approved.** Wobbl supplies credibility evidence and
   proposes levels, and the reviewer, customer or regulator decides what it is enough for. Say plainly
   when readings are synthetic, and quote a failure probability with its interval.
