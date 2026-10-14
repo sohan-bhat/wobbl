@@ -104,11 +104,12 @@ def volumes(X: np.ndarray, tets: np.ndarray) -> np.ndarray:
     return (det * wt).sum(1)
 
 
-def lumped_mass(X: np.ndarray, tets: np.ndarray, density: float) -> np.ndarray:
-    """(n,) lumped nodal masses, t: HRZ for the ten node tet, a quarter each for the linear one."""
+def lumped_mass(X: np.ndarray, tets: np.ndarray, density: float, scheme: str = "hrz") -> np.ndarray:
+    """(n,) lumped nodal masses, t: HRZ for the ten node tet (or a tenth each with scheme='even'), a quarter each
+    for the linear one."""
     m = np.zeros(len(X))
     me = density * volumes(X, tets)
-    share = HRZ if tets.shape[1] == 10 else np.full(4, 0.25)
+    share = (HRZ if scheme == "hrz" else np.full(10, 0.1)) if tets.shape[1] == 10 else np.full(4, 0.25)
     np.add.at(m, tets, me[:, None] * share[None, :])
     return m
 
@@ -122,7 +123,10 @@ class StressRecovery:
         self.dN, _ = _gradients(X[tets], _rule(tets.shape[1])[2])  # (m,nodes,shape functions,3)
         self.dN = self.dN.astype(np.float32)
         self.lam, self.mu = E * nu / ((1 + nu) * (1 - 2 * nu)), E / (2 * (1 + nu))
-        self.count = np.bincount(tets.ravel(), minlength=len(X)).astype(float)
+        count = np.bincount(tets.ravel(), minlength=len(X)).astype(float)
+        # averaging over the elements that share a node, as one sparse product
+        rows = tets.ravel()
+        self.avg = sp.csr_matrix((1.0 / count[rows], (rows, np.arange(rows.size))), shape=(len(X), rows.size))
 
     def stress(self, U: np.ndarray) -> np.ndarray:
         """(n,6) nodal stress xx yy zz xy yz zx, MPa, for displacements (n,3)."""
@@ -135,9 +139,7 @@ class StressRecovery:
         s[..., 1, 1] += self.lam * tr
         s[..., 2, 2] += self.lam * tr
         voigt = np.stack([s[..., 0, 0], s[..., 1, 1], s[..., 2, 2], s[..., 0, 1], s[..., 1, 2], s[..., 2, 0]], -1)
-        out = np.zeros((len(self.count), 6))
-        np.add.at(out, self.tets.ravel(), voigt.reshape(-1, 6).astype(float))
-        return out / np.maximum(self.count, 1)[:, None]
+        return self.avg @ voigt.reshape(-1, 6).astype(float)
 
 
 def von_mises(S: np.ndarray) -> np.ndarray:

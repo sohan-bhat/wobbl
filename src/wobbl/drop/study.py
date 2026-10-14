@@ -66,6 +66,7 @@ class Model:
     order: int
     mesh: object = None
     _rec: object = None
+    scaled: float = 0.0            # share of mass added by mass scaling
 
     def recovery(self, E, nu):
         if self._rec is None:
@@ -94,9 +95,27 @@ def make_model(prep, h: float, mat: dict, order: int, base=None) -> Model:
     return Model(X, tets, tris, mesh.tri_surf, K, mass, h, 0.0, order, mesh)
 
 
-def finish(model: Model, extra: np.ndarray) -> Model:
-    """Add the point masses and find the mesh's top frequency, which sets the time step."""
+def finish(model: Model, extra: np.ndarray, scale: float = 0.02) -> Model:
+    """Add the point masses, then a little mass where the smallest elements sit (selective mass scaling, at most
+    scale of the part's mass) so they no longer hold the time step down, and find the mesh's top frequency.
+
+    A node's frequency is bounded by the row sum of the stiffness over its mass. The few nodes of slivers that
+    the mesher leaves sit far above the rest; raising their mass to bring them down to a common bound costs
+    a percent or two of the mass and lengthens the step by a third or more.
+    """
     model.mass = model.mass + extra
+    if scale > 0:
+        r = np.asarray(abs(model.K).sum(1)).ravel().reshape(-1, 3).max(1)
+        m0, total = model.mass, model.mass.sum()
+        lo, hi = 1.0, float(np.sqrt((r / m0).max()))
+        for _ in range(50):
+            mid = np.sqrt(lo * hi)
+            if np.maximum(r / mid ** 2 - m0, 0.0).sum() > scale * total:
+                lo = mid
+            else:
+                hi = mid
+        model.mass = np.maximum(m0, r / hi ** 2)
+        model.scaled = float(model.mass.sum() / total - 1.0)
     model.wmax = omega_max(model.K, np.repeat(model.mass, 3))
     return model
 
@@ -232,7 +251,7 @@ def contact_for(model: Model, d: np.ndarray, floor: FloorMaterial, E: float, ban
 
 
 def simulate(model: Model, d: np.ndarray, v0: float, floor: FloorMaterial, mat: dict, watch: np.ndarray,
-             frames: int = 100, ring: float = 0.5, progress=None) -> tuple[History, Contact]:
+             frames: int = 100, ring: float = 0.3, progress=None) -> tuple[History, Contact]:
     band = 0.15 * float(np.ptp(model.X @ d)) + 2 * model.h
     c = contact_for(model, d, floor, mat["E"], band)
     # long enough for a soft floor: a spring and mass pulse on the softest floor patch, plus ringing
@@ -338,7 +357,7 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
         pre = describe_part(study.part, out / "work", study.scale, None, study.params)
     prep, feats = pre
     t_wall = feats.thickness_typical or prep.diag / 10
-    h0 = study.mesh_size or min(prep.diag / 14.0, 1.2 * t_wall)
+    h0 = study.mesh_size or min(prep.diag / 14.0, 1.5 * t_wall)
     ductile = material.ductile
     say("mesh", f"meshing with {h0:.3g} mm tets")
     lin = None
@@ -352,7 +371,7 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
     screen = []
     if len(cands) > 1:
         lin = make_model(prep, h0, mat, 1, base=quad0)
-        finish(lin, _restrict(extra, quad0, lin))
+        finish(lin, _restrict(extra, quad0, lin), scale=0.05)
         lw = _restrict_nodes(watch, quad0, lin)
         say("screen", f"{len(cands)} landings on linear tets")
         screen = screen_landings(lin, cands, v0, floor, mat, lw, ductile, g_cut, say)
@@ -622,7 +641,9 @@ def _assumptions(material, floor, H, v0, name, same, mass_notes, model, g_cut, a
          "second landing on another corner are not followed.",
          "Stress is averaged over the time a wave takes to cross two elements, and the accelerometer record is "
          f"low pass filtered at {fmt(g_cut / 1000)} kHz, the bandwidth of a drop test accelerometer.",
-         "The contact patch itself, within two elements of where the part meets the floor, is reported apart."]
+         "The contact patch itself, within two elements of where the part meets the floor, is reported apart.",
+         f"{100 * model.scaled:.2g}% of the part's mass is added at the nodes of the smallest elements so they do not "
+         "hold the time step down (selective mass scaling); the momentum and energy checks include it."]
     a += [f"Added mass: {n}." for n in mass_notes]
     if same:
         a.append("Mirror symmetry of the part made these landings the same as one already run: " +
