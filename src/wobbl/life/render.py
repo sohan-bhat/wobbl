@@ -65,7 +65,7 @@ def render_modes(path: str | Path, X, tets, shapes: list[np.ndarray], labels: li
     size = size or ((SIZE[0], SIZE[1]) if k == 1 else (520 * k, 520))
     try:
         from ..mesh.mesher import _boundary
-        from ..report.render import OVERVIEW, Lines, Look, Panel, camera, compose, draw, feature_edges, surface
+        from ..report.render import OVERVIEW, Lines, Look, Panel, camera, compose, draw, feature_edges, fitted
 
         tris = _boundary(tets, X, 2 if tets.shape[1] == 10 else 1)[0]
         edges = Lines(feature_edges(X, tris), alpha=0.5, width=1.2)
@@ -74,9 +74,10 @@ def render_modes(path: str | Path, X, tets, shapes: list[np.ndarray], labels: li
         panels = []
         for U, label in zip(shapes, labels):
             mag = np.linalg.norm(U, axis=1)
-            surf = surface(_exaggerated(X, U)[0], tris, {"m": mag / max(float(mag.max()), 1e-30)})
+            Xd = _exaggerated(X, U)[0]
             box = OVERVIEW if k == 1 else (0.05, 0.12, 0.95, 0.95)
-            cam = camera(_across(X, U), np.vstack([surf.P, X]), each, box=box)
+            cam = camera(_across(X, U), np.vstack([Xd[np.unique(tris)], X]), each, box=box)
+            surf = fitted(cam, each, Xd, tris, {"m": mag / max(float(mag.max()), 1e-30)})
             panels.append(Panel(draw(each, cam, surf, surf.fields["m"], look, edges), cam,
                                 (look.cmap, look.clim, "relative\nmotion") if k == 1 else None, text=label,
                                 text_size=11 if k > 1 else 13))

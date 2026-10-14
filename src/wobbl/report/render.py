@@ -142,9 +142,10 @@ class Surface:
     fields: dict[str, np.ndarray] = field(default_factory=dict)
 
 
-def surface(X, tris, fields: dict | None = None, n: int | None = None) -> Surface:
+def surface(X, tris, fields: dict | None = None, n: int | None = None, normals=None) -> Surface:
     """Split each boundary face n times along each edge, quadratic faces along their curve, and carry nodal fields,
-    scalar or vector, to the new points with each face's shape functions."""
+    scalar or vector, to the new points with each face's shape functions. normals, from _node_normals, can be
+    passed in when several surfaces share the same faces."""
     X, tris = np.asarray(X, float), np.asarray(tris)
     quad = tris.shape[1] == 6
     if n is None:
@@ -152,7 +153,7 @@ def surface(X, tris, fields: dict | None = None, n: int | None = None) -> Surfac
     l, sub = _tri_grid(n)
     W = _shape(l) if quad else l
     P = np.einsum("pj,kjc->kpc", W, X[tris]).reshape(-1, 3)
-    N = np.einsum("pj,kjc->kpc", W, _node_normals(X, tris)).reshape(-1, 3)
+    N = np.einsum("pj,kjc->kpc", W, _node_normals(X, tris) if normals is None else normals).reshape(-1, 3)
     N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-300)
     out = {}
     for name, f in (fields or {}).items():
@@ -161,6 +162,25 @@ def surface(X, tris, fields: dict | None = None, n: int | None = None) -> Surfac
                      np.einsum("pj,kjc->kpc", W, f[tris]).reshape(-1, f.shape[1]))
     T = (np.arange(len(tris))[:, None, None] * len(l) + sub[None]).reshape(-1, 3)
     return Surface(P, T, N, out)
+
+
+def subdivision(cam: "Camera", size: tuple[int, int], X, tris) -> int:
+    """How finely to split quadratic faces for a view: in two along each edge while the faces on screen are under
+    20 pixels across, else in four, so curves and fields stay smooth without drawing triangles smaller than a
+    pixel. Splitting in two keeps the midside nodes, where a peak often sits; flat faces are not split."""
+    tris = np.asarray(tris)
+    if tris.shape[1] != 6:
+        return 1
+    xa, ya, _ = cam.project(X[tris[:, 0]])
+    xb, yb, _ = cam.project(X[tris[:, 1]])
+    on = (xa >= 0) & (xa < size[0]) & (ya >= 0) & (ya < size[1])
+    px = np.hypot(xb - xa, yb - ya)[on] if on.any() else np.hypot(xb - xa, yb - ya)
+    return 4 if float(np.median(px)) > 20.0 else 2
+
+
+def fitted(cam: "Camera", size: tuple[int, int], X, tris, fields: dict | None = None, normals=None) -> Surface:
+    """surface() split as finely as this view needs."""
+    return surface(X, tris, fields, subdivision(cam, size, np.asarray(X, float), tris), normals)
 
 
 def feature_edges(X, tris, angle: float = FEATURE_ANGLE) -> np.ndarray:
@@ -241,7 +261,7 @@ def _rasterize(x, y, iz, T, W: int, H: int):
     between its edges, all vectorized, so only pixels inside a triangle are ever tested, big or small.
     """
     zbuf = np.zeros(W * H, np.float32)
-    tri = np.full(W * H, -1, np.int64)
+    tri = np.full(W * H, -1, np.int32)
     w1buf, w2buf = np.zeros(W * H, np.float32), np.zeros(W * H, np.float32)
     x0, x1, x2 = (x[T[:, c]] for c in range(3))
     y0, y1, y2 = (y[T[:, c]] for c in range(3))
@@ -321,9 +341,9 @@ class Lines:
     depth_test: bool = True               # False draws the lines through the surface, for a see through part
 
 
-def _lighting(cam: Camera, P: np.ndarray, N: np.ndarray, look: Look) -> tuple[np.ndarray, np.ndarray]:
-    """Diffuse and specular light at each point. The small triangles span a few pixels, so lighting their corners
-    and blending across them looks the same as lighting every pixel, at a fraction of the work."""
+def _lighting(cam: Camera, P: np.ndarray, N: np.ndarray, power: float = 30.0) -> tuple[np.ndarray, np.ndarray]:
+    """Diffuse light and the specular highlight at each point, before a look scales them. The small triangles span
+    a few pixels, so lighting their corners and blending across them looks the same as lighting every pixel."""
     eye = cam.eye - P
     eye /= np.linalg.norm(eye, axis=1, keepdims=True)
     diff, spec = np.zeros(len(P)), np.zeros(len(P))
@@ -331,67 +351,138 @@ def _lighting(cam: Camera, P: np.ndarray, N: np.ndarray, look: Look) -> tuple[np
         L = lx * cam.right + ly * cam.up - lz * cam.fwd
         L /= np.linalg.norm(L)
         diff += k * np.maximum(N @ L, 0.0)
-        if look.specular:
-            h = eye + L
-            h /= np.maximum(np.linalg.norm(h, axis=1, keepdims=True), 1e-300)
-            spec += k * np.maximum(np.einsum("ij,ij->i", N, h), 0.0) ** look.power
-    return look.ambient + look.diffuse * diff, look.specular * spec
+        h = eye + L
+        h /= np.maximum(np.linalg.norm(h, axis=1, keepdims=True), 1e-300)
+        spec += k * np.maximum(np.einsum("ij,ij->i", N, h), 0.0) ** power
+    return diff, spec
 
 
-def draw(size: tuple[int, int], cam: Camera, surf: Surface, values, look: Look, lines: Lines | None = None,
-         two_sided: bool = False, coverage: bool = False):
-    """The picture of a surface colored by a field at its points, as an (H, W, 3) array of floats in 0..1, and with
-    coverage=True also the share of each pixel the surface or lines cover, for laying pictures over each other.
+@dataclass
+class Frame:
+    """A view rasterized once, ready to be colored by any look. Pixels a single triangle fills are kept as one
+    sample at their center; pixels at an edge of the surface or under a line keep all SS x SS samples."""
+    size: tuple[int, int]
+    one: np.ndarray            # final pixels a single triangle fills
+    one_attr: np.ndarray       # field, diffuse and specular light at their centers, (n, 3)
+    many: np.ndarray           # final pixels kept as samples
+    hit: np.ndarray            # which of their samples, (m, SS * SS), the surface covers
+    many_attr: np.ndarray      # field and light at the covered samples, (hit.sum(), 3)
+    on_line: np.ndarray        # which samples a line covers, (m, SS * SS)
+    lines: Lines | None
+
+
+def _interpolate(attr, iz, T, tri, w1, w2):
+    """Perspective correct interpolation of per point attributes at samples of known triangle and weights."""
+    c = T[tri]
+    q = np.column_stack([1.0 - w1 - w2, w1, w2]).astype(np.float32) * iz[c]
+    q /= q.sum(1, keepdims=True)
+    return np.einsum("ij,ijk->ik", q, attr[c])
+
+
+def frame(size: tuple[int, int], cam: Camera, surf: Surface, values, lines: Lines | None = None,
+          two_sided: bool = False, power: float = 30.0) -> Frame:
+    """Rasterize a surface and interpolate its field and lighting, once for any number of looks.
 
     A closed surface hides its back faces behind its front ones, so only faces toward the camera are drawn. A
     two sided surface, a shell's midsurface, draws both sides and lights each from the side the camera sees.
     """
-    from matplotlib import colormaps
-
-    W, H = size[0] * SS, size[1] * SS
+    w, h = size
+    W, H = w * SS, h * SS
     x, y, iz = cam.project(surf.P, SS)
     P, T, N = surf.P, surf.T, surf.N
     if two_sided:
         N = N * np.where(np.einsum("ij,ij->i", N, cam.eye - P) < 0, -1.0, 1.0)[:, None]
-    else:
+    elif len(T):
         toward = np.einsum("ij,ij->i", np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]]), cam.eye - P[T[:, 0]])
         T = T[toward > 0]
     tri, w1, w2, zbuf = _rasterize(x, y, iz, T, W, H)
-    pix = np.nonzero(tri >= 0)[0]
-    lit, shine = _lighting(cam, P, N, look)
-    a = np.column_stack([iz, values, lit, shine]).astype(np.float32)[T][tri[pix]]   # (pixels, corner, 4)
-    w1, w2 = w1[pix], w2[pix]
-    q = np.column_stack([1.0 - w1 - w2, w1, w2]) * a[:, :, 0]
-    q /= q.sum(1, keepdims=True)          # perspective correct weights of the corners
-    val, light, spec = np.einsum("ij,ijk->ki", q, a[:, :, 1:])
-    if look.transform is not None:
-        val = look.transform(val)
+    diff, spec = _lighting(cam, P, N, power)
+    attr = np.column_stack([np.asarray(values, float), diff, spec]).astype(np.float32)
+    iz = iz.astype(np.float32)
+    # each final pixel's SS x SS samples, as SS * SS slices of the sample grid
+    k = np.arange(SS * SS)
+    offs = (k // SS) * W + k % SS
+    base = ((np.arange(h) * SS * W)[:, None] + np.arange(w) * SS).ravel()
+    grid = tri.reshape(h, SS, w, SS)
+    corner = [grid[:, dy, :, dx].ravel() for dy in range(SS) for dx in range(SS)]
+    line = None
+    crossed = np.zeros(h * w, bool)
+    if lines is not None and len(lines.segments):
+        hits = _line_samples(zbuf, cam, lines, W, H)
+        line = np.zeros(W * H, bool)
+        line[hits] = True
+        py, px = np.divmod(hits, W)
+        crossed[(py // SS) * w + px // SS] = True
+    single = corner[0] >= 0
+    covered = corner[0] >= 0
+    for c in corner[1:]:
+        single &= c == corner[0]
+        covered |= c >= 0
+    single &= ~crossed
+    one = np.nonzero(single)[0]
+    many = np.nonzero(~single & (covered | crossed))[0]
+    # an affine weight averaged over samples placed symmetrically about the center is its value at the center
+    g1, g2 = w1.reshape(h, SS, w, SS), w2.reshape(h, SS, w, SS)
+    c1 = sum(g1[:, dy, :, dx] for dy in range(SS) for dx in range(SS)).ravel()[one] / (SS * SS)
+    c2 = sum(g2[:, dy, :, dx] for dy in range(SS) for dx in range(SS)).ravel()[one] / (SS * SS)
+    one_attr = _interpolate(attr, iz, T, corner[0][one], c1, c2)
+    sub = base[many][:, None] + offs[None, :]
+    hit = tri[sub] >= 0
+    s = sub[hit]
+    many_attr = _interpolate(attr, iz, T, tri[s], w1[s], w2[s])
+    on_line = line[sub] if line is not None else np.zeros(sub.shape, bool)
+    return Frame(size, one, one_attr, many, hit, many_attr, on_line, lines)
+
+
+def paint(fr: Frame, look: Look, coverage: bool = False):
+    """Color a frame: an (H, W, 3) array of floats in 0..1, and with coverage=True also the share of each pixel
+    the surface or lines cover, for laying pictures over each other."""
+    from matplotlib import colormaps
+
+    w, h = fr.size
     lo, hi = look.clim
     hi = hi if hi > lo else lo + max(abs(lo), 1.0) * 1e-9
     cmap = colormaps[look.cmap] if isinstance(look.cmap, str) else look.cmap
     lut = cmap(np.linspace(0, 1, 256))[:, :3].astype(np.float32)
-    missing = ~np.isfinite(val)
-    rgb = lut[np.clip((np.where(missing, lo, val) - lo) * (255.0 / (hi - lo)) + 0.5, 0, 255).astype(np.int64)]
-    if look.above:
-        rgb[val > hi + 1e-9 * abs(hi)] = _rgb(look.above)
-    rgb[missing] = _rgb(look.nan)
-    rgb = np.clip(rgb * light[:, None] + spec[:, None], 0, 1)
-    if lines is not None and len(lines.segments):
-        pix, rgb = _draw_lines(pix, rgb, zbuf, cam, lines, W, H)
-    # average each SS x SS block down to one pixel, the background filling what the surface leaves
-    py, px = np.divmod(pix, W)
-    block = (py // SS) * size[0] + px // SS
-    n = size[0] * size[1]
-    cover = np.bincount(block, minlength=n)
-    bg = _rgb(BG)
-    out = np.column_stack([np.bincount(block, weights=rgb[:, c], minlength=n) + bg[c] * (SS * SS - cover)
-                           for c in range(3)]) / (SS * SS)
-    out = out.reshape(size[1], size[0], 3)
-    return (out, (cover / (SS * SS)).reshape(size[1], size[0])) if coverage else out
+
+    def color(a):
+        val = a[:, 0] if look.transform is None else look.transform(a[:, 0])
+        missing = ~np.isfinite(val)
+        rgb = lut[np.clip((np.where(missing, lo, val) - lo) * (255.0 / (hi - lo)) + 0.5, 0, 255).astype(np.int64)]
+        if look.above:
+            rgb[val > hi + 1e-9 * abs(hi)] = _rgb(look.above)
+        rgb[missing] = _rgb(look.nan)
+        light = look.ambient + look.diffuse * a[:, 1]
+        return np.clip(rgb * light[:, None] + (look.specular * a[:, 2])[:, None], 0, 1)
+
+    bg = _rgb(BG).astype(np.float32)
+    out = np.empty((h * w, 3), np.float32)
+    out[:] = bg
+    out[fr.one] = color(fr.one_attr)
+    samples = np.empty(fr.hit.shape + (3,), np.float32)
+    samples[:] = bg
+    samples[fr.hit] = color(fr.many_attr)
+    if fr.lines is not None:
+        a = fr.lines.alpha
+        samples[fr.on_line] = samples[fr.on_line] * (1 - a) + _rgb(fr.lines.color).astype(np.float32) * a
+    out[fr.many] = samples.mean(1)
+    out = out.reshape(h, w, 3)
+    if not coverage:
+        return out
+    cover = np.zeros(h * w, np.float32)
+    cover[fr.one] = 1.0
+    cover[fr.many] = (fr.hit | fr.on_line).mean(1)
+    return out, cover.reshape(h, w)
 
 
-def _draw_lines(pix, rgb, zbuf, cam: Camera, lines: Lines, W: int, H: int):
-    """Blend depth tested line segments into the drawn subpixels (sorted indices and colors), each pixel once."""
+def draw(size: tuple[int, int], cam: Camera, surf: Surface, values, look: Look, lines: Lines | None = None,
+         two_sided: bool = False, coverage: bool = False):
+    """The picture of a surface colored by a field at its points: frame() then paint()."""
+    return paint(frame(size, cam, surf, values, lines, two_sided, look.power), look, coverage)
+
+
+def _line_samples(zbuf, cam: Camera, lines: Lines, W: int, H: int) -> np.ndarray:
+    """The samples line segments cover, tested against the depth of the surface unless lines.depth_test is off."""
     xa, ya, za = cam.project(lines.segments[:, 0], SS)
     xb, yb, zb = cam.project(lines.segments[:, 1], SS)
     n = np.ceil(np.hypot(xb - xa, yb - ya)).astype(np.int64) + 2
@@ -406,13 +497,7 @@ def _draw_lines(pix, rgb, zbuf, cam: Camera, lines: Lines, W: int, H: int):
             ok = (px >= 0) & (px < W) & (py >= 0) & (py < H)
             p = py[ok] * W + px[ok]
             hits.append(p[z[ok] >= zbuf[p] * (1 - 1e-4)] if lines.depth_test else p)
-    line = np.unique(np.concatenate(hits))
-    color, alpha = _rgb(lines.color), lines.alpha
-    at = np.minimum(np.searchsorted(pix, line), max(len(pix) - 1, 0))
-    on = (len(pix) > 0) & (pix[at] == line) if len(pix) else np.zeros(len(line), bool)
-    rgb[at[on]] = rgb[at[on]] * (1 - alpha) + color * alpha
-    over = np.tile(_rgb(BG) * (1 - alpha) + color * alpha, (int((~on).sum()), 1))
-    return np.concatenate([pix, line[~on]]), np.concatenate([rgb, over.astype(rgb.dtype)])
+    return np.unique(np.concatenate(hits))
 
 
 # ------------------------------------------------------------- annotation
@@ -508,12 +593,6 @@ def compose(path: str | Path, panels: list[Panel]) -> str:
     return str(path)
 
 
-def _shot(size, view, surf: Surface, values, look: Look, focus=None, zoom: float = 3.2, span=None, box=OVERVIEW,
-          lines: Lines | None = None, frame_pts=None):
-    cam = camera(view, surf.P if frame_pts is None else frame_pts, size, focus, zoom, box, span)
-    return draw(size, cam, surf, values, look, lines), cam
-
-
 # ----------------------------------------------------------------- pictures
 def render_structural(out_dir: str | Path, X, tets, tris, measure, U, governing_xyz, governing_value,
                       measure_label: str, allowable: float, target_sf: float, spots: list[dict],
@@ -534,42 +613,56 @@ def render_structural(out_dir: str | Path, X, tets, tris, measure, U, governing_
 def _render(out, X, tris, measure, U, g, gval, mlabel, allowable, target_sf, spots, unit):
     view = _view_dir(X, g, _surface_normal_at(X, tris, g))
     span = float(np.linalg.norm(X.max(0) - X.min(0)))
-    surf = surface(X, tris, {"stress": measure})
+    rim = X[np.unique(tris)]
+    normals = _node_normals(X, tris)
     artifacts = [s for s in spots if s.get("excluded") and s.get("values") and s["values"][-1] > gval]
     stress = Look("turbo", (0.0, gval if gval > 0 else float(measure.max())), "#ffffff" if artifacts else None,
                   specular=0.15)
-    files = {}
-    for name, size, focus in (("stress", (1600, 1000), None), ("zoom", (1200, 900), g)):
-        rgb, cam = _shot(size, view, surf, surf.fields["stress"], stress, focus, span=span)
-        mspan = span if focus is None else span / (3.2 / 1.15)
-        marks = [Mark(g, f"{gval:.3g} {unit}")]
+    bar = (stress.cmap, stress.clim, f"{mlabel}\n{unit}", stress.above)
+
+    def marks(mspan):
+        out_ = [Mark(g, f"{gval:.3g} {unit}")]
         labeled = [g]
         for s in artifacts[:3]:
             xyz = np.asarray(s["xyz"], float)
             # a label close to one already placed would cover it, so only the first of a cluster is named
             near = min(np.linalg.norm(xyz - q) for q in labeled) < 0.06 * mspan
-            marks.append(Mark(xyz, "" if near else "artifact", ARTIFACT, small=True))
+            out_.append(Mark(xyz, "" if near else "artifact", ARTIFACT, small=True))
             if not near:
                 labeled.append(xyz)
-        files[name] = compose(out / f"{name}.png", [Panel(rgb, cam, (stress.cmap, stress.clim, f"{mlabel}\n{unit}",
-                                                                     stress.above), marks)])
+        return out_
+
+    files = {}
+    big = (1600, 1000)
+    cam = camera(view, rim, big, span=span)
+    surf = fitted(cam, big, X, tris, {"stress": measure}, normals)
+    # the stress and safety pictures share the view, so the part is rasterized once and colored twice
+    fr = frame(big, cam, surf, surf.fields["stress"], power=stress.power)
+    files["stress"] = compose(out / "stress.png", [Panel(paint(fr, stress), cam, bar, marks(span))])
+
+    small = (1200, 900)
+    zcam = camera(view, rim, small, focus=g, zoom=3.2, span=span)
+    zsurf = fitted(zcam, small, X, tris, {"stress": measure}, normals)
+    files["zoom"] = compose(out / "zoom.png", [Panel(draw(small, zcam, zsurf, zsurf.fields["stress"], stress), zcam,
+                                                     bar, marks(span / (3.2 / 1.15)))])
 
     top = max(2.0 * target_sf, 3.0)
     safety = Look("RdYlGn", (0.0, top),
                   transform=lambda s: np.where(s > 0, allowable / np.maximum(s, 1e-30), 99.0))
-    rgb, cam = _shot((1600, 1000), view, surf, surf.fields["stress"], safety, span=span)
-    files["safety"] = compose(out / "safety.png", [Panel(rgb, cam, (safety.cmap, safety.clim, "safety factor"),
+    files["safety"] = compose(out / "safety.png", [Panel(paint(fr, safety), cam, (safety.cmap, safety.clim,
+                                                                                  "safety factor"),
                                                          [Mark(g, f"SF {allowable / gval:.2f}" if gval > 0 else "")])])
 
     umag = np.linalg.norm(U, axis=1)
     factor = 0.08 * span / umag.max() if umag.max() > 0 else 1.0
-    warped = surface(X + factor * U, tris, {"umag": umag})
+    Xw = X + factor * U
+    dcam = camera(view, np.vstack([Xw[np.unique(tris)], rim]), big, box=(OVERVIEW[0], 0.08, OVERVIEW[2], OVERVIEW[3]),
+                  span=span)
+    warped = fitted(dcam, big, Xw, tris, {"umag": umag})
     deflection = Look("viridis", (float(umag.min()), float(umag.max())))
-    rgb, cam = _shot((1600, 1000), view, warped, warped.fields["umag"], deflection, span=span,
-                     box=(OVERVIEW[0], 0.08, OVERVIEW[2], OVERVIEW[3]), lines=Lines(feature_edges(X, tris)),
-                     frame_pts=np.vstack([warped.P, X]))
-    files["deformed"] = compose(out / "deformed.png", [Panel(rgb, cam, (deflection.cmap, deflection.clim,
-                                                                        "deflection\nmm"),
+    rgb = draw(big, dcam, warped, warped.fields["umag"], deflection, Lines(feature_edges(X, tris)))
+    files["deformed"] = compose(out / "deformed.png", [Panel(rgb, dcam, (deflection.cmap, deflection.clim,
+                                                                         "deflection\nmm"),
                                                              text=f"shape exaggerated {factor:.3g}x")])
     return files
 
@@ -579,13 +672,15 @@ def render_scalar(path: str | Path, X, tets, tris, values, label: str, unit: str
     """One heatmap of any nodal field (temperature, current density) with an optional marked point."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    X, values = np.asarray(X, float), np.asarray(values, float)
+    X, values, tris = np.asarray(X, float), np.asarray(values, float), np.asarray(tris)
     g = np.asarray(mark_xyz if mark_xyz is not None else X[int(np.argmax(values))], float)
     view = _view_dir(X, g, _surface_normal_at(X, tris, g))
-    surf = surface(X, tris, {"v": values})
+    size = (1600, 1000)
+    cam = camera(view, X[np.unique(tris)], size)
+    surf = fitted(cam, size, X, tris, {"v": values})
     look = Look(cmap, tuple(clim) if clim is not None else (float(values.min()), float(values.max())))
-    rgb, cam = _shot((1600, 1000), view, surf, surf.fields["v"], look)
-    return compose(path, [Panel(rgb, cam, (cmap, look.clim, f"{label}\n{unit}"),
+    return compose(path, [Panel(draw(size, cam, surf, surf.fields["v"], look), cam, (cmap, look.clim,
+                                                                                   f"{label}\n{unit}"),
                                 [Mark(g, mark_label)] if mark_label else [])])
 
 

@@ -84,7 +84,7 @@ def _path_numpy(path, X, tets, fronts, cycles, origin, label, starts=None):
     else:
         img = np.broadcast_to(bg, (size[1], size[0], 3)).copy()
     part_tris = _boundary(tets, X, 2 if tets.shape[1] == 10 else 1)[0]
-    part = R.surface(X, part_tris)
+    part = R.fitted(cam, size, X, part_tris)
     shade, cover = R.draw(size, cam, part, np.zeros(len(part.P)), R.Look(ListedColormap(["#8a9099"])), coverage=True)
     img = img * (1 - 0.22 * cover[..., None]) + 0.22 * (shade - (1 - cover)[..., None] * bg)
     empty = R.Surface(np.zeros((0, 3)), np.zeros((0, 3), int), np.zeros((0, 3)))

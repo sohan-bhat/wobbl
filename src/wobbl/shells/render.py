@@ -50,9 +50,9 @@ def render_shell(path: str | Path, X: np.ndarray, tris: np.ndarray, values: np.n
     g = np.asarray(mark_xyz if mark_xyz is not None else X[int(np.argmax(values))], float)
     lo, hi = clim or (float(np.nanmin(values)), float(np.nanmax(values)))
     view = R._view_dir(X, g, R._surface_normal_at(X, tris, g))
-    surf = R.surface(Xd, tris, {"v": values})
+    cam = R.camera(view, Xd[np.unique(tris)], SIZE)
+    surf = R.fitted(cam, SIZE, Xd, tris, {"v": values})
     look = R.Look(cmap, (lo, hi))
-    cam = R.camera(view, surf.P, SIZE)
     rgb = R.draw(SIZE, cam, surf, surf.fields["v"], look, two_sided=True)
     marks = [R.Mark(Xd[int(np.argmin(np.linalg.norm(X - g, axis=1)))], mark_label)] if mark_label else []
     R.compose(path, [R.Panel(rgb, cam, (cmap, (lo, hi), f"{label}\n{unit}" if unit else label), marks, note)])
