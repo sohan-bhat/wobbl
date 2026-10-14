@@ -277,6 +277,11 @@ def _sdof_check(modes, h, sine, zeta) -> Check:
     through that mode's stress at the governing node."""
     f = h["f_peak"]
     i = int(np.argmin(np.abs(np.log(modes.freq / f))))
+    if abs(f / modes.freq[i] - 1) > 3 * zeta:
+        return Check("single mode estimate", "info",
+                     f"the sweep peaks at {fmt(f)} Hz, away from every natural frequency (the nearest is mode {i + 1} "
+                     f"at {fmt(modes.freq[i])} Hz), so no single resonance sets the peak and the response there is "
+                     "close to static", {"peak_Hz": f, "nearest_mode": i + 1})
     w = 2 * math.pi * modes.freq[i]
     q = abs(float(h["force"][i])) / (2 * zeta * w * w)
     single = float(modal.vm_amplitude((q * modes.stress[i, h["node"]].astype(float))[None, :] + 0j)[0])
@@ -312,6 +317,12 @@ def _miles_check(modes, r, psd, axis, zeta, frac) -> Check:
     if not inband.any():
         return Check("hand calculation (Miles)", "skip", "no mode lies inside the PSD band")
     share = np.where(inband, g ** 2, 0.0)
+    total = float(modes.total_mass[:3].mean())
+    if share.max() < 0.01 * total:
+        return Check("hand calculation (Miles)", "info",
+                     f"no mode inside the {fmt(psd.f[0])} to {fmt(psd.f[-1])} Hz band moves even 1% of the mass along "
+                     f"{_axis_word(d)}, so the response is close to static and Miles' equation for one resonance "
+                     "does not apply")
     i = int(np.argmax(share))
     level = float(psd(np.array([modes.freq[i]]))[0])
     q_rms = modal.single_mode_rms(g[i], float(modes.freq[i]), zeta, level)
