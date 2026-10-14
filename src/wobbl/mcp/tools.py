@@ -242,6 +242,8 @@ _RERUN_TOOL.update({"buckling": "solve_buckling", "vibration": "solve_vibration"
 _DOMAIN_WORD.update({"buckling": "buckling", "vibration": "vibration", "fatigue": "fatigue"})
 _RERUN_TOOL.update({"plastic": "solve_plastic"})
 _DOMAIN_WORD.update({"plastic": "plasticity"})
+_RERUN_TOOL.update({"mechanism": "solve_mechanism"})
+_DOMAIN_WORD.update({"mechanism": "mechanism"})
 
 
 def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = None) -> dict:

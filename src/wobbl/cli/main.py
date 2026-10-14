@@ -7,6 +7,7 @@
     wobbl report wobbl-out/part --open                rebuild and open the HTML report
     wobbl fix    wobbl-out/part --apply               apply suggested fixes and compare
     wobbl motion rocket.toml                          a drop, a throw or a rocket flight
+    wobbl mechanism arm --set payload=500g            servos, linkages, gears, impacts, tipping
     wobbl doctor | setup | uninstall | materials | mcp | validate
 """
 from __future__ import annotations
@@ -89,11 +90,14 @@ def ask(ctx, part, question, **kw):
     from ..ask import detect_domain
 
     dom = detect_domain(question, part)
-    if part == "-" and dom != "circuit":
+    if part == "-" and dom not in ("circuit", "mechanism"):
         ui.fail("pass the part file first: wobbl part.step \"your question\"")
     if dom == "circuit":
         from .circuits import circuit_ask
         return circuit_ask(part, question, kw)
+    if dom == "mechanism":
+        from .mechanism import mechanism_ask
+        return mechanism_ask(part, question, kw)
     if dom == "thermal":
         from .thermal import thermal_ask
         return thermal_ask(part, question, kw)
@@ -311,6 +315,9 @@ def _load_outcome(result_dir: str):
     if data.get("domain") == "motion":
         from ..motion.study import MotionOutcome
         return MotionOutcome.load(d / "outcome.json")
+    if data.get("domain") == "mechanism":
+        from ..mechanism.study import MechanismOutcome
+        return MechanismOutcome.load(d / "outcome.json")
     from ..outcome_generic import GenericOutcome
     return GenericOutcome.load(d / "outcome.json")
 
@@ -424,6 +431,7 @@ def _register():
     from .circuits import circuit
     from .credibility import credibility, test_plan, uncertainty, validate_against
     from .flow import flow
+    from .mechanism import mechanism
     from .motion import motion
     from .nonlinear import plastic
     from .thermal import thermal
@@ -431,7 +439,7 @@ def _register():
     for c in (setup, doctor, uninstall, thermal, circuit, motion, uncertainty, flow, validate_against, credibility,
               test_plan):
         cli.add_command(c)
-    for c in (motor, flame, propellant):
+    for c in (motor, flame, propellant, mechanism):
         cli.add_command(c)
     from .life import buckling, fatigue, vibration
     for c in (buckling, vibration, fatigue):

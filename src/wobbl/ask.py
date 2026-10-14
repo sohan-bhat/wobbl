@@ -39,6 +39,9 @@ def detect_domain(question: str, path: str = "") -> str:
     if path.lower().endswith((".cir", ".sp", ".spice", ".net")) or re.search(
             r"\b(led|resistor|ripple|mosfet|regulator|buck|capacitor|circuit|volts?|amps?)\b", q):
         return "circuit"
+    if re.search(r"\b(servos?|robot arm|pick and place|linkage|four.?bar|crank|rocker|gear ?(?:box|train|ratio)|"
+                 r"pendulum|tip(?:s|ping)? over|topple)\b", q):
+        return "mechanism"
     if re.search(r"\b(overheat|heat|hot|temperature|thermal|cool|watts?|\d+\s*w\b|celsius|°c)\b", q):
         return "thermal"
     return "strength"

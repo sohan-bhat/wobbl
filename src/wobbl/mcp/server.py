@@ -22,7 +22,8 @@ sweeps and random vibration: solve_vibration. Fatigue life of a finished strengt
 Odds of failure under scatter, comparison with test readings, credibility evidence and a test plan for a
 finished study: quantify_uncertainty, validate_against_tests, assess_credibility and plan_tests. Wobbl
 supplies evidence and never certifies a model.
-Metal parts loaded past yield (permanent set, collapse load): solve_plastic."""
+Metal parts loaded past yield (permanent set, collapse load): solve_plastic.
+Robot arms and servos, linkages, gear trains, impacts and tipping: solve_mechanism."""
 
 
 def _protect_stdout():
@@ -129,6 +130,23 @@ def build_server():
         ambient, switching), 'rc' (r, c, v); or netlist=SPICE text with params.vectors to read."""
         from ..circuits.tools import solve_circuit_tool
         return solve_circuit_tool(template, netlist, params or {})
+
+    @srv.tool()
+    def solve_mechanism(template: str = "", spec: str = "", params: dict | None = None, question: str = "") -> dict:
+        """Mechanisms run in MuJoCo and checked against closed forms, half the time step, an energy account and
+        contact depth. template='arm' (servo or shoulder_servo and so on, payload, links, link_mass, pick, place,
+        lift, move_time, mount=free with base_mass and base_size) says whether hobby servos lift a load through a
+        pick and place. 'fourbar' (ground, crank, coupler, rocker in mm, motor or stall_torque and no_load_speed, or
+        speed, load on the rocker, sweep) gives swing, dead points, transmission angle and motor torque. 'gears'
+        (teeth like '12:36,10:40', efficiency, motor, load, speed) gives output speed and torque. 'impact' (mass,
+        speed or drop, target_mass, restitution, radius, material, limit) gives peak contact force. 'tip' (base,
+        base_mass, mass, height, payload, reach, force, accel) says whether it tips, and 'pendulum' swings one. Or
+        pass spec, a TOML spec path or its text, or an MJCF or URDF path, or just a question. Bare numbers are mm,
+        g, degrees, N m, rpm and s.
+        Returns verdict, headline, per joint torque and speed against each motor, events, confidence with checks,
+        fixes that were solved again, images and the trajectory CSV. Runs take a few seconds to half a minute."""
+        from ..mechanism.tools import solve_mechanism_tool
+        return solve_mechanism_tool(template, spec, params or {}, question)
 
     @srv.tool()
     def solve_motion(spec: str = "", name: str = "", mass: str = "", density: str = "", diameter: str = "",
