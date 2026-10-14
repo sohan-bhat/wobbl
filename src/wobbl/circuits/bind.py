@@ -122,6 +122,12 @@ def bind(c: Circuit, overrides: dict | None = None) -> None:
                              or k.split(".", 1)[0] == e.name.lower()})
 
 
+def bind_new(c: Circuit, elements: list[Element]) -> None:
+    """Bind parts added to an already bound circuit (a fix's flyback diode or regulator), leaving the rest."""
+    for e in elements:
+        _bind_one(c, e, notes(e), notes(e).get("part") or "")
+
+
 def _use_library(c: Circuit, e: Element, p: Part) -> None:
     """Point the element at a library model and add the model's text to the circuit."""
     e.part = _as_dict(p)
