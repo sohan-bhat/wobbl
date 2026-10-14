@@ -58,7 +58,7 @@ def _path_numpy(path, X, tets, fronts, cycles, origin, label, starts=None):
     for n, side in enumerate(fronts):
         if starts is not None and n < len(starts) and len(side):
             P, T = _strip(_ribbon([np.asarray(starts[n], float), np.asarray(side[0], float)]))
-            pts.append(P), tris.append(T + sum(len(q) for q in pts[:-1])), vals.append(np.full(len(P), np.inf))
+            pts.append(P), tris.append(T + sum(len(q) for q in pts[:-1])), vals.append(np.full(len(P), 1e30))
         if len(side) < 2:
             continue
         rib = _ribbon(side)

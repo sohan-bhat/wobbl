@@ -10,6 +10,7 @@ all draw the same picture.
 from __future__ import annotations
 
 import os
+import threading
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -98,6 +99,19 @@ def _shape_grad(l: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 _NODES = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1], [.5, .5, 0], [0, .5, .5], [.5, 0, .5]], float)
 
 
+def _length(v: np.ndarray) -> np.ndarray:
+    """Lengths of vectors along the last axis, written out for three components."""
+    return np.sqrt(v[..., 0] * v[..., 0] + v[..., 1] * v[..., 1] + v[..., 2] * v[..., 2])
+
+
+def _apply(Wt: np.ndarray, F: np.ndarray) -> np.ndarray:
+    """Weights (p, j) applied to per face values (k, j) or (k, j, c): (k, p) or (k, p, c), as one matrix product."""
+    if F.ndim == 2:
+        return F @ Wt.T
+    k, j, c = F.shape
+    return (Wt @ F.transpose(1, 0, 2).reshape(j, k * c)).reshape(len(Wt), k, c).transpose(1, 0, 2)
+
+
 def _node_normals(X: np.ndarray, tris: np.ndarray) -> np.ndarray:
     """Outward unit normal at each node of each boundary face, (faces, nodes, 3).
 
@@ -108,29 +122,32 @@ def _node_normals(X: np.ndarray, tris: np.ndarray) -> np.ndarray:
     """
     P = X[tris]
     flat = np.cross(P[:, 1] - P[:, 0], P[:, 2] - P[:, 0])
-    area = np.linalg.norm(flat, axis=1)
+    area = _length(flat)
     if tris.shape[1] == 6:
         du, dv = _shape_grad(_NODES)
-        n = np.cross(np.einsum("pj,kjc->kpc", du, P), np.einsum("pj,kjc->kpc", dv, P))
+        n = np.cross(_apply(du, P), _apply(dv, P))
     else:
         n = np.repeat(flat[:, None], tris.shape[1], axis=1)
-    ln = np.linalg.norm(n, axis=2, keepdims=True)
+    ln = _length(n)[..., None]
     own = flat[:, None] / np.maximum(area, 1e-300)[:, None, None]
     n = np.where(ln > 1e-9 * area[:, None, None], n / np.maximum(ln, 1e-300), own).reshape(-1, 3)
     ids, wa = tris.ravel(), np.repeat(area, tris.shape[1])
     cos = np.cos(np.radians(FEATURE_ANGLE))
 
     def mean(sel):
-        w = n * (wa * sel)[:, None]
-        S = np.column_stack([np.bincount(ids, weights=w[:, c], minlength=len(X)) for c in range(3)])
-        return (S / np.maximum(np.linalg.norm(S, axis=1, keepdims=True), 1e-300))[ids]
+        w = wa * sel
+        S = np.column_stack([np.bincount(ids, weights=n[:, c] * w, minlength=len(X)) for c in range(3)])
+        return (S / np.maximum(_length(S), 1e-300)[:, None])[ids]
+
+    def dot(a, b):
+        return a[:, 0] * b[:, 0] + a[:, 1] * b[:, 1] + a[:, 2] * b[:, 2]
 
     m = mean(np.ones(len(ids)))
     for _ in range(2):
-        m = mean(np.einsum("ij,ij->i", n, m) > cos)
-    first = np.einsum("ij,ij->i", n, m) > cos
+        m = mean(dot(n, m) > cos)
+    first = dot(n, m) > cos
     m2 = mean(~first)
-    second = ~first & (np.einsum("ij,ij->i", n, m2) > cos)
+    second = ~first & (dot(n, m2) > cos)
     return np.where(first[:, None], m, np.where(second[:, None], m2, n)).reshape(len(tris), -1, 3)
 
 
@@ -153,14 +170,13 @@ def surface(X, tris, fields: dict | None = None, n: int | None = None, normals=N
         n = (4 if 16 * len(tris) <= SUBDIVIDE else 2) if quad else 1
     l, sub = _tri_grid(n)
     W = _shape(l) if quad else l
-    P = np.einsum("pj,kjc->kpc", W, X[tris]).reshape(-1, 3)
-    N = np.einsum("pj,kjc->kpc", W, _node_normals(X, tris) if normals is None else normals).reshape(-1, 3)
-    N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-300)
+    P = _apply(W, X[tris]).reshape(-1, 3)
+    N = _apply(W, _node_normals(X, tris) if normals is None else normals).reshape(-1, 3)
+    N /= np.maximum(_length(N), 1e-300)[:, None]
     out = {}
     for name, f in (fields or {}).items():
         f = np.asarray(f, float)
-        out[name] = (np.einsum("pj,kj->kp", W, f[tris]).ravel() if f.ndim == 1 else
-                     np.einsum("pj,kjc->kpc", W, f[tris]).reshape(-1, f.shape[1]))
+        out[name] = _apply(W, f[tris]).ravel() if f.ndim == 1 else _apply(W, f[tris]).reshape(-1, f.shape[1])
     T = (np.arange(len(tris))[:, None, None] * len(l) + sub[None]).reshape(-1, 3)
     return Surface(P, T, N, out)
 
@@ -273,42 +289,48 @@ def _rasterize(x, y, iz, T, W: int, H: int):
     xlo = np.maximum(np.minimum(np.minimum(x0, x1), x2), 0.0)
     xhi = np.minimum(np.maximum(np.maximum(x0, x1), x2), float(W))
     ok = np.nonzero((np.abs(area) > 1e-12) & (j1 >= j0) & (xhi > xlo))[0]
-    rows = j1[ok] - j0[ok] + 1
-    work = np.cumsum(rows * np.maximum(xhi[ok] - xlo[ok], 1.0))   # about how many pixels each prefix covers
+    # per triangle, each corner weight is a straight function of the pixel, w = a x + b y + c, and so is the
+    # inverse depth; worked out once here, a row only evaluates them
+    ok_area = area[ok]
+    a1, b1 = ((y2 - y0)[ok] / ok_area), (-(x2 - x0)[ok] / ok_area)
+    a2, b2 = (-(y1 - y0)[ok] / ok_area), ((x1 - x0)[ok] / ok_area)
+    c1 = -(a1 * x0[ok] + b1 * y0[ok])
+    c2 = -(a2 * x0[ok] + b2 * y0[ok])
+    dz1, dz2 = (z1 - z0)[ok], (z2 - z0)[ok]
+    za, zb, zc = dz1 * a1 + dz2 * a2, dz1 * b1 + dz2 * b2, z0[ok] + dz1 * c1 + dz2 * c2
+    j0, rows, xlo, xhi = j0[ok], (j1 - j0)[ok] + 1, xlo[ok], xhi[ok]
+    work = np.cumsum(rows * np.maximum(xhi - xlo, 1.0))   # about how many pixels each prefix covers
     start = 0
     while start < len(ok):
-        stop = max(int(np.searchsorted(work, work[start] - (rows[start] * max(xhi[ok[start]] - xlo[ok[start]], 1.0))
-                                       + CHUNK, side="right")), start + 1)
-        t = np.repeat(ok[start:stop], rows[start:stop])
-        py = j0[t] + (np.arange(len(t)) - np.repeat(np.cumsum(rows[start:stop]) - rows[start:stop],
-                                                      rows[start:stop]))
-        cy = py + 0.5 - y0[t]
-        a = area[t]
-        # each corner weight is a straight function of x along the row, w = s x + c; keep the x where all are >= 0
-        s1, c1 = (y2 - y0)[t] / a, (-x0[t] * (y2 - y0)[t] - cy * (x2 - x0)[t]) / a
-        s2, c2 = -(y1 - y0)[t] / a, (cy * (x1 - x0)[t] + x0[t] * (y1 - y0)[t]) / a
-        lo, hi = xlo[t].copy(), xhi[t].copy()
-        for s, c in ((s1, c1), (s2, c2), (-s1 - s2, 1.0 - c1 - c2)):
+        stop = max(int(np.searchsorted(work, work[start] - rows[start] * max(xhi[start] - xlo[start], 1.0) + CHUNK,
+                                       side="right")), start + 1)
+        sel = np.arange(start, stop)
+        t = np.repeat(sel, rows[sel])
+        py = j0[t] + (np.arange(len(t)) - np.repeat(np.cumsum(rows[sel]) - rows[sel], rows[sel]))
+        cy = py + 0.5
+        # along the row each weight is s x + c; keep the x where all three are >= 0
+        s1, k1 = a1[t], b1[t] * cy + c1[t]
+        s2, k2 = a2[t], b2[t] * cy + c2[t]
+        lo, hi = xlo[t], xhi[t]
+        for sl, k in ((s1, k1), (s2, k2), (-s1 - s2, 1.0 - k1 - k2)):
             with np.errstate(divide="ignore", invalid="ignore"):
-                edge = (-1e-7 - c) / s
-            lo = np.where(s > 1e-12, np.maximum(lo, edge), lo)
-            hi = np.where(s < -1e-12, np.minimum(hi, edge), hi)
-            hi = np.where((np.abs(s) <= 1e-12) & (c < -1e-7), -1.0, hi)
+                edge = (-1e-7 - k) / sl
+            lo = np.where(sl > 1e-12, np.maximum(lo, edge), lo)
+            hi = np.where(sl < -1e-12, np.minimum(hi, edge), np.where((np.abs(sl) <= 1e-12) & (k < -1e-7), -1.0, hi))
         i0 = np.maximum(np.ceil(lo - 0.5), 0).astype(np.int64)
-        i1 = np.minimum(np.floor(hi - 0.5), W - 1).astype(np.int64)
-        n = np.maximum(i1 - i0 + 1, 0)
+        n = np.maximum(np.minimum(np.floor(hi - 0.5), W - 1).astype(np.int64) - i0 + 1, 0)
         r = np.repeat(np.arange(len(t)), n)
         px = i0[r] + (np.arange(len(r)) - np.repeat(np.cumsum(n) - n, n))
-        # inverse depth is a straight function of x along the row too; the weights are worked out for winners only
-        dz1, dz2 = (z1 - z0)[t], (z2 - z0)[t]
-        sz, cz = (dz1 * s1 + dz2 * s2).astype(np.float32), (z0[t] + dz1 * c1 + dz2 * c2).astype(np.float32)
+        tr = t[r]
         cx = (px + 0.5).astype(np.float32)
-        z = sz[r] * cx + cz[r]
+        z = za[tr].astype(np.float32) * cx + (zb[t] * cy + zc[t]).astype(np.float32)[r]
         pix = py[r] * W + px
         np.maximum.at(zbuf, pix, z)
         win = np.nonzero(z >= zbuf[pix])[0]
-        pix, rw, cw = pix[win], r[win], px[win] + 0.5
-        tri[pix], w1buf[pix], w2buf[pix] = t[rw], s1[rw] * cw + c1[rw], s2[rw] * cw + c2[rw]
+        pix, rw, cw = pix[win], r[win], cx[win]
+        tri[pix] = ok[tr[win]]
+        w1buf[pix] = s1[rw] * cw + k1[rw]
+        w2buf[pix] = s2[rw] * cw + k2[rw]
         start = stop
     return tri, w1buf, w2buf, zbuf
 
@@ -345,16 +367,18 @@ class Lines:
 def _lighting(cam: Camera, P: np.ndarray, N: np.ndarray, power: float = 30.0) -> tuple[np.ndarray, np.ndarray]:
     """Diffuse light and the specular highlight at each point, before a look scales them. The small triangles span
     a few pixels, so lighting their corners and blending across them looks the same as lighting every pixel."""
-    eye = cam.eye - P
-    eye /= np.linalg.norm(eye, axis=1, keepdims=True)
+    ex, ey, ez = (cam.eye[i] - P[:, i] for i in range(3))
+    inv = 1.0 / np.sqrt(ex * ex + ey * ey + ez * ez)
+    ex, ey, ez = ex * inv, ey * inv, ez * inv
+    nx, ny, nz = N[:, 0], N[:, 1], N[:, 2]
     diff, spec = np.zeros(len(P)), np.zeros(len(P))
     for k, (lx, ly, lz) in LIGHTS:
         L = lx * cam.right + ly * cam.up - lz * cam.fwd
         L /= np.linalg.norm(L)
-        diff += k * np.maximum(N @ L, 0.0)
-        h = eye + L
-        h /= np.maximum(np.linalg.norm(h, axis=1, keepdims=True), 1e-300)
-        spec += k * np.maximum(np.einsum("ij,ij->i", N, h), 0.0) ** power
+        diff += k * np.maximum(nx * L[0] + ny * L[1] + nz * L[2], 0.0)
+        hx, hy, hz = ex + L[0], ey + L[1], ez + L[2]
+        hn = np.maximum(np.sqrt(hx * hx + hy * hy + hz * hz), 1e-300)
+        spec += k * np.maximum((nx * hx + ny * hy + nz * hz) / hn, 0.0) ** power
     return diff, spec
 
 
@@ -373,64 +397,106 @@ class Frame:
 
 
 def _interpolate(attr, iz, T, tri, w1, w2):
-    """Perspective correct interpolation of per point attributes at samples of known triangle and weights."""
-    c = T[tri]
-    q = np.column_stack([1.0 - w1 - w2, w1, w2]).astype(np.float32) * iz[c]
-    q /= q.sum(1, keepdims=True)
-    return np.einsum("ij,ijk->ik", q, attr[c])
+    """Perspective correct interpolation of per point attributes, (points, 3), at samples of known triangle and
+    screen space weights, written out plane by plane."""
+    c0, c1, c2 = T[tri, 0], T[tri, 1], T[tri, 2]
+    q1, q2 = w1 * iz[c1], w2 * iz[c2]
+    q0 = (1.0 - w1 - w2) * iz[c0]
+    inv = 1.0 / (q0 + q1 + q2)
+    q0, q1, q2 = q0 * inv, q1 * inv, q2 * inv
+    out = np.empty((len(tri), attr.shape[1]), np.float32)
+    for j in range(attr.shape[1]):
+        a = attr[:, j]
+        out[:, j] = q0 * a[c0] + q1 * a[c1] + q2 * a[c2]
+    return out
+
+
+# how far apart two neighboring pixels may be before their edge is antialiased: in the field, as a share of its
+# spread in the view, and in the diffuse and specular light
+EDGE_FIELD, EDGE_LIGHT = 0.015, 0.04
+
+
+def _edges(h: int, w: int, covered: np.ndarray, feat: list[np.ndarray]) -> np.ndarray:
+    """Pixels on either side of a jump to a horizontal or vertical neighbor: surface against background, or any
+    feature plane (scaled so 1 is a visible step) changing by more than 1."""
+    cov = covered.reshape(h, w)
+    f = [a.reshape(h, w) for a in feat]
+    edge = np.zeros((h, w), bool)
+    for dy, dx in ((0, 1), (1, 0)):
+        ca, cb = cov[:h - dy, :w - dx], cov[dy:, dx:]
+        jump = ca != cb
+        for a in f:
+            jump |= np.abs(a[:h - dy, :w - dx] - a[dy:, dx:]) > 1.0
+        edge[:h - dy, :w - dx] |= jump
+        edge[dy:, dx:] |= jump
+    return edge.ravel()
 
 
 def frame(size: tuple[int, int], cam: Camera, surf: Surface, values, lines: Lines | None = None,
           two_sided: bool = False, power: float = 30.0) -> Frame:
     """Rasterize a surface and interpolate its field and lighting, once for any number of looks.
 
+    The surface is rasterized once at the final size, one sample at each pixel center. Where the picture can step
+    sharply from one pixel to the next, at its outline, at a crease in the light, at a jump in the field or under
+    a line, the pixels are sampled again SS x SS times from the triangles around them, so edges come out smooth
+    while the smooth inside, most of the picture, costs one sample a pixel.
+
     A closed surface hides its back faces behind its front ones, so only faces toward the camera are drawn. A
     two sided surface, a shell's midsurface, draws both sides and lights each from the side the camera sees.
     """
     w, h = size
-    W, H = w * SS, h * SS
-    x, y, iz = cam.project(surf.P, SS)
     P, T, N = surf.P, surf.T, surf.N
+    x, y, iz = cam.project(P)
     if two_sided:
         N = N * np.where(np.einsum("ij,ij->i", N, cam.eye - P) < 0, -1.0, 1.0)[:, None]
     elif len(T):
         toward = np.einsum("ij,ij->i", np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]]), cam.eye - P[T[:, 0]])
         T = T[toward > 0]
-    tri, w1, w2, zbuf = _rasterize(x, y, iz, T, W, H)
+    tri, w1, w2, zbuf = _rasterize(x, y, iz, T, w, h)
     diff, spec = _lighting(cam, P, N, power)
     attr = np.column_stack([np.asarray(values, float), diff, spec]).astype(np.float32)
-    iz = iz.astype(np.float32)
-    # each final pixel's SS x SS samples, as SS * SS slices of the sample grid
-    k = np.arange(SS * SS)
-    offs = (k // SS) * W + k % SS
-    base = ((np.arange(h) * SS * W)[:, None] + np.arange(w) * SS).ravel()
-    grid = tri.reshape(h, SS, w, SS)
-    corner = [grid[:, dy, :, dx].ravel() for dy in range(SS) for dx in range(SS)]
+    iz32 = iz.astype(np.float32)
+    covered = tri >= 0
+    pix = np.nonzero(covered)[0]
+    at = _interpolate(attr, iz32, T, tri[pix], w1[pix], w2[pix])
+    # what decides whether neighbors look alike: the field against its spread, and the light
+    val = at[:, 0]
+    finite = np.isfinite(val)
+    lo, hi = np.percentile(val[finite], [1, 99]) if finite.any() else (0.0, 1.0)
+    feat = [np.zeros(h * w, np.float32) for _ in range(3)]
+    feat[0][pix] = np.where(finite, val / (max(hi - lo, 1e-30) * EDGE_FIELD), 1e9)
+    feat[1][pix] = at[:, 1] / EDGE_LIGHT
+    feat[2][pix] = at[:, 2] / EDGE_LIGHT
+    edge = _edges(h, w, covered, feat)
+    W, H = w * SS, h * SS
     line = None
-    crossed = np.zeros(h * w, bool)
     if lines is not None and len(lines.segments):
-        hits = _line_samples(zbuf, cam, lines, W, H)
+        hits = _line_samples(zbuf, w, cam, lines, W, H)
         line = np.zeros(W * H, bool)
         line[hits] = True
         py, px = np.divmod(hits, W)
-        crossed[(py // SS) * w + px // SS] = True
-    single = corner[0] >= 0
-    covered = corner[0] >= 0
-    for c in corner[1:]:
-        single &= c == corner[0]
-        covered |= c >= 0
-    single &= ~crossed
-    one = np.nonzero(single)[0]
-    many = np.nonzero(~single & (covered | crossed))[0]
-    # an affine weight averaged over samples placed symmetrically about the center is its value at the center
-    g1, g2 = w1.reshape(h, SS, w, SS), w2.reshape(h, SS, w, SS)
-    c1 = sum(g1[:, dy, :, dx] for dy in range(SS) for dx in range(SS)).ravel()[one] / (SS * SS)
-    c2 = sum(g2[:, dy, :, dx] for dy in range(SS) for dx in range(SS)).ravel()[one] / (SS * SS)
-    one_attr = _interpolate(attr, iz, T, corner[0][one], c1, c2)
-    sub = base[many][:, None] + offs[None, :]
-    hit = tri[sub] >= 0
-    s = sub[hit]
-    many_attr = _interpolate(attr, iz, T, tri[s], w1[s], w2[s])
+        edge[(py // SS) * w + px // SS] = True
+    many = np.nonzero(edge)[0]
+    keep = ~edge[pix]
+    one, one_attr = pix[keep], at[keep]
+    # the samples of the edge pixels, from the triangles seen in and around them
+    k = np.arange(SS * SS)
+    sub = ((many // w) * SS * W + (many % w) * SS)[:, None] + ((k // SS) * W + k % SS)[None, :]
+    near = edge.reshape(h, w).copy()
+    near[1:] |= near[:-1].copy()
+    near[:-1] |= near[1:].copy()
+    near[:, 1:] |= near[:, :-1].copy()
+    near[:, :-1] |= near[:, 1:].copy()
+    near = near.ravel() & covered
+    hit = np.zeros(sub.shape, bool)
+    many_attr = np.zeros((0, 3), np.float32)
+    if near.any():
+        cand = np.unique(tri[near])
+        t2, v1, v2, _ = _rasterize(x * SS, y * SS, iz, T[cand], W, H)
+        got = t2[sub]
+        hit = got >= 0
+        smp = sub[hit]
+        many_attr = _interpolate(attr, iz32, T, cand[got[hit]], v1[smp], v2[smp])
     on_line = line[sub] if line is not None else np.zeros(sub.shape, bool)
     return Frame(size, one, one_attr, many, hit, many_attr, on_line, lines)
 
@@ -482,8 +548,9 @@ def draw(size: tuple[int, int], cam: Camera, surf: Surface, values, look: Look, 
     return paint(frame(size, cam, surf, values, lines, two_sided, look.power), look, coverage)
 
 
-def _line_samples(zbuf, cam: Camera, lines: Lines, W: int, H: int) -> np.ndarray:
-    """The samples line segments cover, tested against the depth of the surface unless lines.depth_test is off."""
+def _line_samples(zbuf, zw: int, cam: Camera, lines: Lines, W: int, H: int) -> np.ndarray:
+    """The samples line segments cover, tested against the depth of the surface at the pixel holding each sample
+    (zbuf, zw pixels wide) unless lines.depth_test is off."""
     xa, ya, za = cam.project(lines.segments[:, 0], SS)
     xb, yb, zb = cam.project(lines.segments[:, 1], SS)
     n = np.ceil(np.hypot(xb - xa, yb - ya)).astype(np.int64) + 2
@@ -496,8 +563,11 @@ def _line_samples(zbuf, cam: Camera, lines: Lines, W: int, H: int) -> np.ndarray
         for dy in np.arange(-r + 0.5, r, 1.0):
             px, py = np.floor(x + dx).astype(np.int64), np.floor(y + dy).astype(np.int64)
             ok = (px >= 0) & (px < W) & (py >= 0) & (py < H)
-            p = py[ok] * W + px[ok]
-            hits.append(p[z[ok] >= zbuf[p] * (1 - 1e-4)] if lines.depth_test else p)
+            px, py, zk = px[ok], py[ok], z[ok]
+            if lines.depth_test:
+                front = zk >= zbuf[(py // SS) * zw + px // SS] * (1 - 4e-3)
+                px, py = px[front], py[front]
+            hits.append(py * W + px)
     return np.unique(np.concatenate(hits))
 
 
@@ -621,6 +691,9 @@ def _bar(img, bar, W: int, H: int, x0: int):
                fill=_rgba(FG), anchor="md")
 
 
+_FONT_LOCK = threading.Lock()     # a FreeType face is not safe to draw with from two threads at once
+
+
 def compose(path: str | Path, panels: list[Panel]) -> str:
     """Lay the panels side by side, add their bars, marks and captions, and save a PNG."""
     from PIL import Image, ImageDraw
@@ -634,6 +707,15 @@ def compose(path: str | Path, panels: list[Panel]) -> str:
         base[:H, x0:x0 + W] = (np.clip(p.rgb, 0, 1) * 255 + 0.5).astype(np.uint8)
         x0 += W
     img = Image.fromarray(base, "RGB").convert("RGBA")
+    with _FONT_LOCK:
+        _overlays(img, panels)
+    img.convert("RGB").save(path, compress_level=6)
+    return str(path)
+
+
+def _overlays(img, panels: list[Panel]):
+    from PIL import ImageDraw
+
     x0 = 0
     for p in panels:
         H, W = p.rgb.shape[:2]
@@ -647,8 +729,6 @@ def compose(path: str | Path, panels: list[Panel]) -> str:
         if p.bar:
             _bar(img, p.bar, W, H, x0)
         x0 += W
-    img.convert("RGB").save(path, compress_level=6)
-    return str(path)
 
 
 # ----------------------------------------------------------------- pictures
@@ -690,39 +770,58 @@ def _render(out, X, tris, measure, U, g, gval, mlabel, allowable, target_sf, spo
                 labeled.append(xyz)
         return out_
 
-    files = {}
-    big = (1600, 1000)
-    cam = camera(view, rim, big, span=span)
-    surf = fitted(cam, big, X, tris, {"stress": measure}, normals)
-    # the stress and safety pictures share the view, so the part is rasterized once and colored twice
-    fr = frame(big, cam, surf, surf.fields["stress"], power=stress.power)
-    files["stress"] = compose(out / "stress.png", [Panel(paint(fr, stress), cam, bar, marks(span))])
-
-    small = (1200, 900)
-    zcam = camera(view, rim, small, focus=g, zoom=3.2, span=span)
-    zsurf = fitted(zcam, small, X, tris, {"stress": measure}, normals)
-    files["zoom"] = compose(out / "zoom.png", [Panel(draw(small, zcam, zsurf, zsurf.fields["stress"], stress), zcam,
-                                                     bar, marks(span / (3.2 / 1.15)))])
-
+    big, small = (1600, 1000), (1200, 900)
     top = max(2.0 * target_sf, 3.0)
     safety = Look("RdYlGn", (0.0, top),
                   transform=lambda s: np.where(s > 0, allowable / np.maximum(s, 1e-30), 99.0))
-    files["safety"] = compose(out / "safety.png", [Panel(paint(fr, safety), cam, (safety.cmap, safety.clim,
-                                                                                  "safety factor"),
-                                                         [Mark(g, f"SF {allowable / gval:.2f}" if gval > 0 else "")])])
 
-    umag = np.linalg.norm(U, axis=1)
-    factor = 0.08 * span / umag.max() if umag.max() > 0 else 1.0
-    Xw = X + factor * U
-    dcam = camera(view, np.vstack([Xw[np.unique(tris)], rim]), big, box=(OVERVIEW[0], 0.08, OVERVIEW[2], OVERVIEW[3]),
-                  span=span)
-    warped = fitted(dcam, big, Xw, tris, {"umag": umag})
-    deflection = Look("viridis", (float(umag.min()), float(umag.max())))
-    rgb = draw(big, dcam, warped, warped.fields["umag"], deflection, Lines(feature_edges(X, tris)))
-    files["deformed"] = compose(out / "deformed.png", [Panel(rgb, dcam, (deflection.cmap, deflection.clim,
-                                                                         "deflection\nmm"),
-                                                             text=f"shape exaggerated {factor:.3g}x")])
-    return files
+    def overview():
+        cam = camera(view, rim, big, span=span)
+        surf = fitted(cam, big, X, tris, {"stress": measure}, normals)
+        # the stress and safety pictures share the view, so the part is rasterized once and colored twice
+        fr = frame(big, cam, surf, surf.fields["stress"], power=stress.power)
+        sf = [Mark(g, f"SF {allowable / gval:.2f}" if gval > 0 else "")]
+        return {"stress": compose(out / "stress.png", [Panel(paint(fr, stress), cam, bar, marks(span))]),
+                "safety": compose(out / "safety.png", [Panel(paint(fr, safety), cam, (safety.cmap, safety.clim,
+                                                                                      "safety factor"), sf)])}
+
+    def zoom():
+        cam = camera(view, rim, small, focus=g, zoom=3.2, span=span)
+        surf = fitted(cam, small, X, tris, {"stress": measure}, normals)
+        rgb = draw(small, cam, surf, surf.fields["stress"], stress)
+        return {"zoom": compose(out / "zoom.png", [Panel(rgb, cam, bar, marks(span / (3.2 / 1.15)))])}
+
+    def deformed():
+        umag = np.linalg.norm(U, axis=1)
+        factor = 0.08 * span / umag.max() if umag.max() > 0 else 1.0
+        Xw = X + factor * U
+        cam = camera(view, np.vstack([Xw[np.unique(tris)], rim]), big,
+                     box=(OVERVIEW[0], 0.08, OVERVIEW[2], OVERVIEW[3]), span=span)
+        warped = fitted(cam, big, Xw, tris, {"umag": umag})
+        look = Look("viridis", (float(umag.min()), float(umag.max())))
+        rgb = draw(big, cam, warped, warped.fields["umag"], look, Lines(feature_edges(X, tris)))
+        return {"deformed": compose(out / "deformed.png", [Panel(rgb, cam, (look.cmap, look.clim, "deflection\nmm"),
+                                                                 text=f"shape exaggerated {factor:.3g}x")])}
+
+    done = _in_parallel([overview, zoom, deformed])
+    return {k: done[k] for k in ("stress", "zoom", "safety", "deformed")}
+
+
+def _in_parallel(jobs: list) -> dict:
+    """Run picture jobs side by side in threads, numpy and Pillow letting go of the interpreter lock while they
+    work, and merge what they return. WOBBL_RENDER_THREADS=1 runs them one after another."""
+    threads = int(os.environ.get("WOBBL_RENDER_THREADS", "0") or 0) or min(len(jobs), os.cpu_count() or 1)
+    out: dict = {}
+    if threads <= 1:
+        for job in jobs:
+            out.update(job())
+        return out
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(threads) as pool:
+        for got in pool.map(lambda job: job(), jobs):
+            out.update(got)
+    return out
 
 
 def render_scalar(path: str | Path, X, tets, tris, values, label: str, unit: str, cmap: str = "inferno",
