@@ -42,6 +42,7 @@ class Deck:
     extra: dict[str, tuple[int, int]] = field(default_factory=dict)   # rigid body -> (ref node, rot node), 0 based
     mass_nodes: dict[str, np.ndarray] = field(default_factory=dict)   # attached mass -> nodes carrying it, 0 based
     mass_values: dict[str, np.ndarray] = field(default_factory=dict)  # attached mass -> mass on each of them, t
+    rigid_sets: dict[int, tuple[np.ndarray, np.ndarray]] = field(default_factory=dict)  # ref node -> (nodes, point)
     notes: list[str] = field(default_factory=list)
 
 
@@ -78,6 +79,8 @@ def make_deck(model: StaticModel, path: Path, attached: list[Attached] = ()) -> 
     loads = "".join(b for b in blocks if b.upper().startswith(STEP_LOADS))
     n = model.mesh.n_nodes
     deck = Deck(head, supports, loads, n, extra, notes=notes)
+    for r in rigid:
+        deck.rigid_sets[extra[r.name][0]] = (np.asarray(r.nodes), np.asarray(r.ref_point, float))
     eid = _max_element(head)
     lines = []
     for a in attached:
@@ -96,6 +99,32 @@ def make_deck(model: StaticModel, path: Path, attached: list[Attached] = ()) -> 
             lines.append(f"*ELEMENT, TYPE=MASS, ELSET={tag}\n{eid},{int(node) + 1}\n*MASS, ELSET={tag}\n{m:.10g}\n")
     deck.head = head + "".join(lines)
     return deck
+
+
+def fill_rigid(U: np.ndarray, X: np.ndarray, deck: Deck) -> np.ndarray:
+    """Set the motion of every rigid attachment's reference node from the motion of the faces it holds.
+
+    CalculiX writes zero for a rigid body's reference node in a frequency step, but the faces move as one body,
+    u = u0 + theta x (x - p), so a least squares fit of u0 and theta over them recovers the motion at the point,
+    which is where an attached mass sits. U is (n_all, 3) or (m, n_all, 3).
+    """
+    out = np.array(U, dtype=float, copy=True)
+    single = out.ndim == 2
+    if single:
+        out = out[None]
+    for ref, (nodes, point) in deck.rigid_sets.items():
+        r = X[nodes] - point
+        A = np.zeros((3 * len(nodes), 6))
+        for k in range(3):
+            A[k::3, k] = 1.0
+        # theta x r = -r x theta: rows of the cross product matrix of r, negated
+        A[0::3, 3:] = np.column_stack([np.zeros(len(r)), r[:, 2], -r[:, 1]])
+        A[1::3, 3:] = np.column_stack([-r[:, 2], np.zeros(len(r)), r[:, 0]])
+        A[2::3, 3:] = np.column_stack([r[:, 1], -r[:, 0], np.zeros(len(r))])
+        P = np.linalg.pinv(A)
+        for j in range(len(out)):
+            out[j, ref] = (P @ out[j, nodes].reshape(-1))[:3]
+    return out[0] if single else out
 
 
 def _blocks(step: str) -> list[str]:
