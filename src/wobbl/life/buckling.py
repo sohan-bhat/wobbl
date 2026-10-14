@@ -45,7 +45,8 @@ class BucklingStudy:
         return asdict(self)
 
 
-def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=None) -> LifeOutcome:
+def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=None,
+                 render: bool = True) -> LifeOutcome:
     t0 = time.time()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -156,7 +157,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
     if level != "high":
         head += f" Confidence is {level}."
     say("render", "drawing the buckling modes")
-    images = _images(out / "images", mesh, shapes, factors, levels)
+    images = _images(out / "images", mesh, shapes, factors, levels) if render else {}
     o = LifeOutcome(
         "buckling", str(base.part), base.question, verdict, head,
         [("buckling factor", fmt(lam)), ("knockdown", f"{gamma:.2f}"), ("design factor", fmt(design)),

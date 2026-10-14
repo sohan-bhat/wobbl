@@ -81,7 +81,7 @@ def cycles_text(n: float) -> str:
     return f"{n:.2g}"
 
 
-def run_fatigue(study: FatigueStudy, out_dir: str | Path, progress=None) -> LifeOutcome:
+def run_fatigue(study: FatigueStudy, out_dir: str | Path, progress=None, render: bool = True) -> LifeOutcome:
     t0 = time.time()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -141,7 +141,7 @@ def run_fatigue(study: FatigueStudy, out_dir: str | Path, progress=None) -> Life
     head = _headline(single, life, need, sf, target, curve, blocks, src, repeats, D)
     if level != "high":
         head += f" Confidence is {level}."
-    images = _images(out / "images", curve, blocks, lives, model, need if single else None)
+    images = _images(out / "images", curve, blocks, lives, model, need if single else None) if render else {}
     values = {"analysis": "fatigue", "source": src["kind"], "material": mat.name, "life": life,
               "required": need, "sf": sf, "target_sf": target, "mean_model": model, "damage": D * repeats,
               "blocks": [{"label": b.label, "amplitude_MPa": b.amplitude, "mean_MPa": b.mean, "cycles": b.cycles,

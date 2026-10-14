@@ -37,7 +37,8 @@ from .vibspec import (VibrationStudy, default_damping, default_duration, parse_m
 MAX_MODES = 40
 
 
-def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre=None) -> LifeOutcome:
+def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre=None,
+                  render: bool = True) -> LifeOutcome:
     from . import vibchecks as vc
 
     t0 = time.time()
@@ -121,7 +122,8 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
         study, mat, modes, mesh, built, levels, stopped_by, q["tol"], zeta, excite, sine, psd, axis, resp,
         harmonic, rayleigh, dur, p)
     say("render", "drawing the modes and the response")
-    images = vc.images(out / "images", mesh, modes, excite, sine, psd, axis, resp, harmonic, study.margin)
+    images = vc.images(out / "images", mesh, modes, excite, sine, psd, axis, resp, harmonic, study.margin) \
+        if render else {}
     from ..verify.checks import confidence
 
     level, reasons = confidence(checks, extra)
