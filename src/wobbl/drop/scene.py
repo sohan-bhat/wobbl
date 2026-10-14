@@ -87,7 +87,7 @@ def write_scene(out: Path, model, hist, ev: dict, d, H: float, v0: float, floor,
     tone = {"holds": "pass", "marginal": "warn", "fails": "fail"}.get(verdict, "info")
     s.verdict({"holds": "SURVIVES", "marginal": "MARGINAL", "fails": "FAILS"}.get(verdict, verdict.upper()),
               headline.split(". ")[0] + ".", tone)
-    s.camera(target=(0.0, 0.0, 0.3 * span), direction=(1.0, -1.4, 0.6), distance=2.6 * span, fov=30)
+    s.camera(target=(0.0, 0.0, 0.3 * span), direction=(1.0, -1.4, 0.6), distance=3.6 * span, fov=30)
     return s.save(out)
 
 

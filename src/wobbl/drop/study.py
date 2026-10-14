@@ -299,14 +299,17 @@ def lowpass(x: np.ndarray, dt: float, fc: float, before: float = 0.0) -> np.ndar
 
 
 def evaluate(model: Model, hist: History, c: Contact, mat: dict, ductile: bool, v0: float, watch: np.ndarray,
-             g_cutoff: float) -> dict:
+             g_cutoff: float | None, zone: float | None = None) -> dict:
+    """The run's numbers: peak stress away from the contact patch (the touched nodes and everything within zone of
+    them, two elements of the first mesh, the same on every mesh so the levels compare), the g, the pulse and
+    what the momentum and energy checks need."""
     S = stress_history(model, hist, mat, ductile)
     peak = S.max(0)
     from scipy.spatial import cKDTree
 
+    r = zone or 2.0 * model.h
     zone = np.zeros(len(model.X), bool)
     if hist.touched is not None and len(hist.touched):
-        r = 2.0 * model.h
         dist, _ = cKDTree(model.X[hist.touched]).query(model.X)
         zone = dist <= r
     away = ~zone if (~zone).any() else np.ones(len(zone), bool)
@@ -321,7 +324,7 @@ def evaluate(model: Model, hist: History, c: Contact, mat: dict, ductile: bool, 
     t0, t1 = hist.t_contact
     impulse = float(np.trapezoid(hist.force, hist.t))
     grav = m * G * float(hist.t[-1])
-    return {"S": S, "peak": peak, "zone": zone, "node": gi, "frame": fi, "governing": float(peak[gi]),
+    return {"S": S, "peak": peak, "zone": zone, "zone_mm": r, "node": gi, "frame": fi, "governing": float(peak[gi]),
             "contact_peak": float(peak[ci]), "contact_node": ci,
             "g_watch": float(acc_f.max()) / G, "g_watch_raw": float(acc.max()) / G,
             "g_rigid": float(hist.force.max()) / (m * G), "force": float(hist.force.max()),
@@ -368,6 +371,7 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
     axes = mirror_axes(quad0.X, extra, h0)
     cands, same = unique_landings(cands, axes)
     g_cut = 10_000.0
+    zone = 2.0 * h0
     screen = []
     if len(cands) > 1:
         lin = make_model(prep, h0, mat, 1, base=quad0)
@@ -387,7 +391,7 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
         name, d = cands[i]
         say("solve", f"{name} on quadratic tets")
         hist, c = simulate(quad0, d, v0, floor, mat, watch)
-        runs[i] = (hist, c, evaluate(quad0, hist, c, mat, ductile, v0, watch, g_cut))
+        runs[i] = (hist, c, evaluate(quad0, hist, c, mat, ductile, v0, watch, g_cut, zone))
     worst = max(runs, key=lambda i: runs[i][2]["governing"])
     name, d = cands[worst]
     levels = [_level(0, quad0, runs[worst][2])]
@@ -407,7 +411,7 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
         finish(mk, ex)
         say("solve", f"level 1: {len(mk.X):,} nodes")
         hist, c = simulate(mk, d, v0, floor, mat, wk)
-        ev = evaluate(mk, hist, c, mat, ductile, v0, wk, g_cut)
+        ev = evaluate(mk, hist, c, mat, ductile, v0, wk, g_cut, zone)
         levels.append(_level(1, mk, ev))
         last = (mk, hist, c, ev)
         watch = wk
@@ -613,7 +617,7 @@ def _checks(levels, ev, hist, c, model, floor, diag, allow, material) -> list[Ch
     cz = ev["contact_peak"]
     if cz > ev["governing"]:
         ch.append(Check("contact stress", "info",
-                        f"{fmt(cz)} MPa right where the part meets the floor, within two elements of it, is left out "
+                        f"{fmt(cz)} MPa right where the part meets the floor, within {fmt(ev['zone_mm'])} mm of it, is left out "
                         "of the answer: it is the local crush of the contact patch, set by the mesh and the "
                         "floor's idealized stiffness. Expect a scuff or a dent there", {"value": cz}))
     rel = ev["governing"] / allow if allow else 0
@@ -652,7 +656,8 @@ def _assumptions(material, floor, H, v0, name, same, mass_notes, model, g_cut, a
          "second landing on another corner are not followed.",
          "Stress is averaged over the time a wave takes to cross two elements, and the accelerometer record is "
          f"low pass filtered at {fmt(g_cut / 1000)} kHz, the bandwidth of a drop test accelerometer.",
-         "The contact patch itself, within two elements of where the part meets the floor, is reported apart.",
+         "The contact patch itself, within two elements of the first mesh of where the part meets the floor, is "
+         "reported apart: its stress is the local crush of an ideally sharp landing.",
          f"{100 * model.scaled:.2g}% of the part's mass is added at the nodes of the smallest elements so they do not "
          "hold the time step down (selective mass scaling); the momentum and energy checks include it."]
     a += [f"Added mass: {n}." for n in mass_notes]
