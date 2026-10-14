@@ -136,4 +136,4 @@ def test_options_when_it_does_not_fit(tmp_path, monkeypatch):
     assert "--instance " + cloud["instance"] in cloud["summary"]
     crash = E.predict(E.explicit_cost(1_520_000, 1_490_000, 0.2), machine(), max_hours=12, target="yaris.k")
     assert crash.verdict == "too long"
-    assert [o["kind"] for o in crash.options] == ["background", "coarser", "remote"]
+    assert [o["kind"] for o in crash.options] == ["coarser", "remote"]

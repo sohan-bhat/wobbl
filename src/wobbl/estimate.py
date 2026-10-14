@@ -183,40 +183,6 @@ def dissection(sample: np.ndarray, n: int) -> tuple[float, float]:
     return F, M
 
 
-def inside(pts: np.ndarray, X: np.ndarray, tris: np.ndarray, chunk: int = 2_000_000) -> np.ndarray:
-    """Which points lie inside a closed triangulated surface, by the parity of crossings along a skew ray."""
-    V0, V1, V2 = X[tris[:, 0]], X[tris[:, 1]], X[tris[:, 2]]
-    e1, e2 = V1 - V0, V2 - V0
-    d = np.array([0.5773, 0.5774, 0.5775])
-    p = np.cross(d, e2)
-    det = np.einsum("tk,tk->t", p, e1)
-    ok = np.abs(det) > 1e-14
-    inv = np.where(ok, 1.0 / np.where(ok, det, 1.0), 0.0)
-    out = np.zeros(len(pts), bool)
-    step = max(1, chunk // max(len(tris), 1))
-    for r0 in range(0, len(pts), step):
-        s = pts[r0:r0 + step, None, :] - V0[None]
-        u = np.einsum("rtk,tk->rt", s, p) * inv
-        q = np.cross(s, e1[None])
-        v = (q @ d) * inv
-        t = np.einsum("tk,rtk->rt", e2, q) * inv
-        hits = ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 1e-9)
-        out[r0:r0 + step] = hits.sum(1) % 2 == 1
-    return out
-
-
-def solid_sample(prep, n_points: int = 4000) -> np.ndarray:
-    """Points spread evenly through a part's solid, for the dissection of a mesh not built yet."""
-    from .mesh.mesher import build_surface_mesh
-
-    sm = build_surface_mesh(prep)
-    lo, hi = np.asarray(prep.bbox[0], float), np.asarray(prep.bbox[1], float)
-    box = float(np.prod(np.maximum(hi - lo, 1e-9)))
-    fill = float(np.clip(prep.volume / box, 0.02, 1.0))
-    pts = lo + np.random.default_rng(0).random((int(min(60000, 1.3 * n_points / fill)), 3)) * (hi - lo)
-    return pts[inside(pts, sm.X, sm.tris[:, :3])][:n_points]
-
-
 # --------------------------------------------------------------------------------------------- calibration
 def calibration_path() -> Path:
     from .solvers.locate import wobbl_home
@@ -522,9 +488,10 @@ def predict(cost: Cost, machine: Machine | None = None, max_hours: float | None 
     if m.name == "this machine":
         tf, nt = factor(cost.solver, "time")
         mf, _ = factor(cost.solver, "memory")
+        how = ("Run wobbl estimate --calibrate to measure it." if cost.solver == "calculix" else
+               "A finished job here measures it.")
         basis.append(f"Calibrated on this machine from {nt} measured run{'s' if nt != 1 else ''}." if nt else
-                     "Not calibrated on this machine yet, so the reference machine's speed is used. "
-                     "Run wobbl estimate --calibrate to measure it.")
+                     f"Not calibrated on this machine yet, so the reference machine's speed is used. {how}")
     seconds = cost.core_seconds * tf * m.speed / amdahl(m.threads, cost.parallel)
     mem, disk = cost.peak_bytes * mf, cost.disk_bytes
     problems = []
@@ -566,7 +533,8 @@ def advise(est: Estimate, max_hours: float | None = None) -> list[dict]:
     target = est.target or "DECK"
     limit = (max_hours or 24.0) * 3600.0
     opts = []
-    if est.verdict in ("long", "too long") and not any("memory" in p or "free" in p for p in est.problems):
+    if est.verdict in ("long", "too long") and c.solver == "calculix" \
+            and not any("memory" in p or "free" in p for p in est.problems):
         opts.append({"kind": "background", "command": f"wobbl jobs start {target}",
                      "summary": f"Run it in the background with wobbl jobs start {target}, which keeps going after "
                                 "the terminal closes, shows progress and an ETA, and resumes from its last "
@@ -634,6 +602,93 @@ def estimate_deck(path: str | Path, machine: Machine | None = None, max_hours: f
                   str(path))
     est.basis += deck.notes
     return est
+
+
+STUDY_GROWTH = 1.2     # nodes from one refinement level to the next, typical of the bundled examples (1.05 to 2.5)
+STUDY_LEVELS = 3       # a converged study needs at least three meshes
+STUDY_CHECKS = 1.5     # the load path and large deflection checks solve again, about half as much once more
+
+
+def first_mesh(prep, features, domain: str = "strength", quality: str = "normal", mesh_size: float | None = None,
+               transient: bool = False):
+    """The first mesh a study would build, made with the study's own sizing rules: its node count and nodes are
+    what the rest of the prediction rests on, and gmsh makes it in seconds."""
+    from .mesh.mesher import Sizing, auto_sizing, build_mesh
+
+    if domain == "strength":
+        from .structural.run import QUALITY, initial_sizing
+        from .structural.spec import StructuralStudy
+
+        q = QUALITY.get(quality, QUALITY["normal"])
+        st = StructuralStudy(part=str(prep.source), material="pla", quality=quality, mesh_size=mesh_size)
+        s = initial_sizing(prep, features, st, q, [])
+        mesh = build_mesh(prep, s)
+        cap = 2.0 * features.thickness_min
+        if mesh.n_nodes > 1.6 * q["nodes"] and not mesh_size and s.h < cap:
+            # the study coarsens a first mesh that comes out much larger, and so does the prediction
+            f = min((mesh.n_nodes / q["nodes"]) ** (1 / 3), cap / s.h)
+            s.h *= f
+            for r in s.refinements:
+                if r.corners_only:
+                    r.size *= f
+            coarse = build_mesh(prep, s)
+            mesh = coarse if coarse.n_nodes < mesh.n_nodes else mesh
+        return mesh
+    s = auto_sizing(prep, thickness=features.thickness_typical, fineness=0.8, max_nodes=8000 if transient else 25000)
+    return build_mesh(prep, Sizing(h=s.h))
+
+
+def study_cost(mesh, domain: str = "strength", quality: str = "normal", transient: bool = False,
+               budget: float = 300.0) -> Cost:
+    """A Wobbl study from its first mesh: the levels its budget allows, each priced on the first mesh's nodes."""
+    from .structural.budget import Budget, mesh_cost
+
+    n0 = mesh.n_nodes
+    if domain == "strength":
+        from .structural.run import QUALITY
+
+        q = QUALITY.get(quality, QUALITY["normal"])
+        b, levels, n = Budget(budget), [], float(n0)
+        while True:
+            levels.append(int(n))
+            b.charge_level(int(n))
+            if len(levels) >= STUDY_LEVELS or not b.next_level_fits(n) or n * STUDY_GROWTH > q["max_nodes"]:
+                break
+            n *= STUDY_GROWTH
+        dof, solves, checks = 3, 1.0, STUDY_CHECKS
+    else:
+        levels = [int(n0 / f ** 3) for f in ((1.0, 0.7) if transient else (1.0, 0.7, 0.5))]
+        dof, solves, checks = 1, (150 * 0.85 if transient else 1.0), 1.0
+    secs = par = mem = disk = 0.0
+    F0, M0 = dissection(mesh.X, n0)
+    for nk in levels:
+        r = nk / n0        # a refined level adds nodes around the peaks, so its cuts grow more slowly than its size
+        c = calculix_cost(nk, sums=(F0 * r ** 1.5, M0 * r ** 1.2), dof=dof, solves=solves,
+                          procedure="heat" if dof == 1 else "static")
+        secs += c.core_seconds * checks + mesh_cost(nk)
+        par += c.core_seconds * checks * c.parallel
+        mem = max(mem, c.peak_bytes)
+        disk += c.disk_bytes
+    basis = [f"A {domain} study of this part meshes about {', '.join(f'{x:,}' for x in levels)} nodes. The first "
+             "mesh was built with the study's own sizing rules and the later ones follow its time budget.",
+             f"CalculiX cost from the mesh's nested dissection, fit on {REFERENCE}. The checks that solve again "
+             "make a whole study the least certain estimate, within a factor of about three."]
+    return Cost("calculix", "heat" if dof == 1 else "static", secs, par / max(secs, 1e-9), mem, disk,
+                {"nodes": levels[-1], "levels": levels, "dof": dof * levels[-1]}, basis)
+
+
+def estimate_part(part: str | Path, domain: str = "strength", quality: str = "normal",
+                  mesh_size: float | None = None, scale: float = 1.0, transient: bool = False,
+                  machine: Machine | None = None, max_hours: float | None = None) -> Estimate:
+    """Predict a Wobbl strength or heat study of a CAD part from its first mesh, before anything is solved."""
+    import tempfile
+
+    from .structural.run import describe_part
+
+    with tempfile.TemporaryDirectory() as tmp:
+        prep, features = describe_part(str(part), tmp, scale)
+        mesh = first_mesh(prep, features, domain, quality, mesh_size, transient)
+    return predict(study_cost(mesh, domain, quality, transient), machine or this_machine(), max_hours, str(part))
 
 
 def estimate_size(solver: str, nodes: int = 0, elements: int = 0, end_time: float = 0.0, time_step: float = 0.0,
