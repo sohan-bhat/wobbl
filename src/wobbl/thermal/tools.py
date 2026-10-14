@@ -40,7 +40,7 @@ def read_thermal_question(q: str) -> dict:
     m = re.search(r"(?:at|in|ambient(?: of)?|air(?: at)?)\s+(-?\d+(?:\.\d+)?)\s*(?:°\s*)?(c|f)\b", low)
     if m:
         out["ambient"] = f"{m.group(1)} {m.group(2).upper()}"
-    m = re.search(r"(?:above|over|exceed|past|beyond|limit(?: of)?)\s+(\d+(?:\.\d+)?)\s*(?:°\s*)?(c|f)\b", low)
+    m = re.search(r"(?:above|over|exceed|past|beyond|under|below|limit(?: of)?)\s+(\d+(?:\.\d+)?)\s*(?:°\s*)?(c|f)\b", low)
     if m:
         out["limit"] = f"{m.group(1)} {m.group(2).upper()}"
     m = re.search(r"(?:for|after|in)\s+(\d+(?:\.\d+)?)\s*(min|minutes|h|hours?|s|seconds)\b", low)
