@@ -245,6 +245,8 @@ def _outcome(c, source, question, verdict, head, stress, checks, extra, values, 
     from ..report.html import badge, esc, table
 
     lvl, reasons = confidence(checks, extra)
+    if reasons and reasons[0].startswith("passed "):      # several hand calculations are one kind of check
+        reasons[0] = "passed " + ", ".join(dict.fromkeys(reasons[0][7:].split(", ")))
     rows = []
     for s in sorted(stress, key=lambda s: -(s.worst.use if s.worst and s.worst.use else 0)):
         w = s.worst

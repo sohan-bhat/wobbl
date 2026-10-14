@@ -93,13 +93,14 @@ def key_values(stress: list[Stress]) -> dict[str, float]:
 
 def compare(a: dict[str, float], b: dict[str, float], name: str, how: str) -> Check:
     """The largest relative change between two runs' key values, ignoring values too small to matter."""
-    scale = max([abs(v) for v in a.values()] + [1e-12])
+    # a value under a thousandth of the largest of its kind (a decoupling capacitor's microamps) is noise here
+    scale = {kind: max([abs(v) for k, v in a.items() if k.endswith(kind)] + [1e-12]) for kind in ("power", "current")}
     worst, which = 0.0, ""
     for k, va in a.items():
         vb = b.get(k)
         if vb is None:
             continue
-        ref = max(abs(va), abs(vb), 1e-3 * scale if "power" in k else 1e-6)
+        ref = max(abs(va), abs(vb), 1e-3 * scale["power" if k.endswith("power") else "current"], 1e-9)
         d = abs(va - vb) / ref
         if d > worst:
             worst, which = d, k
