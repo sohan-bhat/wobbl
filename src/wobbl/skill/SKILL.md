@@ -205,22 +205,22 @@ together, `enclosure` does the same for a box measured in millimeters, `muffler`
 transmission loss and `panel` gives the sound pressure level of a vibrating panel treated as a baffled piston,
 which is an upper estimate.
 
-For a fatigue crack, use crack growth (MCP `grow_crack`) instead of a hand Paris law estimate. It cuts
-the crack into the part, reads K_I, K_II and K_III along its front, turns and grows the front step by
+For a fatigue crack, ask `wobbl simulate` (MCP `simulate`) instead of working a Paris law by hand. It
+cuts the crack into the part, reads K_I, K_II and K_III along its front, turns and grows the front step by
 step with a fresh mesh each time, so the path comes from the geometry, and integrates the NASGRO equation
-along it. The quickest start is a finished strength or fatigue result, as in
-`wobbl crack wobbl-out/bracket --target-life 100000`, which reuses its part, material, loads and supports,
-starts the crack at its governing point and, from a fatigue result, takes its duty cycle and required life.
-A part file works too, as in
-`wobbl crack lug.step -m 7075-t6 --fix "bolt holes d=6.6" --load "4 kN 0.866,0.5,0 bearing @ hole d=8" --crack "through 1.27 mm at hole d=8" --r-ratio 0.1 --target-life 100000`.
-The crack defaults to `auto`, the damage tolerance flaw at the most stressed point, or give `auto at 30,0,5`,
-`through`, `corner` or `surface`, as in `--crack "surface a=1 c=2 at hottest"`. The loads are the peak of
-each cycle. Give `--r-ratio` for constant amplitude, or `--spectrum` with a file of `max,min` factors or
-blocks such as `"100% x 3650 R=0; 70% x 1e8 R=0.7"`, and `--wheeler` only with an exponent from tests.
+along it, as in
+`wobbl simulate lug.step "how long until a crack from the pin hole grows critical?" -m 7075-t6 --fix "bolt holes d=6.6" --load "4 kN 0.866,0.5,0 bearing @ hole d=8" --set target-life=100000`.
+A finished strength or fatigue result works as the thing, as in
+`wobbl simulate wobbl-out/bracket "how long until a crack grows critical?"`, and brings its part,
+material, loads, supports and governing point, and from a fatigue result its duty cycle and required life.
+The crack is the damage tolerance flaw at the most stressed point unless `--set crack=...` gives one, such
+as `"through 1.27 mm at hole d=8"`, `"corner 1 mm at hole d=8"`, `"surface a=1 c=2 at hottest"` or
+`"auto at 30,0,5"`. The loads are the peak of each cycle, with `--set r-ratio=0.1`, or
+`--set spectrum=...` holding a file of `max,min` factors or blocks such as `"100% x 3650 R=0; 70% x 1e8 R=0.7"`.
 Metals without growth data get constants estimated from their stiffness, which the checks flag, and
-plastics need measured constants through `--growth`. The result gives the nominal life, B10 and B1 from a
-Monte Carlo over thousands of parts, the chance of failing before the target and an inspection interval.
-Quote the spread, never one part's failure cycle, which nothing can predict.
+plastics need measured constants through `--set growth=...`. The result gives the nominal life, B10 and
+B1 from a Monte Carlo over thousands of parts, the chance of failing before the target and an inspection
+interval. Quote the spread, never one part's failure cycle, which nothing can predict.
 
 ## Never skip
 

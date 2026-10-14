@@ -77,13 +77,6 @@ def check_values(name: str, p: dict):
             template(p["target"], dict(s.split("=", 1) for s in p["sets"]))
         else:
             assert p["target"].endswith((".toml", ".json", ".xml", ".urdf")), p["target"]
-    elif name == "crack" and p["part"].startswith("wobbl-out/"):
-        assert not p["loads"] and not p["fixes"], "a result folder brings its own loads and supports"
-    elif name == "crack":
-        from wobbl.cli.crack import study_from_options
-
-        study_from_options(p["part"], p["material"], p["loads"], p["fixes"], p["crack"], r_ratio=p["r_ratio"],
-                           target_life=p["target_life"])
     elif name.startswith("flow "):
         from wobbl.flow.tools import build
 
@@ -106,7 +99,7 @@ def check_values(name: str, p: dict):
 def test_the_skill_names_every_kind_of_command():
     names = {dry_parse(shlex.split(c)[1:])[0] for c in skill_commands()}
     assert {"inspect", "run", "materials", "fix", "thermal", "circuit", "motion", "motor", "flame", "runaway",
-            "propellant", "mechanism", "crack"} <= names, names
+            "propellant", "mechanism"} <= names, names
 
 
 @pytest.mark.parametrize("command", skill_commands())
