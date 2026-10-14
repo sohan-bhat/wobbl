@@ -393,3 +393,136 @@ def _true_plastic(eng: list[tuple[float, float]], E: float, start: float = 0.0) 
         out.append((round(float(st), 4), round(float(ep), 6)))
     return tuple(out)
 
+
+# --- magnetic and dielectric materials for the field studies ------------------------------
+# DC magnetization curves are B in tesla against H in A/m. The ASM Metals Handbook curves were digitized for the
+# FEMM 4.2 material library (D. Meeker, femm.info), which is where these numbers come from.
+@dataclass(frozen=True)
+class MagneticMaterial:
+    key: str
+    name: str
+    mur: float = 1.0                 # relative permeability (linear materials, magnet recoil)
+    bh: tuple[tuple[float, ...], tuple[float, ...]] | None = None
+    br: float = 0.0                  # remanence of a magnet, T
+    hcj: float = 0.0                 # intrinsic coercivity of a magnet, A/m
+    aliases: tuple[str, ...] = ()
+    source: str = ""
+
+    def knee(self, mur_diff: float = 100.0) -> float:
+        """Flux density where the differential relative permeability falls below mur_diff, T (saturation)."""
+        if not self.bh:
+            return float("inf")
+        b, h = self.bh
+        for i in range(1, len(b)):
+            if (b[i] - b[i - 1]) / max(h[i] - h[i - 1], 1e-12) / (4e-7 * math.pi) < mur_diff:
+                return b[i - 1]
+        return b[-1]
+
+
+_MH = "ASM Metals Handbook DC magnetization curve, as digitized in the FEMM 4.2 material library"
+MAGNETIC: dict[str, MagneticMaterial] = {m.key: m for m in [
+    MagneticMaterial("air", "Air, copper, aluminum or plastic", aliases=("none", "copper", "aluminum", "plastic",
+                                                                      "ss304", "304", "brass", "vacuum")),
+    MagneticMaterial("1010-steel", "Low carbon steel 1010", bh=(
+        (0.0, 0.2119, 0.2657, 0.3324, 0.4144, 0.5138, 0.6319, 0.7678, 0.917, 1.0704, 1.2143, 1.3346, 1.423, 1.4806,
+         1.5172, 1.5445, 1.5713, 1.602, 1.6384, 1.6805, 1.7273, 1.7767, 1.8254, 1.8706, 1.9108, 1.9472, 1.9823,
+         2.0183, 2.0554, 2.0925, 2.1281, 2.1616, 2.1946, 2.2303, 2.2724, 2.3243, 2.3894, 2.4712),
+        (0.0, 79.6, 100.2, 126.1, 158.8, 199.9, 251.6, 316.8, 398.8, 502.1, 632.1, 795.8, 1001.8, 1261.2, 1587.8,
+         1998.9, 2516.5, 3168.0, 3988.3, 5021.0, 6321.1, 7957.7, 10018.2, 12612.2, 15877.8, 19989.0, 25164.6,
+         31680.4, 39883.2, 50210.0, 63210.6, 79577.5, 100182.1, 126121.8, 158777.9, 199889.6, 251646.1, 316803.6)),
+        aliases=("1010", "1008", "low carbon steel", "steel", "iron", "1018", "12l14"),
+        source="FEMM 4.2 material library, 1010 Steel"),
+    MagneticMaterial("mild-steel", "Hot rolled low carbon steel", bh=(
+        (0.0, 0.0554, 0.0826, 0.1375, 0.1701, 0.277, 0.407, 0.9834, 1.2472, 1.3003, 1.3439, 1.3681, 1.548, 1.5714,
+         1.627, 1.634, 1.7342, 1.8664, 1.9876, 2.0274, 2.1014, 2.1252, 2.414, 2.4898),
+        (0.0, 54.4, 60.3, 73.4, 81.4, 104.4, 129.6, 266.5, 470.4, 555.2, 655.3, 719.3, 1700.4, 1945.9, 2826.9,
+         2977.4, 6091.7, 12988.3, 24965.0, 32025.0, 54377.3, 64205.3, 260993.3, 321280.0)),
+        aliases=("a36", "hot rolled steel", "mild steel", "structural steel"), source=_MH),
+    MagneticMaterial("cold-drawn-steel", "Cold drawn carbon steel, annealed", bh=(
+        (0.0, 0.0909, 0.1214, 0.159, 0.1989, 0.3212, 0.3661, 0.6386, 0.8061, 0.9969, 1.0545, 1.2389, 1.3106, 1.4476,
+         1.5272, 1.5696, 1.6139, 1.6637, 1.7641, 1.7814, 1.9319, 2.0894, 2.1336, 2.1967, 2.2435, 2.4709),
+        (0.0, 82.4, 96.2, 112.4, 126.0, 154.8, 164.7, 233.8, 296.3, 399.6, 438.4, 610.1, 719.8, 1159.1, 1718.7,
+         2204.4, 2856.9, 3819.5, 6827.1, 7495.0, 17912.7, 50567.0, 71237.0, 107930.0, 142883.3, 321350.0)),
+        aliases=("cold drawn steel", "cold rolled steel", "bar stock"), source=_MH),
+    MagneticMaterial("pure-iron", "Pure iron, annealed", bh=(
+        (0.0, 0.0588, 0.1213, 0.229, 0.4727, 0.9517, 1.1915, 1.3111, 1.3628, 1.443, 1.5193, 1.5976, 1.6691, 1.6919,
+         1.7425, 1.7815, 1.82, 1.8702, 1.9361, 2.0256, 2.1086, 2.1723, 2.2847, 2.4118, 2.5628),
+        (0.0, 16.3, 18.4, 22.4, 31.9, 62.2, 92.1, 118.0, 136.4, 176.7, 243.6, 409.3, 999.5, 1437.5, 2571.0, 3976.1,
+         5600.2, 7969.0, 11696.8, 17893.1, 27661.2, 41894.6, 106704.4, 203216.7, 320990.0)),
+        aliases=("armco", "soft iron", "electrical iron"), source=_MH),
+    MagneticMaterial("m19", "Silicon steel M-19 laminations", bh=(
+        (0.0, 0.0562, 0.093, 0.3607, 0.6568, 0.9245, 1.1448, 1.2407, 1.3226, 1.3564, 1.4314, 1.5568, 1.5995, 1.7207,
+         1.8445, 1.882, 1.9773, 2.0382, 2.0859, 2.1646, 2.3428),
+        (0.0, 22.7, 26.5, 48.3, 82.7, 141.5, 260.5, 394.3, 615.8, 765.7, 1518.9, 5010.8, 6494.2, 11605.3, 19895.7,
+         23730.7, 44232.0, 83364.0, 121186.7, 183646.7, 325220.0)),
+        aliases=("m-19", "silicon steel", "electrical steel", "lamination", "laminations"), source=_MH),
+    MagneticMaterial("ss416", "Stainless steel 416, annealed", bh=(
+        (0.0, 0.2078, 0.2617, 0.2889, 0.4122, 0.6257, 0.7825, 0.9582, 1.0768, 1.2056, 1.3726, 1.4276, 1.5423,
+         1.6334, 1.6932, 1.764, 1.8508, 2.0216, 2.0765),
+        (0.0, 320.9, 355.8, 374.7, 470.2, 660.9, 837.8, 1165.8, 1509.6, 2284.1, 4970.0, 6783.8, 12124.3, 21451.7,
+         36049.7, 76959.0, 143556.7, 279173.3, 322880.0)),
+        aliases=("416", "magnetic stainless", "430"), source=_MH),
+    # sintered magnets: middle of each grade's remanence range in makers' grade tables, recoil permeability 1.05
+    MagneticMaterial("n35", "NdFeB N35", mur=1.05, br=1.19, hcj=955e3, aliases=("neodymium", "ndfeb"),
+                     source="sintered NdFeB grade tables (Br 1.17 to 1.21 T, Hcj at least 955 kA/m)"),
+    MagneticMaterial("n42", "NdFeB N42", mur=1.05, br=1.30, hcj=955e3, aliases=("n40", "n45"),
+                     source="sintered NdFeB grade tables (Br 1.28 to 1.32 T, Hcj at least 955 kA/m)"),
+    MagneticMaterial("n52", "NdFeB N52", mur=1.05, br=1.44, hcj=876e3, aliases=("n50", "n48"),
+                     source="sintered NdFeB grade tables (Br 1.42 to 1.47 T, Hcj at least 876 kA/m)"),
+    MagneticMaterial("ferrite", "Ferrite magnet, grade C8", mur=1.1, br=0.39, hcj=250e3,
+                     aliases=("ceramic", "c8", "ceramic 8", "y30", "hard ferrite"),
+                     source="ceramic grade C8 tables (Br about 0.39 T, Hcj about 250 kA/m)"),
+]}
+
+
+@dataclass(frozen=True)
+class Dielectric:
+    key: str
+    name: str
+    epsr: float                      # relative permittivity
+    strength: float                  # dielectric strength, kV/mm (short term, for the thickness tested)
+    loss_tangent: float = 0.0
+    aliases: tuple[str, ...] = ()
+    source: str = ""
+
+
+DIELECTRICS: dict[str, Dielectric] = {d.key: d for d in [
+    Dielectric("air", "Air at sea level", 1.0006, 3.0, aliases=("vacuum", "none"),
+               source="about 3 kV/mm in uniform fields across gaps of a few mm (Paschen); less across wider gaps"),
+    Dielectric("fr4", "FR4 laminate", 4.4, 20.0, 0.02, aliases=("pcb", "g10"),
+               source="typical FR4 at 1 MHz to 1 GHz (IPC-4101/21 allows up to 5.4); strength through 1.6 mm"),
+    Dielectric("ro4350b", "Rogers RO4350B", 3.66, 31.2, 0.0037, aliases=("rogers", "ro4350"),
+               source="Rogers RO4350B datasheet, design Dk 3.66 at 8 to 40 GHz, 31.2 kV/mm"),
+    Dielectric("ptfe", "PTFE", 2.1, 60.0, 0.0002, aliases=("teflon",), source="Chemours Teflon PTFE data, thin film"),
+    Dielectric("polyimide", "Polyimide film (Kapton HN)", 3.4, 300.0, 0.002, aliases=("kapton", "flex"),
+               source="DuPont Kapton HN datasheet, 25 um film"),
+    Dielectric("alumina", "Alumina 96%", 9.4, 15.0, 0.0003, aliases=("ceramic substrate", "al2o3"),
+               source="CoorsTek AD-96 data"),
+    Dielectric("glass", "Soda lime glass", 7.0, 10.0, 0.01, source="typical soda lime glass"),
+    Dielectric("mineral-oil", "Transformer oil", 2.2, 12.0, 0.0005, aliases=("oil",),
+               source="IEC 60296 oils, about 12 kV/mm in a 2.5 mm gap test"),
+    Dielectric("pe", "Polyethylene", 2.25, 20.0, 0.0003, aliases=("polyethylene", "coax dielectric"),
+               source="typical solid polyethylene cable insulation"),
+]}
+
+
+def get_magnetic(name: str) -> MagneticMaterial:
+    return _lookup(name, MAGNETIC, "magnetic material")
+
+
+def get_dielectric(name: str) -> Dielectric:
+    if name.lower().startswith("er="):
+        v = float(name.split("=", 1)[1])
+        return Dielectric("custom", f"Dielectric with relative permittivity {v:g}", v, 0.0, source="user supplied")
+    return _lookup(name, DIELECTRICS, "dielectric")
+
+
+def _lookup(name: str, table: dict, what: str):
+    k = _clean(name)
+    for m in table.values():
+        if k in (_clean(m.key), _clean(m.name), *(_clean(a) for a in m.aliases)):
+            return m
+    close = difflib.get_close_matches(k, [_clean(m.key) for m in table.values()], n=3, cutoff=0.5)
+    hint = f" Did you mean {', '.join(close)}?" if close else ""
+    raise KeyError(f"unknown {what} '{name}'.{hint} Known: {', '.join(table)}")
+
