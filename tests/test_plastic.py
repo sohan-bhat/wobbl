@@ -183,3 +183,29 @@ def test_playback_is_a_small_decimated_surface_with_quantized_frames(parts, tmp_
     pe = decode(d["frames"][2]["plastic_strain"])
     assert pe == pytest.approx(pos[:, 0] / 200, abs=0.5 / 255) and d["frames"][1]["values"] == {"load": 0.5}
     assert len(text) < 300_000
+
+
+def test_plastic_section_cuts_square_across_a_hook_shank(tmp_path):
+    """The J hook example: the line from the shank to the sling leaves the shank at 24 degrees, but the section is
+    cut square to the shank, 12 x 10 mm, carrying 3 kN x 22 mm of bending and 3 kN of tension."""
+    from pathlib import Path
+
+    from wobbl.materials import resolve_material
+    from wobbl.mesh.mesher import Sizing, build_mesh
+    from wobbl.plastic.section import plastic_section
+    from wobbl.structural.build import build_static
+    from wobbl.structural.run import describe_part, resolve_selections
+    from wobbl.structural.spec import StructuralStudy, parse_fixture, parse_load
+
+    hook = str(Path(__file__).resolve().parents[1] / "examples" / "steel-hook" / "hook.py")
+    st = StructuralStudy(hook, "mild-steel", [parse_load("3 kN -z @ within 5 of 22,0,-16")],
+                         [parse_fixture("bolt holes d=8.5")])
+    prep, feats = describe_part(hook, tmp_path)
+    loads, fixes, _ = resolve_selections(st, feats)
+    mesh = build_mesh(prep, Sizing(h=4.0))
+    built = build_static(mesh, loads, fixes, resolve_material("mild-steel"), feats.faces)
+    s, why = plastic_section(mesh, [6.0, -1.7, 20.8], built.model, 250.0)
+    assert s is not None, why
+    assert s["axis"] == pytest.approx([0, 0, 1]) and s["area_mm2"] == pytest.approx(120, rel=0.01)
+    lam = (-66 / 90 + ((66 / 90) ** 2 + 4 * 0.1 ** 2) ** 0.5) / (2 * 0.1 ** 2)    # (lam M/Mp) + (lam N/Np)^2 = 1
+    assert s["factor"] == pytest.approx(lam, rel=0.01)
