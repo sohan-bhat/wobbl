@@ -271,19 +271,21 @@ function flightCharts() {
   const figs = $$('[data-flight]');
   if (!figs.length) return;
   if (!reduceMotion() && 'IntersectionObserver' in window) {
+    // the first report on each chart says where it is as the page opens, with no layout read here
+    const seen = new WeakSet<Element>();
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        io.unobserve(e.target);
-        e.target.classList.add('fc-play');
+        const fig = e.target;
+        if (!seen.has(fig)) {
+          seen.add(fig);
+          if (e.isIntersecting) io.unobserve(fig); else fig.classList.add('fc-armed');
+        } else if (e.intersectionRatio >= 0.4) {
+          io.unobserve(fig);
+          fig.classList.add('fc-play');
+        }
       }
-    }, { threshold: 0.45 });
-    for (const fig of figs) {
-      const r = fig.getBoundingClientRect();
-      if (r.top < innerHeight && r.bottom > 0) continue;
-      fig.classList.add('fc-armed');
-      io.observe(fig);
-    }
+    }, { threshold: [0, 0.45] });
+    figs.forEach((fig) => io.observe(fig));
     cleanups.push(() => io.disconnect());
   }
   for (const fig of figs) {

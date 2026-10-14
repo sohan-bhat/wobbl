@@ -152,7 +152,10 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .answer-img .run-img, .answer-img .run-metric { aspect-ratio: 4 / 3; object-fit: contain; border: 0; }
 .answer-img:hover .run-img { outline: 1px solid var(--line-2); }
 
-/* A dropped rock and a rocket: two motion runs side by side, their rows lined up by a subgrid */
+/* A dropped rock and a rocket: two motion runs side by side, their rows lined up by a subgrid.
+   Below the hero, the section is laid out only once it comes close to the screen. */
+.flights { content-visibility: auto; contain-intrinsic-size: auto 2300px; }
+@media (min-width: 1000px) { .flights { contain-intrinsic-size: auto 1150px; } }
 .pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 56px; margin-top: 36px; }
 .flight { display: grid; align-content: start; gap: 24px; min-width: 0; }
 .flight + .flight { padding-top: 48px; border-top: 1px solid var(--line); }
