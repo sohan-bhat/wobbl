@@ -147,6 +147,7 @@ def _session():
         gmsh.finalize()
     gmsh.initialize(readConfigFiles=False, run=False)
     gmsh.option.setNumber("General.Terminal", 0)
+    gmsh.option.setNumber("Geometry.OCCBoundsUseStl", 1)    # tight boxes around curved parts
     _deterministic(gmsh)
     return gmsh
 
