@@ -230,7 +230,10 @@ function contents() {
   cleanups.push(() => io.disconnect());
 }
 
-/** Headline numbers count up once when they come into view; instantly under reduced motion. */
+/**
+ * Headline numbers count up once when they come into view; instantly under reduced motion. They race
+ * through the low numbers and slow down for the last few, so the final count lands where the eye is.
+ */
 function countUp() {
   const els = $$('[data-count]');
   if (!els.length || reduceMotion() || !('IntersectionObserver' in window)) return;
@@ -242,9 +245,10 @@ function countUp() {
       const end = Number(el.dataset.count);
       const t0 = performance.now();
       const tick = (t: number) => {
-        const k = Math.min((t - t0) / 700, 1);
-        el.textContent = String(Math.round(end * (1 - (1 - k) ** 3)));
-        if (k < 1) requestAnimationFrame(tick);
+        const k = Math.min((t - t0) / 2600, 1);
+        const n = Math.round(end * (1 - (1 - k) ** 4));
+        el.textContent = String(n);
+        if (n < end) requestAnimationFrame(tick);
       };
       el.textContent = '0';
       requestAnimationFrame(tick);
