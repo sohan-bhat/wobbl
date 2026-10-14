@@ -37,15 +37,23 @@ added as one more input unless you pass `--no-mesh-error`.
 | a tolerance band, read as plus or minus three standard deviations | `"thickness tol 0.2"` |
 | a range | `"film uniform 3..8"` |
 
-How fast it runs depends on what the input changes.
+It works on a run of any domain, a part, a circuit, a flight, a pipe, a motor or a cell. Every
+run keeps `request.json`, the values it was made from, and any number in it can scatter by its
+name, such as `load1`, `thickness`, `rocket.cd`, `film` or `ambient`, in the unit it was written
+in. A name it does not know gets the list of names back. The run is then solved again through its
+own analysis at a design of values, and the answer is a polynomial chaos fit of those runs. What
+fails comes from the criteria the run lists, each a value it must stay under or over, and the
+numerical error from the change its own convergence checks measured.
+
+Some domains have a faster exact path behind the same command.
 
 | Input | How it is carried |
 |---|---|
 | load, Young's modulus and strength of a strength run | exact scaling of the converged solution, in seconds |
 | one load at a time, `load1`, `load2` and so on, when a study has several | one solve per load on the final mesh, summed exactly for every sample |
 | Poisson's ratio `nu` and the stiffness of an elastic support (`support`) | a few solves on the final mesh, fitted with polynomial chaos |
-| a parameter of a `.py` part, such as `thickness` | new converged studies, fitted with polynomial chaos |
-| heat inputs such as `film`, `power` and `ambient`, and circuit values | new solves, fitted with polynomial chaos |
+| heat inputs such as `film`, `power` and `ambient` | heat solves on the converged mesh, fitted with polynomial chaos |
+| anything else, in any domain | the whole run again through its analysis, fitted with polynomial chaos |
 
 Every fitted answer reports its leave one out error, the share of the variance the fit misses
 on a solve it did not see. When a run also solved the other load attachment, the probability of
@@ -55,13 +63,22 @@ moves the answer more than any scatter.
 ## Comparing with tests
 
 `wobbl validate-against` reads a CSV of physical readings, one per row, and predicts each one
-from the run. A strain gauge is read the way a real one reads, averaged over its grid on the
-surface along its axis, and a dial gauge as the motion of the nearest node along its direction.
+from the run. A reading's quantity is any value the run reports, by the name in its
+`outcome.json`, given in any unit of the same kind, so an altimeter's apogee in feet compares
+with `apogee_m`. With a time it is read from a time series the run wrote, such as a flight's
+trajectory. On a part a strain gauge is read the way a real one reads, averaged over its grid on
+the surface along its axis, and a dial gauge as the motion of the nearest node along its direction.
 
 ```text readings.csv
 name,quantity,x,y,z,direction,load,value,uncertainty,unit
 SG1,strain,43.84,8.91,79.39,"-0.179,-0.627,0.758",2000,1566.0,30.5,microstrain
 D1,displacement,24.23,0,112,"-0.190,-0.972,-0.137",2000,0.2686,0.005,mm
+```
+
+```text flight.csv
+name,quantity,value,uncertainty,unit
+ALT,apogee_m,10560,30,ft
+GPS,landing_speed_mps,5.9,0.3,m/s
 ```
 
 | Column | Meaning |

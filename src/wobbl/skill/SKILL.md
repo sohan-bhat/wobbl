@@ -105,19 +105,21 @@ domain's words, and take the surroundings from a finished heat study, as in
 `wobbl runaway --cell 21700 --film "sealed box" --from wobbl-out/pack`. The kinetics are for a fully
 charged LiCoO2 cell, so say the answer is indicative for other chemistries.
 
-When someone asks how likely a part is to fail, which input matters most, whether the model matches
-their tests, or which physical tests they can skip, build the evidence on a finished run's folder.
-`wobbl uncertainty wobbl-out/part --vary "load lognormal 10%" --vary "yield 8%" --vary "E 3%"`
+When someone asks how likely a design is to fail, which input matters most, whether the model matches
+their tests, or which physical tests they can skip, build the evidence on a finished run's folder, from
+any domain. `wobbl uncertainty wobbl-out/part --vary "load lognormal 10%" --vary "yield 8%"`
 (MCP `quantify_uncertainty`) gives the probability of failure with its 95% interval, the spread of the
-answer and Sobol indices that rank the inputs. Scatter is written as a percentage, an `sd`, a `tol`
-band or a range, as in `"thickness tol 0.2"` or `"film uniform 3..8"`. Load, stiffness and strength
-scatter on a strength run scale the solution exactly and take seconds. With several loads, `load1`,
-`load2` and so on scatter on their own through one solve per load on the final mesh, and `nu` or the
-stiffness of an elastic support (`support`) takes a few solves there. Geometry, heat and circuit inputs need new solves and a polynomial chaos surrogate
-whose leave one out error comes back with the answer. `wobbl validate-against wobbl-out/part readings.csv` (MCP `validate_against_tests`) compares the
-run with strain, displacement, temperature or circuit readings as ASME V&V 20 does, adds the area metric
-and calibrates the uncertain inputs. `wobbl credibility wobbl-out/part --influence high --consequence medium`
-(MCP `assess_credibility`) maps all of it to a V&V 40 style assessment, writes `credibility.html` for a
+answer and Sobol indices that rank the inputs. Any number the run was made from can scatter, by the
+name request.json gives it (`load1`, `thickness`, `rocket.cd`, `film`, `ambient`), and a wrong name
+gets the list back. Scatter is written as a percentage, an `sd`, a `tol` band or a range, as in
+`"thickness tol 0.2"` or `"film uniform 3..8"`. The run is solved again at a design of values through
+its own analysis and fitted with polynomial chaos, whose leave one out error comes back with the
+answer. A strength run scales exactly instead and takes seconds, and its several loads scatter one at a
+time on the final mesh. `wobbl validate-against wobbl-out/part readings.csv` (MCP
+`validate_against_tests`) compares the run with readings of any value it reports (`apogee_m`, `dp_Pa`,
+`t_max_C`, a gauge on a part) as ASME V&V 20 does, adds the area metric and calibrates the uncertain
+inputs. `wobbl credibility wobbl-out/part --influence high --consequence medium` (MCP
+`assess_credibility`) maps all of it to a V&V 40 style assessment, writes `credibility.html` for a
 reviewer and a test plan, which `wobbl test-plan wobbl-out/part` (MCP `plan_tests`) also writes alone.
 
 For buckling, vibration and fatigue, use the life commands instead of hand formulas.

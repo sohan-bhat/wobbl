@@ -455,15 +455,17 @@ wobbl validate-against wobbl-out/mount readings.csv
 wobbl credibility wobbl-out/mount --influence high --consequence medium
 ```
 
-- `wobbl uncertainty` carries load, material, geometry and boundary condition
-  scatter through the run with Latin hypercube sampling, where a support's
-  stiffness comes from an elastic support such as `--fix "elastic 50 N/mm3 @ z=min"`. It returns the probability
-  of failure with its 95% interval, the spread of the answer and Sobol indices that
-  rank the inputs. A strength run scales exactly with load, stiffness and strength,
-  so those take seconds and need no new solve. Geometry, heat and circuit inputs get
-  new solves and a polynomial chaos surrogate whose leave one out error is reported.
-- `wobbl validate-against` reads a CSV of strain gauge, displacement, temperature,
-  circuit or scope readings at stated places and loads, computes the ASME V&V 20
+- `wobbl uncertainty` works on a finished run of any domain. Any number the run
+  was made from (a load, a dimension, a drag coefficient, a film coefficient, the
+  air temperature) can scatter by its name in `request.json`, and the run is solved
+  again through its own analysis at a design of values with Latin hypercube
+  sampling on top. It returns the probability of failure against the run's own
+  criteria with its 95% interval, the spread of the answer and Sobol indices that
+  rank the inputs, with the leave one out error of the polynomial chaos fit. A
+  strength run scales exactly with load, stiffness and strength instead, in seconds.
+- `wobbl validate-against` reads a CSV of readings of any value the run reports
+  (an apogee, a pressure drop, a peak temperature), a column of a time series it
+  wrote at a stated time, or strain and dial gauges on a part, and computes the ASME V&V 20
   comparison error and validation uncertainty of each and the area metric, and
   calibrates the uncertain inputs with stated posterior intervals. For a strength
   run it also says which load attachment idealization the readings favour.
