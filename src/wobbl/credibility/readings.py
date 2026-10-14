@@ -27,7 +27,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..units import UnitError, parse_quantity
+from ..units import UnitError, convert, parse_quantity
 
 
 class ReadingError(ValueError):
@@ -66,9 +66,19 @@ def _scale(quantity: str, unit: str) -> tuple[float, float]:
             raise ReadingError(f"unknown strain unit '{unit}' (use microstrain or strain)")
         return STRAIN_UNITS.get(u.lower(), STRAIN_UNITS.get(u, 1.0)), 0.0
     kind = {"displacement": "length", "temperature": "temperature"}.get(quantity)
-    if kind is None:     # circuit values: plain SI, or V, mV, A, mA and the like
+    if kind is None:
         if not u:
             return 1.0, 0.0
+        from .domains import unit_of
+
+        target = unit_of(quantity.split(":")[-1])   # a value named with its unit, such as apogee_m or t_max_C
+        if target:
+            try:
+                a = convert(0.0, u, target)
+                return convert(1.0, u, target) - a, a
+            except UnitError:
+                raise ReadingError(f"cannot turn {unit} into {target}, the unit of {quantity}") from None
+        # circuit values: plain SI, or V, mV, A, mA and the like
         for k in ("voltage", "current", "si_power", "resistance", "frequency"):
             try:
                 return parse_quantity(f"1 {u}", k).value, 0.0

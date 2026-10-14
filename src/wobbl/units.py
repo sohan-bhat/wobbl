@@ -169,6 +169,27 @@ def parse_quantity(text: str | float | int, kind: str, default_unit: str | None 
     return Quantity(value * table[u], kind, raw, u in IMPERIAL_UNITS)
 
 
+def convert(value: float, unit: str, target: str) -> float:
+    """value in unit, written in target instead, for any two units of one kind ("12 in" to "mm", "300 K" to "C",
+    "5 mph" to "m/s"). Raises UnitError when no kind knows both."""
+    if _norm(unit) == _norm(target):
+        return float(value)
+    temps = {"c", "degc", "celsius", "k", "kelvin", "f", "degf", "fahrenheit"}
+    if _norm(unit) in temps and _norm(target) in temps:
+        c = parse_quantity(f"{value} {unit}", "temperature").value
+        back = parse_quantity(f"0 {target}", "temperature").value
+        per = parse_quantity(f"1 {target}", "temperature").value - back
+        return (c - back) / per
+    for kind in _UNITS:
+        try:
+            a = parse_quantity(f"1 {unit}", kind).value
+            b = parse_quantity(f"1 {target}", kind).value
+        except UnitError:
+            continue
+        return float(value) * a / b
+    raise UnitError(f"cannot turn {unit} into {target}")
+
+
 def to_internal(text: str | float, kind: str, default_unit: str | None = None) -> float:
     return parse_quantity(text, kind, default_unit).value
 
