@@ -63,7 +63,7 @@ PACKAGES: dict[str, Package] = {p.name: p for p in [
     # 2025.9.3 is the newest release with wheels for every platform Wobbl runs on, Intel Macs included
     Package("rdkit", "2025.9.3", ("molecule", "chemistry"), "SMILES, InChI, 3D structures and conformers",
             prune=("rdkit/Contrib", "rdkit/Docs", "rdkit/include", "rdkit/share", "rdkit/Chem/Draw/*.js",
-                   "rdkit/Chem/Pharm2D", "rdkit/Chem/Pharm3D", "rdkit/Chem/Fraggle", "rdkit/ML",
+                   "rdkit/Chem/Pharm2D", "rdkit/Chem/Pharm3D", "rdkit/Chem/Fraggle",
                    "rdkit/Dbase", "rdkit/sping", "rdkit/VLib", "rdkit/SimDivFilters", "rdkit/Avalon",
                    "rdkit/Chem/Subshape", "rdkit/Data/Pains", "rdkit/Data/Fragments", "rdkit/Data/SmartsLib",
                    "rdkit/Data/NCI", "rdkit/Data/Pubchem*", "rdkit/Data/RECAP*", "rdkit/Data/*.sdf",

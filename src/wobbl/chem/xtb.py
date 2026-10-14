@@ -137,6 +137,8 @@ class XTB:
 
 
 def ase_calculator(engine):
+    from .install import require_pkg
+    require_pkg("ase")
     from ase.calculators.calculator import Calculator, all_changes
 
     class _Wrap(Calculator):
