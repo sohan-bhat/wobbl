@@ -1002,6 +1002,11 @@ CASES += [
          "load factor at first ply failure", "x", 0.05, False, TC.cross_ply_strip),
 ]
 
+# --- casting, mold filling and print warp (the case functions are in process_cases.py) --------------------------
+from .process_cases import PROCESS_CASES  # noqa: E402
+
+CASES += PROCESS_CASES
+
 def run_cases(out_dir: str | Path, ids: list[str] | None = None, log=print) -> list[dict]:
     out = Path(out_dir)
     results = []
