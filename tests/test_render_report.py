@@ -30,3 +30,20 @@ def test_html_page_is_self_contained(tmp_path):
     assert "<script>" not in html.split("<style>")[1].split("</style>")[1] or "&lt;script&gt;" in html
     assert "http" not in html.replace("https://", "") or "<link" not in html
     assert "HOLDS" in html
+
+
+def test_rasterizer_fills_without_cracks_and_keeps_the_nearest():
+    """Two triangles sharing a diagonal cover every pixel of a 40 x 30 square once, with no gap along the shared
+    edge, and a nearer triangle over part of it wins those pixels."""
+    from wobbl.report.render import _rasterize
+
+    x = np.array([10.0, 50.0, 50.0, 10.0, 0.0, 30.0, 0.0])
+    y = np.array([10.0, 10.0, 40.0, 40.0, 0.0, 0.0, 30.0])
+    iz = np.array([1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0])
+    tri, _, _, _ = _rasterize(x, y, iz, np.array([[0, 1, 2], [0, 2, 3]]), 64, 48)
+    cov = (tri >= 0).reshape(48, 64)
+    assert cov.sum() == 40 * 30 and cov[10:40, 10:50].all()
+    tri, w1, w2, _ = _rasterize(x, y, iz, np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6]]), 64, 48)
+    tri = tri.reshape(48, 64)
+    assert tri[12, 12] == 2 and tri[35, 45] in (0, 1)
+    assert 0 <= w1.min() and w1.max() <= 1 and 0 <= w2.min() and w2.max() <= 1
