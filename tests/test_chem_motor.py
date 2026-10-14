@@ -44,7 +44,8 @@ def test_the_example_runs_verified_and_flags_its_narrow_ports(tmp_path):
     assert o.values["port_throat"] == pytest.approx((16 / 12.7) ** 2, rel=1e-6)
     assert o.values["designation"].startswith("J") and 1100 < o.values["impulse_Ns"] < 1400
     core = next(f for f in o.fixes if f["kind"] == "core")
-    assert "18 mm" in core["title"] and "Simulated" in core["summary"]
+    assert core["after"]["port_throat"] >= 2 and core["after"]["peak_mass_flux"] <= 1406
+    assert core["after"]["core_mm"] > 16 and "Simulated" in core["summary"]
     assert (tmp_path / "thrust.csv").read_text().startswith("time_s,thrust_N")
     if not install.available():
         assert _check(o, "chemistry").status == "skip"

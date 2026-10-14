@@ -26,7 +26,7 @@ def write_curves(spec: MotorSpec, b: Burn, out: Path) -> dict:
     rows += [f"{b.t[i]:.5g},{b.F[i]:.6g},{b.P[i]:.6g},{b.mdot[i]:.5g},{left[i]:.5g}" for i in keep]
     (out / "thrust.csv").write_text("\n".join(rows) + "\n")
     (out / "motor.eng").write_text(rasp(spec, b))
-    return {"thrust_csv": str(out / "thrust.csv"), "eng": str(out / "motor.eng")}
+    return {"thrust_csv": "thrust.csv", "eng": "motor.eng"}     # beside outcome.json, so results can move
 
 
 def loaded_mass(spec: MotorSpec, b: Burn) -> float:

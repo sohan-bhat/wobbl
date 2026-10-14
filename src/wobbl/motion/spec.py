@@ -419,7 +419,7 @@ def _motor(m: dict, base: Path) -> Motor:
         try:
             mo = motion_motor(base / m["design"], m.get("name", ""))
         except ValueError as e:
-            raise SpecError(f"motor.design: {e}", getattr(e, "hint", "")) from None
+            raise SpecError(f"could not read motor.design, {e}", getattr(e, "hint", "")) from None
         if "loaded_mass" in m:
             mo.loaded_mass = quantity(m["loaded_mass"], "mass", "motor.loaded_mass")
             if mo.loaded_mass <= mo.propellant:

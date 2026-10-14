@@ -153,7 +153,7 @@ def _propellant(p) -> tuple[Propellant, float]:
         if missing:
             raise SpecError(f"a custom propellant needs {', '.join(missing)}",
                             "Give density, the burn rate a (mm/s at MPa) and n, and T (K), M (kg/kmol) and k, or "
-                            "name a known propellant: knsb, kndx, knsu, ocean-water, cherry-limeade.")
+                            "name a known propellant such as knsb, kndx, knsu, ocean-water or cherry-limeade.")
     over = {}
     if "density" in p:
         over["density"] = q(p["density"], "density", "propellant.density")
@@ -169,7 +169,7 @@ def _propellant(p) -> tuple[Propellant, float]:
         try:
             over["composition"] = parse_composition(str(p["composition"]))
         except ValueError as e:
-            raise SpecError(f"propellant.composition: {e}") from None
+            raise SpecError(f"could not read propellant.composition, {e}") from None
     if base is None:
         prop = Propellant("custom", str(p.get("name", "custom propellant")), source="user supplied", **over)
     else:
@@ -202,8 +202,9 @@ def _grains(g: dict, where: str) -> list:
     try:
         grain = make_grain(shape, D, L, ends, **params)
     except (TypeError, ValueError) as e:
-        raise SpecError(f"{where}: {e}".replace("got an unexpected keyword argument", "does not take"),
-                        f"Shapes: bates, tube, endburner, {', '.join(CORES)}.") from None
+        why = str(e).replace("got an unexpected keyword argument", "does not take")
+        raise SpecError(f"{where} is not a valid grain, {why}",
+                        f"The shapes are bates, tube, endburner, {', '.join(CORES)}.") from None
     return [grain] * count
 
 
@@ -284,7 +285,7 @@ def spec_from_flags(propellant: str, grains: list[str], throat: str, exit_: str,
     """The TOML table a set of flags stands for."""
     if not propellant or not grains or not throat:
         raise SpecError("a motor needs --propellant, at least one --grain and --throat, or a spec file",
-                        'Example: --propellant knsb --grain "bates d=48 core=18 L=80 x4" --throat 13 --exit 33')
+                        'For example --propellant knsb --grain "bates d=48 core=18 L=80 x4" --throat 13 --exit 33')
     d = {"name": name, "propellant": {"name": propellant}, "grain": [parse_grain(g) for g in grains],
          "nozzle": {"throat": _with_mm(throat), "exit": _with_mm(exit_ or throat)}}
     if efficiency is not None:

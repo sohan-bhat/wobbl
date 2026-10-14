@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 from ..solvers.locate import wobbl_home
 
@@ -34,7 +35,8 @@ def solve_motor_tool(spec: str = "", propellant: str = "", grains: list[str] | N
         o = run_motor(ms, out)
     except Exception as e:  # noqa: BLE001
         return _err(e)
-    return _compact(o, {"thrust_csv": o.values["files"]["thrust_csv"], "eng": o.values["files"]["eng"]})
+    files = {k: str(Path(o.workdir) / v) for k, v in o.values["files"].items()}
+    return _compact(o, files)
 
 
 def solve_flame_tool(fuel: str, oxidizer: str = "air", phi: float = 1.0, pressure: str = "1 atm",

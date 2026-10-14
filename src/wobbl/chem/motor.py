@@ -102,7 +102,24 @@ def run_motor(spec: MotorSpec, out_dir: str | Path, cb=None, render: bool = True
     o = GenericOutcome("motor", spec.source or spec.name, spec.question, verdict, head, metrics, level, reasons,
                        checks, assumptions(spec, chem_vals), values, imgs, fixes, solver=_solver(chem_vals),
                        t_total=time.time() - t0)
-    return o.write(out)
+    return o.write(out, [_numbers(spec, values)])
+
+
+def _numbers(spec: MotorSpec, v: dict) -> str:
+    """The motor's key numbers and grains as a table for the report."""
+    from ..report.html import table
+
+    rows = [["designation", v["designation"]], ["total impulse", f"{fmt(v['impulse_Ns'])} N s"],
+            ["average and peak thrust", f"{fmt(v['average_thrust_N'])} N and {fmt(v['peak_thrust_N'])} N"],
+            ["burn time (thrust over 5% of peak)", f"{fmt(v['burn_time_s'])} s"],
+            ["delivered Isp", f"{fmt(v['isp_s'])} s"],
+            ["propellant", f"{fmt(v['propellant_kg'])} kg"],
+            ["Kn at ignition, peak and burnout", f"{fmt(v['kn_initial'])}, {fmt(v['kn_max'])}, {fmt(v['kn_final'])}"],
+            ["port to throat area ratio", f"{v['port_throat']:.2f}"],
+            ["peak core mass flux", f"{fmt(v['peak_mass_flux'])} kg/(m2 s)"]]
+    rows += [[f"grain {i + 1}", g.describe() + ("" if g.ends == 2 else f", {2 - g.ends} end coated")]
+             for i, g in enumerate(spec.motor.grains)]
+    return "<h2>Motor</h2>" + table(["", ""], rows)
 
 
 def _solver(chem_vals: dict) -> str:
@@ -216,18 +233,7 @@ def _erosive_check(m: Motor, b: Burn) -> tuple[Check, dict]:
     if not ported:
         return Check("erosive burning", "pass", "an end burner has no core for the flow to scour"), \
             {"port_throat": math.inf, "peak_mass_flux": 0.0}
-    ratio = min(g.port(0.0) for g in ported) / At
-    rho = m.propellant.density
-    peak = 0.0
-    for k in np.linspace(0, len(b.t) - 1, min(len(b.t), 300)).astype(int):
-        x, r = float(b.x[k]), m.propellant.burn_rate.rate(float(b.P[k]))
-        if x >= m.web:
-            break
-        made = 0.0
-        for g in m.grains:              # forward to aft: each core carries what burned upstream of its aft end
-            made += rho * g.burn_area(x) * r
-            if g.port(x) > 0:
-                peak = max(peak, made / g.port(x))
+    ratio, peak = _flux(m, b)
     vals = {"port_throat": ratio, "peak_mass_flux": peak}
     s = (f"the narrowest port is {ratio:.2f} times the throat area at ignition and the peak mass flux down the cores "
          f"is {fmt(peak)} kg/(m2 s), against the usual limits of {PORT_THROAT_MIN:g} and {fmt(MASS_FLUX_LIMIT)}")
@@ -239,6 +245,24 @@ def _erosive_check(m: Motor, b: Burn) -> tuple[Check, dict]:
                                                    "out, so the real pressure early in the burn can differ from this "
                                                    "prediction", vals), vals
     return Check("erosive burning", "pass", s, vals), vals
+
+
+def _flux(m: Motor, b: Burn) -> tuple[float, float]:
+    """The narrowest port over the throat area at ignition, and the peak mass flux down the cores over the burn."""
+    ported = [g for g in m.grains if g.port(0.0) > 0]
+    if not ported:
+        return math.inf, 0.0
+    rho, peak = m.propellant.density, 0.0
+    for k in np.linspace(0, len(b.t) - 1, min(len(b.t), 300)).astype(int):
+        x, r = float(b.x[k]), m.propellant.burn_rate.rate(float(b.P[k]))
+        if x >= m.web:
+            break
+        made = 0.0
+        for g in m.grains:              # forward to aft: each core carries what burned upstream of its aft end
+            made += rho * g.burn_area(x) * r
+            if g.port(x) > 0:
+                peak = max(peak, made / g.port(x))
+    return min(g.port(0.0) for g in ported) / m.nozzle.At, peak
 
 
 # --- checks on the design ------------------------------------------------------------------------------------
@@ -348,16 +372,10 @@ def _fixes(spec: MotorSpec, b: Burn, case_vals: dict, ero_vals: dict, noz_vals: 
             fixes.append({"kind": "segments", "title": f"Fly {len(m.grains) - 1} segments instead of {len(m.grains)}",
                           "summary": f"Simulated, the peak falls to {_mpa(tb.peak_pressure)} for a safety factor of "
                                      f"{sf:.2f}, with {fmt(tb.impulse)} N s ({tb.designation()}).", "auto": False})
-    if ero_vals.get("port_throat", math.inf) < PORT_THROAT_MIN and any(isinstance(g, Bates) for g in m.grains):
-        need = math.sqrt(4 * PORT_THROAT_MIN * m.nozzle.At / math.pi)
-        grains = [replace(g, core=max(g.core, need)) if isinstance(g, Bates) else g for g in m.grains]
-        if all(not isinstance(g, Bates) or g.core < g.D * 0.9 for g in grains):
-            tb = _quick(replace(m, grains=grains), dt)
-            fixes.append({"kind": "core", "title": f"Open the cores to {fmt(need * 1000)} mm",
-                          "summary": f"That gives a port to throat ratio of {PORT_THROAT_MIN:g}. Simulated, the "
-                                     f"peak is {_mpa(tb.peak_pressure)} with {fmt(tb.impulse)} N s "
-                                     f"({tb.designation()}), since a wider core carries less propellant.",
-                          "auto": False})
+    erosive = (ero_vals.get("port_throat", math.inf) < PORT_THROAT_MIN
+               or ero_vals.get("peak_mass_flux", 0.0) > MASS_FLUX_LIMIT)
+    if erosive and any(isinstance(g, Bates) for g in m.grains):
+        fixes += _core_fix(m, dt)
     if noz_vals.get("separated_fraction", 0.0) > 0.05:
         d = m.nozzle.throat * math.sqrt(noz_vals["optimum_area_ratio"])
         tb = _quick(replace(m, nozzle=replace(m.nozzle, exit=d)), dt)
@@ -366,6 +384,36 @@ def _fixes(spec: MotorSpec, b: Burn, case_vals: dict, ero_vals: dict, noz_vals: 
                                  f"Simulated, the motor gives {fmt(tb.impulse)} N s ({tb.designation()}).",
                       "auto": False})
     return fixes
+
+
+def _core_fix(m: Motor, dt: float) -> list[dict]:
+    """The smallest common core that brings the port to throat ratio to 2 and the core mass flux under the
+    guideline, each step simulated. Mass flux falls roughly with the port area, which steers the next step."""
+    d = max(math.sqrt(4 * PORT_THROAT_MIN * m.nozzle.At / math.pi),
+            min(g.core for g in m.grains if isinstance(g, Bates)))
+    best = None
+    for _ in range(12):
+        grains = [replace(g, core=max(g.core, d)) if isinstance(g, Bates) else g for g in m.grains]
+        if any(isinstance(g, Bates) and g.core > 0.8 * g.D for g in grains):
+            break
+        trial = replace(m, grains=grains)
+        tb = _quick(trial, dt)
+        ratio, peak = _flux(trial, tb)
+        best = (d, tb, ratio, peak)
+        if ratio >= PORT_THROAT_MIN * 0.999 and peak <= MASS_FLUX_LIMIT:
+            break
+        d = max(d + 0.0005, d * math.sqrt(max(peak / MASS_FLUX_LIMIT, 1.0)) * 1.01)
+    if best is None:
+        return []
+    d, tb, ratio, peak = best
+    s = (f"That gives a port to throat ratio of {ratio:.2f} and a peak core mass flux of {fmt(peak)} kg/(m2 s). "
+         f"Simulated, the peak pressure is {_mpa(tb.peak_pressure)} with {fmt(tb.impulse)} N s ({tb.designation()}), "
+         "since a wider core carries less propellant.")
+    if peak > MASS_FLUX_LIMIT:
+        s += " The flux stays over the guideline even so, so fewer or shorter segments would also help."
+    return [{"kind": "core", "title": f"Open the cores to {fmt(d * 1000)} mm", "summary": s, "auto": False,
+             "after": {"core_mm": d * 1000, "port_throat": ratio, "peak_mass_flux": peak,
+                       "peak_pressure_Pa": tb.peak_pressure, "impulse_Ns": tb.impulse}}]
 
 
 def _headline(spec: MotorSpec, b: Burn, cv: dict, verdict: str) -> str:

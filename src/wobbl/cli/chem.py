@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import click
 
@@ -56,8 +57,9 @@ def motor(spec, propellant, grains, throat, exit_, efficiency, casing, out, ques
         ui.fail(str(e), getattr(e, "hint", ""))
     _finish(o, as_json)
     if not as_json:
-        files = o.values["files"]
-        ui.console.print(f"  thrust curve {files['thrust_csv']}\n  motor file   {files['eng']}\n")
+        d = Path(o.workdir)
+        ui.console.print(f"  thrust curve {d / o.values['files']['thrust_csv']}\n"
+                         f"  motor file   {d / o.values['files']['eng']}\n")
 
 
 @click.command()

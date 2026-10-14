@@ -74,7 +74,7 @@ def parse_composition(text: str) -> dict[str, float]:
         k, v = re.split(r"[:=]", item, maxsplit=1)
         k = k.strip().lower()
         if k not in INGREDIENTS:
-            raise ValueError(f"unknown ingredient '{k}' (known: {', '.join(INGREDIENTS)})")
+            raise ValueError(f"unknown ingredient '{k}', known ones are {', '.join(INGREDIENTS)}")
         parts[k] = parts.get(k, 0.0) + float(v.strip().rstrip("%"))
     total = sum(parts.values())
     if total <= 0:
@@ -157,7 +157,7 @@ PROPELLANTS: dict[str, Propellant] = {p.key: p for p in [
                BurnRate(((0.103, 0.807, 10.71, 0.625), (0.807, 1.50, 8.763, -0.314), (1.50, 3.79, 7.852, -0.013),
                          (3.79, 7.03, 3.907, 0.535), (7.03, 10.67, 9.653, 0.064))),
                1600.0, 39.9, 1.1361, {"kno3": 0.65, "sorbitol": 0.35},
-               source=f"burn rate from {NAKKA}, Table 2; T, M and k from Nakka's KN-Sorbitol data as listed in "
+               source=f"burn rate from {NAKKA}, Table 2, with T, M and k from Nakka's KN-Sorbitol data as listed in "
                       "openMotor's KNSB preset",
                notes="Density is about 95% of the 1841 kg/m3 ideal, typical of cast grains. A mesa propellant, "
                      "whose rate barely changes from 0.8 to 3.8 MPa.", aliases=("kn-sorbitol", "sorbitol")),
@@ -165,14 +165,14 @@ PROPELLANTS: dict[str, Propellant] = {p.key: p for p in [
                BurnRate(((0.103, 0.779, 8.88, 0.619), (0.779, 2.57, 7.55, -0.009), (2.57, 5.93, 3.84, 0.688),
                          (5.93, 8.50, 17.2, -0.148), (8.50, 11.20, 4.78, 0.442))),
                1710.0, 42.39, 1.1308, {"kno3": 0.65, "dextrose": 0.35},
-               source=f"burn rate from {NAKKA}, Table 1; T, M and k from Nakka's KN-Dextrose data as listed in "
+               source=f"burn rate from {NAKKA}, Table 1, with T, M and k from Nakka's KN-Dextrose data as listed in "
                       "openMotor's KNDX preset",
                notes="Density is about 95% of the 1879 kg/m3 ideal.", aliases=("kn-dextrose", "dextrose")),
     Propellant("knsu", "KNSU (65/35 potassium nitrate and sucrose)", 1800.0,
                BurnRate(((0.0, 10.34, 8.26, 0.319),)),
                1720.0, 41.98, 1.133, {"kno3": 0.65, "sucrose": 0.35},
                source="burn rate a = 8.26 mm/s, n = 0.319 from Nakka's strand burner "
-                      "(nakka-rocketry.net/design1.html); T, M and k from Nakka's Technical Notepad 1, KNSU Ideal "
+                      "(nakka-rocketry.net/design1.html), with T, M and k from Nakka's Technical Notepad 1, KNSU Ideal "
                       "Performance Calculations",
                notes="Density is about 95% of the 1889 kg/m3 ideal.", aliases=("kn-sucrose", "sucrose", "rcandy")),
     Propellant("ocean-water", "MIT Ocean Water (APCP)", 1650.0, BurnRate(((0.0, 6.895, 2.8735, 0.382),)),
@@ -192,5 +192,5 @@ def get_propellant(name: str) -> Propellant:
     for p in PROPELLANTS.values():
         if k == p.key or k in p.aliases:
             return p
-    raise KeyError(f"unknown propellant '{name}' (known: {', '.join(PROPELLANTS)}); or give its density, burn rate "
-                   "a and n, and T, M and k")
+    raise KeyError(f"unknown propellant '{name}'. Known ones are {', '.join(PROPELLANTS)}, or give its density, burn "
+                   "rate a and n, and T, M and k")

@@ -157,12 +157,12 @@ def install(log: Log = print, force: bool = False) -> dict:
         f = pick_wheel(json.loads(meta.read_text()).get("urls", []))
         if f is None:
             raise SetupError(f"Cantera {CANTERA_VERSION} has no wheel for Python {sys.version_info.major}."
-                             f"{sys.version_info.minor} on this platform; 'pip install cantera' may build one")
+                             f"{sys.version_info.minor} on this platform, and 'pip install cantera' may build one")
         log(f"downloading {f['filename']} ({f['size'] / 1e6:.1f} MB)")
         whl = download(f["url"], tmp / f["filename"], log)
         want = (f.get("digests") or {}).get("sha256", "")
         if want and hashlib.sha256(whl.read_bytes()).hexdigest() != want:
-            raise SetupError("the Cantera download does not match PyPI's checksum; run the install again")
+            raise SetupError("the Cantera download does not match PyPI's checksum, so run the install again")
         stage = dest.with_name("cantera.partial")
         shutil.rmtree(stage, ignore_errors=True)
         with zipfile.ZipFile(whl) as z:
@@ -185,7 +185,7 @@ def check(log: Log = print) -> dict | str:
     """Solve one small equilibrium, hydrogen burning in oxygen, the way the setup registry checks a solver."""
     ct = load()
     if ct is None:
-        return "Cantera is not installed; it installs the first time you run a combustion or motor study"
+        return "Cantera is not installed, and it installs the first time you run a combustion or motor study"
     ok, err = False, ""
     try:
         g = ct.Solution("gri30.yaml")
