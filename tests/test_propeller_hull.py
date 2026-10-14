@@ -1,11 +1,12 @@
-"""Blade element momentum theory against UIUC propeller measurements. No solver is needed."""
+"""Blade element momentum theory against UIUC propeller measurements, and Holtrop and Mennen against their paper's
+worked example. Neither needs a solver."""
 from __future__ import annotations
 
 import math
 
 import pytest
 
-from wobbl.flow import bem
+from wobbl.flow import bem, hull
 
 
 def test_bundled_props_carry_geometry_and_measurements():
@@ -49,3 +50,23 @@ def test_bem_settles_with_stations_and_finds_hover_speed():
     # forward flight: thrust falls with speed, and the efficiency is a fraction
     fwd = bem.solve(p, 6000, 8.0)
     assert fwd.thrust < bem.solve(p, 6000).thrust and 0 < fwd.eta < 1
+
+
+def test_holtrop_mennen_reproduces_the_paper_example():
+    """Holtrop and Mennen (1982): 205 m, 25 knots, 1793.26 kN, with S 7381.45 m2 and 1 + k1 1.156."""
+    r = hull.resistance(hull.EXAMPLE, 25 * hull.KNOT)
+    assert r.wetted == pytest.approx(7381.45, rel=1e-5)
+    assert r.form_factor == pytest.approx(1.156, abs=1e-3)
+    assert r.parts["friction"] / r.form_factor == pytest.approx(869.63e3, rel=1e-3)
+    assert r.parts["waves"] == pytest.approx(557.11e3, rel=0.002)
+    assert r.parts["transom"] == 0.0
+    assert r.total == pytest.approx(hull.EXAMPLE_KN * 1e3, rel=0.002)
+    assert not r.out_of_range
+
+
+def test_hull_estimates_what_is_missing_and_flags_its_range():
+    h = hull.Hull(12.0, 3.5, 0.9, 18.0).fill()
+    assert 0.9 < h.cm < 1.0 and 0.6 < h.cwp < 0.95 and len(h.estimated) == 2
+    slow, fast = hull.resistance(h, 2.0), hull.resistance(h, 7.0)
+    assert fast.total > slow.total > 0
+    assert any("Froude" in s for s in fast.out_of_range)
