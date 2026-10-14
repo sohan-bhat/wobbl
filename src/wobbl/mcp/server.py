@@ -285,19 +285,20 @@ def build_server():
     @srv.tool()
     def quantify_uncertainty(result_dir: str, vary: list[str], samples: int = 200000,
                              solves: int | None = None) -> dict:
-        """Carry input scatter through a finished study. vary lists inputs with their scatter, e.g. ['load 10%',
-        'yield 8%', 'E uniform 70000..75000', 'thickness tol 0.2', 'film uniform 3..8']. Returns the probability
-        of failure with its 95% interval, the spread of the answer and Sobol indices ranking the inputs. Load,
-        stiffness and strength scatter on a strength study scale the solution exactly and take seconds; geometry,
-        heat and circuit inputs need new solves and a surrogate whose error is reported."""
+        """Carry input scatter through a finished result of any domain. vary lists inputs by the names in the
+        result's request.json with their scatter, e.g. ['load1 10%', 'yield 8%', 'thickness tol 0.2',
+        'rocket.cd 10%', 'film uniform 3..8']; a wrong name returns the list. The run is solved again through its
+        own analysis and fitted with polynomial chaos, whose leave one out error is reported (a strength study
+        scales exactly instead). Returns the probability of failure against the run's criteria with its 95%
+        interval, the spread of the answer and Sobol indices ranking the inputs."""
         return tools.quantify_uncertainty(result_dir, vary, samples, solves)
 
     @srv.tool()
     def validate_against_tests(result_dir: str, tests: str, vary: list[str] | None = None,
                                load_uncertainty: float = 0.01) -> dict:
-        """Compare a finished study with physical test readings. tests is a CSV with columns name, quantity
-        (strain, displacement, temperature or a circuit value), value, unit, uncertainty, x, y, z, direction, load
-        and time. Returns the ASME V&V 20 comparison error and validation uncertainty of each reading, the area
+        """Compare a finished result of any domain with physical test readings. tests is a CSV with columns name,
+        quantity (any value the result reports, e.g. apogee_m or t_max_C, or a strain, displacement or temperature
+        gauge on a part), value, unit, uncertainty, x, y, z, direction, load and time. Returns the ASME V&V 20 comparison error and validation uncertainty of each reading, the area
         metric, and a Bayesian calibration of the uncertain inputs (from quantify_uncertainty or vary, e.g.
         ['E 5%']). Readings marked synthetic in the file are reported as synthetic."""
         return tools.validate_against_tests(result_dir, tests, vary, load_uncertainty)
@@ -305,7 +306,7 @@ def build_server():
     @srv.tool()
     def assess_credibility(result_dir: str, influence: str = "medium", consequence: str = "medium",
                            question: str = "") -> dict:
-        """Map a finished study's evidence to an ASME V&V 40 style credibility assessment. influence (low, medium,
+        """Map a finished result's evidence, from any domain, to an ASME V&V 40 style credibility assessment. influence (low, medium,
         high) is how much the decision leans on the model, consequence how bad a wrong decision would be. Returns
         each factor's level against a proposed goal with its evidence, the test plan and credibility.html for a
         reviewer. Run quantify_uncertainty and validate_against_tests first for the strongest evidence. Wobbl
