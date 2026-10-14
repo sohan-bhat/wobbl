@@ -185,9 +185,25 @@ def _resonance_head(rows, v, excite, margin) -> str:
                 f"from the {near['excitation']}." if near else ".")
 
 
+def free_mass(mesh, built, modes) -> np.ndarray:
+    """r^T M r along x, y and z over the directions supports leave free, the total CalculiX reports: mass carried by
+    a held direction never moves, so it drops out."""
+    out = np.zeros(3)
+    held = [c for c in built.model.constraints]
+    for k in range(3):
+        r = np.zeros((mesh.n_nodes, 3))
+        r[:, k] = 1.0
+        for c in held:
+            if k + 1 in c.dofs:
+                r[c.nodes, k] = 0.0
+        out[k] = float(np.sum(r * modal.mass_times(mesh, built.model.density, r, modes.mass_nodes, modes.mass_values)))
+    return out
+
+
 def _mass_check(mesh, built, modes, total) -> Check:
     """CalculiX scales every mode to unit modal mass with its own mass matrix, so Wobbl's mass matrix has to give
-    one too. Without rigid attachments CalculiX's total mass must also match the volume times the density."""
+    one too. Where the supports simply fix directions, CalculiX's total of the mass free to move must also match the
+    same total from Wobbl's mass matrix."""
     pm = modal.part_mass(mesh, built.model.density, modes.mass_values)
     k = min(6, modes.count)
     mm = modal.modal_masses(mesh, built.model.density, modal.Modes(
@@ -198,11 +214,15 @@ def _mass_check(mesh, built, modes, total) -> Check:
          f"{k} modes a modal mass of one to {100 * norm:.2g}%, as CalculiX scaled them")
     worst, detail = norm, {"wobbl_kg": pm * 1000, "modal_mass": mm.tolist()}
     rigid = any(np.any(np.asarray(nodes) >= modes.n) for nodes in modes.mass_nodes.values())
-    if modes.solver_total_mass is not None and not rigid:
-        ccx_total = float(np.mean(modes.solver_total_mass[:3]))
-        err = abs(ccx_total - pm) / pm if pm > 0 else 1.0
-        s += f". CalculiX's total, {fmt(ccx_total * 1e6)} g, is {100 * err:.2g}% from it"
-        worst, detail["calculix_kg"] = max(worst, err), ccx_total * 1000
+    simple = not built.model.normal_constraints and not built.model.rigid
+    if modes.solver_total_mass is not None and not rigid and simple:
+        ccx = np.asarray(modes.solver_total_mass[:3], float)
+        mine = free_mass(mesh, built, modes)
+        err = float(np.max(np.abs(ccx - mine) / np.maximum(mine, 1e-300)))
+        s += (f". The mass free to move, what CalculiX totals, is {fmt(float(ccx.mean()) * 1e6)} g there and "
+              f"{fmt(float(mine.mean()) * 1e6)} g from Wobbl's matrix ({100 * err:.2g}% apart at most)")
+        worst, detail["calculix_free_kg"], detail["wobbl_free_kg"] = max(worst, err), (ccx * 1000).tolist(), \
+            (mine * 1000).tolist()
     status = "pass" if worst <= 0.01 else ("warn" if worst <= 0.03 else "fail")
     return Check("mass balance", status, s, detail)
 
