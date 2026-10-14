@@ -1,0 +1,35 @@
+MARGINAL. Carries the load, but it collapses at 1.34x the load (4.03 kN), below the 1.5 target. The hinge forms on face 6 at (6, -3.63, 20.2).
+
+Confidence: high. passed mesh convergence, collapse, hand calculation, force balance, unloading balance, ductility, load steps, units and sanity
+first yield: 0.701x the load
+collapse: 1.34x the load
+reserve past first yield: 1.92x
+target: 1.5
+permanent set: 0.0331 mm
+peak plastic strain: 0.14%
+
+Checks:
+  [pass] mesh convergence: collapse load settled: 1.33 -> 1.34 x the load over 2 meshes, last change 1.1%
+  [pass] collapse: the ramp ended where the part had lost 100.0% of its elastic stiffness, the last increments moving it for almost no extra load: a plastic mechanism
+  [pass] hand calculation: a fully plastic section through the hinge (Z 360 mm3, 120 mm2) collapses at 1.34x the load by beam theory; the FEA collapse is 1.01x that
+  [pass] force balance: at the collapse load, reactions balance the loads to 0.00013% (forces) and 4.1e-05% (moments)
+  [pass] unloading balance: once the load is off the supports carry 5.3e-06% of it, so the stress left in the part balances itself as it must
+  [pass] ductility: peak plastic strain 0.14% against the 18% true strain at which Mild steel (ASTM A36) breaks in a tensile test (20% elongation)
+  [pass] load steps: the collapse ramp took 15 increments and 75 iterations, and the attempt that failed was 0.16% past the last increment that converged, so the collapse load is known that closely; the load and unload run took 12 increments
+  [pass] units and sanity: part 113 mm across, first yield at 0.701x and collapse at 1.34x the load, a reserve of 1.9 past first yield: plausible
+
+Assumptions:
+  - Mild steel (ASTM A36): E 200000 MPa, yield 250 MPa, tensile strength 400 MPa (ASTM A36 minimum yield; MatWeb A36 typical properties). Past yield it follows a multilinear true stress strain curve: Yun and Gardner (2017), Stress-strain curves for hot-rolled steels, J. Constr. Steel Res. 133, quad-linear model through the yield and tensile strength.
+  - The collapse load comes from an elastic perfectly plastic copy of the part at the yield stress with small deflection theory, the limit load of plasticity theory. Hardening usually carries a little more, while large deflections can carry more or less, and buckling or necking can carry less.
+  - Hardening is isotropic, so reversed yielding as the load comes off (the Bauschinger effect) is not modeled. The load is applied once; repeated loads that ratchet or fatigue the part are not.
+  - First yield is read away from sharp inside corners and supports, where linear stress is singular. A tiny region there yields first, which the plastic runs include.
+  - Loads keep their direction as the part deforms, and supports are as rigid as in a strength study.
+  - Wrought metal treated as isotropic; rolled, drawn or extruded stock is close to it at yield.
+
+Suggested fixes:
+  - Deepen the section at the hinge by 1.1x: The hinge forms on face 6 at (6, -3.63, 20.2), where the part bends through a section about 12 mm deep. Its plastic moment grows with the depth squared, so about 12.7 mm deep (or 1.1x as wide) reaches the 1.5 target.
+  - Use a metal that yields above 279 MPa: The collapse load scales with the yield stress, so 1.1x the 250 MPa of Mild steel (ASTM A36) reaches the target, such as Steel 4140 (quenched and tempered) at 655 MPa.
+  - Keep the load under 0.896x this one: With Mild steel (ASTM A36) as drawn, the 1.5 margin on the 1.34x collapse load allows 0.896x the load in service.
+
+Images: plastic: images/plastic.png, set: images/set.png, collapse: images/collapse.png, path: images/path.png, playback: playback.json
+Report: report.html

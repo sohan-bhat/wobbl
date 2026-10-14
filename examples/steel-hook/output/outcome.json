@@ -1,0 +1,316 @@
+{
+ "domain": "plastic",
+ "part": "../hook.py",
+ "question": "Will this steel hook bend for good under a 3 kN sling, and what load pulls it open?",
+ "verdict": "marginal",
+ "headline": "Carries the load, but it collapses at 1.34x the load (4.03 kN), below the 1.5 target. The hinge forms on face 6 at (6, -3.63, 20.2).",
+ "metrics": [
+  [
+   "first yield",
+   "0.701x the load"
+  ],
+  [
+   "collapse",
+   "1.34x the load"
+  ],
+  [
+   "reserve past first yield",
+   "1.92x"
+  ],
+  [
+   "target",
+   "1.5"
+  ],
+  [
+   "permanent set",
+   "0.0331 mm"
+  ],
+  [
+   "peak plastic strain",
+   "0.14%"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed mesh convergence, collapse, hand calculation, force balance, unloading balance, ductility, load steps, units and sanity"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "collapse load settled: 1.33 -> 1.34 x the load over 2 meshes, last change 1.1%",
+   "detail": {
+    "values": [
+     1.329654,
+     1.344236
+    ],
+    "last_change": 0.010848,
+    "tolerance": 0.03,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "collapse",
+   "status": "pass",
+   "summary": "the ramp ended where the part had lost 100.0% of its elastic stiffness, the last increments moving it for almost no extra load: a plastic mechanism",
+   "detail": {
+    "stiffness_ratio": 9e-06
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "a fully plastic section through the hinge (Z 360 mm3, 120 mm2) collapses at 1.34x the load by beam theory; the FEA collapse is 1.01x that",
+   "detail": {
+    "factor": 1.337325,
+    "point": [
+     6.0,
+     -3.63188,
+     20.205111
+    ],
+    "axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "area_mm2": 120.0,
+    "Z_mm3": 359.89408,
+    "Mp_Nmm": 89973.520117,
+    "moment_Nmm": 66075.483032,
+    "axial_N": -3000.0,
+    "depth_mm": 12.034721,
+    "bending_share": 0.982116
+   }
+  },
+  {
+   "name": "force balance",
+   "status": "pass",
+   "summary": "at the collapse load, reactions balance the loads to 0.00013% (forces) and 4.1e-05% (moments)",
+   "detail": {
+    "applied_N": [
+     0.0,
+     0.0,
+     -4032.707441
+    ],
+    "reaction_N": [
+     -0.000629,
+     0.002981,
+     4032.711742
+    ],
+    "force_error": 1e-06,
+    "moment_error": 0.0
+   }
+  },
+  {
+   "name": "unloading balance",
+   "status": "pass",
+   "summary": "once the load is off the supports carry 5.3e-06% of it, so the stress left in the part balances itself as it must",
+   "detail": {
+    "residual": 0.0
+   }
+  },
+  {
+   "name": "ductility",
+   "status": "pass",
+   "summary": "peak plastic strain 0.14% against the 18% true strain at which Mild steel (ASTM A36) breaks in a tensile test (20% elongation)",
+   "detail": {
+    "peeq": 0.001368,
+    "fracture_strain": 0.182322
+   }
+  },
+  {
+   "name": "load steps",
+   "status": "pass",
+   "summary": "the collapse ramp took 15 increments and 75 iterations, and the attempt that failed was 0.16% past the last increment that converged, so the collapse load is known that closely; the load and unload run took 12 increments",
+   "detail": {
+    "bracket": 0.001629,
+    "increments": 15
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "part 113 mm across, first yield at 0.701x and collapse at 1.34x the load, a reserve of 1.9 past first yield: plausible",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Mild steel (ASTM A36): E 200000 MPa, yield 250 MPa, tensile strength 400 MPa (ASTM A36 minimum yield; MatWeb A36 typical properties). Past yield it follows a multilinear true stress strain curve: Yun and Gardner (2017), Stress-strain curves for hot-rolled steels, J. Constr. Steel Res. 133, quad-linear model through the yield and tensile strength.",
+  "The collapse load comes from an elastic perfectly plastic copy of the part at the yield stress with small deflection theory, the limit load of plasticity theory. Hardening usually carries a little more, while large deflections can carry more or less, and buckling or necking can carry less.",
+  "Hardening is isotropic, so reversed yielding as the load comes off (the Bauschinger effect) is not modeled. The load is applied once; repeated loads that ratchet or fatigue the part are not.",
+  "First yield is read away from sharp inside corners and supports, where linear stress is singular. A tiny region there yields first, which the plastic runs include.",
+  "Loads keep their direction as the part deforms, and supports are as rigid as in a strength study.",
+  "Wrought metal treated as isotropic; rolled, drawn or extruded stock is close to it at yield."
+ ],
+ "values": {
+  "first_yield_factor": 0.70058,
+  "first_yield_xyz": [
+   6.587783,
+   -0.956444,
+   -4.296925
+  ],
+  "first_yield_MPa": 356.847359,
+  "collapse_factor": 1.344236,
+  "collapsed": true,
+  "ramp_factor": 2.802319,
+  "twice_elastic_slope_factor": 1.296321,
+  "hinge_xyz": [
+   6.0,
+   -3.63188,
+   20.205111
+  ],
+  "target": 1.5,
+  "levels": [
+   {
+    "level": 0,
+    "n_nodes": 3379,
+    "h": 5.150624,
+    "first_yield": 0.702128,
+    "collapse": 1.329654,
+    "collapsed": true,
+    "increments": 13,
+    "iterations": 57,
+    "t_solve": 75.212951
+   },
+   {
+    "level": 1,
+    "n_nodes": 6119,
+    "h": 3.862968,
+    "first_yield": 0.70058,
+    "collapse": 1.344236,
+    "collapsed": true,
+    "increments": 15,
+    "iterations": 75,
+    "t_solve": 282.894178
+   }
+  ],
+  "plastic_section": {
+   "factor": 1.337325,
+   "point": [
+    6.0,
+    -3.63188,
+    20.205111
+   ],
+   "axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "area_mm2": 120.0,
+   "Z_mm3": 359.89408,
+   "Mp_Nmm": 89973.520117,
+   "moment_Nmm": 66075.483032,
+   "axial_N": -3000.0,
+   "depth_mm": 12.034721,
+   "bending_share": 0.982116
+  },
+  "load_path": {
+   "factor": [
+    0.140116,
+    0.280232,
+    0.420348,
+    0.560464,
+    0.70058,
+    0.840696,
+    0.980812,
+    1.120927,
+    1.261043,
+    1.296072,
+    1.331101,
+    1.339859,
+    1.342047,
+    1.342048,
+    1.344236
+   ],
+   "deflection_mm": [
+    0.128289,
+    0.256577,
+    0.384866,
+    0.513272,
+    0.642277,
+    0.77371,
+    0.930262,
+    1.175325,
+    1.837239,
+    2.361164,
+    4.142031,
+    7.998467,
+    12.563101,
+    33.591361,
+    260.618243
+   ],
+   "point": [
+    44.718579,
+    -3.444334,
+    -16.366617
+   ]
+  },
+  "_figures": [
+   [
+    "plastic",
+    "Plastic strain under the load, with the peak marked"
+   ],
+   [
+    "collapse",
+    "Plastic strain at collapse: the mechanism"
+   ],
+   [
+    "set",
+    "Permanent set once the load comes off"
+   ],
+   [
+    "path",
+    "Load against deflection on the way to collapse"
+   ]
+  ],
+  "peak_plastic_strain": 0.001368,
+  "peak_plastic_strain_xyz": [
+   -6.0,
+   5.0,
+   49.104061
+  ],
+  "permanent_set_mm": 0.033095,
+  "permanent_set_xyz": [
+   45.25501,
+   -5.0,
+   -15.595015
+  ],
+  "deflection_at_load_mm": 0.934935,
+  "residual_stress_MPa": 190.038412
+ },
+ "images": {
+  "plastic": "images/plastic.png",
+  "set": "images/set.png",
+  "collapse": "images/collapse.png",
+  "path": "images/path.png",
+  "playback": "playback.json"
+ },
+ "fixes": [
+  {
+   "kind": "section",
+   "title": "Deepen the section at the hinge by 1.1x",
+   "summary": "The hinge forms on face 6 at (6, -3.63, 20.2), where the part bends through a section about 12 mm deep. Its plastic moment grows with the depth squared, so about 12.7 mm deep (or 1.1x as wide) reaches the 1.5 target.",
+   "auto": false
+  },
+  {
+   "kind": "material",
+   "title": "Use a metal that yields above 279 MPa",
+   "summary": "The collapse load scales with the yield stress, so 1.1x the 250 MPa of Mild steel (ASTM A36) reaches the target, such as Steel 4140 (quenched and tempered) at 655 MPa.",
+   "auto": false
+  },
+  {
+   "kind": "load",
+   "title": "Keep the load under 0.896x this one",
+   "summary": "With Mild steel (ASTM A36) as drawn, the 1.5 margin on the 1.34x collapse load allows 0.896x the load in service.",
+   "auto": false
+  }
+ ],
+ "notes": [
+  "Built from hook.py with radius=22, depth=12, width=10, shank=70, eye=8.5, sweep=200."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 523.70027,
+ "solver": "CalculiX 2.23",
+ "criteria": []
+}
