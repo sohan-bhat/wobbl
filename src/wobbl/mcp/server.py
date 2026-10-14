@@ -28,7 +28,7 @@ Robot arms and servos, linkages, gear trains, impacts and tipping: solve_mechani
 Solenoids, electromagnets and magnets: solve_magnetic. Capacitance and breakdown: solve_electric. Trace
 impedance, crosstalk and board parasitics: solve_board. Antennas and wireless range: solve_antenna. Room modes,
 mufflers and panel noise: solve_sound.
-Big problems: estimate_cost before any long solve. start_job,
+Big problems: estimate_cost before any long solve, and solve_submodel to refine only around a peak. start_job,
 job_status, job_logs, cancel_job and resume_job run a deck in the background or on a remote machine. A cloud run
 starts only after the user agrees to its plan."""
 
@@ -376,6 +376,21 @@ def build_server():
         balance and the exact piston."""
         from ..fields.tools import solve_field_tool
         return solve_field_tool("sound", template, params)
+
+    @srv.tool()
+    def solve_submodel(result_dir: str, at: list[float] | None = None, radius: float | None = None,
+                       size: float | None = None) -> dict:
+        """Refine only around the peak of a finished result, with the refinement its domain registered. For a
+        solve_structural result the part is cut down to a ball around the peak (or around at=[x, y, z] in mm),
+        meshed finely and held on its cut where the global solution moved (CalculiX *SUBMODEL). Returns the local
+        peak against the global one, and two checks on the cut, the peak's distance from it in feature sizes and
+        the stress agreement across it. Quote the local peak only when trusted is true. Use it when the global
+        mesh is too coarse at the peak and a finer whole model would be too big."""
+        from ..jobs.workload import refine
+        try:
+            return refine(result_dir, at, radius, size)
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e), **({"hint": e.hint} if getattr(e, "hint", "") else {})}
 
     @srv.tool()
     def estimate_cost(command: list[str] | None = None, path: str = "", solver: str = "", nodes: float = 0,

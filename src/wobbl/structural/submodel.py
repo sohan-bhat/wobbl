@@ -341,7 +341,7 @@ def run_submodel(result_dir: str | Path, center=None, radius: float | None = Non
         shutil.copy2(g.frd, link)
     write_submodel_inp(run / "sub.inp", built.model, cut_nodes, "global.frd")
     say("solve", f"solving {mesh.n_nodes:,} nodes driven by the global displacements")
-    log, t_solve = _run(ccx, run, "sub", 3600)
+    _, t_solve = _run(ccx, run, "sub", 3600)
     blocks = read_frd(run / "sub.frd", mesh.n_nodes)
     U, S = blocks["DISP"][-1][1][:, :3], blocks["STRESS"][-1][1][:, :6]
     res = StaticResult(U, S, np.zeros_like(U), t_solve=t_solve)

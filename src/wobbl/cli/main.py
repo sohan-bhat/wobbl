@@ -488,7 +488,8 @@ def _register():
     for c in (magnetic, electric, board, antenna, sound):
         cli.add_command(c)
     from .jobs import estimate, jobs, remote
-    for c in (estimate, jobs, remote):
+    from .submodel import submodel
+    for c in (estimate, jobs, remote, submodel):
         cli.add_command(c)
     from .process import cast
     for c in (cast,):

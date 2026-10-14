@@ -66,6 +66,22 @@ def refiner(domain: str) -> Callable | None:
     return None
 
 
+def refine(result_dir: str | Path, at=None, radius: float | None = None, size: float | None = None,
+           out: str | Path | None = None, progress: Callable | None = None) -> dict:
+    """Refine a finished result of any domain locally, with the refinement its domain registered."""
+    d = Path(result_dir)
+    try:
+        domain = json.loads((d / "outcome.json").read_text()).get("domain", "")
+    except (OSError, ValueError):
+        raise WorkloadError(f"no Wobbl result in {d}", "Pass the folder a Wobbl run printed") from None
+    fn = refiner(domain)
+    if fn is None:
+        meshed = sorted({h.domain for h in REGISTRY.values() if h.refine is not None})
+        raise WorkloadError(f"{domain or 'this'} results have no local refinement, which needs a meshed field with "
+                            "a local peak", "Results that have one: " + ", ".join(meshed))
+    return fn(d, at, radius, size, out, progress)
+
+
 @dataclass
 class Workload:
     argv: list[str]                   # the command line after 'wobbl'
