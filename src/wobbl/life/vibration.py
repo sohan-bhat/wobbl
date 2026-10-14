@@ -139,6 +139,12 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
                     reasons, checks, vc.assumptions(mat, zeta_why, masses, deck, sine, psd, base), values, images,
                     vc.fixes(values, mat, p.features), deck.notes + p.prep.notes,
                     solver=f"CalculiX {adapter.version()}", t_total=time.time() - t0)
+    from . import scene
+
+    scene.clear(out)
+    if render and scene.vibration(out, mesh, modes, vc.shown_modes(modes, excite), vc.mode_labels(values), verdict,
+                                  headline, base.question or f"Vibration of {Path(base.part).stem}", base.question):
+        o.values["scene"] = "scene.wobbl"
     o.write(out)
     save_study(study, out)
     clean_work(work, study.keep)

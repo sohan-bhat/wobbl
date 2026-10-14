@@ -487,19 +487,28 @@ def pick_modes(modes, frac, excite, k: int) -> list[int]:
     return [int(i) for i in rel] if rel else list(range(min(k, modes.count)))
 
 
+def mode_labels(values: dict) -> dict[int, str]:
+    """Each mode's worst status against any excitation, by mode index."""
+    rank = {"resonant": 3, "close": 2, "barely excited": 1, "clear": 0}
+    labels: dict[int, str] = {}
+    for r in values.get("resonance", []):
+        i = r["mode"] - 1
+        if rank[r["status"]] >= rank.get(labels.get(i, "clear"), 0):
+            labels[i] = r["status"]
+    return labels
+
+
+def shown_modes(modes, excite) -> list[int]:
+    total = float(modes.total_mass[:3].mean())
+    return pick_modes(modes, modes.effective_mass[:, :3] / max(total, 1e-300), excite, 4)
+
+
 def playback(path: Path, mesh, modes, excite, resp, values: dict) -> str | None:
     from .playback import modes_doc, write
 
     try:
-        total = float(modes.total_mass[:3].mean())
-        frac = modes.effective_mass[:, :3] / max(total, 1e-300)
-        picks = pick_modes(modes, frac, excite, 4)
-        rank = {"resonant": 3, "close": 2, "barely excited": 1, "clear": 0}
-        labels: dict[int, str] = {}
-        for r in values.get("resonance", []):   # each mode's worst status against any excitation
-            i = r["mode"] - 1
-            if rank[r["status"]] >= rank.get(labels.get(i, "clear"), 0):
-                labels[i] = r["status"]
+        picks = shown_modes(modes, excite)
+        labels = mode_labels(values)
         extra = dict(values, resonance_bands=[{"label": e.label, "lo_Hz": round(e.lo, 4), "hi_Hz": round(e.hi, 4)}
                                               for e in excite])
         if resp is not None and "harmonic" in resp:

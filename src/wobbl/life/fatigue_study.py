@@ -168,13 +168,22 @@ def run_fatigue(study: FatigueStudy, out_dir: str | Path, progress=None, render:
                     values, images, _fixes(sf, target, single, blocks, curve, model, kt, radius, src, mat, data,
                                            need, surface), src.get("notes", []),
                     solver="Wobbl stress life", t_total=time.time() - t0)
+    doc = None
     try:
         from .playback import fatigue_doc, write
 
-        write(out / "playback.json", fatigue_doc(blocks, lives, repeats, single, need, values))
+        doc = fatigue_doc(blocks, lives, repeats, single, need, values)
+        write(out / "playback.json", doc)
         o.values["playback"] = "playback.json"
     except Exception:  # noqa: BLE001  the playback file is a convenience, never a reason to fail
         pass
+    from . import scene
+
+    scene.clear(out)
+    if render and doc and src["kind"] == "strength result" and scene.fatigue(
+            out, study.source, src["peak"], blocks, curve, model, 1.0 if single else repeats, doc["frames"], verdict,
+            head, study.question or src.get("question") or "Fatigue life", study.question):
+        o.values["scene"] = "scene.wobbl"
     o.write(out)
     (out / "study.json").write_text(json.dumps(study.to_dict(), indent=1))
     return o

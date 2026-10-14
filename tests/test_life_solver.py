@@ -39,6 +39,12 @@ def _playback_ok(out, kind):
     assert p.exists() and p.stat().st_size < 300_000
     d = json.loads(p.read_text())
     assert d["kind"] == kind and d["format"] == "wobbl-playback" and d["mesh"]["vertices"]["data"]
+    from wobbl.viz.scene import BUDGET, load
+    scene = out / "scene.wobbl"
+    assert scene.exists() and scene.stat().st_size < BUDGET
+    head = load(scene)[0]
+    assert head["domain"] == kind and head["timeline"]["frames"] > 10 and head["objects"]
+    assert "scene.wobbl" in json.loads((out / "outcome.json").read_text())["values"].get("scene", "")
 
 
 @needs_ccx
