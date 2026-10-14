@@ -185,8 +185,11 @@ def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None
                 if m:
                     hits.setdefault(a.key, {})[i] = m.group(0).strip()
         chosen = [a for a in pool if a.key in hits]
-        chosen = [b for b in chosen if not any(b.name in a.covers and set(hits[b.key]) <= set(hits[a.key])
-                                               for a in chosen if a is not b)]
+        def covered(b: Analysis) -> bool:
+            return any(b.name in a.covers and (a.covers_all or set(hits[b.key]) <= set(hits[a.key]))
+                       for a in chosen if a is not b)
+
+        chosen = [b for b in chosen if not covered(b)]
         claimed = {i for a in chosen for i in hits[a.key]}
         shared = [i for i in range(len(parts)) if i not in claimed]
         word = {}

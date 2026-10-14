@@ -54,7 +54,8 @@ class Analysis:
     kinds: tuple[str, ...] = ()        # the kinds of thing it applies to, all of the domain's when empty
     default: bool = False      # run it when the question asks for nothing in particular
     needs: tuple[str, ...] = ()        # analyses whose results it reads, run first
-    covers: tuple[str, ...] = ()       # analyses it makes unnecessary when both are asked for
+    covers: tuple[str, ...] = ()       # analyses it makes unnecessary when both are asked in the same clause
+    covers_all: bool = False   # its covers hold for the whole question, as a layup says what the whole part is
     legacy: str = ""           # the old command that ran the same study, kept as a hidden alias
     dry: bool = False          # the entry calls job.ready() just before it solves, so --plan can show its guesses
     example: str = ""

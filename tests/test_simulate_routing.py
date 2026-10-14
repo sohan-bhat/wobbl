@@ -28,6 +28,7 @@ class Case:
     kind: str | None = None
     physics: tuple[str, ...] | None = None     # the exact analyses, in any order
     given: tuple[str, ...] = ()                # --physics given explicitly
+    waits: object = None                       # a check that the registration this case needs has landed
 
     @property
     def label(self) -> str:
@@ -84,6 +85,9 @@ CASES = [
     Case(str(PARTS / "enclosure_shell.step"), "will it survive a 1.2 m drop onto tile?", "part", "step", ("drop",)),
     Case(str(EX / "drone-arm" / "arm.py"), "it is bolted at the base, will it hold 20 N and survive a 1 m drop?",
          "part", "parametric", ("stress", "drop")),
+    # a layup says what the whole part is made of, so it replaces the strength run in every clause
+    Case(str(EX / "drone-arm" / "arm.py"), "carbon fiber [0/±45/0]s, 40 N at the tip, is it strong enough?", "part",
+         "parametric", ("composite",), waits=lambda: registry.get("part", "composite").covers_all),
     # circuits: netlists and circuits in words
     Case("", "will a blue LED on 5V with a 47 ohm resistor fry?", "circuit", "led", ("ratings",)),
     Case("buck converter from 12 V to 3.3 V at 2 A", "how big is the ripple?", "circuit", "buck", ("transient",)),
@@ -181,7 +185,8 @@ def check(case: Case, tmp: Path) -> dict:
             got["error"] = str(e)
     got["domain_ok"] = got["domain"] == case.domain and (case.kind is None or got["kind"] == case.kind)
     want = case.physics
-    if want and set(want) <= {a.name for a in registry.analyses(case.domain)}:
+    if want and set(want) <= {a.name for a in registry.analyses(case.domain)} and (case.waits is None or
+                                                                                   case.waits()):
         got["physics_ok"] = got["physics"] is not None and sorted(got["physics"]) == sorted(want)
     else:
         got["physics_ok"] = None
