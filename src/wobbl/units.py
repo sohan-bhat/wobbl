@@ -9,7 +9,8 @@ In that system thermal properties come out as: conductivity mW/(mm K), which is
 numerically equal to W/(m K); film coefficient mW/(mm2 K) = 1e-3 W/(m2 K);
 specific heat mJ/(t K) = 1e6 J/(kg K); density t/mm3 = 1e-12 kg/m3.
 
-Circuit quantities stay in plain SI (V, A, ohm, F, H, s, Hz, W).
+Circuit quantities stay in plain SI (V, A, ohm, F, H, s, Hz, W). Speeds come out in mm/s and angles in
+degrees, and the motion domain turns lengths, masses and speeds into m, kg and m/s as it reads them.
 """
 from __future__ import annotations
 
@@ -65,6 +66,12 @@ _UNITS: dict[str, dict[str, float]] = {
     "inductance": {"h": 1.0, "mh": 1e-3, "uh": 1e-6, "nh": 1e-9},
     "frequency": {"hz": 1.0, "khz": 1e3, "mhz": 1e6, "ghz": 1e9},
     "si_power": {"w": 1.0, "mw": 1e-3, "kw": 1e3},
+    # motion
+    "speed": {"mm/s": 1.0, "m/s": 1000.0, "mps": 1000.0, "km/h": 1000 / 3.6, "kph": 1000 / 3.6, "kmh": 1000 / 3.6,
+              "mph": 447.04, "ft/s": 304.8, "fps": 304.8, "kn": 1852 / 3.6, "kt": 1852 / 3.6, "knot": 1852 / 3.6,
+              "knots": 1852 / 3.6},
+    "angle": {"deg": 1.0, "degree": 1.0, "degrees": 1.0, "rad": 57.29577951308232, "radian": 57.29577951308232,
+              "radians": 57.29577951308232},
 }
 
 # display labels for the internal unit of each dimension
@@ -73,12 +80,12 @@ INTERNAL = {
     "power": "mW", "time": "s", "heatflux": "mW/mm2", "film": "mW/(mm2 K)", "conductivity": "W/(m K)",
     "density": "t/mm3", "specific_heat": "mJ/(t K)", "volumetric_power": "mW/mm3", "voltage": "V",
     "current": "A", "resistance": "ohm", "capacitance": "F", "inductance": "H", "frequency": "Hz",
-    "si_power": "W", "temperature": "C",
+    "si_power": "W", "temperature": "C", "speed": "mm/s", "angle": "deg",
 }
 
 IMPERIAL_UNITS = {"in", "inch", "inches", '"', "ft", "foot", "feet", "lbf", "lb", "lbs", "pound", "pounds",
                   "kip", "kips", "psi", "ksi", "msi", "lbf*in", "in*lb", "in-lb", "lbf-in", "ft-lb", "lbf*ft",
-                  "f", "degf", "thou", "mil", "oz"}
+                  "f", "degf", "thou", "mil", "oz", "mph", "ft/s", "fps"}
 
 _NUM = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
 _QTY = re.compile(rf"^\s*({_NUM})\s*([^\s].*?)?\s*$")
