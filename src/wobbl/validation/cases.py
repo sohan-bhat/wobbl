@@ -299,6 +299,67 @@ def buck(out: Path):
     return o.values["ripple_V"] * 1000, buck_tpl(p).expect["ripple_v"] * 1000, {"confidence": o.confidence}
 
 
+# general circuits: netlists through the same study any user circuit takes, against an exact answer
+def _general(net: str, out: Path, question: str = ""):
+    from ..circuits.study import simulate_circuit
+
+    return simulate_circuit(net, question, {}, out / "run", quick=True)
+
+
+def divider_general(out: Path):
+    """A 12 V divider of 10k over 4.7k into a high impedance input, V = 12 x 4.7 / 14.7."""
+    o = _general("* divider\nV1 vin 0 12\nR1 vin mid 10k\nR2 mid 0 4.7k\n", out)
+    return o.values["nodes"]["mid"], 12 * 4.7 / 14.7, {"confidence": o.confidence}
+
+
+def led_general(out: Path):
+    """A 9 V supply through 470 ohm into a library 1N4148, the diode equation solved by Newton with its own
+    IS, N and RS."""
+    from ..circuits.parts import VT, lookup
+
+    net = "* diode\nV1 vin 0 9\nR1 vin a 470\nD1 a 0 1N4148\n"
+    o = _general(net, out)
+    import re as _re
+    text = lookup("1N4148").text
+    isat, n, rs = (float(_re.search(rf"\b{k}=([\d.e+-]+)", text).group(1)) for k in ("IS", "N", "RS"))
+    i = 0.017
+    for _ in range(100):
+        f = i * (470 + rs) + n * VT * math.log(i / isat + 1) - 9
+        i -= f / (470 + rs + n * VT / (i + isat))
+    return o.values["parts"]["D1"]["i"] * 1000, i * 1000, {"confidence": o.confidence}
+
+
+def rc_corner(out: Path):
+    """The -3 dB corner of 1 kohm into 100 nF, 1 / (2 pi R C), from an AC sweep."""
+    o = _general("* rc\nV1 in 0 SIN(0 1 1k) AC 1\nR1 in out 1k\nC1 out 0 100n\n", out, "what is the cutoff?")
+    return o.values["ac"]["response"]["f3db"][0], 1 / (2 * math.pi * 1e3 * 100e-9), {"confidence": o.confidence}
+
+
+def opamp_gain(out: Path):
+    """An LM358 non inverting stage with 100k over 10k from 0.3 V: (Vin + Vos) (1 + Rf/Rg) / (1 + (1 + Rf/Rg) /
+    Aol) with the model's 2 mV offset and 100 dB open loop gain."""
+    net = "* gain\nV1 vcc 0 12\nV2 in 0 0.3\nXU1 in fb vcc 0 out LM358\nR1 out fb 100k\nR2 fb 0 10k\n"
+    o = _general(net, out)
+    return o.values["nodes"]["out"], (0.3 + 2e-3) * 11 / (1 + 11 / 1e5), {"confidence": o.confidence}
+
+
+def lm317_output(out: Path):
+    """An LM317 with 240 ohm and 720 ohm at 100 mA: 1.25 (1 + R2 / R1) + Iadj R2."""
+    net = "* lm317\nV1 vin 0 12\nXU1 vin adj out LM317\nR1 out adj 240\nR2 adj 0 720\nRLOAD out 0 50\n"
+    o = _general(net, out)
+    return o.values["nodes"]["out"], 1.25 * (1 + 720 / 240) + 50e-6 * 720, {"confidence": o.confidence}
+
+
+def timer_period(out: Path):
+    """An NE555 astable with 1k, 10k and 100 nF: the textbook period 0.693 (Ra + 2 Rb) C, which ignores the
+    discharge transistor's resistance and the comparators' delay."""
+    net = ("* astable\nV1 vcc 0 9\nXU1 0 thr out vcc ctl thr dis vcc NE555\nR1 vcc dis 1k\nR2 dis thr 10k\n"
+           "C1 thr 0 100n\nC2 ctl 0 10n\n")
+    o = _general(net, out, "how fast does it oscillate?")
+    hc = next(c for c in o.checks if c.detail.get("shape") == "555")
+    return hc.detail["sim_s"] * 1000, 0.693 * 21e3 * 100e-9 * 1000, {"confidence": o.confidence}
+
+
 # --- motion -----------------------------------------------------------------------
 # Each flight goes through the motion domain's own integrator, events, phases and checks, reduced to a setup with
 # an exact answer: gravity held at 9.80665 m/s2 and either no air or air of one density.
@@ -656,6 +717,19 @@ CASES = [
          True, rc),
     Case("buck", "Buck converter output ripple", "circuit", "ideal triangular current through C and ESR",
          "peak to peak ripple", "mV", 0.15, False, buck),
+    Case("divider-general", "12 V divider of 10k over 4.7k, as a netlist", "circuit", "V R2 / (R1 + R2)",
+         "divider output", "V", 0.001, True, divider_general),
+    Case("diode-general", "9 V through 470 ohm into a 1N4148, as a netlist", "circuit",
+         "diode equation solved by Newton with the part's IS, N and RS", "diode current", "mA", 0.005, True,
+         led_general),
+    Case("rc-corner", "1 kohm into 100 nF, swept in frequency", "circuit", "1 / (2 pi R C)", "-3 dB corner", "Hz",
+         0.01, True, rc_corner),
+    Case("opamp-gain", "LM358 non inverting stage, 100k over 10k", "circuit",
+         "(Vin + Vos) (1 + Rf/Rg) / (1 + (1 + Rf/Rg) / Aol)", "output voltage", "V", 0.002, True, opamp_gain),
+    Case("lm317-output", "LM317 with 240 and 720 ohm at 100 mA", "circuit", "1.25 (1 + R2 / R1) + Iadj R2",
+         "output voltage", "V", 0.01, True, lm317_output),
+    Case("ne555-period", "NE555 astable, 1k, 10k and 100 nF", "circuit", "0.693 (Ra + 2 Rb) C",
+         "period", "ms", 0.04, False, timer_period),
     Case("free-fall", "Ball dropped 300 m without air", "motion", "t = sqrt(2 h / g)", "fall time", "s", 0.001,
          True, free_fall),
     Case("drag-fall", "Granite sphere dropped 300 m through air", "motion",

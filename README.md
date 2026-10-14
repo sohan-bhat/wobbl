@@ -603,7 +603,7 @@ where the two servo idealizations disagree, a load cell in service and coupons.
 
 ## Validation
 
-Fifty seven cases with known answers run through the same pipeline you get. Every
+Sixty three cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
@@ -612,7 +612,7 @@ modeled setup lands within 2%.
 | Textbook and benchmark strength (Timoshenko, Kirsch, Lame, NAFEMS LE1 and LE10, torsion, self weight, a cantilever on an elastic root) | 9 | 1.54%, plate with a hole |
 | Real parts against converged reference models | 5 | 4.26%, PLA bracket with a 6 mm fillet |
 | Heat (slab conduction, lumped cooling, a bar whose end jumps to 120 C) | 3 | 0.85%, the bar against the erfc solution |
-| Circuits (LED, RC, buck ripple) | 3 | 7.70%, buck ripple against an ideal formula that ignores switch and diode drops |
+| Circuits (LED, RC, buck ripple, and netlists through the general study: a divider, a diode, an RC corner, an op amp stage, an LM317 and a 555) | 9 | 7.70%, buck ripple against an ideal formula that ignores switch and diode drops |
 | Motion (free fall, drag fall, a throw, a constant thrust rocket's burnout speed and altitude, parachute descent) | 6 | 0.0000014%, the rocket's burnout altitude |
 | Combustion (methane flame against Turns, LOX and LH2 c* and Isp against NASA CEA, KNSU c* against PROPEP) | 4 | 0.05%, the LOX and LH2 c* |
 | Solid motors (steady Kn against the closed form, a neutral grain's web time, two MIT static fires) | 4 | 9.26%, the impulse of the O3800 static fire, whose peak pressure came out 7% low |
