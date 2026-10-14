@@ -192,12 +192,22 @@ Moody chart, drag comes from published curves (a result near the drag crisis com
 confidence), props from their measured UIUC curves checked with blade element momentum theory, and hulls
 from Holtrop and Mennen.
 
-**Fields.** A solenoid, electromagnet or magnet, capacitor plates, a coax or a PCB trace, an antenna, a room
-or a muffler, as in `wobbl simulate solenoid "does it pull 8 N over its stroke?" --turns 800 --current 0.6A --stroke 6mm --need 8N`
-or `wobbl simulate "2.4 GHz dipole" "where does it resonate?" --frequency 2.4GHz --length 58mm`, solve with
-GetDP, fetched the first time (an 11 MB download). A magnetic force comes from the Maxwell stress tensor and is
-checked by virtual work, so read that check before quoting it. A patch antenna is sized with the transmission
-line model rather than a full wave solve, so say so when you quote it.
+**Fields.** Magnetic, electric and sound fields run on the user's own CAD, and board effects on their own
+board, all with GetDP, fetched the first time (an 11 MB download). Say what each body is with `--assign`:
+`wobbl simulate actuator.step "does the plunger pull 5 N at 0.8 A?" --assign "frame: steel 1010" --assign "coil: coil 1100 turns 0.8 A" --assign "plunger: steel 1010"`
+gives the force, torque and inductance, `--assign "rod: conductor 20 kV" --assign "flange: ground" --assign "sleeve: ptfe"`
+the capacitance and the breakdown margin, and `--assign "box: rigid"` the standing waves of the air inside a
+box (`--assign "cone: vibrating 1 mm/s"` the sound a vibrating body makes). Bodies are picked by their CAD
+name, `body 2`, `largest` or `at x,y,z`; a run with no `--assign` reads the body names and says what it guessed.
+Coils find their axis from their hole, magnets need a direction such as `n42 +z`. Quote the force only when
+the virtual work and action and reaction checks pass. A KiCad `.kicad_pcb` or a Gerber folder gives every
+net's impedance, inductance, capacitance and the worst crosstalk from the board's real traces and planes,
+`--netlist board.cir` runs that circuit with and without the layout, and the result's `parasitics.json`
+feeds a circuit run as `--parasitics <board result folder>`, as in
+`wobbl simulate buck.kicad_pcb "how hard does the switch node ring?" --netlist buck.cir`. Devices in words run
+parametric studies, as in `wobbl simulate "a 0.3 mm microstrip on 0.17 mm fr4" "what is its impedance?"` or
+`wobbl simulate "a solenoid with 800 turns at 0.6 A and a 6 mm stroke" "does it pull 8 N?"`. A patch antenna in
+words is sized with the transmission line model rather than a full wave solve, so say so when you quote it.
 
 **Chemistry.** A fuel, a reaction, a propellant or a cell, as in
 `wobbl simulate "CH4 + 2 O2 -> CO2 + 2 H2O" "how hot is the flame?"`,

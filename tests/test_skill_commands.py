@@ -49,7 +49,8 @@ ROOT = Path(__file__).resolve().parents[1]
 STAND_IN = {".step": ROOT / "src" / "wobbl" / "validation" / "parts" / "shelf_bracket_fillet.step",
             ".py": ROOT / "examples" / "shelf-bracket" / "bracket.py",
             ".toml": ROOT / "examples" / "rocket-launch" / "rocket.toml",
-            ".kicad_sch": ROOT / "tests" / "data" / "circuits" / "ldo_mcu_board.kicad_sch"}
+            ".kicad_sch": ROOT / "tests" / "data" / "circuits" / "ldo_mcu_board.kicad_sch",
+            ".kicad_pcb": ROOT / "examples" / "pcb-buck-ringing" / "buck_tight.kicad_pcb"}
 
 
 def stand_in(thing: str, tmp: Path) -> str:
