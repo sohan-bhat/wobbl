@@ -53,7 +53,7 @@ def load(source: str, params: dict | None = None, assume=None) -> Circuit:
 
 def simulate_circuit(source: str, question: str = "", params: dict | None = None, out_dir: str | Path | None = None,
                      probes: list[str] | tuple = (), focus: str = "ratings", quick: bool = False,
-                     log=None, assume=None) -> GenericOutcome:
+                     log=None, assume=None, ready=None) -> GenericOutcome:
     """The general entry: any circuit, any question. focus is ratings (every part against its limits),
     operating-point, transient, ac or tolerance; each still reports every part's stress."""
     from .templates import TEMPLATES
@@ -75,6 +75,14 @@ def simulate_circuit(source: str, question: str = "", params: dict | None = None
             e.letter in "vi"]:
         raise NetlistError("the circuit has no source to power it", "Add a supply, as V1 vcc 0 5, or name one in "
                                                                      "the description")
+    if assume is not None:          # what reading the input had to guess, each with how to change it
+        for a in c.assumptions:
+            m = re.search(r"\(set ([^)]+)\)", a)
+            how = m.group(1).split(" or ")[0].split(" for ")[0].strip() if m else ""
+            assume(re.sub(r"\s*\(set [^)]+\)", "", a).rstrip("."), f"--set {how}" if how else "")
+        c.assumptions = []
+    if ready is not None:
+        ready()
     ta = _ambient(params)
     q = (question or "").lower()
     log("solve", f"{len(c.elements)} parts on {len(c.nodes())} nets")

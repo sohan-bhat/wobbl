@@ -102,6 +102,7 @@ def _template(job, kind: str, text: str, params: dict):
     p.update({k: v for k, v in params.items() if k not in ("ambient", "parasitics")})
     if p:
         job.use("set", [f"{a}={b}" for a, b in p.items()])
+    job.ready()
     o = run_circuit(tpl, p, job.out, job.question)
     job.situate(objects=["breadboard"], environment={"ambient": "25 C"}, circuit={"template": tpl})
     return o
@@ -112,14 +113,18 @@ def _run(job, focus: str):
 
     params = _params(job)
     text = job.thing if job.path is None and job.thing and job.thing != "-" else ""
-    words = " ".join(x for x in (text, job.question) if x)
+    words = " ".join(x for x in (text, job.focus) if x)
     if job.path is None and job.kind in TEMPLATE_KINDS and template_fit(job.kind, words):
         return _template(job, job.kind, words, params)
-    source = str(job.path) if job.path is not None else (text or job.question)
+    source = str(job.path) if job.path is not None else (text or job.focus)
+    m = re.search(r"\b(?:at|from|on|with|off)\s+(\d+(?:\.\d+)?)\s*v\b", job.focus.lower())
+    if job.path is not None and m and "supply" not in params:
+        params["supply"] = m.group(1)       # "will it overheat at 12 V" sets an input the board leaves open
+        job.use("set", [*job.values("set"), f"supply={m.group(1)}"])
     if "ambient" not in params:
         params["ambient"] = job.value("ambient", "25 C", "air temperature around the board not given")
-    o = simulate_circuit(source, job.question, params, job.out, job.values("probe"), focus, quick=job.quick,
-                         log=job.log, assume=lambda t, ov="": job.assume(t, ov))
+    o = simulate_circuit(source, job.focus, params, job.out, job.values("probe"), focus, quick=job.quick,
+                         log=job.log, assume=lambda t, ov="": job.assume(t, ov), ready=job.ready)
     board = "pcb" if job.kind == "kicad" or source.endswith(".kicad_sch") else "breadboard"
     parts = o.values.get("parts", {})
     hot = sorted(parts.values(), key=lambda d: -(d.get("use") or 0))[:3]
@@ -156,7 +161,7 @@ def tolerance(job):
 KINDS = ("netlist", "kicad", "words", *TEMPLATE_KINDS)
 register(Analysis(
     "circuit", "ratings", "Every part against its voltage, current, power and temperature limits, and whether the "
-                          "circuit works", ratings, kinds=KINDS, default=True, legacy="wobbl circuit",
+                          "circuit works", ratings, kinds=KINDS, default=True, legacy="wobbl circuit", dry=True,
     keywords=(r"\bfry\b|\bburn|blow (?:up|out)|smoke|overheat|\bhot\b|too hot|\bsafe\b|ratings?\b|survive|"
               r"stress|exceed|over ?current|too much current|damage|anything|warm|temperature|will it work|"
               r"does it work|work\?|dissipat|power rating",),
@@ -164,27 +169,27 @@ register(Analysis(
     example='wobbl simulate board.kicad_sch "will anything overheat at 12 V?"'))
 register(Analysis(
     "circuit", "operating-point", "The steady DC voltages at every node and currents through every part",
-    operating_point, kinds=KINDS,
+    operating_point, kinds=KINDS, dry=True,
     keywords=(r"what is v\(|voltage (?:at|on|across)|current (?:through|in|into)|\bbias\b|operating point|"
               r"quiescent|what voltage|how much current|how many (?:milli)?amps|\bdc\b|node voltage|output voltage|"
               r"what is the output|divider",),
     aliases=("op", "dc", "bias")))
 register(Analysis(
     "circuit", "transient", "The circuit over time from power on: ripple, inrush, timing, oscillation and switch off",
-    transient, kinds=KINDS,
+    transient, kinds=KINDS, dry=True,
     keywords=(r"ripple|start.?up|power.?on|inrush|transient|waveform|blink|flash|oscillat|frequency of|period|"
               r"timing|how long|charge time|rise time|time constant|over time|turn.?off|switch(?:es|ing)? off|spike|"
               r"how fast",),
     aliases=("tran", "time", "startup")))
 register(Analysis(
     "circuit", "ac", "Frequency response and, where there is feedback, loop gain, phase margin and gain margin", ac,
-    kinds=("netlist", "kicad", "words"),
+    kinds=("netlist", "kicad", "words"), dry=True,
     keywords=(r"frequency response|bode|cut.?off|corner frequency|bandwidth|\bfilter|phase margin|gain margin|"
               r"stab(?:le|ility)|\bgain\b|-3 ?db|resonan|\bac\b",),
     aliases=("frequency", "stability", "bode", "loop")))
 register(Analysis(
     "circuit", "tolerance", "Every part across the supply range and part tolerances: Monte Carlo builds and worst "
-                            "case corners", tolerance, kinds=("netlist", "kicad", "words"),
+                            "case corners", tolerance, kinds=("netlist", "kicad", "words"), dry=True,
     keywords=(r"toleranc|worst.?case|monte.?carlo|spread|corners?\b|every board|batch|production|"
               r"battery (?:drains|runs down|range|gets low)|as the battery|supply range|over the range",),
     aliases=("monte-carlo", "worst-case", "corners", "sweep")))

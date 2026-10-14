@@ -146,7 +146,8 @@ def attach(c: Circuit, s, pins: list[tuple], params: dict) -> None:
         v = _volts(val) or _supply(params)
         if v is None:
             v = 12.0
-            c.assumptions.append(f"{ref} is a DC input with no voltage on the schematic; assumed 12 V (set supply=).")
+            c.assumptions.append(f"{ref} is a DC input with no voltage on the schematic, so it is taken as 12 V "
+                                 "(set supply=12V).")
         add("v", [pick("1", "+", "tip") or order[0], pick("2", "-", "sleeve") or order[-1]], [f"{v:g}"], ["+", "-"],
             note=f"{v:g} V DC input")
         return
@@ -246,8 +247,8 @@ def _connector(c, s, pins, params, add, order):
         e.name = f"RLOAD_{s.ref}"
         c.assumptions.append(f"{s.ref} ({s.value or 'connector'}) drives {load}, as set.")
         return
-    c.assumptions.append(f"{s.ref} ({s.value or 'connector'}) has nothing plugged in; set {s.ref}.load=2A or "
-                         f"{s.ref}.load=12ohm to put a load on it.")
+    c.assumptions.append(f"{s.ref} ({s.value or 'connector'}) has nothing plugged in (set {s.ref}.load=2A or "
+                         f"{s.ref}.load=12ohm for a load on it).")
 
 
 def _part(p) -> dict:
