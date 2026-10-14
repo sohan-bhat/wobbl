@@ -100,7 +100,7 @@ def listed(v, read) -> list[float]:
 
 
 def fmt_torque(nm: float) -> str:
-    """N m, with the hobby servo kg cm alongside when the torque is small enough for that to be how it is rated."""
+    """N m, with the hobby servo kg cm alongside for torques in the range servos are rated in."""
     from ..units import fmt
 
-    return f"{fmt(nm)} N m ({fmt(nm / KGF_CM)} kg cm)" if abs(nm) < 20 else f"{fmt(nm)} N m"
+    return f"{fmt(nm)} N m ({fmt(nm / KGF_CM)} kg cm)" if abs(nm) < 4 else f"{fmt(nm)} N m"

@@ -168,7 +168,7 @@ def motor_from(d) -> Motor:
     if "stall_torque" not in vals:
         raise ValueError("a motor needs stall_torque (and no_load_speed), or a catalog name like mg996r")
     vals.setdefault("no_load_speed", math.inf)
-    return Motor("custom", name or "custom motor", **vals)
+    return Motor("custom", name or "motor", **vals)
 
 
 def stronger(than: Motor, need_torque: float, need_speed: float = 0.0, need_rms: float = 0.0) -> Motor | None:

@@ -112,7 +112,8 @@ def answer(b, img: Path, say) -> Answer:
         rv = run.v[:, run.col("rocker")]
         for tt in crossings(run.t, rv)[:6]:
             i = int(np.argmin(np.abs(run.t - tt)))
-            events.append(event("rocker at an end", tt, f"{fmt(math.degrees(t4s + run.q[i, run.col('rocker')]))} deg"))
+            ang = (math.degrees(t4s + run.q[i, run.col('rocker')]) + 180) % 360 - 180
+            events.append(event("rocker at an end", tt, f"{fmt(ang)} deg"))
         events.sort(key=lambda e: e["t_s"])
     else:
         events = [event("start", 0.0), event("crank binds", 2.0, f"{fmt(math.degrees(lo))} deg"),
@@ -217,14 +218,16 @@ def _fixes(info, sweep, mu_lo, mu_hi, peak, stalled, hot, full, m) -> list[dict]
     if not full or mu_lo < MU_GOOD[0] or mu_hi > MU_GOOD[1] or abs(sweep - target) > 3:
         best = _better(d, a, b, c, target)
         if best:
-            bb, cc, sw, lo, hi = best
-            out.append({"kind": "lengths", "title": f"Make the coupler {fmt(bb * 1000)} mm and the rocker "
-                                                    f"{fmt(cc * 1000)} mm",
-                        "summary": f"Freudenstein's equation gives a {fmt(sw)} degree sweep with the transmission "
-                                   f"angle between {fmt(lo)} and {fmt(hi)} degrees and a crank that turns fully. Run "
-                                   "it again with these lengths to check the torque.", "auto": False,
-                        "after": {"coupler_mm": bb * 1000, "rocker_mm": cc * 1000, "sweep_deg": sw,
-                                  "transmission_deg": [lo, hi]}})
+            aa, bb, cc, sw, lo, hi = best
+            what = [f"{name} {fmt(new * 1000)} mm" for name, new, old in
+                    (("crank", aa, a), ("coupler", bb, b), ("rocker", cc, c)) if abs(new - old) > 5e-4]
+            out.append({"kind": "lengths", "title": "Make the " + " and the ".join(what),
+                        "summary": f"With the ground at {fmt(d * 1000)} mm, the toggle positions where crank and "
+                                   f"coupler line up give a {fmt(sw)} degree sweep with the transmission angle between "
+                                   f"{fmt(lo)} and {fmt(hi)} degrees, and the crank still turns fully. Run it again "
+                                   "with these lengths to check the torque.", "auto": False,
+                        "after": {"crank_mm": aa * 1000, "coupler_mm": bb * 1000, "rocker_mm": cc * 1000,
+                                  "sweep_deg": sw, "transmission_deg": [lo, hi]}})
     motor = info["motor"]
     if (stalled or hot) and motor is not None:
         w = 0.7 * motor.no_load_speed
@@ -246,22 +249,23 @@ def _fixes(info, sweep, mu_lo, mu_hi, peak, stalled, hot, full, m) -> list[dict]
 
 
 def _better(d, a, b, c, target_deg: float):
-    """Coupler and rocker lengths, within -40% and +60% of today's, that keep a fully turning crank and the wanted
-    sweep within 1.5 degrees while holding the transmission angle closest to 90 degrees."""
-    th2 = np.linspace(0, 2 * np.pi, 361)
-    best, score = None, -1.0
-    for bb in np.linspace(0.6 * b, 1.6 * b, 41):
-        for cc in np.linspace(0.6 * c, 1.6 * c, 41):
-            if T.grashof(d, a, bb, cc)[0] not in ("crank rocker",):
-                continue
-            t4, t3 = T.freudenstein(d, a, bb, cc, th2)
-            if not np.all(np.isfinite(t4)):
-                continue
-            sw = float(np.degrees(np.ptp(np.unwrap(t4))))
-            if abs(sw - target_deg) > 1.5:
-                continue
-            mu = np.degrees(T.transmission_angle(t3, t4))
-            s = min(float(mu.min()), 180 - float(mu.max()))
-            if s > score:
-                best, score = (float(bb), float(cc), sw, float(mu.min()), float(mu.max())), s
-    return best
+    """Crank, coupler and rocker lengths, the crank within 20% of today's and the others within -40% and +60%,
+    that keep a crank rocker with the wanted sweep within 1.5 degrees while holding the transmission angle closest
+    to 90 degrees. A crank rocker's extremes sit at its toggle positions, where crank and coupler line up, so the
+    sweep and the transmission angle's range follow from the law of cosines across the whole grid at once."""
+    A, B, C = np.meshgrid(np.linspace(0.8 * a, 1.2 * a, 17), np.linspace(0.6 * b, 1.6 * b, 61),
+                          np.linspace(0.6 * c, 1.6 * c, 61), indexing="ij")
+    with np.errstate(invalid="ignore"):
+        rocker = lambda r: np.arccos((d * d + C * C - r * r) / (2 * d * C))  # noqa: E731
+        sweep = np.degrees(rocker(B + A) - rocker(B - A))
+        mu_lo = np.degrees(np.arccos((B * B + C * C - (d - A) ** 2) / (2 * B * C)))
+        mu_hi = np.degrees(np.arccos((B * B + C * C - (d + A) ** 2) / (2 * B * C)))
+    longest = np.maximum(np.maximum(B, C), d)
+    others = B + C + d - longest
+    grashof = (A < np.minimum(np.minimum(B, C), d)) & (A + longest <= others)
+    ok = grashof & np.isfinite(sweep) & np.isfinite(mu_lo) & np.isfinite(mu_hi) & (np.abs(sweep - target_deg) <= 1.5)
+    if not ok.any():
+        return None
+    score = np.where(ok, np.minimum(mu_lo, 180 - mu_hi), -1.0)
+    k = np.unravel_index(int(np.argmax(score)), score.shape)
+    return (float(A[k]), float(B[k]), float(C[k]), float(sweep[k]), float(mu_lo[k]), float(mu_hi[k]))
