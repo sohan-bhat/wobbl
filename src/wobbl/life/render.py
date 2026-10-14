@@ -82,7 +82,7 @@ def render_modes(path: str | Path, X, tets, shapes: list[np.ndarray], labels: li
             p.add_mesh(warped, scalars="m", cmap="viridis", clim=[0, 1], smooth_shading=True, ambient=0.3,
                        diffuse=0.8, show_scalar_bar=k == 1, scalar_bar_args=_bar("relative\nmotion"))
             p.add_text(label, position="upper_left", font_size=11 if k > 1 else 13, color=FG, font="courier")
-            _camera(p, X, _across(X, U))
+            _camera(p, X, _across(X, U), zoom=1.15 if k == 1 else 0.85)
         p.screenshot(str(path))
         p.close()
     except Exception:  # noqa: BLE001  no OpenGL: a flat matplotlib drawing of the deflected surface
@@ -155,13 +155,18 @@ def _finish(plt, fig, ax, path) -> str:
 
 
 def frequency_map(path, freqs: np.ndarray, weights: np.ndarray, tones: list[tuple[float, str]],
-                  bands: list[tuple[float, float, str]], margin: float) -> str:
-    """Natural frequencies as stems, as tall as the share of mass each moves along the excitation, with every
-    excitation tone and its keep out margin and every excitation band shaded behind them."""
+                  bands: list[tuple[float, float, str]], margin: float,
+                  inputs: list[tuple[float, float, str]] = ()) -> str:
+    """Natural frequencies as stems, as tall as the share of mass each moves along the excitation. Tones and bands
+    to stay clear of are red, with their keep out margin, and the band of a test input is grey behind them."""
     plt, fig, ax = _axes()
     top = max(float(np.max(weights)) if len(weights) else 1.0, 0.05) * 1.15
-    for lo, hi, name in bands:
-        ax.axvspan(lo, hi, color="#4a90d9", alpha=0.15, label=name)
+    for lo, hi, name in inputs:
+        ax.axvspan(lo, hi, color="#9aa0a6", alpha=0.10, label=name)
+    reds = ["#ff4d4f", "#ff9f43", "#c56cf0"]
+    for (lo, hi, name), c in zip(bands, reds * 4):
+        ax.axvspan(lo / (1 + margin), hi * (1 + margin), color=c, alpha=0.08)
+        ax.axvspan(lo, hi, color=c, alpha=0.25, label=name)
     for f, name in tones:
         ax.axvspan(f * (1 - margin), f * (1 + margin), color="#ff4d4f", alpha=0.18)
         ax.axvline(f, color="#ff4d4f", lw=1.4, ls="--", label=name)
