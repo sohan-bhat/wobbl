@@ -14,7 +14,7 @@ INSTRUCTIONS = """Wobbl runs verified engineering simulations. Typical flow for 
    confidence result as final, and never quote peaks listed as excluded artifacts.
 4. Open images.stress to see where the peak is. If the verdict is fails or marginal, call
    suggest_fix(result_dir, apply=true) for before and after numbers.
-Heat questions: solve_thermal. Circuits: solve_circuit."""
+Heat questions: solve_thermal. Circuits: solve_circuit. Falling, thrown and rocket flights: solve_motion."""
 
 
 def _protect_stdout():
@@ -99,8 +99,8 @@ def build_server():
         """Concrete fixes with numbers for a finished study. For a strength result they cover fillet radius, wall
         thickness, gussets and material, and with apply=True Wobbl builds the automatic ones, solves each again
         and returns before and after. Pass which to pick kinds from fillet, thicken, gusset and material.
-        Heat and circuit results return their fixes with a note to call solve_thermal or solve_circuit again
-        with the new value."""
+        Heat, circuit and motion results return their fixes with a note to call solve_thermal, solve_circuit or
+        solve_motion again with the new value."""
         return tools.suggest_fix(result_dir, apply, which)
 
     @srv.tool()
@@ -121,6 +121,21 @@ def build_server():
         ambient, switching), 'rc' (r, c, v); or netlist=SPICE text with params.vectors to read."""
         from ..circuits.tools import solve_circuit_tool
         return solve_circuit_tool(template, netlist, params or {})
+
+    @srv.tool()
+    def solve_motion(spec: str = "", name: str = "", mass: str = "", density: str = "", diameter: str = "",
+                     cd: float | None = None, height: str = "", speed: str = "", angle: str = "", wind: str = "",
+                     question: str = "") -> dict:
+        """Drops, throws and rocket flights through gravity that falls off with altitude, the 1976 standard
+        atmosphere, drag, wind, thrust and parachutes, integrated with scipy and checked against closed forms, an
+        energy balance and a delta v budget. A round body takes diameter='9 cm' with mass='1 kg' or
+        density='2700 kg/m3', cd (default 0.47), height='300 m', speed='30 m/s', angle='35 deg' and wind. A rocket
+        takes spec, a TOML file path or the TOML text itself, with [rocket], [nose], [fins], [motor], [launch],
+        [drogue], [main] and [targets] tables as in examples/rocket-launch/rocket.toml, and wind overrides the
+        spec's. Returns verdict, headline, events, apogee, peak Mach, stability margin, rail exit and landing
+        speed, drift, confidence with checks, fixes and the trajectory CSV. Runs take a second or two."""
+        from ..motion.tools import solve_motion_tool
+        return solve_motion_tool(spec, name, mass, density, diameter, cd, height, speed, angle, wind, question)
 
     @srv.tool()
     def list_materials() -> dict:

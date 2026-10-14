@@ -55,6 +55,14 @@ def check_values(name: str, p: dict):
         resolve_material(p["material"])
         study_from(p["part"], p["material"], p["power"], p["heat_faces"], list(p["films"]), p["ambient"],
                    list(p["fixed"]), p["duration"], p["limit"], p["radiation"])
+    elif name == "motion":
+        from wobbl.motion.tools import study_from
+
+        if p["spec"]:
+            assert p["spec"].endswith(".toml"), p["spec"]
+        else:
+            study_from(p["name"], p["mass"], p["density"], p["diameter"], p["cd"], p["height"], p["speed"],
+                       p["angle"], p["wind"])
     elif name == "circuit":
         from wobbl.circuits.templates import TEMPLATES
 
@@ -67,7 +75,7 @@ def check_values(name: str, p: dict):
 
 def test_the_skill_names_every_kind_of_command():
     names = {dry_parse(shlex.split(c)[1:])[0] for c in skill_commands()}
-    assert {"inspect", "run", "materials", "fix", "thermal", "circuit"} <= names, names
+    assert {"inspect", "run", "materials", "fix", "thermal", "circuit", "motion"} <= names, names
 
 
 @pytest.mark.parametrize("command", skill_commands())
@@ -84,7 +92,7 @@ def test_skill_command_parses(command):
 def test_flags_named_alone_exist():
     """Flags the skill names on their own, like `--quality fine`, belong to a command and take the value shown."""
     bases = {"run": ["run", "part.step"], "thermal": ["thermal", "part.step", "-m", "6061-t6"],
-             "circuit": ["circuit", "led"]}
+             "circuit": ["circuit", "led"], "motion": ["motion", "--diameter", "9 cm", "--mass", "1 kg"]}
     spans = [s for s in _spans(SKILL) if s.startswith("--")]
     assert spans
     for s in spans:

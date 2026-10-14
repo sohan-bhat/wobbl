@@ -1,12 +1,12 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts and circuits with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), wants stress, deflection, safety factor or temperature numbers, or asks about LED current, regulator ripple or MOSFET heating. Wobbl meshes the CAD, runs CalculiX or ngspice, checks its own answer and returns a heatmap, a confidence level and fixes.
+description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift). Wobbl meshes the CAD, runs CalculiX, ngspice or a scipy flight integrator, checks its own answer and returns a picture, a confidence level and fixes.
 ---
 
 # Wobbl: simulate before you build
 
-Wobbl wraps real solvers (gmsh, CalculiX, ngspice) behind one CLI and an MCP
-server. It refines the mesh until the answer stops moving, checks equilibrium,
+Wobbl wraps real solvers (gmsh, CalculiX, ngspice, and scipy for motion) behind
+one CLI and an MCP server. It refines the mesh until the answer stops moving, checks equilibrium,
 compares against beam theory, flags stress singularities and reports a
 confidence level. Use it instead of hand calculations for real geometry, and
 never write your own finite element code.
@@ -48,6 +48,18 @@ For heat, run `wobbl thermal part.step -m 6061-t6 --power "12 W" --film "5 W/m2K
 For circuits, give each template value its own `--set`, as in
 `wobbl circuit led --set supply=5V --set resistor=150 --set led=red`, or run your own netlist with
 `wobbl circuit board.cir --probe "v(out)"` (MCP `solve_circuit`).
+
+For anything that falls, flies or launches, use motion (MCP `solve_motion`) instead of writing your own
+integrator. It flies the body through gravity that falls off with altitude, the 1976 standard
+atmosphere, drag, wind, thrust and parachutes, and checks the flight against closed forms, an energy
+balance and a delta v budget. A dropped or thrown body is one line, as in
+`wobbl motion --name rock --diameter "9 cm" --density "2700 kg/m3" --cd 0.6 --height "300 m"` or
+`wobbl motion --name ball --mass "145 g" --diameter "7.4 cm" --speed "40 m/s" --angle 35`.
+A rocket is a TOML spec with its motor's thrust curve, nose, fins, balance point, rail and
+parachutes, run with `wobbl motion rocket.toml`, and the MCP tool also takes the TOML as text. For a
+rocket the verdict comes from the stability margin, the speed off the rail, apogee against its target
+and the landing speed, and the fixes give the nose weight, fin span, rail length or main parachute that
+would pass. Every run writes `trajectory.csv` with one row at every event.
 
 ## Never skip
 

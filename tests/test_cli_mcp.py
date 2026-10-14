@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_help_and_version():
     r = CliRunner().invoke(cli, ["--help"])
     assert r.exit_code == 0
-    for cmd in ("run", "inspect", "check", "report", "fix", "setup", "doctor", "thermal", "circuit", "mcp"):
+    for cmd in ("run", "inspect", "check", "report", "fix", "setup", "doctor", "thermal", "circuit", "motion",
+                "mcp"):
         assert cmd in r.output
     version = re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M).group(1)
     assert CliRunner().invoke(cli, ["--version"]).output.strip().endswith(version)
@@ -55,7 +56,7 @@ def test_mcp_server_lists_tools():
     srv = build_server()
     names = {t.name for t in asyncio.run(srv.list_tools())}
     for n in ("inspect_geometry", "solve_structural", "verify", "render", "suggest_fix", "solve_thermal",
-              "solve_circuit", "apply_load", "set_material", "mesh"):
+              "solve_circuit", "solve_motion", "apply_load", "set_material", "mesh"):
         assert n in names
 
 
@@ -114,3 +115,24 @@ def test_solve_structural_time_matches_the_real_runs():
     rows = json.loads((ROOT / "docs" / "validation-results.json").read_text())
     slowest = max(r["wall_s"] for r in rows if r["domain"] == "strength")
     assert upper == math.ceil(slowest / 60), (upper, slowest)
+
+
+def test_solve_motion_takes_a_spec_as_text_and_its_fixes_point_back_to_it(tmp_path, monkeypatch):
+    monkeypatch.setenv("WOBBL_HOME", str(tmp_path))
+    spec = (ROOT / "examples" / "rocket-launch" / "rocket.toml").read_text().replace('cg = "1.36 m"', 'cg = "1.50 m"')
+    r = tools_motion(spec=spec)
+    assert "error" not in r, r
+    assert r["verdict"] == "fails" and r["values"]["margin_cal"] < 1 and r["events"][0]["name"] == "liftoff"
+    assert Path(r["trajectory"]).exists() and {c["name"] for c in r["checks"]} >= {"delta v budget", "stability margin"}
+    fix = tools.suggest_fix(r["result_dir"])
+    assert fix["domain"] == "motion" and "solve_motion" in fix["note"]
+    assert {f["kind"] for f in fix["fixes"]} >= {"nose weight", "fin area"}
+    rock = tools_motion(name="rock", diameter="9 cm", density="2700 kg/m3", cd=0.6, height="300 m")
+    assert rock["verdict"] == "ok" and rock["confidence"] == "high"
+    assert "error" in tools_motion(diameter="9 cm", height="300 m")
+
+
+def tools_motion(**kw):
+    from wobbl.motion.tools import solve_motion_tool
+
+    return solve_motion_tool(**kw)

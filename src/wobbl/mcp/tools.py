@@ -234,14 +234,14 @@ def render(result_dir: str) -> dict:
     return {"images": o.images, "report": o.report}
 
 
-_RERUN_TOOL = {"thermal": "solve_thermal", "circuit": "solve_circuit"}
-_DOMAIN_WORD = {"thermal": "heat", "circuit": "circuit"}
+_RERUN_TOOL = {"thermal": "solve_thermal", "circuit": "solve_circuit", "motion": "solve_motion"}
+_DOMAIN_WORD = {"thermal": "heat", "circuit": "circuit", "motion": "motion"}
 
 
 def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = None) -> dict:
     """Fix suggestions with numbers for any finished study. For a strength result, apply=True builds the automatic
-    fixes, solves each one again and compares. Heat and circuit fixes change the inputs rather than the part, so
-    they come back as suggestions with a note on which tool to call again."""
+    fixes, solves each one again and compares. Heat, circuit and motion fixes change the inputs rather than the
+    part, so they come back as suggestions with a note on which tool to call again."""
     try:
         o = _outcome(result_dir)
     except Exception as e:  # noqa: BLE001
@@ -259,8 +259,8 @@ def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = 
 
 
 def _input_fixes(d: dict, apply: bool) -> dict:
-    """The fixes of a heat or circuit result. They change the cooling, the power or a part value, which only a new
-    solve with those inputs can check."""
+    """The fixes of a heat, circuit or motion result. They change the cooling, the power, a part value or a
+    rocket's nose weight, fins, rail or parachute, which only a new solve with those inputs can check."""
     dom = d.get("domain", "")
     tool = _RERUN_TOOL.get(dom, "the solve tool")
     fixes = [{"kind": f.get("kind", ""), "title": f.get("title", ""), "summary": f.get("summary", ""),
