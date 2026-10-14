@@ -39,7 +39,7 @@ def answer(b, img: Path, say) -> Answer:
     ref = info["load"] or 1.0
     motor = info["motor"]
     say("solve", "turning the crank slowly against a steady load")
-    w_slow = 2 * math.pi / 4
+    w_slow = 2 * math.pi / 2.5           # slow enough that the links' own inertia stays out of the torque
     bare = [dataclasses.replace(j, armature=0.0) for j in m.joints]      # an ideal drive has no rotor to spin up
     if full:
         kin = with_(m, joints=bare, drives=[Drive("crank", None, "servo")], spin={"crank": (w_slow, 0.4)}, move=[],

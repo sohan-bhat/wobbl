@@ -837,6 +837,25 @@ CASES += [
          "turning angle", "deg", 0.03, True, _fracture("kink_angle")),
 ]
 
+# --- mechanisms (the case functions are in mechanism.py) ---------------------------------------------------------
+from . import mechanism as MECH  # noqa: E402
+
+CASES += [
+    Case("pendulum-period", "Pendulum released at 120 degrees", "mechanism", "4 sqrt(L/g) K(sin(a/2))", "period",
+         "s", 0.001, True, MECH.pendulum_period),
+    Case("fourbar-sweep", "Crank rocker four bar of 120, 30, 125 and 45 mm", "mechanism",
+         "Freudenstein, toggle positions by the law of cosines", "rocker swing", "deg", 0.002, True,
+         MECH.fourbar_sweep),
+    Case("arm-statics", "Two link arm holding 300 g at its pick point", "mechanism", "moments of the weights",
+         "shoulder holding torque", "N m", 0.005, True, MECH.arm_statics),
+    Case("gear-output", "FA-130 through 12:36 and 10:40 against 5 mN m", "mechanism",
+         "motor line through ratio and efficiency", "output speed", "rpm", 0.005, True, MECH.gear_output),
+    Case("collision-elastic", "Steel balls of 1 and 3 kg, elastic", "mechanism", "momentum and energy",
+         "struck ball's speed after", "m/s", 0.005, True, MECH.collision_elastic),
+    Case("collision-restitution", "Steel balls of 1 and 3 kg, restitution 0.5", "mechanism",
+         "momentum and restitution", "struck ball's speed after", "m/s", 0.005, True, MECH.collision_restitution),
+]
+
 
 def run_cases(out_dir: str | Path, ids: list[str] | None = None, log=print) -> list[dict]:
     out = Path(out_dir)
