@@ -46,6 +46,17 @@ wobbl circuit mosfet --set current=15 --set rds_on=8m --set frequency=20k \
 The junction settles at about 110 C from 1.51 W of loss, under the 150 C limit. Wobbl iterates
 the junction temperature with the on resistance rising 0.6% per degree, which also catches thermal runaway.
 
+## Bench drawings
+
+Every run also draws the circuit wired up, in `images/setup.svg`, and its schematic, in
+`images/schematic.svg`. The bench is a plausible build, such as the LED on a breadboard under a
+supply that reads the simulated current, the buck converter board between a supply and an
+electronic load with a scope on its output, or the MOSFET on a heatsink sized from its junction to
+air resistance. Values, color bands and readings come from the run, so a different `--set` value
+gives a different drawing. Any other netlist has its parts placed on a breadboard the way a person
+would build it, with the measured current on every wire. The report shows both drawings, and the
+[circuits example](/examples/circuits/) plays each bench from power on.
+
 ## Template parameters
 
 Component values take SPICE style suffixes like `10k`, `4k7`, `22u` or `2.2meg`, and units

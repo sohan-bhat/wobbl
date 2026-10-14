@@ -166,5 +166,5 @@ def test_circuit_runs_write_and_embed_both_drawings(tmp_path):
 
     o = run_circuit("led", {"supply": "5", "resistor": "47", "led": "blue"}, tmp_path / "led")
     assert set(o.images) >= {"setup", "schematic"}
-    html = (tmp_path / "led" / "report.html").read_text()
+    html = (tmp_path / "led" / "report.html").read_text(encoding="utf-8")
     assert html.count("<svg") == 2 and "36.9 mA" in html and "data:image/svg" not in html

@@ -130,7 +130,7 @@ def test_any_netlist_runs_instrumented_and_draws(tmp_path):
     data = base.for_domain("circuit").run(c.spice(instrument=True, analyses=c.analyses, save=False), tmp_path,
                                           vecs, "run")[0]
     out = draw.write_circuit(tmp_path / "images", c, data)
-    svg = (tmp_path / "images" / "setup.svg").read_text()
+    svg = (tmp_path / "images" / "setup.svg").read_text(encoding="utf-8")
     assert set(out) == {"setup", "schematic"} and svg.count("data-flow") >= 4
     rl = next(p for p in board.plan(c, data)["parts"] if p["name"] == "RL")
     assert rl["current"] > 0.05 and rl["heat"] > 1  # the load runs hot in a quarter watt resistor

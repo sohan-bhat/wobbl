@@ -227,6 +227,11 @@ First release.
   lumped hand calculations.
 - ngspice checks for LEDs, RC networks, buck converter ripple and MOSFET junction
   temperature, plus arbitrary netlists, with textbook and time step checks.
+- Every circuit run draws its bench, the circuit wired up with the run's own values
+  and readings in `setup.svg`, and its schematic in `schematic.svg`, both in the
+  report. Any netlist is laid out on a breadboard as plain data the 3D viewer can
+  share, and the website plays each bench with the measured current moving along
+  its wires.
 
 **Agents**
 - `wobbl setup` installs CalculiX and ngspice into `~/.wobbl` with a pinned
