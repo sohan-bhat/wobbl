@@ -1,4 +1,4 @@
-"""Answer object shared by the heat and circuit domains (strength has its own richer one)."""
+"""Answer object shared by the heat, circuit and motion domains (strength has its own richer one)."""
 from __future__ import annotations
 
 import json
@@ -10,10 +10,10 @@ from .verify.checks import Check, _jsonable
 
 @dataclass
 class GenericOutcome:
-    domain: str                       # thermal, circuit
+    domain: str                       # thermal, circuit, motion
     part: str
     question: str
-    verdict: str                      # ok, warm, hot / ok, fails
+    verdict: str                      # ok, warm, hot / ok, fails / ok, marginal, fails
     headline: str
     metrics: list[tuple[str, str]]
     confidence: str
@@ -81,7 +81,8 @@ class GenericOutcome:
                         "".join(f"<li>{esc(a)}</li>" for a in self.assumptions) + "</ol>")
         word = self.verdict.upper()
         cls = {"ok": "pass", "warm": "warn", "hot": "fail", "fails": "fail"}.get(self.verdict, "warn")
-        title = {"thermal": "Heat report", "circuit": "Circuit report"}.get(self.domain, "Report")
+        title = {"thermal": "Heat report", "circuit": "Circuit report", "motion": "Motion report"}.get(self.domain,
+                                                                                                    "Report")
         html = page(title, Path(self.part).name if self.part else self.domain, self.question, word, cls,
                     self.headline, self.metrics, self.confidence, self.confidence_reasons, sections,
                     f"Solver {self.solver}. Total time {self.t_total:.0f} s.")
