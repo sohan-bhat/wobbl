@@ -6,6 +6,7 @@ import Term from './Term.astro';
 import { COLOR, metrics, type Run } from '../lib/examples';
 import { meters, mps, secs } from '../scripts/flight-format';
 import { url } from '../lib/site';
+import { hasSim } from '../lib/sim';
 interface Props { run: Run }
 const { run } = Astro.props;
 const checks = (run.outcome.checks ?? []).filter((c) => c.status !== 'skip');
@@ -13,7 +14,7 @@ const sugg = run.fixes.length ? [] : (run.outcome.fixes ?? []).slice(0, 3).map((
 const { model, events = [] } = run.outcome;
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 ---
-<div class="run">
+<div class:list={['run', { 'run-live': hasSim(run) }]}>
   <div class="run-steps">
     <div class="run-step"><p class="run-label">You ask</p><p class="run-ask">{run.question}</p></div>
     <div class="run-step"><p class="run-label">Wobbl runs</p><Term code={run.command} /></div>

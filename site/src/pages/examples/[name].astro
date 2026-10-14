@@ -7,6 +7,7 @@ import FixStrip from '../../components/FixStrip.astro';
 import Term from '../../components/Term.astro';
 import { examples, readmeBody } from '../../lib/examples';
 import { render } from '../../lib/markdown';
+import { hasSim } from '../../lib/sim';
 import { repoUrl, url } from '../../lib/site';
 
 export function getStaticPaths() {
@@ -14,7 +15,12 @@ export function getStaticPaths() {
   return all.map((ex, i) => ({ params: { name: ex.name }, props: { ex, prev: all[i - 1] ?? null, next: all[i + 1] ?? null } }));
 }
 const { ex, prev, next } = Astro.props;
-const notes = render(readmeBody(ex), `examples/${ex.name}/README.md`).html;
+const html = render(readmeBody(ex), `examples/${ex.name}/README.md`).html;
+// a motion example plays its run back above, so the README's charts fold away behind their own titles
+const notes = ex.runs.some(hasSim)
+  ? html.replace(/<figure>([\s\S]*?alt="([^"]*)"[\s\S]*?)<\/figure>/g,
+    (_m, inner: string, alt: string) => `<details class="ex-chart"><summary>${alt}</summary><figure>${inner}</figure></details>`)
+  : html;
 const first = ex.runs[0];
 ---
 <Base title={`${ex.title} example | Wobbl`} path={`examples/${ex.name}/`} search

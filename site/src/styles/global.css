@@ -560,6 +560,11 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .ex-runs { display: grid; gap: 64px; margin-top: clamp(36px, 2rem + 2vw, 64px); }
 .run { display: grid; gap: 28px; align-items: start; }
 @media (min-width: 1000px) { .run { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; } }
+/* a run that plays back: on a phone the playback comes right after the question and the command */
+@media (max-width: 999px) {
+  .run-live .run-steps { display: contents; }
+  .run-live .run-step:nth-child(n+3) { order: 1; }
+}
 .run-steps { display: grid; gap: 26px; min-width: 0; }
 .run-label { margin: 0 0 10px; font: 500 12px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .run-ask { margin: 0; padding-left: 16px; border-left: 3px solid var(--yellow); font-size: clamp(1.15rem, 1.05rem + 0.45vw, 1.4rem); line-height: 1.4; color: var(--fg); text-wrap: pretty; }
@@ -588,6 +593,11 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .run-summary > summary:hover { color: var(--yellow); }
 .run-summary .term { margin-top: 12px; }
 .run-summary pre { max-height: 440px; overflow: auto; font-size: 12.5px; }
+/* a README chart folded under its title on a motion example, whose run plays back above it */
+.prose .ex-chart { margin: 24px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.prose .ex-chart > summary { cursor: pointer; padding: 12px 0; font: 500 13px/1.4 var(--mono); color: var(--fg); }
+.prose .ex-chart > summary:hover { color: var(--yellow); }
+.prose .ex-chart figure { margin: 4px 0 20px; }
 .run-sugg { margin-top: 22px; }
 .run-sugg ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .run-sugg li { padding-left: 16px; position: relative; color: var(--fg); }
