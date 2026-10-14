@@ -320,11 +320,12 @@ def _checks(src, blocks, curve, data, lives, model, spread, target, kt, kf, q, q
     vals = [v for v in spread.values() if math.isfinite(v)]
     if vals and max(b.mean for b in blocks) > 0:
         flips = len({v >= target for v in vals}) > 1
-        s = ", ".join(f"{m.capitalize()} {spread[m]:.2f}" for m in F.MEAN_MODELS)
+        each = [f"{m.capitalize()} {spread[m]:.2f}" for m in F.MEAN_MODELS]
+        s = ", ".join(each[:-1]) + f" and {each[-1]}"
         out.append(Check("mean stress model", "warn" if flips else "pass",
-                         f"the mean stress models give safety factors of {s}, and the answer uses {model.capitalize()}"
-                         + (". The verdict depends on that choice" if flips else ", and the verdict is the same with "
-                            "each"), spread))
+                         f"the mean stress models give safety factors of {s}. The answer uses {model.capitalize()}"
+                         + (", and the verdict depends on that choice" if flips else ", and the verdict is the same "
+                            "with each"), spread))
     if kt:
         out.append(Check("notch sensitivity", "info",
                          f"stress concentration {kt:.2f} at the peak" + (f", notch radius {fmt(radius)} mm" if radius
@@ -397,7 +398,8 @@ def _assumptions(mat, data, curve, model, src, surface, study) -> list[str]:
          f"fully reversed ({data.source}).",
          f"The Marin factors are surface {surface} ({curve.factors['surface ka'][0]:.2f}), size "
          f"{curve.factors['size kb'][0]:.2f}, load {curve.factors['load kc'][0]:.2f}, reliability "
-         f"{100 * study.reliability:g}% ({curve.factors['reliability ke'][0]:.3f}), room temperature.",
+         f"{100 * study.reliability:g}% ({curve.factors['reliability ke'][0]:.3f}), with the part at room "
+         "temperature.",
          f"Mean stress by {model.capitalize()}, with no credit for a compressive mean.",
          "Fatigue lives scatter by a factor of three to ten at the same stress, so the life is an estimate and the "
          "safety factor on stress is the steadier number."]
