@@ -2,7 +2,7 @@
 // page's main thread. The file comes from scripts/export_site_part.py, whose docstring describes it.
 
 /** Zigzag int32 values stored as four byte planes. */
-function planes(bytes, at, count) {
+export function planes(bytes, at, count) {
   const out = new Int32Array(count);
   const b1 = at + count, b2 = at + 2 * count, b3 = at + 3 * count;
   for (let i = 0; i < count; i++) {
@@ -13,7 +13,7 @@ function planes(bytes, at, count) {
 }
 
 /** Residuals back to integers: corners from the corners known before them, midside nodes from their edge. */
-function integers(r, channels, n, nc, pa, pb, ends) {
+export function integers(r, channels, n, nc, pa, pb, ends) {
   const q = new Int32Array(r.length);
   for (let c = 0; c < channels; c++) {
     const o = c * n;
@@ -113,7 +113,7 @@ export function decodePart(man, buf) {
  * sharp CAD edges and fillets shade smooth. Two triangles at a node share a group when they share
  * an edge there and their normals are within 35 degrees, as VTK splits them.
  */
-function shade(pos, tri, n) {
+export function shade(pos, tri, n) {
   const nt = tri.length / 3, COS = Math.cos((35 * Math.PI) / 180);
   const fn = new Float32Array(nt * 3), un = new Float32Array(nt * 3);
   for (let t = 0; t < nt; t++) {
