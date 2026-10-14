@@ -154,8 +154,8 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 
 /* A dropped rock and a rocket: two motion runs side by side, their rows lined up by a subgrid.
    Below the hero, the section is laid out only once it comes close to the screen. */
-.flights { content-visibility: auto; contain-intrinsic-size: auto 2300px; }
-@media (min-width: 1000px) { .flights { contain-intrinsic-size: auto 1150px; } }
+.flights { content-visibility: auto; contain-intrinsic-block-size: auto 2300px; }
+@media (min-width: 1000px) { .flights { contain-intrinsic-block-size: auto 1150px; } }
 .pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 56px; margin-top: 36px; }
 .flight { display: grid; align-content: start; gap: 24px; min-width: 0; }
 .flight + .flight { padding-top: 48px; border-top: 1px solid var(--line); }
@@ -174,8 +174,10 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .flight-meta { display: flex; flex-wrap: wrap; gap: 6px 24px; font: 500 13px/1.4 var(--mono); color: var(--fg-2); }
 .flight-more a { font-weight: 600; text-decoration-color: var(--yellow); display: inline-block; padding: 4px 0; }
 
-/* Altitude over time for a motion run: a stretched SVG line under HTML labels and ticks */
-.fc { margin: 0; min-width: 0; }
+/* Altitude over time for a motion run: a stretched SVG line under HTML labels and ticks.
+   A chart is laid out only as it nears the screen, so a page that opens above it skips its work. */
+.fc { margin: 0; min-width: 0; content-visibility: auto; contain-intrinsic-block-size: auto 290px; }
+@media (min-width: 1000px) { .fc { contain-intrinsic-block-size: auto 430px; } }
 .fc-chart { font: 500 12px/1.2 var(--mono); color: var(--muted); }
 .fc-ytitle { margin: 0 0 14px; color: var(--fg-2); }
 .fc-plot { position: relative; aspect-ratio: 16 / 10; margin: 0 6px 34px calc(var(--y-ch) * 1ch + 12px); touch-action: pan-y; }
@@ -224,7 +226,7 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .fc-armed.fc-play .fc-draw, .fc-armed.fc-play .fc-draw svg { transform: none; transition: transform 1.5s linear; }
 .fc-armed.fc-play .fc-ev { opacity: 1; transition: opacity 200ms ease-out calc(var(--at) * 1.5s); }
 /* the small version on example cards: the line and its events, no labels */
-.fc-compact { display: grid; align-content: center; aspect-ratio: 4 / 3; padding: 12% 10%; background: var(--bg); border-bottom: 1px solid var(--line); }
+.fc-compact { display: grid; align-content: center; aspect-ratio: 4 / 3; padding: 12% 10%; background: var(--bg); border-bottom: 1px solid var(--line); content-visibility: visible; }
 .fc-compact .fc-plot { margin: 0; }
 .fc-compact .fc-ev::before { left: -4px; top: -4px; width: 8px; height: 8px; }
 
