@@ -75,5 +75,14 @@ def footprint() -> dict:
     from . import install
 
     d = install.lib_dir()
-    return {"installed": install.available(), "path": str(d),
-            "installed_bytes": install.tree_size(d) if d.exists() else 0, "version": install.CANTERA_VERSION}
+    size = install.tree_size(d) if d.exists() else 0
+    if size:
+        line = (f"chemistry and motors use Cantera {install.CANTERA_VERSION}, {size / 1e6:.1f} MB in {d} after "
+                "pruning")
+    elif install.available():
+        line = "chemistry and motors use the Cantera already in this Python"
+    else:
+        line = ("chemistry and motors fetch Cantera on their first run, a 6 MB download that takes about 16 MB "
+                "once pruned, or now with wobbl setup --only cantera")
+    return {"installed": install.available(), "path": str(d), "installed_bytes": size,
+            "version": install.CANTERA_VERSION, "line": line}

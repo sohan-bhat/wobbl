@@ -59,6 +59,8 @@ def setup(agents, no_agents, no_solvers, only, project, force, dry_run):
         ui.console.print(f"  {footprint()['line']}")
         from ..life.tools import footprint as life_footprint
         ui.console.print(f"  {life_footprint()['line']}")
+        from ..chem.tools import footprint as chem_footprint
+        ui.console.print(f"  {chem_footprint()['line']}")
     if not no_agents and agents != "none":
         ui.section("agents")
         found = ag.detect()
