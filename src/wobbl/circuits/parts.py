@@ -395,6 +395,15 @@ def _diodes(name: str) -> Part | None:
 
 
 @builder
+def _leds(name: str) -> Part | None:
+    m = re.match(r"^LED[-_ ]?(RED|GREEN|BLUE|YELLOW|ORANGE|WHITE|AMBER|UV|IR|PINK|PURPLE)?(?:[-_ ]?(0402|0603|0805|1206|"
+                 r"3MM|5MM))?$", name.upper())
+    if not m:
+        return None
+    return led((m.group(1) or "red").lower(), (m.group(2) or "").lower())
+
+
+@builder
 def _transistors(name: str) -> Part | None:
     u = name.upper()
     if u in BJTS or u in BJT_ALIAS:

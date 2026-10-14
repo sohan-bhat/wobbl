@@ -211,12 +211,14 @@ def timer(name: str) -> Part | None:
     t = "0.5*(1+tanh(200*(V(thres,gnd)-V(ctrl,gnd))))"
     rr = "0.5*(1+tanh(20*(0.7-V(reset,gnd))))"
     h = "0.5*(1+tanh(40*(V(q)-0.5)))"
+    qh = "0.5*(1+tanh(60*(V(q)-0.5)))"     # the latch state as the output and discharge see it: on or off
     text = (f".subckt {m} gnd trig out reset ctrl thres disch vcc\n"
             f"R1 vcc ctrl 5k\nR2 ctrl lo 5k\nR3 lo gnd 5k\nRq vcc gnd {_g(rq)}\n"
-            f"Bq 0 q I = 1m*((1-{rr})*({s} + (1-{s})*(1-{t})*{h}) - V(q))\nCq q 0 1p\n"
-            f"Bsrc vcc out I = V(q)*max(0, min({isrc}, (V(vcc,gnd)-{vdrop}-V(out,gnd))/{rs}))\n"
-            f"Bsnk out gnd I = (1-V(q))*max(0, min({isnk}, (V(out,gnd)-0.05)/{rk}))\n"
-            f"Bdis disch gnd I = (1-V(q))*min(0.2, max(0, V(disch,gnd))/15) + 1n\n.ends")
+            f"Bq 0 q I = 1m*(0.5*(1+tanh(40*((1-{rr})*({s} + (1-{s})*(1-{t})*{h}) - 0.5))) - V(q))\nCq q 0 10p\n"
+            f"Bsrc vcc out I = {qh}*max(0, min({isrc}, (V(vcc,gnd)-{vdrop}-V(out,gnd))/{rs}))\n"
+            f"Bsnk out gnd I = (1-{qh})*max(0, min({isnk}, (V(out,gnd)-0.05)/{rk}))\n"
+            f"Bdis disch gnd I = (1-{qh})*min(0.2, max(0, V(disch,gnd))/15) + 1n\n"
+            f"Co out gnd 10p\nCd disch gnd 10p\n.ends")
     return Part(name, "timer", {"vsupply_V": vabs, "iout_A": max(isrc, isnk), "theta_ja": thja, "tj_max_C": 150},
                 "x", m, text, ("gnd", "trig", "out", "reset", "ctrl", "thres", "disch", "vcc"),
                 source=f"{name} datasheet: {tech}, {vsmin:g} to {vsmax:g} V, output {isrc * 1000:g} mA source and "
