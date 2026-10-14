@@ -477,8 +477,23 @@ def _chem(name: str):
     return call
 
 
-register(Recipe("cantera", ("combustion", "motor"), (), check=_chem("check"), installer=_chem("install"),
-                present=_chem("available")))
+register(Recipe("cantera", ("combustion", "motor", "mixture", "reaction", "chemistry"), (), check=_chem("check"),
+                installer=_chem("install"), present=_chem("available")))
+
+
+def _chem_pkg(fn: str, name: str):
+    """wobbl.chem.install's function for one chemistry library, imported only when the registry calls it."""
+    def call(*args):
+        from ..chem import install as chem_install
+        return getattr(chem_install, fn)(name, *args)
+    return call
+
+
+# the other chemistry libraries are Python wheels too, each installed when a run first needs it
+for _name, _domains in (("rdkit", ("molecule", "chemistry")), ("tblite", ("molecule", "crystal", "chemistry")),
+                        ("ase", ("molecule", "crystal", "chemistry")), ("pyscf", ("dft", "chemistry"))):
+    register(Recipe(_name, (_name, *_domains), (), check=_chem_pkg("check_pkg", _name),
+                    installer=_chem_pkg("install_pkg", _name), present=_chem_pkg("available_pkg", _name)))
 
 
 def _mech(name: str):

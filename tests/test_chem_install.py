@@ -71,3 +71,25 @@ def test_cantera_is_an_on_demand_recipe_with_its_own_installer(tmp_path, monkeyp
     assert installer.install_on_demand(install.DOMAINS, logs.append) is True
     assert calls == [False] and any("cantera" in m for m in logs)
     assert installer.install_on_demand(install.DOMAINS, logs.append) is False      # already there
+
+
+def test_every_chemistry_library_is_an_on_demand_recipe():
+    for name in ("rdkit", "tblite", "ase", "pyscf"):
+        r = installer.RECIPES[name]
+        assert not r.core and r.installer is not None and name in r.domains and "chemistry" in r.domains
+    assert {r.name for r in installer.recipes_for("molecule")} == {"rdkit", "tblite", "ase"}
+    assert {r.name for r in installer.recipes_for("crystal")} == {"tblite", "ase"}
+    assert [r.name for r in installer.recipes_for("dft")] == ["pyscf"]
+    assert install.PACKAGES["pyscf"].needs == ("h5py",)
+
+
+def test_prune_drops_tests_stubs_and_named_paths(tmp_path):
+    root = tmp_path / "w"
+    for rel in ["rdkit/__init__.py", "rdkit/Chem/rdchem.so", "rdkit/Contrib/x.py", "rdkit/Chem/test/t.py",
+                "rdkit/Chem/a.pyi", "rdkit/Chem/__pycache__/a.pyc", "rdkit-2025.9.3.dist-info/METADATA"]:
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("x" * 10)
+    assert install.prune_pkg("rdkit", root) == 40
+    left = sorted(str(p.relative_to(root)) for p in root.rglob("*") if p.is_file())
+    assert left == ["rdkit-2025.9.3.dist-info/METADATA", "rdkit/Chem/rdchem.so", "rdkit/__init__.py"]
