@@ -134,6 +134,36 @@ def flame(out: Path, phis, temps, species: list[dict], phi: float, info: dict) -
     return _write(out, data)
 
 
+def runaway(out: Path, cell, calm, burst, t_trigger, ta_cr: float, ambient: float, frames: int = 150) -> str:
+    """Frames in time of a cell in two ovens either side of the onset, with how much of each reactant is left."""
+    end = min(calm.t[-1], burst.t[-1])
+    times = np.linspace(0.0, end, frames)
+
+    def series(tr):
+        T = np.interp(times, tr.t, tr.T)
+        left = [np.interp(times, tr.t, tr.y[i]) for i in range(5)]
+        # what is left of each reaction's reactant, 1 at the start and 0 when used up
+        sei, neg, pos, ele = left[0] / tr.y[0, 0], left[1] / tr.y[1, 0], (1 - left[2]) / (1 - tr.y[2, 0]), left[4]
+        return [{"T_C": _r(T[i] - 273.15), "sei": _r(sei[i], 3), "negative": _r(neg[i], 3),
+                 "positive": _r(pos[i], 3), "electrolyte": _r(ele[i], 3)} for i in range(frames)]
+
+    a, b = series(calm), series(burst)
+    rows = [{"t_min": _r(t / 60, 4), "below": a[i], "above": b[i]} for i, t in enumerate(times)]
+    data = {"manifest": {"kind": "cell-runaway", "version": VERSION, "generator": "wobbl runaway",
+                         "frames": len(rows), "time": "frames are evenly spaced in time from the moment the cell "
+                                                     "goes into the oven",
+                         "units": {"t_min": "minutes", "T_C": "C", "sei": "fraction of each reactant left",
+                                   "negative": "fraction left", "positive": "fraction left",
+                                   "electrolyte": "fraction left"}},
+            "cell": {"label": cell.label, "diameter_mm": _r(cell.diameter * 1000), "length_mm": _r(cell.length * 1000),
+                     "critical_C": _r(ta_cr - 273.15), "surroundings_C": _r(ambient - 273.15),
+                     "below_oven_C": _r(calm.Ta - 273.15), "above_oven_C": _r(burst.Ta - 273.15),
+                     "trigger_min": _r(t_trigger / 60) if t_trigger else None,
+                     "trigger": "the cell heats itself faster than 10 C/min"},
+            "frames": rows}
+    return _write(out, data)
+
+
 def nozzle(out: Path, rows: list[dict], info: dict) -> str:
     """Frames from the throat to past the exit, shifting and frozen, with Isp at each area ratio."""
     data = {"manifest": {"kind": "nozzle", "version": VERSION, "generator": "wobbl propellant", "frames": len(rows),
