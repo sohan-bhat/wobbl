@@ -115,9 +115,14 @@ def evaluate(study, mat, modes, mesh, built, levels, stopped_by, tol, zeta, exci
         values["harmonic"] = {"peak_MPa": peak, "frequency_Hz": f_at, "xyz": xyz, "sf": sf_h,
                               "input": sine.text, "solver": "CalculiX" if ok else "Wobbl's modal sum",
                               "masses": h.get("masses", [])}
-        heads.append(f"The {sine.text} sweep peaks at {fmt(f_at)} Hz with {fmt(peak)} MPa at "
-                     f"({', '.join(fmt(v) for v in xyz)}), safety factor {sf_h:.2f} against "
-                     f"{mat.criterion.split(' vs ')[1]}.")
+        what = (f"The {sine.text} sweep peaks" if sine.accel else
+                f"Swept from {fmt(sine.lo)} to {fmt(sine.hi)} Hz, the loads peak")
+        if sine.accel and "load_share" in h:
+            what = f"The {sine.text} sweep with the loads peaks"
+        heads.append(f"{what} at {fmt(f_at)} Hz with {fmt(peak)} MPa at ({', '.join(fmt(v) for v in xyz)}), safety "
+                     f"factor {sf_h:.2f} against {mat.criterion.split(' vs ')[1]}.")
+        if "load_share" in h:
+            checks.append(_load_share(modes, h))
         checks.append(_sdof_check(modes, h, sine, zeta))
         checks.append(_cross_check(harmonic, h))
         checks.append(_singular(h["raw_max"], h["peak"], h["exclusion_radius"], "sine peak"))
@@ -237,16 +242,26 @@ def _rayleigh_check(r) -> Check:
                                                  "modes move mass along the same direction", r)
 
 
+def _load_share(modes, h) -> Check:
+    share = h["load_share"]
+    s = (f"the {modes.count} modes found, up to {fmt(modes.freq[-1])} Hz, carry {100 * share:.1f}% of the "
+         f"{fmt(h['static_mm'])} mm the loads deflect the part when they stand still")
+    if share >= 0.9:
+        return Check("load participation", "pass", s, {"share": share})
+    return Check("load participation", "warn", s + ". Higher modes carry the rest, so the response near the bottom of "
+                                                   "the band may be low. Run with more --modes", {"share": share})
+
+
 def _sdof_check(modes, h, sine, zeta) -> Check:
-    """One mode alone, at the peak: q = Gamma a / (2 zeta w^2) through that mode's stress at the governing node."""
+    """One mode alone, at the peak: q = F / (2 zeta w^2), with F that mode's force from the base motion and the loads,
+    through that mode's stress at the governing node."""
     f = h["f_peak"]
     i = int(np.argmin(np.abs(np.log(modes.freq / f))))
-    g = modes.gamma(sine.direction)[i]
     w = 2 * math.pi * modes.freq[i]
-    q = g * sine.accel / (2 * zeta * w * w)
+    q = abs(float(h["force"][i])) / (2 * zeta * w * w)
     single = float(modal.vm_amplitude((q * modes.stress[i, h["node"]].astype(float))[None, :] + 0j)[0])
     ratio = single / h["peak"] if h["peak"] > 0 else 0.0
-    s = (f"mode {i + 1} alone as a single degree of freedom, Gamma a / (2 zeta w^2), gives {fmt(single)} MPa at the "
+    s = (f"mode {i + 1} alone as a single degree of freedom, F / (2 zeta w^2), gives {fmt(single)} MPa at the "
          f"governing point, {100 * ratio:.0f}% of the full sum")
     detail = {"mode": i + 1, "single_mode_MPa": single, "ratio": ratio}
     if 0.9 <= ratio <= 1.1:
@@ -352,10 +367,18 @@ def assumptions(mat, zeta_why, masses, deck, sine, psd, base) -> list[str]:
         how = (f"a point at ({', '.join(fmt(v) for v in m.point)}) held rigidly by its faces, with no rotary inertia "
                "of its own" if m.rigid else "spread over its faces by area, adding no stiffness")
         a.append(f"Mass {k + 1}, {fmt(m.mass * 1e6)} g ({m.describe()}), is {how}.")
-    if sine is not None:
+    if sine is not None and sine.accel:
         a.append(f"The sine sweep is a base acceleration of {fmt(sine.accel / modal.G0)} g along "
                  f"{_axis_word(sine.direction)} from {fmt(sine.lo)} to {fmt(sine.hi)} Hz, slow enough to reach "
-                 "steady state at every frequency.")
+                 "steady state at every frequency" + (", and the loads act with it at the same frequency and phase."
+                                                      if base.loads else "."))
+    elif sine is not None:
+        a.append(f"The loads act as harmonic forces of their given size at every frequency from {fmt(sine.lo)} to "
+                 f"{fmt(sine.hi)} Hz, all in phase, with the supports held still, and the sweep is slow enough to "
+                 "reach steady state at every frequency.")
+    if any(fx.kind == "wall" for fx in base.fixtures):
+        a.append("A wall holds the faces resting on it along its normal and lets them slide along it, as if whatever "
+                 "presses the part there always outweighs the vibration.")
     if psd is not None:
         a.append(f"The random input is a stationary Gaussian base acceleration, {psd.describe()}. CalculiX has no "
                  "random response step, so Wobbl sums it from CalculiX's modes, with the mean square von Mises stress "

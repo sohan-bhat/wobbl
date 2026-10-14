@@ -86,3 +86,11 @@ def test_rigid_fit_recovers_the_attachment_motion():
     assert filled[30] == pytest.approx(u0, abs=1e-12)
     many = ccx.fill_rigid(np.stack([U, 2 * U]), np.vstack([X, point]), deck)
     assert many[1, 30] == pytest.approx(2 * u0, abs=1e-12)
+
+
+def test_a_band_alone_sweeps_the_loads():
+    s = parse_sine("10-500 Hz")
+    assert s.accel == 0 and (s.lo, s.hi) == (10, 500)
+    assert parse_sine("from 20 Hz to 2 kHz").hi == 2000
+    with pytest.raises(SpecError):
+        parse_sine("fast")

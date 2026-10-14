@@ -5,6 +5,7 @@
     rpm        "9000 rpm" or "4000-9000 rpm"                        a rotor: once per turn and once per blade
     frequency  "120 Hz" or "100-150 Hz"                             any other tone or narrow band to stay clear of
     sine       "2 g z 10-500 Hz"                                    a shaker sweep, base acceleration along an axis
+               "10-500 Hz"                                          the study's loads swept as harmonic forces
     psd        "gevs-qual" or "20:0.01, 80:0.04, 500:0.04, 2000:0.01"   random base acceleration, g^2/Hz
 """
 from __future__ import annotations
@@ -61,7 +62,7 @@ class Sine:
 
 @dataclass
 class VibrationStudy:
-    base: StructuralStudy        # part, material and supports; loads are not used
+    base: StructuralStudy        # part, material and supports, and any loads, which a sweep shakes the part with
     masses: list[str] = field(default_factory=list)
     modes: int = 15
     rpm: list[str] = field(default_factory=list)
@@ -156,11 +157,19 @@ def parse_frequency(text: str) -> Excitation:
 
 
 def parse_sine(text: str) -> Sine:
-    """'2 g z 10-500 Hz': amplitude, axis and band of a base acceleration sweep."""
+    """'2 g z 10-500 Hz': amplitude, axis and band of a base acceleration sweep. A band alone, '10-500 Hz', sweeps
+    the study's loads instead, as harmonic forces of their given size, with the base held still."""
     t = str(text).strip().lower()
     m = re.match(rf"^({_NUM})\s*(g|m/s2|m/s\^2|mm/s2)\s+(\S+)\s+(.+)$", t)
     if not m:
-        raise SpecError(f"could not read the sine sweep '{text}'. Write it like '2 g z 10-500 Hz'")
+        try:
+            lo, hi, start = _band(re.sub(r"^from\s+", "", t), "band", text)
+        except SpecError:
+            lo, hi, start = 0.0, 0.0, 1
+        if start == 0 and hi > lo > 0:
+            return Sine(0.0, [0.0, 0.0, 1.0], lo, hi, str(text).strip())
+        raise SpecError(f"could not read the sine sweep '{text}'. Write it like '2 g z 10-500 Hz', or a band alone "
+                        "like '10-500 Hz' to sweep the loads")
     accel = parse_quantity(f"{m.group(1)} {m.group(2)}", "accel").value
     try:
         d = parse_vector(m.group(3))

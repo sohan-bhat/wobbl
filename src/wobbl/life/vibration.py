@@ -48,15 +48,20 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
     say = progress or (lambda a, b: None)
     adapter = solvers.for_domain("structural")
     exe = adapter.require()
-    base.loads = []
+    sine = parse_sine(study.sine) if study.sine else None
+    if base.loads and sine is None:
+        raise SpecError("loads in a vibration study shake the part as harmonic forces, so give the band they sweep "
+                        "over, for example --sine '10-500 Hz'")
+    if sine is not None and sine.accel == 0 and not base.loads:
+        raise SpecError("a sweep needs a base acceleration, as in '2 g z 10-500 Hz', or loads that shake the part")
     p = prepare(base, work, progress, pre)
     mat = p.material
-    zeta, zeta_why = (study.damping, "given") if study.damping else default_damping(mat)
+    zeta, zeta_why = (study.damping, f"{100 * study.damping:g}% of critical, as given") if study.damping else \
+        default_damping(mat)
     if not 0 < zeta < 0.5:
         raise SpecError("damping is a fraction of critical, for example 0.02 for 2%")
     masses = [parse_mass(m) for m in study.masses]
     excite = study.excitations()
-    sine = parse_sine(study.sine) if study.sine else None
     psd = modal.parse_psd(study.psd) if study.psd else None
     axis = unit_vector(study.axis)
     top = max([e.hi for e in excite] + ([sine.hi] if sine else []) + ([float(psd.f[-1])] if psd else []) + [0.0])
@@ -72,7 +77,8 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
             break
         say("mesh", f"level {k}: element size {sz.h:.3g} mm")
         mesh = build_mesh(p.prep, sz)
-        built = build_static(mesh, [], p.fixtures, mat, p.features.faces)
+        built = build_static(mesh, p.loads, p.fixtures, mat, p.features.faces)
+        hold_walls(built)
         attached = _attach(masses, sel, mesh)
         wl = work / f"level{k}"
         deck = ccx.make_deck(built.model, wl / "static.inp", attached)
@@ -83,7 +89,8 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
             raise SpecError("the supports leave the part free to move as a rigid body (a natural frequency of zero). "
                             "Hold it the way it is mounted, for example --fix 'bolt holes d=3.2'")
         (wl / "modes.frd").unlink(missing_ok=True)
-        resp = _response(modes, mesh, built, p, sz, zeta, sine, psd, axis)
+        applied = _applied(exe, wl, deck, modes, mesh, built) if p.loads else None
+        resp = _response(modes, mesh, built, p, sz, zeta, sine, psd, axis, applied)
         watch = _watched(modes, excite, axis)
         levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sz.h, "freq": modes.freq[:8].tolist(),
                        "watch_mode": watch + 1, "watch_Hz": float(modes.freq[watch]),
@@ -183,7 +190,46 @@ def _watched(modes: modal.Modes, excite, axis) -> int:
     return int(big[0]) if len(big) else 0
 
 
-def _response(modes, mesh, built, p, sz, zeta, sine, psd, axis) -> dict | None:
+def hold_walls(built) -> None:
+    """A part resting on a wall stays against it while it vibrates, as long as whatever presses it there outweighs
+    the vibration, so each wall holds its faces along the wall's normal and lets them slide along it."""
+    from ..fe import NormalConstraint
+
+    for w in built.walls:
+        built.model.normal_constraints.append(NormalConstraint(w.name, w.nodes, w.normal))
+        built.zones[w.name] = w.nodes
+
+
+def _applied(exe, wl: Path, deck, modes, mesh, built) -> dict:
+    """Modal forces of the study's loads, from CalculiX's static solution under them. With K phi = w^2 M phi the
+    modal force phi^T f equals w^2 phi^T M u, which covers point loads, pressures and loads carried in through
+    couplings alike. The share of the static deflection the modes carry, sum (phi^T M u)^2 / u^T M u, says how much
+    the modes left out would add."""
+    text = deck.head + "*STEP\n*STATIC\n" + deck.supports + deck.loads + "*NODE FILE\nU\n*END STEP\n"
+    ccx.run(exe, wl, "loads", text)
+    n_all = mesh.n_nodes + 2 * len(deck.extra)
+    u = ccx.read_blocks(wl / "loads.frd", n_all, ("DISP",))["DISP"][-1][1][:, :3].astype(float)
+    u = ccx.fill_rigid(u, mesh.X, deck)
+    (wl / "loads.frd").unlink(missing_ok=True)
+    Mu = modal.mass_times(mesh, built.model.density, u, modes.mass_nodes, modes.mass_values)
+    proj = np.einsum("mnd,nd->m", modes.shapes.astype(float), Mu)
+    w2 = (2 * math.pi * modes.freq) ** 2
+    uMu = float(np.sum(u * Mu))
+    return {"force": w2 * proj, "share": float(np.sum(proj ** 2) / uMu) if uMu > 0 else 0.0,
+            "static_mm": float(np.linalg.norm(u[:mesh.n_nodes], axis=1).max())}
+
+
+def sweep_force(modes, sine, applied) -> np.ndarray:
+    """Modal forces of a sweep: the base acceleration's inertia and the applied loads, in phase."""
+    force = np.zeros(modes.count)
+    if sine.accel:
+        force = force + modal.base_force(modes, sine.accel, sine.direction)
+    if applied is not None:
+        force = force + applied["force"]
+    return force
+
+
+def _response(modes, mesh, built, p, sz, zeta, sine, psd, axis, applied=None) -> dict | None:
     """Governing response stress on this mesh, from the modes: the sine sweep's peak and the random 3 sigma."""
     if (sine is None and psd is None) or modes.stress is None:
         return None
@@ -198,15 +244,17 @@ def _response(modes, mesh, built, p, sz, zeta, sine, psd, axis) -> dict | None:
                              modes, R, gi), "R": R, "exclusion_radius": r_ex}
         out["stress"] = 3 * float(rms[gi])
     if sine is not None:
-        out["harmonic"] = _sweep(modes, mesh, built, p, sz, zeta, sine)
+        out["harmonic"] = _sweep(modes, mesh, built, p, sz, zeta, sine, sweep_force(modes, sine, applied))
+        if applied is not None:
+            out["harmonic"]["load_share"] = applied["share"]
+            out["harmonic"]["static_mm"] = applied["static_mm"]
         out["stress"] = max(out.get("stress", 0.0), out["harmonic"]["peak"])
     return out
 
 
-def _sweep(modes, mesh, built, p, sz, zeta, sine) -> dict:
-    """The largest von Mises amplitude over a base sweep: at each mode in the band and around it, then the best
+def _sweep(modes, mesh, built, p, sz, zeta, sine, force) -> dict:
+    """The largest von Mises amplitude over a sweep: at each mode in the band and around it, then the best
     frequency refined, all from the modal sum."""
-    force = modal.base_force(modes, sine.accel, sine.direction)
     near = [f * (1 + zeta * np.linspace(-4, 4, 17)) for f in modes.freq if sine.lo <= f <= sine.hi]
     grid = np.unique(np.concatenate(near + [np.array([sine.lo, sine.hi])]))
     grid = grid[(grid >= sine.lo) & (grid <= sine.hi)]
@@ -247,12 +295,12 @@ def _sweep(modes, mesh, built, p, sz, zeta, sine) -> dict:
     curve = modal.vm_amplitude(np.einsum("fm,mc->fc", q, S[:, gi]))
     return {"f_peak": float(f_peak), "peak": float(vm[gi]), "node": gi, "xyz": mesh.X[gi].tolist(), "vm": vm,
             "excluded": excluded, "raw_max": float(vm.max()), "curve_f": curve_f, "curve": curve,
-            "exclusion_radius": r_ex, "masses": mass_motion(modes, zeta, force, f_peak, sine)}
+            "exclusion_radius": r_ex, "force": force, "masses": mass_motion(modes, zeta, force, f_peak, sine)}
 
 
 def mass_motion(modes: modal.Modes, zeta: float, force: np.ndarray, f: float, sine) -> list[dict]:
-    """How far each attached mass moves relative to the base at frequency f, and its acceleration against the
-    input (the transmissibility): a = a_base - w^2 u_relative."""
+    """How far each attached mass moves relative to the base at frequency f, and its acceleration, which against a
+    base input is the transmissibility: a = a_base - w^2 u_relative."""
     qf = modal.harmonic_coords(np.array([f]), modes, zeta, force)[0]
     w2 = (2 * math.pi * f) ** 2
     d = np.asarray(sine.direction, float) / np.linalg.norm(sine.direction)
@@ -262,9 +310,9 @@ def mass_motion(modes: modal.Modes, zeta: float, force: np.ndarray, f: float, si
         u = np.einsum("m,mkd->kd", qf, modes.shapes[:, nodes].astype(float))
         u = (u * m[:, None]).sum(0) / m.sum()
         accel = sine.accel * d - w2 * u
-        out.append({"name": name, "relative_mm": float(np.linalg.norm(np.abs(u))),
-                    "accel_g": float(np.linalg.norm(np.abs(accel)) / modal.G0),
-                    "transmissibility": float(np.linalg.norm(np.abs(accel)) / sine.accel)})
+        a = float(np.linalg.norm(np.abs(accel)))
+        out.append({"name": name, "relative_mm": float(np.linalg.norm(np.abs(u))), "accel_g": a / modal.G0,
+                    "transmissibility": a / sine.accel if sine.accel else None})
     return out
 
 
@@ -273,7 +321,8 @@ def _ccx_harmonic(exe, wl: Path, deck, modes, resp, sine, zeta, mesh) -> dict | 
     motion of the governing node across the band, and the whole field at Wobbl's peak frequency."""
     h = resp["harmonic"]
     gi = h["node"]
-    loads = ccx.body_load(deck, sine.accel, sine.direction)
+    loads = (ccx.body_load(deck, sine.accel, sine.direction) if sine.accel else "") + \
+        (deck.loads if "load_share" in h else "")
     fp = h["f_peak"]
     try:
         text = ccx.harmonic_inp(deck, loads, [(sine.lo, sine.hi, 6, 3.0), (fp, fp * (1 + 1e-6), 2, 1.0)], zeta,
@@ -291,7 +340,7 @@ def _ccx_harmonic(exe, wl: Path, deck, modes, resp, sine, zeta, mesh) -> dict | 
     vm = modal.vm_amplitude(S[:mesh.n_nodes])
     excl = h["excluded"]
     gj = governing(vm, excl)
-    force = modal.base_force(modes, sine.accel, sine.direction)
+    force = h["force"]
     sweep_err = 0.0
     fs = sorted(f for f in printed if sine.lo <= f <= sine.hi)
     if fs:
