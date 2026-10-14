@@ -23,19 +23,54 @@ def _read(d: Path, name: str) -> dict | None:
         return None
 
 
+MARK, END = "<!-- wobbl evidence -->", "<!-- /wobbl evidence -->"
+TEXT_MARK = "\n\nEvidence\n"
+
+
 def refresh(result_dir):
-    """Rebuild report.html and summary.txt of a run so they show its evidence files."""
+    """Show a run's evidence files in its report.html and summary.txt. A strength run and any run written as a
+    generic outcome are rebuilt whole. Any other outcome is left as it is, with the evidence put into its report
+    between markers and after a heading in its summary, so a domain's own fields are never lost."""
+    from dataclasses import fields
+
+    from ..outcome_generic import GenericOutcome
+
     d = Path(result_dir)
     data = json.loads((d / "outcome.json").read_text())
-    if data.get("domain") == "strength":
+    if data.get("domain") == "strength" and "governing_MPa" in data:
         from ..structural.outcome import Outcome
         from ..structural.report import write_outputs
 
         write_outputs(Outcome.load(d / "outcome.json"), d)
-    else:
-        from ..outcome_generic import GenericOutcome
+        return
+    known = {f.name for f in fields(GenericOutcome)}
+    if set(data) <= known | {"criteria"}:
+        try:
+            GenericOutcome.load(d / "outcome.json").write(d)
+            return
+        except (TypeError, KeyError, ValueError):
+            pass
+    _splice(d)
 
-        GenericOutcome.load(d / "outcome.json").write(d)
+
+def _splice(d: Path):
+    rep = d / "report.html"
+    body = MARK + "".join(evidence_sections(d)) + END
+    if rep.exists():
+        html = rep.read_text(encoding="utf-8")
+        if MARK in html and END in html:
+            html = html[:html.index(MARK)] + body + html[html.index(END) + len(END):]
+        elif "</main>" in html:
+            html = html.replace("</main>", body + "</main>", 1)
+        else:
+            html = html.replace("</body>", body + "</body>", 1) if "</body>" in html else html + body
+        rep.write_text(html, encoding="utf-8")
+    summ = d / "summary.txt"
+    if summ.exists():
+        text = summ.read_text(encoding="utf-8")
+        text = text.split(TEXT_MARK)[0].rstrip("\n")
+        ev = evidence_text(d)
+        summ.write_text(text + (TEXT_MARK + ev.lstrip("\n") if ev else "") + "\n", encoding="utf-8")
 
 
 def evidence_sections(result_dir) -> list[str]:
@@ -283,9 +318,13 @@ def test_plan_section(r: dict, d: Path) -> str:
         rows = []
         for g in t.get("gauges", []):
             for p in g.get("predicted", []):
-                val = (f"{fmt(p['microstrain'])} ± {fmt(p['band_95'])} µε" if "microstrain" in p else
-                       f"{fmt(p['mm'])} ± {fmt(p['band_95'])} mm" if "mm" in p else f"{fmt(p.get('C', 0))} C")
-                rows.append([g["kind"], ", ".join(fmt(x) for x in g["xyz"]),
+                if "value" in p:
+                    unit = f" {p['unit']}" if p.get("unit") else ""
+                    val = f"{fmt(p['value'])}{unit}" + (f" ± {fmt(p['band_95'])}{unit}" if p.get("band_95") else "")
+                else:
+                    val = (f"{fmt(p['microstrain'])} ± {fmt(p['band_95'])} µε" if "microstrain" in p else
+                           f"{fmt(p['mm'])} ± {fmt(p['band_95'])} mm" if "mm" in p else f"{fmt(p.get('C', 0))} C")
+                rows.append([g["kind"], ", ".join(fmt(x) for x in g.get("xyz") or []),
                              ", ".join(f"{x:+.2f}" for x in g.get("direction", [])),
                              fmt(p["load"]) if "load" in p else "", val])
         if rows:

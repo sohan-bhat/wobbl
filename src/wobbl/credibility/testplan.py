@@ -125,7 +125,11 @@ def _headline(r: dict) -> str:
 
 
 def _validation_test(dom: str, o: dict, u: dict | None, v: dict | None) -> dict | None:
-    if dom == "strength":
+    """The test that supplies the comparator. A run with a governing point and a strength limit gets gauges, load
+    steps and predicted readings, a run with a hottest point gets thermocouples, and any other run gets a
+    measurement of what decides it, at the design point, with the prediction and its band."""
+    vals = o.get("values") or {}
+    if o.get("governing_xyz") is not None and o.get("allowable_MPa"):
         probes = (u or {}).get("probes") or []
         allow, gov = o["allowable_MPa"], o["governing_MPa"]
         cap = min(1.0, 0.8 * allow / gov) if gov > 0 else 1.0
@@ -169,8 +173,8 @@ def _validation_test(dom: str, o: dict, u: dict | None, v: dict | None) -> dict 
         return {"kind": "validation", "what": f"A static load test with strain gauges and a dial gauge, loaded in "
                 f"steps of {loads}", "gauges": gauges, "steps": steps, "why": why,
                 "addresses": ["comparator", "output comparison", "applicability"]}
-    if dom == "thermal":
-        hot = o.get("values", {}).get("hot_xyz")
+    if vals.get("hot_xyz") is not None and "t_max_C" in vals:
+        hot = vals.get("hot_xyz")
         how = "through the same run" if o.get("values", {}).get("time_over_limit_s") is not None else \
             "until it settles"
         return {"kind": "validation", "what": "Thermocouples at the hottest point and on the cooled faces, with the "
@@ -179,12 +183,34 @@ def _validation_test(dom: str, o: dict, u: dict | None, v: dict | None) -> dict 
                             "predicted": [{"C": o["values"]["t_max_C"]}]}] if hot else [],
                 "why": "It checks the film coefficients and the contact paths, the inputs heat models get wrong most.",
                 "addresses": ["comparator", "output comparison", "applicability"]}
-    if dom == "circuit":
-        key = (u or {}).get("decision") or "the operating point"
-        return {"kind": "validation", "what": f"A bench measurement of {key} at the nominal supply and at its "
-                "tolerance limits", "gauges": [], "why": "It checks the component models against real parts.",
-                "addresses": ["comparator", "output comparison", "applicability"]}
-    return None
+    return _measure_decision(dom, o, u)
+
+
+def _measure_decision(dom: str, o: dict, u: dict | None) -> dict | None:
+    from .domains import criteria, governing, scalar_values, unit_of
+
+    vals = scalar_values(o)
+    crit = criteria(o)
+    key = (u or {}).get("decision") or ((governing(crit, vals) or {}).get("value")) or next(iter(vals), None)
+    if key is None:
+        return None
+    keys = list(dict.fromkeys([key] + [c["value"] for c in crit]))[:4]
+    gauges = []
+    for k in keys:
+        st = ((u or {}).get("outputs") or {}).get(k)
+        mean = st["mean"] if st else vals.get(k)
+        if mean is None:
+            continue
+        gauges.append({"kind": k.replace("_", " "), "quantity": k, "xyz": [],
+                       "predicted": [{"value": mean, "band_95": 2 * st["sd"] if st else None, "unit": unit_of(k)}]})
+    top = [x["input"] for x in ((u or {}).get("sensitivity") or {}).get("indices", []) if x["total"] >= 0.1][:2]
+    what = (f"A measurement of {', '.join(k.replace('_', ' ') for k in keys)} on the real article at the design "
+            "point")
+    if top:
+        what += f", and again with {' and '.join(top)} at the ends of their range, which tells the slope apart"
+    return {"kind": "validation", "what": what, "gauges": gauges,
+            "why": f"It supplies the comparison with tests V&V 20 needs, for the quantity this {dom} run is judged on.",
+            "addresses": ["comparator", "output comparison", "applicability"]}
 
 
 def _discriminator(d: Path, o: dict) -> dict | None:
@@ -230,7 +256,7 @@ def replaceable(dom: str, o: dict, u: dict | None, v: dict | None, c: dict | Non
         why_not.append("credibility factors are short of their goals")
     likely = not why_not
     out = []
-    if dom == "strength":
+    if o.get("governing_xyz") is not None and o.get("allowable_MPa"):
         out.append({"test": "a static proof test at the design load", "verdict": "likely" if likely else "not yet",
                     "why": "the model is validated in this regime, verified, and the margin holds across the input "
                            "scatter and the idealizations" if likely else ", ".join(why_not)})
@@ -245,16 +271,27 @@ def replaceable(dom: str, o: dict, u: dict | None, v: dict | None, c: dict | Non
                     "why": "they measure the inputs the model rests on"})
         out.append({"test": "fatigue, impact and vibration tests", "verdict": "cannot",
                     "why": "this run is a static strength study and does not model them"})
-    elif dom == "thermal":
-        out.append({"test": "a steady soak at full power", "verdict": "likely" if likely else "not yet",
-                    "why": "validated and verified with margin" if likely else ", ".join(why_not)})
-        out.append({"test": "film coefficient measurements", "verdict": "cannot",
-                    "why": "they measure an input the model takes as given"})
-        out.append({"test": "thermal cycling and endurance", "verdict": "cannot",
-                    "why": "this run does not model ageing or cycling"})
     else:
-        out.append({"test": "a bench check of the operating point", "verdict": "likely" if likely else "not yet",
-                    "why": "validated and verified with margin" if likely else ", ".join(why_not)})
-        out.append({"test": "component screening", "verdict": "cannot",
-                    "why": "the spread of real parts is an input the model takes as given"})
+        dec = ((u or {}).get("decision") or "answer").replace("_", " ")
+        test = PROOF.get(dom, f"a test of the {dec} at the design point")
+        out.append({"test": test, "verdict": "likely" if likely else "not yet",
+                    "why": "the model is validated and verified there, and the margin holds across the input scatter"
+                    if likely else ", ".join(why_not)})
+        out.append({"test": "tests of later variants in the same family", "verdict": "likely" if real and agree
+                    else "not yet", "why": "variants inside the validated range of inputs carry the evidence over"
+                    if real and agree else "no validated test exists to carry over"})
+        roles = sorted({i["role"] for i in (u or {}).get("inputs", []) if i["role"] not in ("numerical",)})
+        out.append({"test": "measurements of the inputs themselves", "verdict": "cannot",
+                    "why": "they measure what the model takes as given" + (f" (its {', '.join(roles)} inputs)"
+                                                                             if roles else "")})
+        first = next((a for a in o.get("assumptions", []) if len(a) < 200), "")
+        out.append({"test": "anything outside the run's assumptions", "verdict": "cannot",
+                    "why": "the model says nothing past them" + (f", starting with this one, {first.rstrip('.')}"
+                                                                 if first else "")})
     return out
+
+
+# the usual test a validated run could stand in for, by domain, when it has a familiar name
+PROOF = {"thermal": "a steady soak at full power", "circuit": "a bench check of the operating point",
+         "motion": "a flight or drop test at the design conditions", "flow": "a flow or tow test at the design point",
+         "motor": "a static fire at the design point", "mechanism": "a run of the mechanism through its move"}

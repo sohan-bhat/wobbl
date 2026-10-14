@@ -21,7 +21,11 @@ from . import uq
 
 LEVELS = ["low", "medium", "high"]
 VERB = {"pass": "passes", "warn": "warns", "fail": "fails", "info": "notes", "skip": "was skipped"}
-DOMAIN_SUITE = {"strength": "strength", "thermal": "heat", "circuit": "circuit"}
+SUITE_NAMES = {"thermal": "heat"}     # a domain whose validation cases go by another name
+
+
+def suite_domain(dom: str) -> str:
+    return SUITE_NAMES.get(dom, dom)
 
 
 def model_risk(influence: str, consequence: str) -> int:
@@ -66,36 +70,39 @@ def assess(result_dir, influence: str = "medium", consequence: str = "medium", q
     dom = o.get("domain", "")
     risk = model_risk(influence, consequence)
     goal = goal_for(risk)
-    checks = {c["name"]: c for c in o.get("checks", [])}
     F = []
+    model = _model(d)
 
     # code verification: cases with known answers in this domain
     rows, src = suite_results(d, suite)
-    mine = [r for r in rows if r.get("domain") == DOMAIN_SUITE.get(dom)]
+    sd = suite_domain(dom)
+    mine = [r for r in rows if r.get("domain") in (sd, dom)]
     if mine:
         ok = sum(bool(r.get("pass")) for r in mine)
         worst = max(mine, key=lambda r: r.get("error", 0) or 0)
         lvl = "high" if ok == len(mine) and len(mine) >= 3 else ("medium" if ok == len(mine) else "low")
-        ev = (f"{ok} of {len(mine)} {DOMAIN_SUITE[dom]} cases with known answers pass their tolerance, run through "
+        ev = (f"{ok} of {len(mine)} {sd} cases with known answers pass their tolerance, run through "
               f"the same pipeline, the largest error {100 * (worst.get('error') or 0):.2g}% ({worst.get('title')})")
     else:
         from ..validation.cases import CASES
 
-        n = len([c for c in CASES if c.domain == DOMAIN_SUITE.get(dom)])
-        lvl, ev = "low", (f"{n} {DOMAIN_SUITE.get(dom, dom)} cases exist in Wobbl's validation suite, but no results "
-                          "were found here; run 'wobbl validate' and pass its results.json")
+        n = len([c for c in CASES if c.domain in (sd, dom)])
+        lvl = "low"
+        ev = (f"{n} {sd} cases exist in Wobbl's validation suite, but no results were found here, so run "
+              "'wobbl validate' and pass its results.json") if n else (
+            f"Wobbl's validation suite has no {sd} case with a known answer yet")
     F.append(_factor("code verification", "verification", lvl, goal, ev,
                      "run 'wobbl validate' on this machine and keep its results with the review"))
 
-    # solution verification: the run's own checks
-    conv = checks.get("mesh convergence") or checks.get("time step convergence") or {}
-    bal = checks.get("force balance") or checks.get("energy balance") or checks.get("power balance") or {}
-    st = [conv.get("status"), bal.get("status")]
-    lvl = "high" if st == ["pass", "pass"] else ("low" if "fail" in st or None in st else "medium")
-    if dom == "circuit" and conv.get("status") == "pass" and not bal:
-        lvl = "high"
-    ev = ". ".join(f"The {c['name']} check {VERB.get(c['status'], c['status'])}, {c['summary']}"
-                   for c in (conv, bal) if c) or "no convergence check"
+    # solution verification: the run's own convergence and conservation checks
+    conv, bal = solution_checks(o)
+    st = [c.get("status") for c in conv + bal]
+    if not conv or "fail" in st:
+        lvl = "low"
+    else:
+        lvl = "high" if all(x in ("pass", "info") for x in st) else "medium"
+    ev = ". ".join(f"The {c['name']} check {VERB.get(c['status'], c['status'])}, {_sentence(c['summary'])}"
+                   for c in conv + bal) or "the run has no convergence check"
     F.append(_factor("solution verification", "verification", lvl, goal, ev,
                      "refine further (--quality fine or a longer --budget) until the answer settles"))
 
@@ -107,13 +114,10 @@ def assess(result_dir, influence: str = "medium", consequence: str = "medium", q
                      if guesses else "every load, support and material was stated explicitly",
                      "state the guessed inputs explicitly and run again"))
 
-    # model form: idealizations the checks flag
-    flags = [c for c in o.get("checks", []) if c["name"] in ("load introduction", "large deflection",
-                                                               "singularities", "hand calculation")
-             and c["status"] in ("warn", "fail")]
-    alt = (u or {}).get("alternatives", [])
+    # model form: idealizations and closed form cross checks the run flags
+    flags = idealization_flags(o)
     lvl = "high" if not flags else "medium"
-    if any(c["name"] == "load introduction" for c in flags):
+    if any(_decisive(c) for c in flags):
         lvl = "low"
     ev = ("no check found an idealization that moves the answer" if not flags else
           ". ".join(f"The {c['name']} check reports {_sentence(c['summary'])}" for c in flags))
@@ -134,9 +138,12 @@ def assess(result_dir, influence: str = "medium", consequence: str = "medium", q
 
     # model inputs: uncertainty and sensitivity
     if u:
-        roles = {i["role"] for i in u["inputs"]}
-        need = {"load", "strength"} if dom == "strength" else ({"load", "boundary"} if dom == "thermal" else {"load"})
-        lvl = "high" if need <= roles else "medium"
+        roles = {i["role"] for i in u["inputs"]} - {"numerical"}
+        can = {k.role for k in model.known.values()} if model else roles
+        # the demand and the capacity both: a load, and at least one property of the design or its surroundings
+        demand = "load" in roles or "load" not in can
+        capacity = bool(roles - {"load"}) or not (can - {"load"})
+        lvl = "high" if demand and capacity else "medium"
         top = u["sensitivity"]["indices"][0]
         ev = (f"{len(u['inputs'])} inputs propagated with {u['samples']:,} samples by {u['model']['method']}. "
               f"Of these, {top['input']} drives most of the spread, total Sobol index {top['total']:.2f}")
@@ -194,7 +201,7 @@ def assess(result_dir, influence: str = "medium", consequence: str = "medium", q
         src = rel_up(Path(src).resolve(), d.resolve())
     res = {"kind": "credibility", "domain": dom, "wobbl": __version__,
            "created": _dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "question": question or o.get("question", ""),
-           "context_of_use": _context(o), "influence": influence, "consequence": consequence, "risk": risk,
+           "context_of_use": _context(o, model), "influence": influence, "consequence": consequence, "risk": risk,
            "goal": goal, "factors": F, "met": met, "suite": src,
            "disclaimer": "Wobbl supplies credibility evidence and proposes levels. It does not certify the model, "
                          "and the reviewer decides whether the evidence is enough for the decision."}
@@ -210,17 +217,51 @@ def _sentence(text: str) -> str:
     return text.split(". ")[0].rstrip(".")[:300]
 
 
-def _context(o: dict) -> str:
-    dom = o.get("domain")
-    if dom == "strength":
-        return (f"A linear elastic static model of {Path(o.get('part', '')).name} in {o.get('material')}, under "
-                f"{'; '.join(o.get('loads', []))}, held by {'; '.join(o.get('fixtures', []))}, used to judge "
-                f"the {o.get('measure')} against {fmt(o.get('allowable_MPa', 0))} MPa with a target safety factor "
-                f"of {o.get('target_sf'):g}.")
-    if dom == "thermal":
-        return (f"A heat conduction model of {Path(o.get('part', '')).name} used to judge its hottest point against "
-                f"{fmt(o.get('values', {}).get('limit_C', 0))} C.")
-    return f"An ngspice model of the {o.get('part')} circuit used to judge it against its rating."
+def _model(d: Path):
+    """The run's model, for its inputs and context of use, or None when it cannot be built."""
+    from .models import ModelError, for_result
+
+    try:
+        return for_result(d)
+    except (ModelError, OSError, ValueError, KeyError):
+        return None
+
+
+def _context(o: dict, model) -> str:
+    text = model.context() if model else ""
+    if text:
+        return text
+    part = Path(str(o.get("part", ""))).name
+    q = o.get("question") or ""
+    return (f"A {o.get('domain', '')} model{' of ' + part if part else ''}"
+            + (f", used to answer '{q}'" if q else "") + ".")
+
+
+_CONV = r"converg|time step|tolerance|refin|step size|integrated again|halved|tighter|resolution|grid"
+_BAL = r"balance|conserv|budget|closes|residual|energy|mass|momentum|kirchhoff"
+
+
+def solution_checks(o: dict) -> tuple[list[dict], list[dict]]:
+    """The run's checks of its own numerics: convergence (mesh, time step, tolerance) and conservation."""
+    import re
+
+    conv = [c for c in o.get("checks", []) if re.search(_CONV, c["name"], re.I)]
+    bal = [c for c in o.get("checks", []) if c not in conv and re.search(_BAL, c["name"], re.I)]
+    return conv, bal
+
+
+def idealization_flags(o: dict) -> list[dict]:
+    """Checks outside the numerics that warn or fail: an idealization or a cross check that moves the answer."""
+    conv, bal = solution_checks(o)
+    own = {id(c) for c in conv + bal}
+    return [c for c in o.get("checks", []) if id(c) not in own and c.get("status") in ("warn", "fail")
+            and c["name"] not in ("units and sanity",)]
+
+
+def _decisive(c: dict) -> bool:
+    """A flag that says the verdict itself depends on a modeling choice."""
+    det = c.get("detail") or {}
+    return any(str(k).startswith("alternative") for k in det) or "verdict depends" in c.get("summary", "")
 
 
 def _applicability(o: dict, u: dict | None, v: dict) -> tuple[str, str]:
@@ -229,7 +270,7 @@ def _applicability(o: dict, u: dict | None, v: dict) -> tuple[str, str]:
     rows = v["readings"]
     notes = []
     lvl = "medium"
-    if o.get("domain") == "strength":
+    if o.get("governing_xyz") is not None:
         g = np.asarray(o["governing_xyz"])
         near = [r for r in rows if r.get("xyz") and np.linalg.norm(np.asarray(r["xyz"]) - g) <= 5.0]
         loads = [r["load"] for r in rows if r.get("load") is not None]

@@ -33,13 +33,15 @@ def _result_dir(result_dir: str) -> Path:
 @click.option("--no-mesh-error", is_flag=True, help="Leave out the discretization error the checks measured.")
 @click.option("--json", "as_json", is_flag=True)
 def uncertainty(result_dir, vary, samples, method, solves, seed, no_mesh_error, as_json):
-    """Carry input scatter through a finished run: distributions, probability of failure and Sobol indices.
+    """Carry input scatter through a finished run of any domain: distributions, probability of failure and Sobol
+    indices.
 
     \b
-    Load, stiffness and strength scatter in a strength run scale the converged
-    solution exactly, so they need no new solve. Geometry parameters of a .py
-    part, heat inputs and circuit values need new solves, and the answer comes
-    from a polynomial chaos fit whose leave one out error is reported.
+    Any number the run was made from can scatter, by the name the error
+    message lists. The run is solved again at a design of values and fitted
+    with polynomial chaos, whose leave one out error is reported. Load,
+    stiffness and strength scatter in a strength run scale the converged
+    solution exactly instead, and heat solves again on its converged mesh.
     """
     from ..credibility.models import ModelError
     from ..credibility.uncertainty import run_uncertainty
@@ -103,13 +105,16 @@ def show_uncertainty(r: dict, d: Path):
 @click.option("--no-calibrate", is_flag=True, help="Compare only, without calibrating the uncertain inputs.")
 @click.option("--json", "as_json", is_flag=True)
 def validate_against(result_dir, tests, vary, load_uncertainty, solves, no_calibrate, as_json):
-    """Compare a finished run with physical test readings (a CSV of strain, displacement, temperature or circuit
-    values) as ASME V&V 20 does, with the area metric, and calibrate the uncertain inputs from them.
+    """Compare a finished run of any domain with physical test readings as ASME V&V 20 does, with the area metric,
+    and calibrate the uncertain inputs from them.
 
     \b
-    CSV columns: name, quantity, value, unit, uncertainty, x, y, z, direction,
-    load, time, gauge_length. A note line (# ...) that says the readings are
-    synthetic marks every result as synthetic.
+    A reading's quantity is any value the run reports (such as apogee_m or
+    t_max_C), a column of a time series it wrote read at the reading's time,
+    or a gauge on a strength run (strain, displacement) or a heat run
+    (temperature). CSV columns: name, quantity, value, unit, uncertainty,
+    x, y, z, direction, load, time, gauge_length. A note line (# ...) that
+    says the readings are synthetic marks every result as synthetic.
     """
     from ..credibility.against import ModelError, ReadingError, run_validation
     from ..credibility.uq import VaryError
