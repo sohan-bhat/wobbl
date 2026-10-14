@@ -193,6 +193,46 @@ def show_catalog() -> None:
         ui.console.print(f"[red]  {mod} did not load: {why}[/red]")
 
 
+def _plain(x) -> dict:
+    return x if isinstance(x, dict) else x.to_dict() if hasattr(x, "to_dict") else dict(vars(x))
+
+
+def show_estimate(plan, opts, as_json: bool) -> None:
+    """What the plan will cost to run, from the estimator, before anything runs."""
+    try:
+        from ..estimate import estimate_plan
+    except ImportError:
+        ui.fail("this version of Wobbl cannot estimate a simulate plan yet")
+    try:
+        d = _plain(estimate_plan(plan, opts))
+    except Exception as e:  # noqa: BLE001
+        ui.fail(str(e), getattr(e, "hint", ""))
+    if as_json:
+        return click.echo(json.dumps(d, indent=1, default=str))
+    try:
+        from .jobs import _show_estimate
+        _show_estimate(d)
+    except (KeyError, TypeError):
+        ui.console.print(f"  {d.get('verdict', '')}  {d.get('headline', '')}")
+
+
+def start_job(plan, opts, remote: str, as_json: bool) -> None:
+    """Start the plan as a background job, here or on a remote, and say how to follow it."""
+    try:
+        from ..jobs.manage import start_plan
+    except ImportError:
+        ui.fail("this version of Wobbl cannot run a simulate plan as a job yet")
+    try:
+        d = _plain(start_plan(plan, opts, on=remote))
+    except Exception as e:  # noqa: BLE001
+        ui.fail(str(e), getattr(e, "hint", ""))
+    if as_json:
+        return click.echo(json.dumps(d, indent=1, default=str))
+    ui.console.print(f"\n  started job {d.get('job_id', '')} ({d.get('state', '')})"
+                     + (f" on {remote}" if remote else ""))
+    ui.console.print(f"  follow it with wobbl jobs status {d.get('job_id', '')}\n")
+
+
 def open_view(path: Path) -> None:
     import webbrowser
     webbrowser.open(Path(path).resolve().as_uri())
@@ -200,10 +240,10 @@ def open_view(path: Path) -> None:
 
 @click.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True}, epilog=EPILOG)
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
-@click.option("--physics", multiple=True, help="The physics to run, e.g. stress,heat (default: read from the "
-                                                 "question). See --list.")
-@click.option("--domain", default=None, help="What the thing is, when Wobbl reads it wrongly: part, circuit, "
-                                              "mechanism, flight, fluid, field or chemistry.")
+@click.option("--physics", multiple=True, help="The physics to run, e.g. stress,heat, read from the question "
+                                                 "when left out. See --list.")
+@click.option("--domain", default=None, help="What the thing is when Wobbl reads it wrongly, one of part, "
+                                              "circuit, mechanism, flight, fluid, field or chemistry.")
 @click.option("--kind", default=None, help="The kind of thing within the domain, e.g. buck, solenoid or rocket.")
 @click.option("--material", "-m", default=None, help="Material name, or custom:E=..,nu=..,yield=..")
 @click.option("--load", "-l", "loads", multiple=True, help="Load, e.g. '200 N down @ top' (repeatable).")
@@ -216,9 +256,12 @@ def open_view(path: Path) -> None:
 @click.option("--no-open", is_flag=True, help="Do not open the 3D view in the browser at the end.")
 @click.option("--json", "as_json", is_flag=True, help="Print the result as JSON.")
 @click.option("--quiet", "-q", is_flag=True, help="No progress lines.")
+@click.option("--estimate", "estimate_only", is_flag=True, help="Predict run time, memory and disk, then stop.")
+@click.option("--background", is_flag=True, help="Run it as a background job on this machine, followed with wobbl jobs.")
+@click.option("--remote", default="", help="Run it as a job on a machine added with wobbl remote add.")
 @click.option("--no-images", is_flag=True, hidden=True)
 def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, plan_only, quick, show_list, no_open,
-             as_json, quiet, no_images):
+             as_json, quiet, estimate_only, background, remote, no_images):
     """Simulate anything, from a CAD part or a circuit to a mechanism, a flight, a flow, a field or a chemical.
 
     Pass the thing (a file, a name, a formula or a description) and the
@@ -246,6 +289,10 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
         if as_json:
             click.echo(json.dumps(plan.to_dict(), indent=1))
         return
+    if estimate_only:
+        return show_estimate(plan, opts, as_json)
+    if background or remote:
+        return start_job(plan, opts, remote, as_json)
     from .main import _out_dir
     out_dir = _out_dir(out_name(plan), out)
     try:
