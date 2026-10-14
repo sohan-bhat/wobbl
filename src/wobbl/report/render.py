@@ -436,7 +436,10 @@ class Panel:
 
 
 def compose(path: str | Path, panels: list[Panel]) -> str:
-    """Lay the panels side by side, add their bars, marks and captions, and save a PNG."""
+    """Lay the panels side by side, add their bars, marks and captions, and save a PNG.
+
+    matplotlib draws only the overlays, on a clear figure, which are then blended over the pictures; handing it
+    the pictures themselves would send millions of pixels through its image pipeline for nothing."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -446,13 +449,13 @@ def compose(path: str | Path, panels: list[Panel]) -> str:
     from PIL import Image
 
     Wt, Ht = sum(p.rgb.shape[1] for p in panels), max(p.rgb.shape[0] for p in panels)
-    fig = plt.figure(figsize=(Wt / 100, Ht / 100), dpi=100, facecolor=BG)
+    fig = plt.figure(figsize=(Wt / 100, Ht / 100), dpi=100, facecolor="none")
+    base = np.tile(_rgb(BG).astype(np.float32), (Ht, Wt, 1))
     x0 = 0
     for p in panels:
         H, W = p.rgb.shape[:2]
         fx, fw, fh = x0 / Wt, W / Wt, H / Ht
-        fig.figimage((np.clip(p.rgb, 0, 1) * 255 + 0.5).astype(np.uint8), xo=x0, yo=Ht - H, origin="upper",
-                     zorder=-1)   # pixel for pixel
+        base[:H, x0:x0 + W] = np.clip(p.rgb, 0, 1)
         ax = fig.add_axes([fx, 1 - fh, fw, fh])
         ax.set_xlim(0, W)
         ax.set_ylim(H, 0)
@@ -497,9 +500,11 @@ def compose(path: str | Path, panels: list[Panel]) -> str:
                      family="monospace", fontsize=11.5, linespacing=1.1)
         x0 += W
     fig.canvas.draw()
-    rgb = np.asarray(fig.canvas.buffer_rgba())[..., :3].copy()
+    over = np.asarray(fig.canvas.buffer_rgba(), np.float32) / 255.0     # straight, not premultiplied, alpha
     plt.close(fig)
-    Image.fromarray(rgb).save(path, compress_level=6)
+    a = over[..., 3:]
+    rgb = base * (1.0 - a) + over[..., :3] * a
+    Image.fromarray((rgb * 255 + 0.5).astype(np.uint8)).save(path, compress_level=6)
     return str(path)
 
 
@@ -538,10 +543,14 @@ def _render(out, X, tris, measure, U, g, gval, mlabel, allowable, target_sf, spo
         rgb, cam = _shot(size, view, surf, surf.fields["stress"], stress, focus, span=span)
         mspan = span if focus is None else span / (3.2 / 1.15)
         marks = [Mark(g, f"{gval:.3g} {unit}")]
+        labeled = [g]
         for s in artifacts[:3]:
             xyz = np.asarray(s["xyz"], float)
-            near = np.linalg.norm(xyz - g) < 0.06 * mspan  # keep the governing label readable
+            # a label close to one already placed would cover it, so only the first of a cluster is named
+            near = min(np.linalg.norm(xyz - q) for q in labeled) < 0.06 * mspan
             marks.append(Mark(xyz, "" if near else "artifact", ARTIFACT, small=True))
+            if not near:
+                labeled.append(xyz)
         files[name] = compose(out / f"{name}.png", [Panel(rgb, cam, (stress.cmap, stress.clim, f"{mlabel}\n{unit}",
                                                                      stress.above), marks)])
 
