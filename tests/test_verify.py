@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from wobbl.verify.beam import section_properties
+from wobbl.verify.beam import section_properties, slice_tets
 from wobbl.verify.checks import Check, balance_check, confidence, convergence_check
 
 
@@ -14,6 +14,25 @@ def test_rectangle_section():
     assert np.allclose(G, [0, 10, 3])
     assert I[2, 2] == pytest.approx(20 * 6 ** 3 / 12)
     assert I[1, 1] == pytest.approx(6 * 20 ** 3 / 12)
+
+
+def test_slice_of_a_bar_is_its_cross_section(parts, tmp_path):
+    """A plane square to a 200 x 20 x 10 bar cuts its tetrahedra into exactly the 20 x 10 rectangle, tilted or not."""
+    from wobbl.geometry.cad import prepare
+    from wobbl.mesh.mesher import Sizing, build_mesh
+
+    m = build_mesh(prepare(parts["cantilever"], tmp_path / "g"), Sizing(h=5.0))
+    x = np.array([1.0, 0, 0])
+    pts, faces = slice_tets(m.X, m.tets, x, [100.3, 7.0, 2.0])
+    A, G, I = section_properties(pts[faces], x)
+    assert A == pytest.approx(200.0, rel=1e-9)
+    assert np.allclose(G, [100.3, 10.0, 5.0])
+    assert I[2, 2] == pytest.approx(20 * 10 ** 3 / 12, rel=1e-9)
+    assert I[1, 1] == pytest.approx(10 * 20 ** 3 / 12, rel=1e-9)
+    n = np.array([1.0, 0.3, 0.0]) / np.linalg.norm([1.0, 0.3, 0.0])
+    pts, faces = slice_tets(m.X, m.tets, n, [100.0, 10.0, 5.0])
+    assert section_properties(pts[faces], n)[0] == pytest.approx(200.0 / n[0], rel=1e-9)
+    assert len(slice_tets(m.X, m.tets, x, [300.0, 0, 0])[1]) == 0
 
 
 def test_convergence_levels():

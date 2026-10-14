@@ -112,25 +112,14 @@ def column_info(mesh, built, prep) -> Column | None:
 
 
 def _section(mesh, axis: np.ndarray, at: float) -> tuple[float, float]:
-    import warnings
+    from ..verify.beam import section_properties, slice_tets
 
-    import pyvista as pv
-
-    from ..verify.beam import section_properties
-
-    corners = mesh.tets[:, :4]
-    cells = np.hstack([np.full((len(corners), 1), 4), corners]).ravel()
-    grid = pv.UnstructuredGrid(cells, np.full(len(corners), pv.CellType.TETRA, dtype=np.uint8), mesh.X)
     origin = mesh.X.mean(0)
     origin[int(np.argmax(np.abs(axis)))] = at
-    sl = grid.slice(normal=axis, origin=origin)
-    if sl.n_points == 0:
+    pts, faces = slice_tets(mesh.X, mesh.tets, axis, origin)
+    if len(faces) == 0:
         return 0.0, 0.0
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        tri = sl.triangulate().extract_surface().triangulate()
-    faces = tri.faces.reshape(-1, 4)[:, 1:]
-    props = section_properties(np.asarray(tri.points)[faces], axis)
+    props = section_properties(pts[faces], axis)
     if props is None:
         return 0.0, 0.0
     A, _, I = props

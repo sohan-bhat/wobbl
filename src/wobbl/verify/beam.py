@@ -11,8 +11,6 @@ path, the units or the setup deserve a second look.
 """
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 
 
@@ -35,11 +33,43 @@ def section_properties(tri_pts: np.ndarray, normal: np.ndarray):
     return A, cen, I
 
 
+_EDGES = np.array([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
+
+
+def slice_tets(X: np.ndarray, tets: np.ndarray, normal, origin) -> tuple[np.ndarray, np.ndarray]:
+    """Cut the tetrahedra (their four corners) with a plane: the points and triangles of the cut.
+
+    Each cut tetrahedron gives a triangle or a quadrilateral split in two, with a corner on the plane counted as in
+    front of it, as VTK's cutter does.
+    """
+    n = np.asarray(normal, float) / np.linalg.norm(normal)
+    d = (X - np.asarray(origin, float)) @ n
+    c = np.asarray(tets)[:, :4]
+    front = d[c] >= 0
+    c = c[(front.sum(1) > 0) & (front.sum(1) < 4)]
+    a, b = c[:, _EDGES[:, 0]], c[:, _EDGES[:, 1]]
+    cross = (d[a] >= 0) != (d[b] >= 0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = np.where(cross, d[a] / (d[a] - d[b]), 0.0)
+    P = X[a] + t[..., None] * (X[b] - X[a])
+    tris = []
+    for k in (3, 4):
+        sel = cross.sum(1) == k
+        pts = P[sel][cross[sel]].reshape(-1, k, 3)
+        if k == 4:   # order the quadrilateral's corners around its center, then split it
+            u = np.cross(n, [1.0, 0, 0] if abs(n[0]) < 0.9 else [0, 1.0, 0])
+            r = pts - pts.mean(1, keepdims=True)
+            order = np.argsort(np.arctan2(r @ np.cross(n, u), r @ u), axis=1)
+            pts = np.take_along_axis(pts, order[..., None], axis=1)
+            pts = np.concatenate([pts[:, [0, 1, 2]], pts[:, [0, 2, 3]]])
+        tris.append(pts)
+    pts = np.concatenate(tris).reshape(-1, 3)
+    return pts, np.arange(len(pts)).reshape(-1, 3)
+
+
 def beam_estimate(mesh, measure_at: np.ndarray, loads_force: np.ndarray, loads_moment: np.ndarray,
                   load_nodes: np.ndarray, fixture_nodes: np.ndarray, extra_load_points: list[np.ndarray]):
     """Return a dict with the nominal beam stress at the governing point, or None with a reason string."""
-    import pyvista as pv
-
     X = mesh.X
     F = np.asarray(loads_force, float)
     Mo = np.asarray(loads_moment, float)
@@ -67,19 +97,11 @@ def beam_estimate(mesh, measure_at: np.ndarray, loads_force: np.ndarray, loads_m
     s_load = (lp - H) @ axis
     if not ((s_fix < 0).all() and (s_load > 0).all()):
         return None, "the governing point is not between the fixtures and the load, so no single section carries it"
-    corners = mesh.tets[:, :4]
-    cells = np.hstack([np.full((len(corners), 1), 4), corners]).ravel()
-    grid = pv.UnstructuredGrid(cells, np.full(len(corners), pv.CellType.TETRA, dtype=np.uint8), X)
-    sl = grid.slice(normal=axis, origin=H)
-    if sl.n_points == 0:
-        return None, "the section plane missed the part"
     # the plane separates every fixture from every load, so all material it cuts carries the load:
     # the whole cut is the beam section (two chords of a truss, both walls of a channel)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        conn = sl.triangulate().extract_surface().triangulate()
-    faces = conn.faces.reshape(-1, 4)[:, 1:]
-    pts = np.asarray(conn.points)
+    pts, faces = slice_tets(X, mesh.tets, axis, H)
+    if len(faces) == 0:
+        return None, "the section plane missed the part"
     props = section_properties(pts[faces], axis)
     if props is None:
         return None, "empty section"
