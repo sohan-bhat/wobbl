@@ -241,14 +241,23 @@ def ply_failure(lam: Laminate, k: int, strain_xy: np.ndarray) -> dict:
     return {"stress": sig, "tsai_wu": tw, "hashin": hmin, "hashin_mode": mode}
 
 
-def clt_first_ply_failure(lam: Laminate, N: np.ndarray, M: np.ndarray | None = None) -> dict:
+def clt_first_ply_failure(lam: Laminate, N: np.ndarray, M: np.ndarray | None = None, cylindrical: bool = False
+                          ) -> dict:
     """First ply failure of a laminate under force resultants N (N/mm) and moments M (N mm/mm), by CLT.
 
     Ply strains are taken at each ply's inner and outer face. Returns the governing strength ratio by Tsai-Wu
-    and by Hashin, which ply and mode set each, and the ply by ply table.
+    and by Hashin, which ply and mode set each, and the ply by ply table. With cylindrical, the laminate bends
+    only about its y axis, as a plate held along an edge does (kappa_y = kappa_xy = 0), instead of curling freely
+    across the way a narrow beam does.
     """
     M = np.zeros(3) if M is None else np.asarray(M, float)
-    e = lam.compliance() @ np.concatenate([np.asarray(N, float), M])
+    if cylindrical:
+        ABD = np.linalg.inv(lam.compliance())
+        free = [0, 1, 2, 3]                                   # midplane strains and kappa_x; the rest held at zero
+        e = np.zeros(6)
+        e[free] = np.linalg.solve(ABD[np.ix_(free, free)], np.concatenate([np.asarray(N, float), M])[free])
+    else:
+        e = lam.compliance() @ np.concatenate([np.asarray(N, float), M])
     z = lam.z()
     rows = []
     for k, p in enumerate(lam.plies):

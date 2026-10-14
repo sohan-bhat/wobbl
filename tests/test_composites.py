@@ -28,8 +28,9 @@ def test_cross_ply_strip_matches_lamination_theory(tmp_path):
     v = o.values
     lam = parse_layup("[0/90]s", "t300-5208", 0.25)
     x = v["governing_xyz"][0]
-    want = clt_first_ply_failure(lam, np.zeros(3), np.array([F * (L - x) / b, 0.0, 0.0]))
-    assert v["strength_ratio"] == pytest.approx(min(want["tsai_wu"], want["hashin"]), rel=0.08)
+    # near the clamp the strip cannot curl across: a plate in cylindrical bending
+    want = clt_first_ply_failure(lam, np.zeros(3), np.array([F * (L - x) / b, 0.0, 0.0]), cylindrical=True)
+    assert v["strength_ratio"] == pytest.approx(min(want["tsai_wu"], want["hashin"]), rel=0.05)
     checks = {c.name: c.status for c in o.checks}
     assert checks["hand calculation"] == "pass" and checks["force balance"] == "pass"
     # below the 1.5 target, so the layup changes come with their own lamination theory check
