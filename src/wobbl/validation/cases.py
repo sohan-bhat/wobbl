@@ -914,6 +914,20 @@ CASES += [
 ]
 
 
+# --- shells, laminates and drops (the case functions are in thin_cases.py) ----------------------------------------
+from . import thin_cases as TC  # noqa: E402
+
+CASES += [
+    Case("bar-impact", "Steel bar landing on its end on a rigid floor at 1 m/s", "drop",
+         "one dimensional wave, F = rho c A v0 for 2 L / c", "floor force while the wave runs", "N", 0.03, True,
+         TC.bar_impact),
+    Case("clamped-disk-shell", "Clamped steel disk under pressure, solved as a shell", "shell",
+         "Kirchhoff plate, w = q a^4 / (64 D)", "center deflection", "mm", 0.03, True, TC.clamped_disk),
+    Case("cross-ply-strip", "[0/90]s carbon strip bent as a cantilever", "composite",
+         "classical lamination theory in cylindrical bending at the governing section",
+         "load factor at first ply failure", "x", 0.05, False, TC.cross_ply_strip),
+]
+
 def run_cases(out_dir: str | Path, ids: list[str] | None = None, log=print) -> list[dict]:
     out = Path(out_dir)
     results = []
