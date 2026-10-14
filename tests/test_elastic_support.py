@@ -73,3 +73,27 @@ def test_elastic_root_against_a_winkler_bed(parts, tmp_path):
     assert o.max_disp_mm == pytest.approx(tip, rel=0.03)
     assert next(c for c in o.checks if c.name == "force balance").status == "pass"
     assert any("bed of springs of 500 N/mm3" in a for a in o.assumptions)
+
+
+@pytest.mark.solver
+@needs_ccx
+def test_support_stiffness_scatter_matches_the_closed_form_mean(parts, tmp_path):
+    """The root bed adds c / k to the tip deflection, so with a lognormal stiffness the mean deflection is the beam
+    part plus c E[1/k], and E[1/k] = (1 + cov^2) / k0. The surrogate fitted to solves on the final mesh finds it."""
+    from wobbl.credibility.uncertainty import run_uncertainty
+    from wobbl.structural.pipeline import analyze_strength
+    from wobbl.structural.spec import parse_load
+
+    k0, cov = 500.0, 0.3
+    st = StructuralStudy(parts["cantilever"], "6061-t6", [parse_load("100 N -z @ x=max")],
+                         [parse_fixture(f"elastic {k0:g} N/mm3 @ x=min")], quality="fast", budget=120)
+    o = analyze_strength(st, tmp_path / "run", render=False, fixes=False)
+    b, h, L, F = 20.0, 10.0, 200.0, 100.0
+    c = F * L ** 2 / (b * h ** 3 / 12) + F / (b * h)          # the bed's share of the tip deflection, times k
+    beam = o.max_disp_mm - c / k0
+    r = run_uncertainty(tmp_path / "run", [f"support lognormal {100 * cov:g}%"], samples=50000, solves=6,
+                        numerical=False)
+    assert "solves on the final mesh" in r["model"]["method"]
+    assert r["model"]["surrogate"]["loo_error"]["deflection ratio"] < 0.01
+    want = beam + c * (1 + cov ** 2) / k0
+    assert r["outputs"]["max_deflection_mm"]["mean"] == pytest.approx(want, rel=0.02)
