@@ -14,7 +14,8 @@ INSTRUCTIONS = """Wobbl runs verified engineering simulations. Typical flow for 
    confidence result as final, and never quote peaks listed as excluded artifacts.
 4. Open images.stress to see where the peak is. If the verdict is fails or marginal, call
    suggest_fix(result_dir, apply=true) for before and after numbers.
-Heat questions: solve_thermal. Circuits: solve_circuit. Falling, thrown and rocket flights: solve_motion."""
+Heat questions: solve_thermal. Circuits: solve_circuit. Falling, thrown and rocket flights: solve_motion.
+Propellers, drones and boat hulls: solve_flow."""
 
 
 def _protect_stdout():
@@ -136,6 +137,16 @@ def build_server():
         speed, drift, confidence with checks, fixes and the trajectory CSV. Runs take a second or two."""
         from ..motion.tools import solve_motion_tool
         return solve_motion_tool(spec, name, mass, density, diameter, cd, height, speed, angle, wind, question)
+
+    @srv.tool()
+    def solve_flow(kind: str, params: dict | None = None) -> dict:
+        """Air and water flow. kind='prop' takes prop (a UIUC key like apcsf_10x4.7, or '10x4.7' in inches), and
+        rpm, thrust='4 N' or mass='1.2 kg' with rotors=4 to hover, speed, altitude and max_rpm. kind='hull' takes
+        length, beam, draft, displacement ('16 t' or '15.6 m3'), speed='8 kn' and power='60 kW'. Values take
+        units. Returns the verdict, the key numbers, confidence with checks against measurements or hand
+        calculations, fixes and image paths. Both run in seconds."""
+        from ..flow.tools import solve_flow_tool
+        return solve_flow_tool(kind, params or {})
 
     @srv.tool()
     def quantify_uncertainty(result_dir: str, vary: list[str], samples: int = 200000,

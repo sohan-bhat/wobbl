@@ -64,6 +64,29 @@ def test_holtrop_mennen_reproduces_the_paper_example():
     assert not r.out_of_range
 
 
+def test_the_cli_and_the_mcp_tool_read_flow_values_the_same_way(tmp_path, monkeypatch):
+    import json
+
+    from click.testing import CliRunner
+
+    from wobbl.cli.main import cli
+    from wobbl.flow.tools import build, solve_flow_tool
+
+    monkeypatch.setenv("WOBBL_HOME", str(tmp_path / "home"))
+    boat = {"length": "12 m", "beam": "3.6 m", "draft": "0.9 m", "displacement": "16 t", "speed": "8 kn"}
+    st, _ = build("hull", boat)
+    assert st.hull.displacement == pytest.approx(16000 / 1025) and st.speed == pytest.approx(8 * 0.514444)
+    assert build("hull", {**boat, "displacement": "15.6 m3"})[0].hull.displacement == 15.6
+    r = solve_flow_tool("hull", {**boat, "power": "60 kW"})
+    assert r["verdict"] == "ok" and r["confidence"] == "medium" and r["values"]["resistance_N"] > 0
+    assert "error" in solve_flow_tool("kite", {})
+    res = CliRunner().invoke(cli, ["flow", "hull", "--length", "12 m", "--beam", "3.6 m", "--draft", "0.9 m",
+                                   "--displacement", "16 t", "--speed", "8 kn", "-o", str(tmp_path / "h"), "--json"])
+    assert res.exit_code == 0, res.output
+    assert json.loads(res.output)["domain"] == "flow"
+    assert (tmp_path / "h" / "report.html").exists()
+
+
 def test_hull_estimates_what_is_missing_and_flags_its_range():
     h = hull.Hull(12.0, 3.5, 0.9, 18.0).fill()
     assert 0.9 < h.cm < 1.0 and 0.6 < h.cwp < 0.95 and len(h.estimated) == 2

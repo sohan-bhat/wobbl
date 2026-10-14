@@ -61,6 +61,15 @@ rocket the verdict comes from the stability margin, the speed off the rail, apog
 and the landing speed, and the fixes give the nose weight, fin span, rail length or main parachute that
 would pass. Every run writes `trajectory.csv` with one row at every event.
 
+For air and water flow, use the flow commands (MCP `solve_flow`) instead of guessing a thrust, a drag
+coefficient or a resistance. A drone or propeller question is one line, as in
+`wobbl flow prop apcsf_10x4.7 --mass "1.2 kg" --rotors 4`, which finds the hover speed and shaft power
+from the prop's measured UIUC curves, checks them with blade element momentum theory and judges the
+thrust to weight ratio at the prop's rated top speed. Give the size in inches for a prop outside the
+bundled set, as in `wobbl flow prop 10x4.7 --rpm 6000`. A displacement boat's calm water resistance
+and engine power come from Holtrop and Mennen with
+`wobbl flow hull --length "12 m" --beam "3.6 m" --draft "0.9 m" --displacement "16 t" --speed "8 kn" --power "60 kW"`.
+
 ## Never skip
 
 - **Never quote a low confidence number as the answer.** Say what failed and rerun with

@@ -35,7 +35,13 @@ def dry_parse(args: list[str]) -> tuple[str, click.Context]:
     """Parse a command line exactly as click does before it runs a command, without running it."""
     root = click.Context(cli, info_name="wobbl")
     name, cmd, rest = cli.resolve_command(root, list(args))
-    return name, cmd.make_context(name, list(rest), parent=root)
+    ctx = cmd.make_context(name, list(rest), parent=root)
+    while isinstance(cmd, click.Group):   # a group such as 'wobbl flow' parses its subcommand too
+        held = ctx._protected_args if hasattr(ctx, "_protected_args") else ctx.protected_args   # click 8.2 or older
+        sub, cmd, rest = cmd.resolve_command(ctx, [*held, *ctx.args])
+        name = f"{name} {sub}"
+        ctx = cmd.make_context(sub, list(rest), parent=ctx)
+    return name, ctx
 
 
 def check_values(name: str, p: dict):
@@ -63,6 +69,10 @@ def check_values(name: str, p: dict):
         else:
             study_from(p["name"], p["mass"], p["density"], p["diameter"], p["cd"], p["height"], p["speed"],
                        p["angle"], p["wind"])
+    elif name.startswith("flow "):
+        from wobbl.flow.tools import build
+
+        build(name.split()[1], p)
     elif name == "circuit":
         from wobbl.circuits.templates import TEMPLATES
 
