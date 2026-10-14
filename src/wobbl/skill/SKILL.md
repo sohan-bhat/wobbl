@@ -43,6 +43,12 @@ never write your own finite element code.
 6. **Report** to the user: the verdict, the governing number with units and location, the safety
    factor against the target, the confidence and its reasons, the key assumptions, the image path and
    the HTML report path.
+7. **Show the simulation.** Every run writes an interactive 3D view of what happened, set in the situation the
+   question describes, and its result says where it is as `view` (the run's report.html, or simulation.html
+   for `wobbl simulate`). Open it for the user right away with `open <path>` on macOS, `xdg-open <path>` on
+   Linux or `start "" <path>` on Windows, or run `wobbl view <result folder>`. Then tell them what they are
+   seeing, which props stand for the supports and loads, what plays out (the load coming on, the flight, the
+   heat building) and where the failure shows if there is one.
 
 For heat, run `wobbl thermal part.step -m 6061-t6 --power "12 W" --film "5 W/m2K @ all" --ambient "25 C"`
 (MCP `solve_thermal`). The material is required, and adding `--duration "30 min"` makes the run transient.

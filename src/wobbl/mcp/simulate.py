@@ -31,8 +31,18 @@ def compact(o) -> dict:
                       for c in checks],
            "assumptions": _get(o, "assumptions") or [],
            "fixes": [{k: f.get(k) for k in ("kind", "title", "summary") if k in f} for f in _get(o, "fixes") or []],
-           "images": _get(o, "images") or {}, "report": _get(o, "report", ""), "result_dir": _get(o, "workdir", "")}
+           "images": _get(o, "images") or {}, "report": _get(o, "report", ""), "result_dir": _get(o, "workdir", ""),
+           **view_of(_get(o, "workdir", ""))}
     return out
+
+
+def view_of(result_dir) -> dict:
+    """Where a result's interactive 3D view is, for the agent to open for the user."""
+    if not result_dir:
+        return {}
+    from ..viz import view_path
+    p = view_path(result_dir)
+    return {"view": str(p)} if p else {}
 
 
 def simulate_tool(thing: str = "", question: str = "", physics: list[str] | None = None, domain: str = "",

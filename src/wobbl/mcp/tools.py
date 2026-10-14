@@ -203,10 +203,15 @@ def compact(o) -> dict:
         "assumptions": o.assumptions,
         "fixes": [{"kind": f["kind"], "title": f["title"], "summary": f["summary"], "auto": f.get("auto", False)}
                   for f in o.fixes],
-        "images": o.images, "report": o.report, "result_dir": o.workdir,
+        "images": o.images, "report": o.report, "result_dir": o.workdir, **_view(o.workdir),
         "mesh_levels": [{"nodes": L["n_nodes"], "governing_MPa": round(L["governing"], 4)} for L in o.levels],
         "time_s": round(o.t_total, 1),
     }
+
+
+def _view(result_dir) -> dict:
+    from .simulate import view_of
+    return view_of(result_dir)
 
 
 def _outcome(result_dir: str):
@@ -241,8 +246,8 @@ def render(result_dir: str) -> dict:
     except Exception as e:  # noqa: BLE001
         return _err(e)
     if isinstance(o, dict):
-        return {"images": o.get("images", {}), "report": o.get("report", "")}
-    return {"images": o.images, "report": o.report}
+        return {"images": o.get("images", {}), "report": o.get("report", ""), **_view(result_dir)}
+    return {"images": o.images, "report": o.report, **_view(result_dir)}
 
 
 _RERUN_TOOL = {"thermal": "solve_thermal", "circuit": "solve_circuit", "motion": "solve_motion",

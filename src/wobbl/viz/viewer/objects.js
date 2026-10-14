@@ -75,11 +75,11 @@ function build(S, G, o, grow, arr) {
     if (o.kind === 'ground') {
       const s = o.size / 2, c = o.center, z = o.z, ps = [], runs = [];
       if (o.grid) for (let x = -s; x <= s + 1e-9; x += o.grid) { ps.push(c[0] + x, c[1] - s, z, c[0] + x, c[1] + s, z, c[0] - s, c[1] + x, z, c[0] + s, c[1] + x, z); runs.push(2, 2); }
-      Object.assign(ob, { P: new Float32Array(ps), runs, width: 1, lineCol: [255, 255, 255, 22] });
+      Object.assign(ob, { P: new Float32Array(ps), runs, width: 1, lineCol: [255, 255, 255, 38] });
       if (gl) {
         ob.d = drawable(gl, G.surf, SP); fixed(ob.d, prim('plane', [s, s]));
         ob.d.set('c', new Uint8Array([...base, 255, ...base, 255, ...base, 255, ...base, 255]));
-        ob.M = pose([1, 0, 0, 0], [c[0], c[1], z - 1e-3 * s]);
+        ob.M = pose([1, 0, 0, 0], [c[0], c[1], z - 1e-5 * s]);
       }
     } else {
       Object.assign(ob, { P: S.arr(o.pos), runs: o.runs, width: o.width, lineCol: [...base, 255] });
@@ -264,13 +264,13 @@ function render(G, VPm, eye, w, h) {
   }
   const Q = G.line.loc;
   gl.useProgram(G.line.p);
-  gl.uniformMatrix4fv(Q.VP, false, VPm); gl.uniform2f(Q.vp, w, h);
+  gl.uniformMatrix4fv(Q.VP, false, VPm); gl.uniform2f(Q.vp, w, h); gl.depthFunc(gl.LEQUAL);
   for (const ob of G.objs) {
     if (!ob.vis || !ob.l) continue;
     gl.uniform1f(Q.w, ob.width); gl.uniform1f(Q.tn, ob.tn ?? 1e30);
     gl.bindVertexArray(ob.l.vao);
     gl.drawElements(gl.TRIANGLES, ob.l.count, ty(ob.l), 0);
   }
-  gl.disable(gl.BLEND); gl.depthMask(true);
+  gl.disable(gl.BLEND); gl.depthMask(true); gl.depthFunc(gl.LESS);
   gl.bindVertexArray(null);
 }
