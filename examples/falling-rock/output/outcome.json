@@ -1,0 +1,151 @@
+{
+ "domain": "motion",
+ "part": "rock",
+ "question": "How fast does a fist sized rock hit the ground after falling off a 300 m cliff?",
+ "verdict": "ok",
+ "headline": "Hits the ground 8.72 s after release at 56.8 m/s (205 km/h). Without air it would land after 7.82 s at 76.7 m/s, so drag takes 26% off the impact speed.",
+ "metrics": [
+  [
+   "fall time",
+   "8.72 s"
+  ],
+  [
+   "impact speed",
+   "56.8 m/s"
+  ],
+  [
+   "without air",
+   "7.82 s, 76.7 m/s"
+  ],
+  [
+   "terminal speed",
+   "66.2 m/s"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed step convergence, hand calculation, vacuum drop, energy balance, units and sanity"
+ ],
+ "checks": [
+  {
+   "name": "step convergence",
+   "status": "pass",
+   "summary": "flown again with a tolerance ten times tighter, the flight time 8.72 s and impact speed 56.8 m/s moved by at most 1e-06% (the impact speed)",
+   "detail": {
+    "normal": {
+     "flight time": 8.716865,
+     "impact speed": 56.823386
+    },
+    "tight": {
+     "flight time": 8.716865,
+     "impact speed": 56.823387
+    },
+    "largest_change": 0.0
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "with the air at its density halfway down (1.207 kg/m3) the terminal speed is 66.2 m/s, and v = vt tanh(g t / vt) with h = vt^2/g ln cosh(g t / vt) gives 8.719 s and 56.9 m/s against 8.717 s and 56.8 m/s from the run (0.16% apart), the difference coming from the air thickening on the way down",
+   "detail": {
+    "terminal_mps": 66.223379,
+    "closed_form_time_s": 8.718855,
+    "closed_form_speed_mps": 56.912728,
+    "error": 0.00157
+   }
+  },
+  {
+   "name": "vacuum drop",
+   "status": "pass",
+   "summary": "with the air taken away and gravity held at its ground value the run lands after 7.822 s at 76.7 m/s, and sqrt(2h/g) gives 7.822 s and 76.7 m/s (1.5e-13% apart). The air adds 0.895 s to the fall and takes 19.9 m/s off the impact",
+   "detail": {
+    "time_s": 7.821955,
+    "closed_form_time_s": 7.821955,
+    "speed_mps": 76.70717,
+    "closed_form_speed_mps": 76.70717,
+    "range_m": 0.0
+   }
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "drag took 1.37 kJ and gravity gave 3.03 kJ, which leaves 1.66 kJ of kinetic energy at impact, and the impact speed carries 1.66 kJ (apart by 4.9e-07% of the largest term)",
+   "detail": {
+    "thrust_J": 0.0,
+    "drag_J": -1368.025871,
+    "gravity_J": 3031.875722,
+    "propellant_J": 0.0,
+    "ke_start_J": 0.0,
+    "ke_end_J": 1663.849865,
+    "error": 0.0
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "speeds stay under Mach 0.167, 1.03 kg in a 9 cm body, 2700 kg/m3 for a sphere",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "A point mass in a vertical plane, so it does not spin, tumble or move sideways, and its drag acts against the air rushing past it.",
+  "Drag coefficient 0.6 on a frontal area 9 cm across, the same at every speed.",
+  "The 1976 US standard atmosphere from 0 m above sea level, a standard day.",
+  "Gravity falls off with the square of the distance to the Earth's center, over a flat Earth that does not rotate.",
+  "Still air."
+ ],
+ "values": {
+  "flight_time_s": 8.716865,
+  "impact_speed_mps": 56.823386,
+  "distance_m": 0.0,
+  "max_speed_mps": 56.823386,
+  "max_mach": 0.166983,
+  "trajectory": "trajectory.csv",
+  "_figures": [
+   [
+    "flight",
+    "Altitude and speed over the flight, by phase"
+   ],
+   [
+    "path",
+    "The path through the air"
+   ]
+  ]
+ },
+ "images": {
+  "flight": "images/flight.png"
+ },
+ "fixes": [],
+ "notes": [
+  "A solid sphere 9 cm across, so 1.031 kg."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 3.774,
+ "solver": "scipy 1.18.1 solve_ivp (DOP853)",
+ "events": [
+  {
+   "name": "release",
+   "t_s": 0.0,
+   "alt_m": 300.0,
+   "x_m": 0.0,
+   "speed_mps": 0.0
+  },
+  {
+   "name": "impact",
+   "t_s": 8.7169,
+   "alt_m": 0.0,
+   "x_m": 0.0,
+   "speed_mps": 56.823
+  }
+ ],
+ "runtime_s": 3.774,
+ "model": {
+  "states": 4,
+  "effects": [
+   "gravity falling off with altitude",
+   "1976 standard atmosphere",
+   "air drag"
+  ]
+ }
+}

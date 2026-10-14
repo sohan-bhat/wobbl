@@ -1,0 +1,24 @@
+OK. Hits the ground 8.72 s after release at 56.8 m/s (205 km/h). Without air it would land after 7.82 s at 76.7 m/s, so drag takes 26% off the impact speed.
+
+Confidence: high. passed step convergence, hand calculation, vacuum drop, energy balance, units and sanity
+fall time: 8.72 s
+impact speed: 56.8 m/s
+without air: 7.82 s, 76.7 m/s
+terminal speed: 66.2 m/s
+
+Checks:
+  [pass] step convergence: flown again with a tolerance ten times tighter, the flight time 8.72 s and impact speed 56.8 m/s moved by at most 1e-06% (the impact speed)
+  [pass] hand calculation: with the air at its density halfway down (1.207 kg/m3) the terminal speed is 66.2 m/s, and v = vt tanh(g t / vt) with h = vt^2/g ln cosh(g t / vt) gives 8.719 s and 56.9 m/s against 8.717 s and 56.8 m/s from the run (0.16% apart), the difference coming from the air thickening on the way down
+  [pass] vacuum drop: with the air taken away and gravity held at its ground value the run lands after 7.822 s at 76.7 m/s, and sqrt(2h/g) gives 7.822 s and 76.7 m/s (1.5e-13% apart). The air adds 0.895 s to the fall and takes 19.9 m/s off the impact
+  [pass] energy balance: drag took 1.37 kJ and gravity gave 3.03 kJ, which leaves 1.66 kJ of kinetic energy at impact, and the impact speed carries 1.66 kJ (apart by 4.9e-07% of the largest term)
+  [pass] units and sanity: speeds stay under Mach 0.167, 1.03 kg in a 9 cm body, 2700 kg/m3 for a sphere
+
+Assumptions:
+  - A point mass in a vertical plane, so it does not spin, tumble or move sideways, and its drag acts against the air rushing past it.
+  - Drag coefficient 0.6 on a frontal area 9 cm across, the same at every speed.
+  - The 1976 US standard atmosphere from 0 m above sea level, a standard day.
+  - Gravity falls off with the square of the distance to the Earth's center, over a flat Earth that does not rotate.
+  - Still air.
+
+Images: flight: images/flight.png
+Report: report.html
