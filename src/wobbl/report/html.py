@@ -46,6 +46,9 @@ h2{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:var(--yello
 h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:20px 0 8px}
 figure{margin:0}
 figure img{width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line);background:#0e0f11}
+figure svg{width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line)}
+figure.drawing{display:inline-block;vertical-align:top;width:calc(50% - 8px);margin-bottom:16px}
+figure.drawing+figure.drawing{margin-left:16px}
 figcaption{color:var(--muted);font-size:13px;margin-top:6px}
 .hero{margin-bottom:16px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
@@ -59,7 +62,8 @@ ol.assume,ul.plain{padding-left:20px}ol.assume li,ul.plain li{margin:4px 0}
 .fix .t{font-weight:700}
 footer{margin-top:40px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:14px}
 pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12px}
-@media (max-width:760px){.verdict{grid-template-columns:1fr}.word{font-size:32px}header{flex-direction:column;
+@media (max-width:760px){figure.drawing{width:100%}figure.drawing+figure.drawing{margin-left:0}
+.verdict{grid-template-columns:1fr}.word{font-size:32px}header{flex-direction:column;
 align-items:flex-start}header .meta{text-align:left}}
 @media print{body{background:#fff;color:#111}.card,.fix,pre{background:#f6f6f6;border-color:#ddd}}
 """
@@ -73,6 +77,8 @@ def img_tag(path: str | Path, alt: str) -> str:
     p = Path(path)
     if not p.exists():
         return ""
+    if p.suffix.lower() == ".svg":  # a drawing goes in as markup: its text stays sharp and it carries its own label
+        return p.read_text(encoding="utf-8")
     data = base64.b64encode(p.read_bytes()).decode()
     mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
     return f'<img src="data:{mime};base64,{data}" alt="{esc(alt)}">'
@@ -82,6 +88,8 @@ def figure(path, caption, cls="") -> str:
     t = img_tag(path, caption)
     if not t:
         return ""
+    if t.startswith("<svg"):
+        cls = f"{cls} drawing".strip()
     return f'<figure class="{cls}">{t}<figcaption>{esc(caption)}</figcaption></figure>'
 
 

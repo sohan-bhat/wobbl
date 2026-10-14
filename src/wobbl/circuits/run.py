@@ -12,6 +12,7 @@ from ..outcome_generic import GenericOutcome
 from ..solvers import base as solvers
 from ..units import fmt
 from ..verify.checks import Check, confidence
+from .draw import FIGURES, write_drawings, write_schematic
 from .templates import TEMPLATES, Template, e24_above
 
 
@@ -219,10 +220,11 @@ def run_circuit(template: str, params: dict, out_dir: str | Path, question: str 
         assumptions = [f"On resistance {fmt(rds25 * 1000)} mohm at 25 C rising {tc * 100:g}% per C.",
                        f"Switching loss from {fmt(trf * 1e9)} ns edges: 0.5 V I (tr + tf) f.",
                        f"Junction to air {fmt(theta)} C/W (datasheet, no heatsink unless included)."]
+    imgs.update(write_drawings(out / "images", template, p, data, values, verdict, tpl.netlist))
     out_o = GenericOutcome("circuit", template, question, verdict, head, metrics, "high", [], checks, assumptions,
                            {**values, "params": {k: (v if isinstance(v, (int, float, str, bool)) else str(v))
                                                  for k, v in p.items()},
-                            "_figures": [["waveform", "Simulated waveform"]]}, imgs, fixes, solver=solver,
+                            "_figures": FIGURES + [["waveform", "Simulated waveform"]]}, imgs, fixes, solver=solver,
                            t_total=time.time() - t0)
     out_o.confidence, out_o.confidence_reasons = confidence(checks, extra)
     if "ringing" in imgs:
@@ -264,13 +266,13 @@ def run_netlist(path: str, probes: list[str], out_dir: str | Path, question: str
                  "final": float(data[pr][-1])} for pr in probes}
     xkey = "time" if "time" in data else next(iter(data))
     imgs = {"waveform": line_plot(out / "images" / "waveform.png", data[xkey], {pr: data[pr] for pr in probes},
-                                  xkey, "value")}
+                                  xkey, "value"), **write_schematic(out / "images", body)}
     lvl, reasons = confidence(checks)
     head = "; ".join(f"{pr}: min {fmt(v['min'])}, max {fmt(v['max'])}, final {fmt(v['final'])}" for pr, v in
                      vals.items())
     o = GenericOutcome("circuit", path, question, "ok", head, [(pr, fmt(v["final"])) for pr, v in vals.items()][:4],
                        lvl, reasons, checks, ["Simulated as written; models come from the netlist."],
-                       {"probes": vals, "_figures": [["waveform", "Simulated signals"]]}, imgs,
+                       {"probes": vals, "_figures": [["waveform", "Simulated signals"], FIGURES[1]]}, imgs,
                        solver=f"ngspice {_ngspice().version()}", t_total=time.time() - t0)
     _ = tpl, math
     return o.write(out)

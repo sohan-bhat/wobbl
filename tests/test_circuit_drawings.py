@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 
+from conftest import needs_spice
 from wobbl.circuits import bench, draw, schematic
 from wobbl.circuits.templates import TEMPLATES
 
@@ -151,3 +152,19 @@ def test_anything_else_is_listed_as_parts_and_nets():
     sub = schematic.schematic("* amp\nV1 in 0 1\nX1 in out 0 opamp\nR1 out 0 1k\n")
     assert "not a simple ladder" in sub and "opamp" in sub
     assert "No parts found" in schematic.schematic("* nothing\n.end\n")
+
+
+def test_a_drawing_that_fails_is_left_out(tmp_path):
+    out = draw.write_drawings(tmp_path, "led", {}, {}, {}, "ok", "* broken\nV1 a 0 1\nR1 a 0 1\n")
+    assert "setup" not in out and (tmp_path / "schematic.svg").exists()
+
+
+@pytest.mark.solver
+@needs_spice
+def test_circuit_runs_write_and_embed_both_drawings(tmp_path):
+    from wobbl.circuits.run import run_circuit
+
+    o = run_circuit("led", {"supply": "5", "resistor": "47", "led": "blue"}, tmp_path / "led")
+    assert set(o.images) >= {"setup", "schematic"}
+    html = (tmp_path / "led" / "report.html").read_text()
+    assert html.count("<svg") == 2 and "36.9 mA" in html and "data:image/svg" not in html

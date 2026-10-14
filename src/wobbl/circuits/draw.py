@@ -9,6 +9,8 @@ parameters and results, so changing a --set value changes the drawing.
 from __future__ import annotations
 
 import math
+import os
+from pathlib import Path
 
 import numpy as np
 
@@ -16,6 +18,7 @@ from ..units import fmt
 from .bench import (BG, BLACK_LEAD, RED_LEAD, VERDICT, YEL, W, Breadboard, Svg, capacitor_top, clip, cubic, eng,
                     flow, heatsink, instrument, jumper, lead, led, mat, mix, num, nums, pin, plug, poly, power_resistor,
                     probe, readout, resistor, scope, shimmer, terminal, to220, toroid)
+from .schematic import schematic
 
 SERIES = (7, 13)  # the series part runs between these columns in row c; column 12 is a gap in the rails
 
@@ -287,3 +290,50 @@ def mosfet_setup(p: dict, res: dict, data: dict, verdict: str) -> tuple[str, str
              f"load and a TO-220 MOSFET on {sink_txt}, switched at {eng(f, 'Hz') if f else 'DC'}, and the junction "
              f"settles at {fmt(tj)} C.")
     return s.svg(label, live=4), label
+
+
+SETUPS = {"led": led_setup, "rc": rc_setup, "buck": buck_setup, "mosfet": mosfet_setup}
+FIGURES = [["setup", "Bench setup, drawn from this run"], ["schematic", "Schematic, drawn from the netlist"]]
+
+
+def _notes(template: str, p: dict, res: dict, data: dict) -> dict[str, str]:
+    """Readings to print beside the schematic's nodes, named as in the template's netlist."""
+    if template == "led":
+        return {"vin": f"{fmt(float(p['supply']))} V", "a": f"{fmt(float(res['v_led_V']))} V"}
+    if template == "rc":
+        return {"out": f"{fmt(float(res['v_at_tau']))} V at τ"}
+    if template == "buck":
+        return {"vin": f"{fmt(float(p['vin']))} V", "out": f"{fmt(float(res['vout_avg']))} V"}
+    vd = np.asarray(data["v(d)"], float)
+    return {"vbus": f"{fmt(float(p['vbus']))} V", "d": f"{fmt(float(vd.min()))} V on"}
+
+
+def _save(path: Path, make) -> str | None:
+    """Write one drawing. A drawing that cannot be made is left out rather than failing the run."""
+    try:
+        path.write_text(make(), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
+        return None
+    return str(path)
+
+
+def write_drawings(images: Path, template: str, params: dict, data: dict, values: dict, verdict: str,
+                   netlist: str) -> dict[str, str]:
+    """setup.svg and schematic.svg for a template run, as name -> path."""
+    images.mkdir(parents=True, exist_ok=True)
+    try:
+        notes = _notes(template, params, values, data)
+    except (KeyError, ValueError, TypeError):
+        notes = {}
+    out = {"setup": _save(images / "setup.svg", lambda: SETUPS[template](params, values, data, verdict)[0]),
+           "schematic": _save(images / "schematic.svg", lambda: schematic(netlist, notes, ns=f"{template}-sch"))}
+    return {k: v for k, v in out.items() if v}
+
+
+def write_schematic(images: Path, netlist: str) -> dict[str, str]:
+    """schematic.svg for a netlist of the user's own."""
+    images.mkdir(parents=True, exist_ok=True)
+    path = _save(images / "schematic.svg", lambda: schematic(netlist))
+    return {"schematic": path} if path else {}
