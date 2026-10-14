@@ -94,11 +94,17 @@ def _solve_f(msh, s: WireSpec, f: float, work: Path, tag: str, current: bool = F
     d = work / tag
     d.mkdir(parents=True, exist_ok=True)
     rp = 1.05 * s.a
-    p = WaveProblem(f, gap_length=s.g, volts=1.0, probe_line=(rp, s.g, s.h * 0.999, 160) if current else None)
+    p = WaveProblem(f, gap_length=s.g, volts=1.0, probe_line=(rp, s.g, s.h * 0.999, 160) if current else None,
+                    fields=current)
     solve.run(fullwave_axi(p, msh.tags), msh.path, d, resolution="F")
+    if current:
+        hh = solve.read_nodes(d, "h.txt", msh.node_ids, comps=2)
+        field = {"mesh": msh, "h": hh[:, 0] + 1j * hh[:, 1]}
+    else:
+        field = {}
     ig = solve.read_complex(d, "ig.txt")
     I = -ig                                   # current flowing up the wire for a positive feed voltage
-    out = {"Z": 1.0 / I, "I": I, "prad_abc": float(solve.read_global(d, "prad.txt")[0])}
+    out = {"Z": 1.0 / I, "I": I, "prad_abc": float(solve.read_global(d, "prad.txt")[0]), **field}
     if current:
         rows = [ln.split() for ln in (d / "hwire.txt").read_text().splitlines() if ln.split()]
         z = np.array([float(r[3]) for r in rows])
@@ -302,9 +308,48 @@ def run_antenna(template: str, params: dict, out_dir: str | Path, question: str 
                                      ["pattern", "Elevation pattern"], ["range", "Received power over distance"]]},
                        images, fixes, solver=f"GetDP {solve.getdp().version()} with gmsh",
                        t_total=time.time() - t_start)
+    _wire_playback(s, dip, base, Z, s11, th, gain_db, lk if link_vals else None, out)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out, sections)
+
+
+def _wire_playback(s: WireSpec, dip: bool, base: dict, Z, s11, th, gain_db, lk, out: Path) -> str:
+    """The field around the wire at the working frequency as a complex phasor on the r-z plane, so a viewer can
+    play the radiated wave as Re(H e^(j w t)), with the pattern, the sweep and the range."""
+    from . import playback as pb
+
+    lam = C0 / s.f0
+    msh = base["mesh"]
+    w = min(msh.X[:, 0].max(), max(1.25 * lam, 1.4 * s.h))
+    win = (0.0, w, 0.0, w)
+    n = 72
+    re = pb.grid(msh.X, msh.tris, win, (n, n), node_vals=base["h"].real)
+    im = pb.grid(msh.X, msh.tris, win, (n, n), node_vals=base["h"].imag)
+    m = float(np.nanpercentile(np.abs(np.concatenate([re.ravel(), im.ravel()])), 98))
+    keep = np.arange(0, len(th), max(1, len(th) // 90))
+    data = {"antenna": "dipole" if dip else "monopole", "frequency_Hz": s.f0,
+            "wire": {"radius_mm": round(s.a * 1e3, 4), "height_mm": round(s.h * 1e3, 4),
+                     "gap_mm": round(s.g * 1e3, 4), "mirror_z": dip},
+            "grid": {"x0": 0.0, "x1": round(w * 1e3, 3), "y0": 0.0, "y1": round(w * 1e3, 3), "nx": n, "ny": n,
+                     "mirror": True},
+            "h_re": pb.pack(re, -m, m), "h_im": pb.pack(im, -m, m),
+            "pattern": {"theta_deg": [round(float(np.degrees(t)), 2) for t in th[keep]],
+                        "gain_dBi": [round(float(g), 3) for g in gain_db[keep]]},
+            "sweep": pb.series(np.array(s.freqs) / 1e6, {"s11_dB": s11, "r_ohm": [z.real for z in Z],
+                                                         "x_ohm": [z.imag for z in Z]})}
+    manifest = {"h_re, h_im": "real and imaginary parts of the azimuthal magnetic field phasor on the grid, A/m for "
+                              "1 V at the feed, packed on one range clipped at the 98th percentile (the field "
+                              "grows without bound at the wire); play Re(H e^(j w t)) = h_re cos(w t) - h_im sin(w t)",
+                "grid": "r from x0 to x1 and z from y0 to y1 in mm; mirror about the axis, and for a dipole about "
+                        "z = 0 too (wire.mirror_z)",
+                "wire": "the wire's radius and height above z = 0 (half the dipole) and the feed gap, mm",
+                "pattern": "gain in dBi against the angle from the wire's axis, degrees",
+                "sweep": "x is frequency in MHz, with S11 in dB and the input resistance and reactance in ohm"}
+    if lk:
+        data["range"] = _range_playback(lk)
+        manifest.update(RANGE_MANIFEST)
+    return pb.write(out, "antenna-wire", manifest, data)
 
 
 def _zs(z: complex) -> str:
@@ -418,18 +463,34 @@ def link_budget(p: dict) -> dict:
                    f"losses, {sens:.1f} dBm sensitivity, and a fading margin of {zr * sigma:.1f} dB for {100 * rel:.0f}% of "
                    "spots."]
 
+    d = np.logspace(0, math.log10(max(r50, rfs, dist or 1) * 3), 120)
+    prx = pt + gt + gr - loss - path_loss(d, f, env, heights, floors)
+    pfs = pt + gt + gr - loss - path_loss(d, f, ENVIRONMENTS["free"], heights, 0)
+    curves = {"median_dBm": prx, "reliable_dBm": prx - zr * sigma, "free_space_dBm": pfs}
+
     def image(path):
-        d = np.logspace(0, math.log10(max(r50, rfs, dist or 1) * 3), 120)
-        prx = pt + gt + gr - loss - path_loss(d, f, env, heights, floors)
-        pfs = pt + gt + gr - loss - path_loss(d, f, ENVIRONMENTS["free"], heights, 0)
         ys = {"median": prx, f"{100 * rel:.0f}% of spots": prx - zr * sigma, "free space": pfs}
         return plots.curve(path, d, ys, "distance, m", "received power, dBm", hline=sens, hlabel="sensitivity",
                            logx=True)
 
     return {"verdict": verdict, "headline": head, "checks": checks, "fixes": fixes, "assumptions": assumptions,
-            "image": image, "values": {"range_median_m": r50, "range_reliable_m": rrel, "range_free_space_m": rfs,
-                                       "link_budget_dB": budget, "sigma_dB": sigma, "reliability": rel,
-                                       "environment": env_name}}
+            "image": image, "curves": (d, curves, sens, dist),
+            "values": {"range_median_m": r50, "range_reliable_m": rrel, "range_free_space_m": rfs,
+                       "link_budget_dB": budget, "sigma_dB": sigma, "reliability": rel, "environment": env_name}}
+
+
+def _range_playback(lk: dict) -> dict:
+    from .playback import series
+
+    d, curves, sens, dist = lk["curves"]
+    return {"curves": series(d, curves, 120), "sensitivity_dBm": sens, "distance_m": dist or None,
+            **{k: round(float(v), 4) if isinstance(v, float) else v for k, v in lk["values"].items()}}
+
+
+RANGE_MANIFEST = {"range.curves": "received power against distance (x in m, dBm) for the median, the reliable "
+                                  "fraction of spots and free space",
+                  "range.range_median_m": "distance reached in half of spots, m",
+                  "range.range_reliable_m": "distance reached in the reliability fraction of spots, m"}
 
 
 def _model_text(env: dict, name: str) -> str:
@@ -461,6 +522,8 @@ def run_link(params: dict, out_dir: str | Path, question: str = "") -> GenericOu
                        lk["assumptions"], {**v, "params": {k: str(x) for k, x in params.items()},
                                            "_figures": [["range", "Received power over distance"]]}, images,
                        lk["fixes"], solver="closed form link budget", t_total=time.time() - t0)
+    from .playback import write
+    write(out, "antenna-link", dict(RANGE_MANIFEST), {"range": _range_playback(lk)})
     return o.write(out)
 
 
@@ -557,4 +620,15 @@ def run_patch(params: dict, out_dir: str | Path, question: str = "", keep: bool 
                         "_figures": [["range", "Received power over distance"]]}, images, fixes,
                        solver=f"GetDP {solve.getdp().version()} (cross section) and the transmission line model",
                        t_total=time.time() - t0)
+    from .playback import write
+    pdata = {"patch": {"width_mm": round(W * 1e3, 4), "length_mm": round(L * 1e3, 4), "height_mm": round(h * 1e3, 4),
+                       "inset_mm": round(y0 * 1e3, 4), "er": er, "eps_eff": round(ee, 5)},
+             "numbers": {"resonance_Hz": round(fr, 1), "edge_resistance_ohm": round(rin, 3),
+                         "directivity_dBi": round(10 * math.log10(D), 3)}}
+    pman = {"patch": "the patch's size, substrate height and the inset feed for the match, mm",
+            "numbers": "resonance, edge resistance and directivity from the transmission line model"}
+    if p.get("tx_power") or p.get("distance"):
+        pdata["range"] = _range_playback(lk)
+        pman.update(RANGE_MANIFEST)
+    write(out, "antenna-patch", pman, pdata)
     return o.write(out)

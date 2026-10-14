@@ -198,6 +198,7 @@ def run_room(template: str, params: dict, out_dir, question="", keep=False, log=
                         "_figures": [["spectrum", "Mode frequencies"], ["modes", "The first mode shapes"]]},
                        images, fixes, solver=f"GetDP {solve.getdp().version()} with SLEPc and gmsh",
                        t_total=time.time() - t0)
+    _room_playback(out, shp, f2, labels, L, zh, unit, fs, exact)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
@@ -379,15 +380,18 @@ def run_muffler(params: dict, out_dir, question="", keep=False, log=lambda s, d=
                        {**values, "params": {k: str(v) for k, v in params.items()},
                         "_figures": [["tl", "Transmission loss"]]}, images, fixes,
                        solver=f"GetDP {solve.getdp().version()} with gmsh", t_total=time.time() - t0)
+    shots = [_duct_solve(msh, float(f), work, f"shot{j}", fields=True) | {"f": float(f)}
+             for j, f in enumerate((freqs[i_pk], f_zero or f_pass))]
+    _muffler_playback(out, msh, shots, (a, R, x3), freqs, tl, tl_pw)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
 
 
-def _duct_solve(msh, f: float, work: Path, tag: str) -> dict:
+def _duct_solve(msh, f: float, work: Path, tag: str, fields: bool = False) -> dict:
     d = work / tag
     d.mkdir(parents=True, exist_ok=True)
-    sp = SoundProblem("axi", freq=f, inlet="inlet", outlets=["outlet"], fields=False)
+    sp = SoundProblem("axi", freq=f, inlet="inlet", outlets=["outlet"], fields=fields)
     tags = {k: v for k, v in msh.tags.items() if k != "air" and k != "shell"}
     solve.run(helmholtz(sp, tags), msh.path, d, resolution="H")
     s_in = solve.read_global(d, "S_inlet.txt")[0]
@@ -396,7 +400,11 @@ def _duct_solve(msh, f: float, work: Path, tag: str) -> dict:
     w_inc = s_in                                     # |A|^2 S with A = 1 Pa, all over 2 rho c
     w_ref = abs(p_in - 1.0) ** 2 * s_in
     w_tr = p2_out
-    return {"tl": 10 * math.log10(w_inc / max(w_tr, 1e-30)), "balance": abs(w_inc - w_ref - w_tr) / w_inc}
+    out = {"tl": 10 * math.log10(w_inc / max(w_tr, 1e-30)), "balance": abs(w_inc - w_ref - w_tr) / w_inc}
+    if fields:
+        pc = solve.read_nodes(d, "p.txt", msh.node_ids, comps=2)
+        out["p"] = pc[:, 0] + 1j * pc[:, 1]
+    return out
 
 
 # --- vibrating panel -----------------------------------------------------------------------
@@ -465,8 +473,8 @@ def run_panel(params: dict, out_dir, question="", keep=False, log=lambda s, d=""
     d_spl = float(np.max(np.abs(spl - spl_ex)))
     d_w = float(np.max(np.abs(w_fem - w_ex) / w_ex))
     log("verify", "a finer mesh at the top frequency")
-    fine = _panel_solve(mesh(model(0.7), work / "fine.msh"), float(freqs[-1]), float(vel[-1]), R,
-                        (1e-6 * a, dist), work, "fine")
+    fine_m = mesh(model(0.7), work / "fine.msh")
+    fine = _panel_solve(fine_m, float(freqs[-1]), float(vel[-1]), R, (1e-6 * a, dist), work, "fine", fields=True)
     checks = [convergence_check([rows[-1]["p"], fine["p"]], 0.02, f"pressure at {fmt(dist)} m on the axis", "Pa",
                                 stopped_by="two meshes", min_levels=2),
               Check("closed form", "pass" if d_spl < 1.0 else ("warn" if d_spl < 2.0 else "fail"),
@@ -506,19 +514,96 @@ def run_panel(params: dict, out_dir, question="", keep=False, log=lambda s, d=""
                        {**values, "params": {k: str(v) for k, v in params.items()},
                         "_figures": [["spl", "Sound pressure level on the axis"]]}, images, fixes,
                        solver=f"GetDP {solve.getdp().version()} with gmsh", t_total=time.time() - t0)
+    _panel_playback(out, fine_m, fine["field"], float(freqs[-1]), a, dist, freqs, spl, spl_ex)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
 
 
-def _panel_solve(msh, f: float, v: float, R: float, probe, work: Path, tag: str) -> dict:
+def _panel_solve(msh, f: float, v: float, R: float, probe, work: Path, tag: str, fields: bool = False) -> dict:
     d = work / tag
     d.mkdir(parents=True, exist_ok=True)
-    sp = SoundProblem("axi", freq=f, radiation=("outer", R), piston=("piston", v), fields=False,
+    sp = SoundProblem("axi", freq=f, radiation=("outer", R), piston=("piston", v), fields=fields,
                       probes=[(probe[0], probe[1], 0.0)])
     solve.run(helmholtz(sp, msh.tags), msh.path, d, resolution="H")
     pp = solve.read_point(d, "probe0.txt")
     pr = abs(complex(pp[0], pp[1] if len(pp) > 1 else 0.0))
     p1 = solve.read_complex(d, "P1_piston.txt")
     w = 0.5 * (p1 * v).real                           # 1/2 Re of p v* over the piston, v real
-    return {"p": pr, "w": w}
+    out = {"p": pr, "w": w}
+    if fields:
+        pc = solve.read_nodes(d, "p.txt", msh.node_ids, comps=2)
+        out["field"] = pc[:, 0] + 1j * pc[:, 1]
+    return out
+
+
+# --- playback ---------------------------------------------------------------------------------
+def _room_playback(out, shapes, freqs, labels, L, z, unit, fs, exact) -> str:
+    """Mode shapes on a horizontal plane, each a standing wave the viewer plays as shape times cos(w t)."""
+    from . import playback as pb
+
+    modes = []
+    for i, a in enumerate(shapes):
+        xs, ys = np.unique(np.round(a[:, 0], 9)), np.unique(np.round(a[:, 1], 9))
+        g = np.full((len(ys), len(xs)), np.nan)
+        g[np.searchsorted(ys, np.round(a[:, 1], 9)), np.searchsorted(xs, np.round(a[:, 0], 9))] = a[:, 3]
+        modes.append({"frequency_Hz": round(freqs[i], 4), "kind": labels[i] if i < len(labels) else "mode",
+                      "shape": pb.pack_signed(g)})
+    manifest = {"modes": "the first mode shapes: pressure on the plane, packed on a range symmetric about zero, "
+                         "to be played as shape times cos(2 pi f t)",
+                "modes_Hz": "every mode found below fmax, Hz", "room_mm": "length, width and height, mm",
+                "plane_mm": "height of the sampled plane, mm", "schroeder_Hz": "where modes merge, Hz (0 for a box)",
+                "exact_Hz": "the exact box modes, Hz, for comparison"}
+    return pb.write(out, "sound-modes", manifest,
+                    {"room_mm": [round(v * 1e3, 3) for v in L], "plane_mm": round(z * 1e3, 3), "unit_is_mm": unit < 1,
+                     "modes": modes, "modes_Hz": [round(f, 4) for f in freqs], "schroeder_Hz": round(fs, 3),
+                     "exact_Hz": [round(e[0], 4) for e in exact][:len(freqs)]})
+
+
+def _muffler_playback(out, msh, shots, dims, freqs, tl, tl_pw) -> str:
+    """The pressure phasor through the duct at the first peak and the first pass band, and the loss curve."""
+    from . import playback as pb
+
+    a, R, x3 = dims
+    win = (0.0, R, 0.0, x3)
+    n = (20, int(min(160, max(40, round(20 * x3 / R)))))
+    frames = []
+    for sh in shots:
+        re = pb.grid(msh.X, msh.tris, win, n, node_vals=sh["p"].real)
+        im = pb.grid(msh.X, msh.tris, win, n, node_vals=sh["p"].imag)
+        m = float(np.nanmax(np.abs(np.concatenate([re.ravel(), im.ravel()]))))
+        frames.append({"frequency_Hz": round(sh["f"], 3), "tl_dB": round(sh["tl"], 3),
+                       "p_re": pb.pack(re, -m, m), "p_im": pb.pack(im, -m, m)})
+    manifest = {"frames": "pressure phasor in the duct for a 1 Pa wave coming in at y = 0, Pa, packed; play "
+                          "Re(p e^(j w t)) = p_re cos(w t) - p_im sin(w t)",
+                "grid": "r from x0 to x1 and the duct axis from y0 to y1 in mm, axisymmetric about x = 0; cells "
+                        "outside the duct are -1",
+                "duct_mm": "pipe radius, chamber radius and overall length, mm",
+                "tl": "transmission loss over frequency (x in Hz, dB) from the field solve and plane wave theory"}
+    return pb.write(out, "sound-muffler", manifest,
+                    {"duct_mm": [round(a * 1e3, 3), round(R * 1e3, 3), round(x3 * 1e3, 3)],
+                     "grid": {"x0": 0.0, "x1": round(R * 1e3, 3), "y0": 0.0, "y1": round(x3 * 1e3, 3),
+                              "nx": n[0], "ny": n[1], "mirror": True},
+                     "frames": frames, "tl": pb.series(freqs, {"field_dB": tl, "plane_wave_dB": tl_pw})})
+
+
+def _panel_playback(out, msh, p, f, a, dist, freqs, spl, spl_ex) -> str:
+    """The radiated pressure phasor in front of the panel at the top frequency, and the SPL curve."""
+    from . import playback as pb
+
+    w = min(msh.X[:, 0].max(), max(1.3 * dist, 4 * a)) / 1.0
+    win = (0.0, w, 0.0, w)
+    re = pb.grid(msh.X, msh.tris, win, (64, 64), node_vals=p.real)
+    im = pb.grid(msh.X, msh.tris, win, (64, 64), node_vals=p.imag)
+    m = float(np.nanpercentile(np.abs(np.concatenate([re.ravel(), im.ravel()])), 99))
+    manifest = {"p_re, p_im": "pressure phasor in front of the baffle at frequency_Hz, Pa, packed on one range; "
+                              "play Re(p e^(j w t))",
+                "grid": "r from x0 to x1 and the distance from the baffle from y0 to y1 in mm, axisymmetric about "
+                        "x = 0", "panel_mm": "panel radius and the listening distance, mm",
+                "spl": "sound pressure level on the axis at the listening distance (x in Hz, dB re 20 uPa)"}
+    return pb.write(out, "sound-panel", manifest,
+                    {"frequency_Hz": round(f, 3), "panel_mm": [round(a * 1e3, 3), round(dist * 1e3, 3)],
+                     "grid": {"x0": 0.0, "x1": round(w * 1e3, 3), "y0": 0.0, "y1": round(w * 1e3, 3), "nx": 64,
+                              "ny": 64, "mirror": True},
+                     "p_re": pb.pack(re, -m, m), "p_im": pb.pack(im, -m, m),
+                     "spl": pb.series(freqs, {"field_dB": spl, "exact_dB": spl_ex})})

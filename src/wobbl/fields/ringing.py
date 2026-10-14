@@ -105,7 +105,7 @@ def _ring(t: np.ndarray, v: np.ndarray, vin: float, period: float) -> dict:
 
 
 def ringing(p: dict, work: Path, out: Path) -> dict:
-    from ..report.render import line_plot
+    from .plots import curve
 
     lp, cs, rl, src = parasitics(p)
     period = 1 / p["frequency"]
@@ -160,15 +160,26 @@ def ringing(p: dict, work: Path, out: Path) -> dict:
     fixes.append({"kind": "layout", "title": "Shrink the hot loop",
                   "summary": "Put the input capacitor right next to the switch and diode, with the return on the "
                              "layer just below, so the loop inductance and the overshoot both fall.", "auto": False})
-    tw = ideal["time"]
-    zoom_i = (tw >= ri["t_on"] - 0.02 * period) & (tw <= ri["t_on"] + 0.25 * period)
+    span = min(0.25 * period, 25 / r1["freq"]) if r1["freq"] else 0.25 * period
     tp = par["time"]
-    zoom_p = (tp >= r1["t_on"] - 0.02 * period) & (tp <= r1["t_on"] + 0.25 * period)
-    n = min(zoom_i.sum(), zoom_p.sum())
-    t_ns = (tp[zoom_p][:n] - tp[zoom_p][0]) * 1e9
-    ys = {"with board parasitics": par["v(sw)"][zoom_p][:n],
-          "ideal schematic": np.interp(tp[zoom_p][:n] - r1["t_on"] + ri["t_on"], tw, ideal["v(sw)"])}
-    img = line_plot(out / "images" / "ringing.png", t_ns, ys, "ns after turn on", "switch node, V")
+    zoom = (tp >= r1["t_on"] - 0.1 * span) & (tp <= r1["t_on"] + span)
+    t_rel = tp[zoom] - r1["t_on"]
+    ys = {"with board parasitics": par["v(sw)"][zoom],
+          "ideal schematic": np.interp(t_rel + ri["t_on"], ideal["time"], ideal["v(sw)"])}
+    if sn:
+        ys["with the snubber"] = np.interp(t_rel + sn["t_on"], rs["time"], rs["v(sw)"])
+    img = curve(out / "images" / "ringing.png", t_rel * 1e9, ys, "ns after turn on", "switch node, V")
+    from .playback import series, write
+    write(out, "circuit-ringing",
+          {"switch_node": "switch node voltage after the turn on edge (x in ns, volts) for the ideal schematic, with "
+                          "the board's parasitics and, when tried, with the snubber",
+           "numbers": "loop inductance (H), switch node capacitance (F), peaks (V) and ringing frequency (Hz)"},
+          {"switch_node": series(t_rel * 1e9, {"ideal_V": ys["ideal schematic"],
+                                              "board_V": ys["with board parasitics"],
+                                              **({"snubber_V": ys["with the snubber"]} if sn else {})}, 1200),
+           "numbers": {"loop_inductance_H": lp, "switch_capacitance_F": cs, "vin_V": vin, "peak_V": r1["peak"],
+                       "peak_ideal_V": ri["peak"], "peak_snubber_V": sn.get("peak"), "ring_Hz": r1["freq"],
+                       "ring_closed_form_Hz": f_cl}})
     values = {"loop_inductance_H": lp, "switch_capacitance_F": cs, "loop_resistance_ohm": rl, "sw_peak_V": r1["peak"],
               "sw_peak_ideal_V": ri["peak"], "ring_Hz": r1["freq"], "ring_closed_form_Hz": f_cl,
               "snubber": {"R_ohm": snub_r, "C_F": snub_c, "sw_peak_V": sn.get("peak")} if sn else None}
