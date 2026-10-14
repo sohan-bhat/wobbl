@@ -259,7 +259,7 @@ def _build_setup(st: PartFlowStudy, g: PartGeometry, p: Plan, q: dict, flow: flo
         lo = blo - np.array([up, side, side]) * L
         hi = bhi + np.array([down, side, side]) * L
         size = L / q["base"]
-        level = q["surface"]
+        level = _surface_level(size, q["surface"], ext)
         wake = Region("wake", tuple(blo - np.array([0.2, 0.3, 0.3]) * L), tuple(bhi + np.array([2.0, 0.3, 0.3]) * L),
                       max(1, level - 2))
         near = Region("near", tuple(blo - 0.15 * L), tuple(bhi + np.array([0.6, 0.15, 0.15]) * L), max(1, level - 1))
@@ -280,7 +280,7 @@ def _build_setup(st: PartFlowStudy, g: PartGeometry, p: Plan, q: dict, flow: flo
     size = L / q["base"]
     lo = blo - np.array([1.0 * ext[0], 0.0, 0.0]) - np.array([0, 1e-4, 1e-4]) * L
     hi = bhi + np.array([2.0 * ext[0], 0.0, 0.0]) + np.array([0, 1e-4, 1e-4]) * L
-    level = q["surface"]
+    level = _surface_level(size, q["surface"], ext)
     surfaces = [Surface("walls", tri, "wall", (level, level + 1))]
     loc = np.array([lo[0] + 0.41 * (blo[0] - lo[0]), (lo[1] + hi[1]) / 2 + 0.013 * ext[1],
                     (lo[2] + hi[2]) / 2 + 0.017 * ext[2]])
@@ -289,6 +289,15 @@ def _build_setup(st: PartFlowStudy, g: PartGeometry, p: Plan, q: dict, flow: flo
                                               "zmin": "wall", "zmax": "wall"}, loc, size, [], L, duct_area, u, flow,
                  (u, 0.0, 0.0), "xmin", ["xmax"], _turbulence(re_, u, fl.nu, dh, internal=True), fl.nu, fl.rho,
                  q["iters"])
+
+
+def _surface_level(size: float, level: int, ext: np.ndarray, most: int = 7) -> int:
+    """The refinement level at the surface: the quality's own, raised until the part's thinnest extent spans at
+    least four cells, so a long thin strut or a flat plate is not lost between background cells."""
+    thin = float(np.min(ext))
+    while size / 2 ** level > thin / 4 and level < most:
+        level += 1
+    return level
 
 
 def _turbulence(re_: float, u: float, nu: float, length: float, internal: bool) -> foam.Turbulence:
@@ -350,6 +359,8 @@ def run_level(s: Setup, work: Path, scale: float, tag: str, fields: bool = False
     grid = mesh(case)
     if grid.patches.get(s.inlet, 0) == 0:
         raise RuntimeError("the grid lost the inlet; the lid may not seal the passage")
+    if grid.patches.get("walls", 0) == 0:
+        raise RuntimeError("the grid has no wall faces, so the part fell between its cells; use a finer quality")
     foam.write_fields(case, s.u_in, s.turb, scalar={"inlet": 0.0, "wall": 1.0} if s.heat else None)
     if s.unsteady:
         from .transient import run_transient
