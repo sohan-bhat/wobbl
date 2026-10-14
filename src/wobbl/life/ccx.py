@@ -68,6 +68,7 @@ def make_deck(model: StaticModel, path: Path, attached: list[Attached] = ()) -> 
         rigid.append(RigidCoupling(a.name, nodes, np.asarray(a.point, float)))
         holder[a.name] = a.name
     path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     extra = write_static_inp(path, replace(model, rigid=rigid))
     text = path.read_text()
     k = re.search(r"^\*STEP", text, re.M).start()
@@ -142,8 +143,10 @@ def body_load(deck: Deck, accel: float, direction) -> str:
 
 
 def buckle_inp(deck: Deck, n_modes: int) -> str:
+    """A buckling step. CalculiX first solves the part under the loads, written as the first result set with its
+    reactions, then the buckling factors and their mode shapes."""
     return (deck.head + f"*STEP\n*BUCKLE\n{n_modes}\n" + deck.supports + deck.loads +
-            "*NODE FILE\nU\n*EL FILE\nS\n*END STEP\n")
+            "*NODE FILE\nU,RF\n*EL FILE\nS\n*END STEP\n")
 
 
 def frequency_inp(deck: Deck, n_modes: int, stress: bool = True) -> str:
