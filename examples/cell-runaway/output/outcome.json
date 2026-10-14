@@ -1,0 +1,101 @@
+{
+ "domain": "battery",
+ "part": "18650 cell",
+ "question": "Can a cell at the hottest point of the sealed battery pack run away on its own?",
+ "verdict": "ok",
+ "headline": "Thermal runaway starts above 155 C, 80.4 K above the 74.5 C the 18650 cell sits in, so self heating cannot run away.",
+ "metrics": [
+  [
+   "runaway above",
+   "155 C"
+  ],
+  [
+   "surroundings",
+   "74.5 C"
+  ],
+  [
+   "margin",
+   "80.4 K"
+  ],
+  [
+   "Semenov estimate",
+   "107 C"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed lumped cell, energy balance, time step convergence, Semenov bound"
+ ],
+ "checks": [
+  {
+   "name": "lumped cell",
+   "status": "pass",
+   "summary": "Biot number 0.00581 for 5 W/(m2 K) over the cell, so its inside stays within 0.291% of one temperature",
+   "detail": {}
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "heat made equals heat stored plus heat shed to 9.4e-14% over each transient",
+   "detail": {}
+  },
+  {
+   "name": "time step convergence",
+   "status": "pass",
+   "summary": "at 155 C the cell runs away after 68.6 min, and 68.6 min with a tolerance 100 times tighter (7.7e-05% apart)",
+   "detail": {}
+  },
+  {
+   "name": "closed form",
+   "status": "info",
+   "summary": "at the Semenov point the cell sits 11.4 K above its surroundings, against R Ta^2 / E = 8.92 K for one reaction carrying 67% of the heat, 27% apart",
+   "detail": {}
+  },
+  {
+   "name": "Semenov bound",
+   "status": "pass",
+   "summary": "with fresh reactants that never run out the cell would run away above 107 C, below the 155 C the transient needs, since the small store of SEI burns out before it can carry the cell",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "LiCoO2 cell at 100% charge (Moli ICR18650), 18 by 65 mm, with the kinetics of Hu, He, Rein and Restuccia, Numerical Study of Self-Heating Ignition of a Box of Lithium-Ion Batteries During Storage, Fire Technology 2020, Table 2, from Hatchard et al. 2001 and Kim et al. 2007.",
+  "Cooled by 5 W/(m2 K) of convection and radiation at an emissivity of 0.8 over its whole surface, in surroundings taken from the hottest point of the heat study in ../battery-pack/output.",
+  "The cell is lumped, open circuit and at rest, with no internal short, overcharge or outside fire. Runaway is the moment the cell heats itself faster than 10 C/min, the trigger Feng et al. (Frontiers in Energy Research 2018) use.",
+  "The kinetics describe a fully charged LiCoO2 cell. LFP cells run away at higher temperatures and NMC cells at similar ones, so for other chemistries treat the answer as indicative.",
+  "The kinetics carry the cell up to the trigger. What follows it, the separator melting, venting and fire, is beyond them, so the temperatures after the trigger are not a forecast."
+ ],
+ "values": {
+  "critical_ambient_C": 154.900385,
+  "semenov_ambient_C": 107.400385,
+  "semenov_cell_C": 118.750385,
+  "ambient_C": 74.4553,
+  "margin_K": 80.445085,
+  "time_to_runaway_min": 68.6134,
+  "biot": 0.005813,
+  "h_W_m2K": 5.0,
+  "emissivity": 0.8,
+  "cell_mm": [
+   18.0,
+   65.0
+  ],
+  "files": {
+   "playback": "playback.json"
+  },
+  "_figures": [
+   [
+    "onset",
+    "Cell temperature in an oven just below and just above the onset"
+   ]
+  ]
+ },
+ "images": {
+  "onset": "images/onset.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 10.315923,
+ "solver": "Wobbl lumped Arrhenius kinetics (scipy LSODA)"
+}
