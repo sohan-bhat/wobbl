@@ -449,6 +449,9 @@ def _register():
     from .fields import antenna, board, electric, magnetic, sound
     for c in (magnetic, electric, board, antenna, sound):
         cli.add_command(c)
+    from .jobs import estimate, jobs, remote
+    for c in (estimate, jobs, remote):
+        cli.add_command(c)
 
 
 _register()

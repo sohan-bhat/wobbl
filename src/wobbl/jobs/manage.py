@@ -20,7 +20,8 @@ from . import remote as R
 from .drivers import CalculixDriver, ccx_progress, stage_inp, sta_rows
 from .store import ACTIVE, Job, all_jobs, latest, new_id, write_json
 
-COMPACT = (".sta", ".dat", ".cvg")      # small result files a remote job sends back; .frd stays unless asked
+COMPACT = (".sta", ".dat", ".cvg")      # small result files a remote job sends back, as the .frd stays unless asked
+CLOUD_CCX = "/home/ubuntu/.wobbl/env/bin/ccx"    # where the cloud machine's start up script installs CalculiX
 
 
 class JobError(RuntimeError):
@@ -67,7 +68,8 @@ def start(target: str = "", args: list[str] | None = None, on: str = "", threads
                        f"wobbl estimate {target} predicts its run time, memory and disk")
     entry = R.get(on) if on else None
     if cloud:
-        entry = {"host": cloud["host"], "root": "wobbl-jobs", "ccx": cloud.get("ccx", ".wobbl/env/bin/ccx")}
+        entry = {"host": cloud["host"], "root": "wobbl-jobs", "ccx": cloud.get("ccx", CLOUD_CCX), "cloud": True,
+                 "cores": cloud.get("cores"), "ram": cloud.get("ram")}
     job = Job(new_id(target if kind != "wobbl" else (args[1] if len(args) > 1 else "study")), kind,
               str(Path(target).resolve()) if kind != "wobbl" else " ".join(args), on or ("cloud" if cloud else "local"),
               checkpoint=checkpoint and kind == "calculix", args=args, cloud=cloud or {})
@@ -227,7 +229,7 @@ RUN_SH = """#!/bin/sh
 # Wobbl job {id}, run {run}. Needs only a POSIX shell and CalculiX.
 cd "$(dirname "$0")/work" || exit 1
 export OMP_NUM_THREADS={t} CCX_NPROC_EQUATION_SOLVER={t} CCX_NPROC_RESULTS={t} CCX_NPROC_STIFFNESS={t}
-rm -f ../exit_code
+{wait}rm -f ../exit_code
 echo $$ > ../watcher.pid
 date +%s > ../started
 {ccx} -i {name} >> ../solver.log 2>&1 &
@@ -260,8 +262,11 @@ def _launch_remote(job: Job, entry: dict, resume_deck: str = "", rin_from: str =
         stage_inp(Path(job.input), stage / "work" / "job.inp", job.checkpoint, copy_includes=True)
         shutil.copy2(Path(__file__).with_name("frdsummary.py"), stage / "frdsummary.py")
     ccx = entry.get("ccx") or "ccx"
+    wait = 'while [ ! -f "$HOME/.wobbl-ready" ]; do sleep 10; done\n' if entry.get("cloud") else ""
     (stage / "run.sh").write_text(RUN_SH.format(id=job.id, run=job.restarts, t=job.threads, name=drv.name,
-                                                ccx=shlex.quote(ccx)))
+                                                ccx=shlex.quote(ccx), wait=wait))
+    if entry.get("cloud"):
+        _wait_for_ssh(t)
     t.put(stage, job.remote_dir)
     shutil.rmtree(stage, ignore_errors=True)          # the remote holds the input now
     if rin_from:
@@ -271,6 +276,21 @@ def _launch_remote(job: Job, entry: dict, resume_deck: str = "", rin_from: str =
     write_json(job.folder / "status.json", {"state": "running", "progress": 0.0, "updated": time.time(),
                                             "started": time.time(), "detail": f"started on {t.name}",
                                             "run": job.restarts})
+
+
+def _wait_for_ssh(t: R.Transport, timeout: float = 600.0):
+    """A freshly rented machine takes a minute or two before it answers SSH."""
+    t0 = time.time()
+    while True:
+        try:
+            if t.run("true", timeout=30).returncode == 0:
+                return
+        except R.RemoteError:
+            pass
+        if time.time() - t0 > timeout:
+            raise JobError(f"{t.name} did not answer SSH within {timeout / 60:.0f} minutes",
+                           "Check that the security group lets SSH in from this machine")
+        time.sleep(10)
 
 
 def _remote_status(job: Job) -> dict:
@@ -460,7 +480,7 @@ def resume(job_id: str = "") -> dict:
     read = (lambda n, tail=0: _transport(job).read(f"{job.remote_dir}/work/{n}", tail)) if remote else _reader(job)
     drv = CalculixDriver(job)
     ok, why = drv.can_resume(read)
-    entry = ({"host": job.cloud["host"], "root": "wobbl-jobs", "ccx": ".wobbl/env/bin/ccx"} if job.cloud
+    entry = ({"host": job.cloud["host"], "root": "wobbl-jobs", "ccx": CLOUD_CCX, "cloud": True} if job.cloud
              else R.get(job.runner)) if remote else None
     if not ok:
         if remote:
