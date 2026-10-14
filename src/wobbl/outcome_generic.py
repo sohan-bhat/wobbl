@@ -63,6 +63,7 @@ class GenericOutcome:
         return "\n".join(lines)
 
     def write(self, out_dir: str | Path, sections_extra: list[str] | None = None) -> "GenericOutcome":
+        from .credibility.report import evidence_sections, evidence_text
         from .report.html import badge, esc, figure, page, table
 
         out = Path(out_dir)
@@ -77,6 +78,7 @@ class GenericOutcome:
                 f"<div class='fix'><div class='t'>{esc(f['title'])}</div><div>{esc(f['summary'])}</div></div>"
                 for f in self.fixes))
         sections += sections_extra or []
+        sections += evidence_sections(out)
         sections.append("<h2>Assumptions</h2><ol class='assume'>" +
                         "".join(f"<li>{esc(a)}</li>" for a in self.assumptions) + "</ol>")
         word = self.verdict.upper()
@@ -89,7 +91,7 @@ class GenericOutcome:
         self.report = str(out / "report.html")
         self.workdir = str(out)
         Path(self.report).write_text(html, encoding="utf-8")
-        (out / "summary.txt").write_text(self.text() + "\n", encoding="utf-8")
+        (out / "summary.txt").write_text(self.text() + evidence_text(out) + "\n", encoding="utf-8")
         self.workdir = str(out)
         self.save(out / "outcome.json")
         return self

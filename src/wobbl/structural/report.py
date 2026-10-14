@@ -78,6 +78,9 @@ def write_report(o: Outcome, out_dir: str | Path) -> str:
     setup.append(["part", f"{len(feats.get('holes', []))} holes, {len(feats.get('fillets', []))} inside fillets, "
                           f"{len(feats.get('sharp_inside_corners', []))} sharp inside corners, walls about "
                           f"{fmt(feats.get('thickness_typical_mm', 0))} mm"])
+    from ..credibility.report import evidence_sections
+
+    sections += evidence_sections(out)
     sections.append("<h2>Setup</h2>" + table(["", ""], setup))
     sections.append("<h2>Assumptions</h2><ol class='assume'>" +
                     "".join(f"<li>{esc(a)}</li>" for a in o.assumptions) + "</ol>")
@@ -96,6 +99,8 @@ def write_report(o: Outcome, out_dir: str | Path) -> str:
 def write_outputs(o: Outcome, out_dir: str | Path) -> Outcome:
     out = Path(out_dir)
     o.report = write_report(o, out)
-    (out / "summary.txt").write_text(text_summary(o) + "\n", encoding="utf-8")
+    from ..credibility.report import evidence_text
+
+    (out / "summary.txt").write_text(text_summary(o) + evidence_text(out) + "\n", encoding="utf-8")
     o.save(out / "outcome.json")
     return o

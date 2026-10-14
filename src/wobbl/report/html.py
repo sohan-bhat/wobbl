@@ -43,6 +43,7 @@ text-transform:uppercase;letter-spacing:.06em}
 .badge.info{background:rgba(90,169,255,.15);color:var(--info)}.badge.skip{background:#22252a;color:var(--skip)}
 ul.reasons{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
 h2{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:var(--yellow);margin:34px 0 12px}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:20px 0 8px}
 figure{margin:0}
 figure img{width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line);background:#0e0f11}
 figcaption{color:var(--muted);font-size:13px;margin-top:6px}
