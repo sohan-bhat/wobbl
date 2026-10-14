@@ -39,7 +39,7 @@ const first = ex.runs[0];
     <div class="ex-runs">
       {ex.runs.map((r) => (
         <>
-          {playFor(ex, r) ? <LiveRun ex={ex} run={r} /> : <RunCard run={r} />}
+          {playFor(ex, r) ? <LiveRun ex={ex} run={r} first={r === ex.runs[0]} /> : <RunCard run={r} />}
           {r.fixes.length > 0 && !playFor(ex, r) && <FixStrip run={r} />}
         </>
       ))}

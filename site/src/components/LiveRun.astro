@@ -12,8 +12,8 @@ import { clock, finalValue, firstFix, fmt, meter, pace, panes as panesOf, type P
 import { url } from '../lib/site';
 import '../styles/live-run.css';
 
-interface Props { ex: Example; run: Run }
-const { ex, run } = Astro.props;
+interface Props { ex: Example; run: Run; first?: boolean }
+const { ex, run, first = false } = Astro.props;
 const all = panesOf(ex, run);
 const fix = firstFix(all);
 const shown = fix > 0 ? [all[0], all[fix]] : [all[0]];
@@ -72,7 +72,8 @@ const data = JSON.stringify({
             return (
               <div class="lrun-pane" data-i={i}>
                 {pic && <img class="lrun-poster" src={pic.src} srcset={pic.srcset} sizes={shown.length > 1 ? '(min-width: 1000px) 640px, 100vw' : '(min-width: 1000px) 46vw, 100vw'}
-                             width={pic.width} height={pic.height} loading="lazy" decoding="async" alt={alt(pane.name)} />}
+                             width={pic.width} height={pic.height} loading={first ? undefined : 'lazy'} fetchpriority={first && i === 0 ? 'high' : undefined}
+                             decoding="async" alt={alt(pane.name)} />}
                 {shown.length > 1 && <p class="lrun-name" data-name>{pane.name}</p>}
                 <span class="lrun-mark" hidden aria-hidden="true"><span class="target"></span></span>
               </div>
@@ -112,6 +113,7 @@ const data = JSON.stringify({
           );
         })}
         {event && <p class="lrun-event" data-event>{event.text}</p>}
+        {steady && <p class="lrun-note">The run solved the steady state, and Wobbl's lumped check of the same sink times the warm up.</p>}
         <p class="visually-hidden" data-said aria-live="polite"></p>
       </div>
       <script type="application/json" data-lrun-data set:html={data}></script>

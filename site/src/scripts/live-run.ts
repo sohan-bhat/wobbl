@@ -359,7 +359,7 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
     canvas.tabIndex = 0;
     canvas.setAttribute('role', 'img');
     canvas.setAttribute('aria-label', `3D ${strength ? 'stress' : 'temperature'} map of the ${data.title}, played from the run's own results. ` +
-      'Drag to turn it, or double click to put it back.');
+      'Drag or press the arrow keys to turn it, and double click or press Home to put it back.');
     canvas.style.opacity = '0';
     canvas.style.transition = 'opacity 0.3s ease';
     view.prepend(canvas);
@@ -371,6 +371,14 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
       minDist: radius * 1.1, maxDist: radius * 8 });
     homeCamera();
     on(canvas, 'dblclick', () => { homeCamera(); requestDraw(); });
+    on(canvas, 'keydown', (e: KeyboardEvent) => {
+      const turn = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] } as Record<string, number[]>)[e.key];
+      if (e.key === 'Home') homeCamera();
+      else if (turn) { orbit!.az += (turn[0] * Math.PI) / 18; orbit!.el += (turn[1] * Math.PI) / 18; orbit!.update(); }
+      else return;
+      e.preventDefault();
+      requestDraw();
+    });
     const off = orbitControls(canvas, orbit, { rotateSpeed: 0.8, onChange: requestDraw });
     abort.signal.addEventListener('abort', off, { once: true });
     const ro = new ResizeObserver(() => {
