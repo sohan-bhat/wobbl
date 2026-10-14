@@ -66,11 +66,18 @@ CASES = [
          "part", "result", ("crack",)),
     Case(str(EX / "battery-pack" / "pack.py"), "", "part", "parametric", ("stress",)),
     # circuits: netlists and circuits in words
-    Case("", "will a blue LED on 5V with a 47 ohm resistor fry?", "circuit", "led"),
-    Case("buck converter from 12 V to 3.3 V at 2 A", "how big is the ripple?", "circuit", "buck"),
-    Case("", "will a MOSFET carrying 15 A with 8 mOhm Rds on overheat?", "circuit", "mosfet"),
-    Case("{tmp}/board.cir", "what is v(out)?", "circuit", "netlist"),
-    Case("", "what is the RC time constant of 10k and 100nF?", "circuit", "rc"),
+    Case("", "will a blue LED on 5V with a 47 ohm resistor fry?", "circuit", "led", ("ratings",)),
+    Case("buck converter from 12 V to 3.3 V at 2 A", "how big is the ripple?", "circuit", "buck", ("transient",)),
+    Case("", "will a MOSFET carrying 15 A with 8 mOhm Rds on overheat?", "circuit", "mosfet", ("ratings",)),
+    Case("{tmp}/board.cir", "what is v(out)?", "circuit", "netlist", ("operating-point",)),
+    Case("", "what is the RC time constant of 10k and 100nF?", "circuit", "rc", ("transient",)),
+    Case("{tmp}/board.kicad_sch", "will anything overheat at 12 V?", "circuit", "kicad", ("ratings",)),
+    Case("{tmp}/export.net", "what is the output voltage?", "circuit", "kicad", ("operating-point",)),
+    Case("{tmp}/board.kicad_sch", "", "circuit", "kicad", ("ratings",)),
+    Case("a 555 astable blinking a red LED from a 9 V battery", "how fast does it blink?", "circuit", "led",
+         ("transient",)),
+    Case("", "will an LM358 non inverting amplifier with a gain of 11 be stable?", "circuit", "words", ("ac",)),
+    Case("{tmp}/board.cir", "what happens across part tolerances?", "circuit", "netlist", ("tolerance",)),
     # mechanisms: specs, URDF, MJCF and words
     Case("", "can two mg996r servos lift 500 g with a robot arm?", "mechanism", "arm"),
     Case("four bar linkage with a 120 mm ground, 30 mm crank, 125 mm coupler and 45 mm rocker", "where does it bind?",
@@ -124,6 +131,8 @@ CASES = [
 def _files(tmp: Path) -> None:
     (tmp / "lid.stl").write_text("solid lid\nendsolid lid\n")
     (tmp / "board.cir").write_text("* divider\nV1 in 0 5\nR1 in out 1k\nR2 out 0 1k\n.op\n.end\n")
+    (tmp / "board.kicad_sch").write_text("(kicad_sch (version 20231120) (generator eeschema))\n")
+    (tmp / "export.net").write_text("(export (version D) (design (source board.kicad_sch)))\n")
     (tmp / "robot.urdf").write_text('<?xml version="1.0"?>\n<robot name="arm"><link name="base"/></robot>\n')
     (tmp / "arm.xml").write_text("<mujoco model='arm'><worldbody/></mujoco>\n")
     (tmp / "gripper.toml").write_text('[[bodies]]\nname = "finger"\n\n[[joints]]\nname = "hinge"\n')

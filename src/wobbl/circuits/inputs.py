@@ -42,7 +42,7 @@ def _path(s: str) -> Path | None:
         return None
 
 
-def load(source: str, params: dict) -> Circuit:
+def load(source: str, params: dict, assume=None) -> Circuit:
     kind = kind_of(source)
     p = _path(str(source).strip())
     if kind == "netlist":
@@ -59,6 +59,6 @@ def load(source: str, params: dict) -> Circuit:
         c.source = "kicad"
         return c
     from . import describe
-    c = describe.build(str(source), params)
+    c = describe.build(str(source), params, assume)
     c.source = "description"
     return c

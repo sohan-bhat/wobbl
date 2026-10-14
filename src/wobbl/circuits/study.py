@@ -44,15 +44,16 @@ def _ambient(params: dict) -> float:
         return parse_quantity(str(a), "temperature").value
 
 
-def load(source: str, params: dict | None = None) -> Circuit:
-    """A Circuit from a file path, SPICE or KiCad text, or a plain description."""
+def load(source: str, params: dict | None = None, assume=None) -> Circuit:
+    """A Circuit from a file path, SPICE or KiCad text, or a plain description. assume(text, override) hears
+    each guess a description needed."""
     from . import inputs
-    return inputs.load(source, params or {})
+    return inputs.load(source, params or {}, assume)
 
 
 def simulate_circuit(source: str, question: str = "", params: dict | None = None, out_dir: str | Path | None = None,
                      probes: list[str] | tuple = (), focus: str = "ratings", quick: bool = False,
-                     log=None) -> GenericOutcome:
+                     log=None, assume=None) -> GenericOutcome:
     """The general entry: any circuit, any question. focus is ratings (every part against its limits),
     operating-point, transient, ac or tolerance; each still reports every part's stress."""
     from .templates import TEMPLATES
@@ -66,7 +67,7 @@ def simulate_circuit(source: str, question: str = "", params: dict | None = None
     out = Path(out_dir or Path("wobbl-out") / "circuit")
     out.mkdir(parents=True, exist_ok=True)
     work = out / "work"
-    c = load(source, params)
+    c = load(source, params, assume)
     bind(c, params)
     if params.get("parasitics"):
         join_parasitics(c, _parasitic_spec(params["parasitics"]))
