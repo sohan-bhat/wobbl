@@ -69,20 +69,25 @@ class Deck:
 
 
 class _Sampler:
-    """Every k-th node coordinate, with k doubling whenever the sample fills, so it stays spread over the
-    whole deck however many nodes follow."""
+    """A fixed size, evenly spread sample of node coordinates however many nodes follow. Each node is kept when
+    a hash of its position in the deck falls under a threshold that halves whenever the sample fills. Taking
+    every k-th node instead would alias with the numbering of a structured mesh and keep whole layers."""
 
     def __init__(self, cap: int = SAMPLE):
-        self.cap, self.k, self.i, self.pts = cap, 1, 0, []
+        self.cap, self.i, self.limit, self.pts, self.keys = cap, 0, 1 << 32, [], []
         self.lo = np.full(3, np.inf)
         self.hi = np.full(3, -np.inf)
 
     def add(self, x: float, y: float, z: float):
-        if self.i % self.k == 0:
+        h = (self.i * 2654435761 + 12345) & 0xFFFFFFFF          # Knuth's multiplicative hash
+        if h < self.limit:
             self.pts.append((x, y, z))
+            self.keys.append(h)
             if len(self.pts) >= self.cap:
-                self.pts = self.pts[::2]
-                self.k *= 2
+                self.limit //= 2
+                keep = [j for j, k in enumerate(self.keys) if k < self.limit]
+                self.pts = [self.pts[j] for j in keep]
+                self.keys = [self.keys[j] for j in keep]
         self.i += 1
         p = (x, y, z)
         for d in range(3):
