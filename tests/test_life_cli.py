@@ -49,41 +49,48 @@ def test_fatigue_tool_and_errors(tmp_path, monkeypatch):
     assert fp["download_bytes"] == 0 and "download nothing" in fp["line"]
 
 
-def test_the_skills_life_commands_read_their_values():
-    """Every buckling, vibration and fatigue command the skill teaches parses, and its loads, supports, masses,
-    speeds, sweeps, PSDs and blocks all read, so an agent that copies one never hits an input error."""
+def test_the_skills_life_commands_read_their_values(tmp_path):
+    """Every buckling, vibration and fatigue run the skill teaches routes to that physics, and its loads, supports,
+    masses, speeds, sweeps, PSDs and blocks all read, so an agent that copies one never hits an input error."""
     import shlex
 
-    from test_skill_commands import dry_parse, skill_commands
+    from test_skill_commands import dry_parse, skill_commands, stand_in
+    from wobbl.cli.simulate import options_from, split_args
     from wobbl.life import modal
     from wobbl.life.fatigue import parse_block
     from wobbl.life.vibspec import parse_mass, parse_rpm, parse_sine
     from wobbl.materials import resolve_material
+    from wobbl.simulate import route
     from wobbl.structural.spec import parse_fixture, parse_load
 
     seen = set()
     for cmd in skill_commands():
-        words = shlex.split(cmd)
-        if len(words) < 2 or words[1] not in ("buckling", "vibration", "fatigue"):
-            continue
-        name, ctx = dry_parse(words[1:])
+        name, ctx = dry_parse(shlex.split(cmd)[1:])
         p = ctx.params
-        seen.add(name)
-        if p.get("material"):
-            resolve_material(p["material"])
-        for f in p.get("fixes", ()):
+        if name != "simulate" or not p["args"]:
+            continue
+        thing, question, extra = split_args(p["args"])
+        plan = route(stand_in(thing, tmp_path), question, list(p["physics"]), p["domain"], p["kind"])
+        life = {"buckling", "vibration", "fatigue"} & set(plan.names)
+        if not life:
+            continue
+        seen |= life
+        o = options_from(p["material"], p["loads"], p["fixes"], p["sets"], extra)
+        if o.get("material"):
+            resolve_material(o["material"][-1])
+        for f in o.get("fix", ()):
             parse_fixture(f)
-        for ld in p.get("loads", ()):
+        for ld in o.get("load", ()):
             parse_load(ld)
-        for m in p.get("masses", ()):
+        for m in o.get("mass", ()):
             parse_mass(m)
-        for r in p.get("rpm", ()):
-            parse_rpm(r, p["blades"])
-        if p.get("sine"):
-            parse_sine(p["sine"])
-        if p.get("psd"):
-            modal.parse_psd(p["psd"])
-        for b in p.get("blocks", ()):
+        for r in o.get("rpm", ()):
+            parse_rpm(r, int(o.get("blades", ["2"])[-1]))
+        for x in o.get("sine", ()):
+            parse_sine(x)
+        for x in o.get("psd", ()):
+            modal.parse_psd(x)
+        for b in o.get("block", ()):
             parse_block(b, 1.0, 1.0)
     assert seen == {"buckling", "vibration", "fatigue"}
 
