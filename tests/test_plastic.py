@@ -128,3 +128,34 @@ def test_end_moment_collapses_at_the_fully_plastic_moment(tmp_path):
 def test_custom_metal_without_a_tensile_strength_is_perfectly_plastic():
     h = hardening_curve(parse_custom("custom:E=200000,nu=0.3,yield=250"))
     assert h.points == ((pytest.approx(250 * (1 + 250 / 200000)), 0.0),) and h.kind == "bilinear"
+
+
+def test_playback_is_a_small_decimated_surface_with_quantized_frames(parts, tmp_path):
+    import base64
+    import json
+
+    import numpy as np
+
+    from wobbl.mesh.mesher import Sizing, build_mesh
+    from wobbl.plastic.common import write_playback
+    from wobbl.structural.run import describe_part
+
+    prep, _ = describe_part(parts["cantilever"], tmp_path)
+    mesh = build_mesh(prep, Sizing(h=2.0))
+    U = np.zeros((mesh.n_nodes, 3))
+    U[:, 2] = -0.01 * mesh.X[:, 0]
+    frames = [{"t": k / 2, "label": "loading", "U": U * k / 2, "plastic_strain": mesh.X[:, 0] * k / 400,
+               "values": {"load": k / 2}} for k in range(3)]
+    path = write_playback(tmp_path / "p.json", mesh, frames, {"kind": "test"},
+                          {"plastic_strain": {"unit": "%", "min": 0.0, "max": 0.5}})
+    text = open(path).read()
+    d = json.loads(text)
+    pos = np.frombuffer(base64.b64decode(d["mesh"]["positions"]), np.float32).reshape(-1, 3)
+    idx = np.frombuffer(base64.b64decode(d["mesh"]["indices"]), np.uint32).reshape(-1, 3)
+    assert len(pos) <= 2000 < len(np.unique(mesh.tris[:, :3])) and idx.max() < len(pos)
+    assert pos.min(0) == pytest.approx([0, 0, 0], abs=1.5) and pos.max(0) == pytest.approx([200, 20, 10], abs=1.5)
+    u = np.frombuffer(base64.b64decode(d["frames"][2]["u"]), np.int16).reshape(-1, 3) * d["u_scale"]
+    assert np.abs(u[:, 2]).max() == pytest.approx(2.0, rel=0.05)
+    pe = np.frombuffer(base64.b64decode(d["frames"][2]["plastic_strain"]), np.uint8)
+    assert pe.max() == 255 and d["frames"][1]["values"] == {"load": 0.5}
+    assert len(text) < 300_000

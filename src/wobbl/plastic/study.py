@@ -51,6 +51,7 @@ class PlasticStudy:
     body: int | None = None
     params: dict = field(default_factory=dict)
     keep: bool = False
+    playback: bool = False           # also write playback.json, every increment of the run for a player
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -118,7 +119,7 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
     if y["factor"] < 1.0 and lim["factor"] > 1.0:
         say("solve", "applying and removing the load with the true stress strain curve and large deflection theory")
         try:
-            service = service_run(built, mat, curve, y["factor"], work / "service")
+            service = service_run(built, mat, curve, y["factor"], work / "service", every=study.playback)
         except Exception as e:  # noqa: BLE001  the collapse answer stands without it
             service = {"error": str(e)[:200]}
     o = evaluate(study, mat, curve, prep, feats, loads, mesh, built, lin, y, lim, levels, service)
@@ -127,6 +128,8 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
         say("render", "drawing the plastic strain and the load path")
         o.images = render(out / "images", mesh, feats, y, lim, service)
     o.notes = list(prep.notes)
+    if study.playback:
+        o.images["playback"] = playback(out / "playback.json", study, mesh, lim, service)
     o.write(out)
     clean_work(work, study.keep)
     return o
@@ -182,16 +185,19 @@ def limit_run(built, mat, lam_y: float, lin, work: Path) -> dict:
             "lam": lam.tolist(), "u": u.tolist(), "monitor_xyz": built.model.mesh.X[mon].tolist(),
             "stiffness_ratio": float(k_end / k0) if np.isfinite(k0) and k0 > 0 else None, "tes": tes,
             "bracket": float(res.last_attempt * lam_max) if not res.finished else 0.0, "frame": frame,
+            "frames": res.frames,
             "increments": res.increments, "iterations": res.iterations, "t_solve": res.t_solve, "solver": res.solver}
 
 
-def service_run(built, mat, curve: Hardening, lam_y: float, work: Path) -> dict:
+def service_run(built, mat, curve: Hardening, lam_y: float, work: Path, every: bool = False) -> dict:
     """Apply the load with the true stress strain curve and large deflection theory, then take it off. What stays
     bent afterwards is the permanent set."""
     p = mat.internal()
     first = float(np.clip(0.8 * lam_y, 0.05, 0.5))
-    steps = [nl.Step(1.0, nlgeom=True, first=first, largest=0.25, smallest=1e-5),
-             nl.Step(0.0, nlgeom=True, first=0.5, largest=0.5, smallest=1e-4)]
+    # a recorded run takes tenths of the load, so a player sees the plastic zone grow
+    steps = [nl.Step(1.0, nlgeom=True, first=min(first, 0.1) if every else first, largest=0.1 if every else 0.25,
+                     smallest=1e-5, every_increment=every),
+             nl.Step(0.0, nlgeom=True, first=0.5, largest=0.5, smallest=1e-4, every_increment=every)]
     model = nl.NonlinearModel(built.model, [nl.Material(mat.name, p["E"], p["nu"], p["density"],
                                                         list(curve.points))], steps)
     res = nl.solve_nonlinear(model, work, "service")
@@ -200,7 +206,7 @@ def service_run(built, mat, curve: Hardening, lam_y: float, work: Path) -> dict:
     X = built.model.mesh.X
     i, j = int(np.argmax(on["PEEQ"])), int(np.argmax(np.linalg.norm(off["U"], axis=1)))
     k = int(np.argmax(np.linalg.norm(on["U"], axis=1)))
-    return {"peeq": float(on["PEEQ"][i]), "peeq_xyz": X[i].tolist(), "disp": float(np.linalg.norm(on["U"][k])),
+    return {"frames": res.frames if every else [], "peeq": float(on["PEEQ"][i]), "peeq_xyz": X[i].tolist(), "disp": float(np.linalg.norm(on["U"][k])),
             "disp_xyz": X[k].tolist(), "set": float(np.linalg.norm(off["U"][j])), "set_xyz": X[j].tolist(),
             "residual_stress": float(nl.von_mises(off["S"]).max()), "on": on, "off": off,
             "increments": res.increments, "iterations": res.iterations, "t_solve": res.t_solve}
@@ -444,6 +450,37 @@ def fixes(verdict, mat, lam_y, lam_c, target, section, where_h) -> list[dict]:
                 "summary": f"With {mat.name} as drawn, the {target:g} margin on the {fmt(lam_c)}x collapse load "
                            f"allows {fmt(lam_c / target)}x the load in service.", "auto": False})
     return out
+
+
+def playback(path: Path, study, mesh, lim, service) -> str:
+    """The run as a player sees it: the load going on and coming off with the plastic strain spreading, then the
+    elastic perfectly plastic ramp to collapse, on one decimated surface."""
+    from .common import write_playback
+
+    frames = []
+    if service and "error" not in service:
+        for fr in service["frames"]:
+            t = float(fr["time"])
+            frames.append({"t": t, "label": "loading" if t <= 1 + 1e-9 else "unloading", "U": fr["U"],
+                           "plastic_strain": 100 * fr["PEEQ"], "values": {"load": t if t <= 1 else 2 - t}})
+    start = frames[-1]["t"] if frames else 0.0
+    ramp = [fr for fr in lim.get("frames", []) if "PEEQ" in fr]
+    for i in np.unique(np.linspace(0, len(ramp) - 1, min(len(ramp), 10)).astype(int)) if ramp else []:
+        fr = ramp[i]
+        frames.append({"t": start + float(fr["time"]), "label": "collapse ramp", "U": fr["U"],
+                       "plastic_strain": 100 * fr["PEEQ"], "values": {"load": float(fr["time"]) * lim["ramp"]}})
+    top = max([float(np.max(f["plastic_strain"])) for f in frames] + [1e-9])
+    return write_playback(
+        path, mesh, frames,
+        {"kind": "plastic", "title": Path(study.part).name, "question": study.question,
+         "units": {"length": "mm", "load": "multiple of the load asked about", "plastic_strain": "%"},
+         "phases": ["loading", "unloading", "collapse ramp"],
+         "note": "Frames play in order of t. The load goes on (t 0 to 1) and comes off (t 1 to 2) with the true "
+                 "stress strain curve and large deflection theory, then an elastic perfectly plastic copy on the "
+                 "same mesh is ramped to collapse (t from 2 on). values.load is the load multiple at each frame; "
+                 "the last frame is the mechanism, which moves much further than the frames before it."},
+        {"plastic_strain": {"unit": "%", "min": 0.0, "max": top}},
+        {"collapse_path": {"load": lim["lam"], "deflection_mm": lim["u"]}})
 
 
 def render(out: Path, mesh, feats, y, lim, service) -> dict:
