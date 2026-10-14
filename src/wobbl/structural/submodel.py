@@ -381,3 +381,46 @@ def run_submodel(result_dir: str | Path, center=None, radius: float | None = Non
         if ext != ".frd":
             (run / f"sub{ext}").unlink(missing_ok=True)
     return out_d
+
+
+# ------------------------------------------------------------------------------------------- wobbl simulate
+def simulate_entry(job):
+    """part.submodel for wobbl simulate: refine a finished strength result, given as the thing or run just before
+    in the same plan, and answer with the safety factor the fine local model gives."""
+    from ..outcome_generic import GenericOutcome
+    from ..verify.checks import Check
+
+    src = job.path if job.kind == "result" else None
+    prior = job.earlier.get("stress")
+    if src is None and prior is not None:
+        work = prior.get("workdir", "") if isinstance(prior, dict) else getattr(prior, "workdir", "")
+        src = Path(work) if work else None
+    if src is None:
+        raise SubmodelError("a submodel refines a finished strength result",
+                            "Pass its result folder, or ask for the stress and a submodel together")
+    at = job.value("at")
+    point = [float(v) for v in at.replace(" ", "").split(",")] if at else None
+    r = run_submodel(src, point, job.number("radius"), job.number("size"), job.out, job.log)
+    g = json.loads((Path(src) / "outcome.json").read_text())
+    allow, target = float(g.get("allowable_MPa") or 0.0), float(g.get("target_sf") or 1.5)
+    peak = r["submodel_peak_MPa"]
+    sf = allow / peak if allow and peak > 0 else None
+    verdict = "holds" if sf and sf >= target else "marginal" if sf and sf >= 1.0 else "fails" if sf else "ok"
+    sign = "+" if r["change_pct"] >= 0 else ""
+    head = (f"Refined around the peak, the {r['measure']} is {peak:.4g} MPa against {r['global_peak_MPa']:.4g} MPa in "
+            f"the global model ({sign}{r['change_pct']:.3g}%)" + (f", a safety factor of {sf:.3g}." if sf else "."))
+    checks = [Check(c["name"], c["status"], c["summary"]) for c in r["checks"]]
+    reasons = ["The cut is far enough from the peak and agrees with the global solution."] if r["trusted"] else \
+        [c.summary for c in checks if c.status != "pass"]
+    o = GenericOutcome(
+        "submodel", str(g.get("part", "")), job.question, verdict, head,
+        [("local peak", f"{peak:.4g} MPa"), ("global peak", f"{r['global_peak_MPa']:.4g} MPa")]
+        + ([("safety factor", f"{sf:.3g}")] if sf else []) + [("nodes", f"{r['nodes']:,}")],
+        "high" if r["trusted"] else "low", reasons, checks,
+        [f"The ball of radius {r['radius_mm']:.3g} mm around ({', '.join(f'{v:.4g}' for v in r['center_mm'])}) mm is "
+         f"held on its cut where the global solution moved, with {r['element_size_mm']:.3g} mm elements against "
+         f"{r['global_element_size_mm']:.3g} mm there.", f"Feature size from {r['feature']}."] + r["notes"],
+        values=r, t_total=r["time_s"], solver="CalculiX *SUBMODEL")
+    if allow:
+        job.criterion("stress", "submodel_peak_MPa", allow, "max")
+    return o.write(job.out)

@@ -59,15 +59,12 @@ def test_a_result_it_cannot_use_is_refused(tmp_path):
     assert S.frd_nodes(frd) == 3922 and S.frd_nodes(tmp_path / "none.frd") == -1
 
 
-def test_a_result_is_refined_by_its_own_domain(tmp_path):
-    from wobbl.jobs import workload as WL
+def test_a_question_on_a_strength_result_routes_to_the_submodel(tmp_path):
+    from wobbl.simulate import route
 
-    (tmp_path / "outcome.json").write_text(json.dumps({"domain": "motion"}))
-    with pytest.raises(WL.WorkloadError, match="motion results have no local refinement") as e:
-        WL.refine(tmp_path)
-    assert "strength" in e.value.hint
-    with pytest.raises(WL.WorkloadError, match="no Wobbl result"):
-        WL.refine(tmp_path / "missing")
+    (tmp_path / "outcome.json").write_text(json.dumps({"domain": "strength"}))
+    assert route(str(tmp_path), "refine the stress around the peak").names == ["submodel"]
+    assert route(str(tmp_path), "submodel the fillet").names == ["submodel"]
 
 
 @pytest.fixture(scope="module")
@@ -104,3 +101,20 @@ def test_a_cut_too_close_to_the_peak_is_flagged(coarse, tmp_path):
     r = S.run_submodel(folder, radius=9.0, size=1.5, out=tmp_path / "small")
     cut = next(c for c in r["checks"] if c["name"] == "cut distance")
     assert cut["status"] == "fail" and not r["trusted"]
+
+
+@pytest.mark.solver
+@needs_ccx
+def test_simulate_refines_a_result_and_gives_its_safety_factor(coarse, tmp_path):
+    from wobbl.simulate import route, run_plan
+
+    folder, _ = coarse
+    plan = route(str(folder), "refine the stress around the peak")
+    steps = run_plan(plan, {"size": ["1.5"]}, tmp_path / "zoom")
+    o = steps[0].outcome
+    assert o.domain == "submodel" and o.verdict == "holds" and o.confidence == "high"
+    assert o.values["submodel_peak_MPa"] == pytest.approx(REFERENCE_MPA, rel=0.03)
+    assert dict(o.metrics)["safety factor"] == f"{250 / o.values['submodel_peak_MPa']:.3g}"
+    req = json.loads((tmp_path / "zoom" / "request.json").read_text())
+    assert req["analysis"] == "submodel" and req["spec"]["options"]["size"] == ["1.5"]
+    assert (tmp_path / "zoom" / "report.html").exists()

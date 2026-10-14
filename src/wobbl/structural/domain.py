@@ -105,3 +105,15 @@ register(Analysis(
              Option("budget", "Seconds for the convergence study", "300"),
              Option("print-direction", "Axis the print layers stack along, e.g. z")),
     example='wobbl simulate bracket.step "will it hold 200 N?"'))
+
+
+register(Analysis(
+    "part", "submodel", "Submodel: a fine local model of the peak, driven by the coarse result's displacements",
+    "wobbl.structural.submodel:simulate_entry", kinds=PART_KINDS + ("result",), needs=("stress",),
+    keywords=(r"\bsubmodel", r"\brefine\b.*\b(?:peak|locally|around|hot ?spot|stress)", r"\bzoom\b.*\bpeak",
+              r"local(?:ly)?\s+(?:fine|refine)", r"\bfiner\b.*\b(?:peak|hole|fillet|corner)"),
+    aliases=("submodeling", "local-refinement", "zoom"),
+    options=(Option("at", "Center of the local model as x,y,z in mm", "the global peak"),
+             Option("radius", "Radius of the local model in mm", "2.5 feature sizes"),
+             Option("size", "Element size in the local model in mm", "a sixth of the feature size")),
+    example='wobbl simulate output "refine the stress around the peak"'))
