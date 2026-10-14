@@ -9,14 +9,14 @@ target: 3
 Checks:
   [pass] mesh convergence: first buckling factor settled: 3.25 -> 3.25 times the load over 2 meshes, last change 0.0%
   [pass] force balance: reactions balance the loads to 2.8e-05% (forces) and 2.6e-06% (moments)
-  [pass] hand calculation: Euler's column, clamped at the base and pinned at the loaded end (K = 0.699), with I = 5857 mm4 over 600 mm gives 22644 N, a factor of 3.23; the finite element factor is 3.25 (+0.5%)
-  [pass] mode separation: the first factor repeats, the same buckle in two directions of a symmetric section; the next distinct mode is at 9.42, 2.90 times the first
+  [pass] hand calculation: Euler's column, clamped at the base and pinned at the loaded end (K = 0.699), with I = 5857 mm4 over 600 mm gives 22644 N, a factor of 3.23, and the finite element factor is 3.25 (+0.5%)
+  [pass] mode separation: the first factor repeats, the same buckle in two directions of a symmetric section, and the next distinct mode is at 9.42, 2.90 times the first
   [pass] yield before buckling: the most stressed point (51.1 MPa von Mises stress at the reference load, away from the supports) reaches 276 MPa at 5.41 times the load, after it buckles, so buckling governs
   [pass] units and sanity: buckling factor 3.25, deflection 0.381 mm under the reference load (0.063% of size): plausible
 
 Assumptions:
-  - Linear eigenvalue buckling: the stiffness the loads take away is found from the stress they cause in the perfect, undeformed part, and the loads keep their direction as it deflects. It overpredicts the collapse load of real parts, most of all for thin shells, which is what the knockdown is for.
-  - Shape class: column, a straight member 600 mm long pushed along its length, slenderness L/r 99. Knockdown: EN 1999-1-1 class A alloys (imperfection factor 0.2): relative slenderness 1.39, reduction 0.418 on the squash load of 44272 N.
+  - Linear eigenvalue buckling, where the stiffness the loads take away is found from the stress they cause in the perfect, undeformed part, and the loads keep their direction as it deflects. It overpredicts the collapse load of real parts, most of all for thin shells, which is what the knockdown is for.
+  - The shape class is column, a straight member 600 mm long pushed along its length, slenderness L/r 99, and the knockdown comes from EN 1999-1-1 class A alloys (imperfection factor 0.2), whose relative slenderness of 1.39 keeps 0.418 of the squash load of 44272 N.
   - Aluminum 6061-T6: E 68900 MPa, Poisson 0.33, von Mises vs yield 276 MPa (ASM Aerospace Specification Metals, Aluminum 6061-T6).
   - The design factor also counts crookedness, eccentricity and yielding, through the column curve.
   - Fixed faces are perfectly rigid. A support that gives a little, or turns, lowers the buckling load, and for a column that is clamped on paper it can lower it by half or more.

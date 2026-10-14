@@ -86,8 +86,8 @@
   }
  ],
  "assumptions": [
-  "Linear elastic, small vibrations about the unloaded shape. Supports are as rigid as modeled; real mounts flex, which lowers every natural frequency.",
-  "Damping is the same for every mode: 3% of critical, typical of a plastic, wood or composite part. The response at a resonance grows as damping falls.",
+  "Linear elastic, small vibrations about the unloaded shape. Supports are as rigid as modeled, while real mounts flex, which lowers every natural frequency.",
+  "Damping is the same for every mode, 3% of critical, typical of a plastic, wood or composite part. The response at a resonance grows as damping falls.",
   "Nylon PA12 (SLS or MJF): E 1700 MPa, Poisson 0.39, density 1010 kg/m3, von Mises vs yield 48 MPa (HP 3D High Reusability PA 12 datasheet; EOS PA 2200).",
   "Mass 1, 80 g (80 g at 150,0,32 @ top and within 15 of 150,0,15), is a point at (150, 0, 32) held rigidly by its faces, with no rotary inertia of its own.",
   "Printed part treated as isotropic at 100% infill; across the layers it is roughly 90% as strong. Pass --print-direction to check that."
@@ -440,6 +440,6 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 110.722492,
+ "t_total": 76.482495,
  "solver": "CalculiX 2.23"
 }

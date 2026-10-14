@@ -23,13 +23,15 @@
     "kind": "fixed",
     "faces": "z=min",
     "text": "fixed z=min",
-    "dofs": "xyz"
+    "dofs": "xyz",
+    "stiffness": 0.0
    },
    {
     "kind": "fixed",
     "faces": "z=max",
     "text": "fixed-xy z=max",
-    "dofs": "xy"
+    "dofs": "xy",
+    "stiffness": 0.0
    }
   ],
   "target_sf": null,
