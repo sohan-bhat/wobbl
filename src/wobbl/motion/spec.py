@@ -1,15 +1,20 @@
 """What flies and where: a body or a rocket, its motor and parachutes, the launch and the air.
 
-A falling rock or a thrown ball is a mass and a diameter with a drag coefficient. A rocket adds a motor with a
-thrust curve, a nose, fins and a balance point for Barrowman's stability margin, a launch rail, and a drogue
-and a main parachute. Everything here is stored in SI (m, kg, s, N).
+A falling rock or a thrown ball is a mass and a diameter with a drag coefficient, given as flags. A rocket is
+a TOML file (see examples/rocket-launch/rocket.toml) that adds a motor with a thrust curve, a nose, fins and
+a balance point for Barrowman's stability margin, a launch rail, and a drogue and a main parachute. Every
+quantity goes through units.py, so "2 kg", "100 m", "12 cm" and "10 mph" all work, and everything here is
+stored in SI (m, kg, s, N).
 """
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
+
+from ..units import UnitError, parse_quantity
 
 SPHERE_CD = 0.47           # a sphere below the drag crisis
 LANDING_LIMIT = 6.1        # m/s, about 20 ft/s, the usual ceiling for landing under a main
@@ -278,3 +283,177 @@ def burnout_cg(study: MotionStudy) -> float | None:
         return None
     x_prop = af.length - mo.length / 2
     return (study.liftoff_mass * af.cg - mo.propellant * x_prop) / study.burnout_mass
+
+
+# --- reading --------------------------------------------------------------------------
+_SI = {"length": 1e-3, "mass": 1e3, "speed": 1e-3, "angle": 1.0, "density": 1e12, "force": 1.0, "time": 1.0}
+
+
+def quantity(value, kind: str, where: str) -> float:
+    """A quantity with its unit in SI, with the key named in any error."""
+    try:
+        return parse_quantity(str(value), kind).value * _SI[kind]
+    except UnitError as e:
+        raise SpecError(f"could not read {where}, {e}") from None
+
+
+def _number(value, where: str) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise SpecError(f"{where} should be a plain number, not '{value}'") from None
+
+
+def _table(rows, kinds: tuple[str, str], units: list[str] | None, where: str) -> list[tuple[float, float]]:
+    """A table of number pairs, converted by the units given for its two columns (SI when none)."""
+    if not isinstance(rows, list) or not rows or not all(isinstance(r, list) and len(r) == 2 for r in rows):
+        raise SpecError(f"{where} should be a table of pairs like [[0.0, 0.0], [0.1, 1500.0]]")
+    scale = [1.0, 1.0]
+    for k, (kind, unit) in enumerate(zip(kinds, units or [])):
+        if kind:
+            scale[k] = quantity(f"1 {unit}", kind, f"{where} units")
+    return [(_number(a, where) * scale[0], _number(b, where) * scale[1]) for a, b in rows]
+
+
+def _check_keys(d: dict, known: set[str], where: str):
+    extra = set(d) - known
+    if extra:
+        raise SpecError(f"unknown key{'s' if len(extra) > 1 else ''} {', '.join(sorted(extra))} in [{where}]",
+                        f"[{where}] takes {', '.join(sorted(known))}.")
+
+
+def read_eng(path: str | Path, name: str = "") -> Motor:
+    """A RASP .eng motor file, as thrustcurve.org serves them: a header line with the designation, diameter and
+    length in mm, delays, propellant and total mass in kg and the maker, then time and thrust pairs."""
+    lines = [ln.split(";")[0].strip() for ln in Path(path).read_text().splitlines()]
+    lines = [ln for ln in lines if ln]
+    if len(lines) < 3:
+        raise SpecError(f"{path} is not a RASP .eng motor file")
+    head = lines[0].split()
+    try:
+        curve = [(float(a), float(b)) for a, b in (ln.split()[:2] for ln in lines[1:])]
+        return Motor(name or head[0], curve, float(head[4]), float(head[5]), float(head[2]) / 1000)
+    except (IndexError, ValueError):
+        raise SpecError(f"could not read the header and thrust pairs of {path}") from None
+
+
+def load_toml(text: str) -> dict:
+    try:
+        import tomllib
+    except ModuleNotFoundError:   # Python 3.10
+        import tomli as tomllib
+    try:
+        return tomllib.loads(text)
+    except tomllib.TOMLDecodeError as e:
+        raise SpecError(f"the spec is not valid TOML ({e})") from None
+
+
+def read_spec(source: str | Path, question: str = "") -> MotionStudy:
+    """A study from a TOML file, or from TOML text (what an agent passes over MCP)."""
+    path = Path(source) if "\n" not in str(source) else None
+    if path is not None and not path.exists():
+        raise SpecError(f"there is no spec file at {source}")
+    d = load_toml(path.read_text() if path else str(source))
+    base = path.parent if path else Path.cwd()
+    _check_keys(d, {"name", "rocket", "body", "nose", "fins", "motor", "launch", "drogue", "main", "targets",
+                    "world"}, "spec")
+    if ("rocket" in d) == ("body" in d):
+        raise SpecError("the spec needs one [rocket] or one [body] table")
+    kind = "rocket" if "rocket" in d else "body"
+    b = d[kind]
+    _check_keys(b, {"mass", "density", "diameter", "length", "cg", "cd"}, kind)
+    st = MotionStudy(name=str(d.get("name") or (path.stem if path else kind)), question=question,
+                     source=str(path.resolve()) if path else "")
+    st.diameter = quantity(b.get("diameter", ""), "length", f"{kind}.diameter") if "diameter" in b else 0.0
+    if "mass" in b:
+        st.mass = quantity(b["mass"], "mass", f"{kind}.mass")
+    elif "density" in b and st.diameter:
+        st.mass = quantity(b["density"], "density", f"{kind}.density") * math.pi / 6 * st.diameter ** 3
+        st.notes.append(f"A solid sphere {st.diameter * 100:.3g} cm across, so {st.mass:.4g} kg.")
+    cd = b.get("cd", SPHERE_CD)
+    st.cd = _table(cd, ("", ""), None, f"{kind}.cd") if isinstance(cd, list) else _number(cd, f"{kind}.cd")
+    st.transonic = kind == "rocket" and not isinstance(cd, list)
+    if "motor" in d:
+        st.motor = _motor(d["motor"], base)
+    if "nose" in d or "fins" in d:
+        st.airframe = _airframe(d, b, st.motor)
+    elif "cg" in b or "length" in b:
+        raise SpecError(f"{kind}.cg and {kind}.length are for the stability margin, which also needs [nose] "
+                        "and [fins]")
+    _launch(d.get("launch", {}), st)
+    for name in ("drogue", "main"):
+        if name in d:
+            c = d[name]
+            _check_keys(c, {"diameter", "cd", "deploy"}, name)
+            dep = str(c.get("deploy", "apogee")).strip().lower()
+            st.chutes.append(Chute(name, quantity(c.get("diameter", ""), "length", f"{name}.diameter"),
+                                   _number(c.get("cd", 1.5), f"{name}.cd"),
+                                   None if dep == "apogee" else quantity(dep, "length", f"{name}.deploy")))
+    t = d.get("targets", {})
+    _check_keys(t, {"apogee", "landing_speed", "rail_exit_speed", "stability"}, "targets")
+    if "apogee" in t:
+        st.target_apogee = quantity(t["apogee"], "length", "targets.apogee")
+    if "landing_speed" in t:
+        st.landing_limit = quantity(t["landing_speed"], "speed", "targets.landing_speed")
+    if "rail_exit_speed" in t:
+        st.rail_exit_min = quantity(t["rail_exit_speed"], "speed", "targets.rail_exit_speed")
+    if "stability" in t:
+        st.stability_min = _number(t["stability"], "targets.stability")
+    w = d.get("world", {})
+    _check_keys(w, {"air", "gravity"}, "world")
+    air = str(w.get("air", "standard")).strip().lower()
+    st.air = air if air in ("standard", "vacuum") else quantity(air, "density", "world.air")
+    grav = str(w.get("gravity", "falls off")).strip().lower()
+    if grav not in ("falls off", "uniform"):
+        raise SpecError("world.gravity is 'falls off' (the default) or 'uniform'")
+    st.uniform_gravity = grav == "uniform"
+    st.validate()
+    return st
+
+
+def _motor(m: dict, base: Path) -> Motor:
+    _check_keys(m, {"name", "eng", "thrust", "thrust_units", "propellant", "loaded_mass", "length"}, "motor")
+    if "eng" in m:
+        mo = read_eng(base / m["eng"], m.get("name", ""))
+    else:
+        if "thrust" not in m:
+            raise SpecError("[motor] needs a thrust curve", "Give thrust = [[s, N], ...] or eng = 'motor.eng'.")
+        curve = _table(m["thrust"], ("time", "force"), m.get("thrust_units"), "motor.thrust")
+        mo = Motor(str(m.get("name", "motor")), curve, quantity(m.get("propellant", ""), "mass", "motor.propellant"),
+                   quantity(m.get("loaded_mass", ""), "mass", "motor.loaded_mass"))
+    if "length" in m:
+        mo.length = quantity(m["length"], "length", "motor.length")
+    return mo
+
+
+def _airframe(d: dict, b: dict, motor: Motor | None) -> Airframe:
+    if "nose" not in d or "fins" not in d or "length" not in b:
+        raise SpecError("the stability margin needs [nose], [fins] and the rocket's length")
+    n, f = d["nose"], d["fins"]
+    _check_keys(n, {"shape", "length"}, "nose")
+    _check_keys(f, {"count", "root", "tip", "span", "sweep", "position"}, "fins")
+    length = quantity(b["length"], "length", "rocket.length")
+    root = quantity(f.get("root", ""), "length", "fins.root")
+    shape = str(n.get("shape", "ogive")).strip().lower().replace("von karman", "haack")
+    if shape not in NOSE_SHAPES:
+        raise SpecError(f"unknown nose shape '{shape}'", f"Use one of {', '.join(NOSE_SHAPES)}.")
+    fins = Fins(int(_number(f.get("count", 3), "fins.count")), root,
+                quantity(f.get("tip", "0 m"), "length", "fins.tip"), quantity(f.get("span", ""), "length", "fins.span"),
+                quantity(f.get("sweep", "0 m"), "length", "fins.sweep"),
+                quantity(f["position"], "length", "fins.position") if "position" in f else length - root)
+    cg = quantity(b["cg"], "length", "rocket.cg") if "cg" in b else None
+    return Airframe(length, quantity(n.get("length", ""), "length", "nose.length"), shape, fins, cg)
+
+
+def _launch(lch: dict, st: MotionStudy):
+    _check_keys(lch, {"height", "speed", "angle", "rail_length", "rail_angle", "wind", "site_altitude"}, "launch")
+    if "angle" in lch and "rail_angle" in lch:
+        raise SpecError("give the launch angle above horizontal (angle) or the rail's tilt from vertical "
+                        "(rail_angle), not both")
+    st.height = quantity(lch.get("height", "0 m"), "length", "launch.height")
+    st.speed = quantity(lch.get("speed", "0 m/s"), "speed", "launch.speed")
+    st.angle = (quantity(lch["angle"], "angle", "launch.angle") if "angle" in lch else
+                90.0 - quantity(lch.get("rail_angle", "0 deg"), "angle", "launch.rail_angle"))
+    st.rail_length = quantity(lch.get("rail_length", "0 m"), "length", "launch.rail_length")
+    st.wind = quantity(lch.get("wind", "0 m/s"), "speed", "launch.wind")
+    st.site_altitude = quantity(lch.get("site_altitude", "0 m"), "length", "launch.site_altitude")
