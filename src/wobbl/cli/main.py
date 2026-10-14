@@ -25,8 +25,8 @@ from . import ui
 
 
 # what 'wobbl --help' shows, in this order; every other command is a hidden alias that still works
-VISIBLE = ("simulate", "inspect", "check", "report", "fix", "uncertainty", "credibility", "test-plan", "estimate",
-           "jobs", "materials", "validate", "setup", "doctor", "mcp")
+VISIBLE = ("simulate", "view", "inspect", "check", "report", "fix", "uncertainty", "credibility", "test-plan",
+           "estimate", "jobs", "materials", "validate", "setup", "doctor", "mcp")
 
 
 def _routable(args) -> bool:
@@ -516,6 +516,8 @@ def _register():
     from .fields import antenna, board, electric, magnetic, sound
     for c in (magnetic, electric, board, antenna, sound):
         cli.add_command(c)
+    from .view import view
+    cli.add_command(view)
     from .jobs import estimate, jobs, remote
     from .submodel import submodel
     for c in (estimate, jobs, remote, submodel):
