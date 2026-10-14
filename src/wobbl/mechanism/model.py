@@ -264,8 +264,15 @@ def load(path: str | Path) -> Loaded:
     except ValueError as e:
         raise SpecError(f"MuJoCo could not read {p.name}: {_short(str(e))}") from e
     model = out.compile()
+    # a body or joint the file leaves unnamed gets the name it is reported by, so drives and moves can name it
+    for b in out.spec.bodies:
+        if not b.name and b.id > 0:
+            b.name = f"body {b.id}"
+    for j in out.spec.joints:
+        if not j.name:
+            j.name = f"joint {j.id}"
     if out.kind == "mjcf":
-        out.limits = actuator_limits(model)
+        out.limits = actuator_limits(out.compile())
     return out
 
 
