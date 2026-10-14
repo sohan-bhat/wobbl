@@ -34,8 +34,9 @@ def _groups(mesh_tags: dict[str, int], extra: dict[str, list[str]]) -> str:
     return "Group {\n" + "\n".join(lines) + "\n}\n"
 
 
-def _jacobian(kind: str, shell: tuple | None, shell_name: str = "shell") -> str:
-    vol = "VolAxiSqu" if kind == "axi" else "Vol"
+def _jacobian(kind: str, shell: tuple | None, shell_name: str = "shell", scalar: bool = False) -> str:
+    """Axisymmetric vector potentials use GetDP's squared radius mapping, nodal scalars the plain one."""
+    vol = ("VolAxi" if scalar else "VolAxiSqu") if kind == "axi" else "Vol"
     sur = "SurAxi" if kind == "axi" else "Sur"
     sh = ""
     if shell:
@@ -252,5 +253,246 @@ def magnetostatic(p: MagProblem, tags: dict[str, int]) -> str:
     if mags:
         po.append('Print[ hpar, OnElementsOf DomM, Format Table, File "hm.txt" ];')
     out.append("PostOperation {\n  { Name P; NameOfPostProcessing M; Operation {\n    " + "\n    ".join(po) +
+               "\n  } }\n}\n")
+    return "".join(out)
+
+
+def _space(name: str, coef: str, support: str, cons: list[tuple[str, str]], order: int, form: str = "Form0",
+           extra: str = "") -> str:
+    """A nodal function space, with second order hierarchical functions when order is 2."""
+    bf = (f"      {{ Name sn; NameOfCoef {coef}; Function BF_Node; Support {support}; Entity NodesOf[All{extra}]; }}\n")
+    cs = "".join(f"      {{ NameOfCoef {coef}; EntityType NodesOf; NameOfConstraint {c}; }}\n" for c, _ in cons)
+    if order == 2:
+        bf += (f"      {{ Name sn2; NameOfCoef {coef}2; Function BF_Node_2E; Support {support}; "
+               "Entity EdgesOf[All]; }\n")
+        cs += "".join(f"      {{ NameOfCoef {coef}2; EntityType EdgesOf; NameOfConstraint {c}; }}\n" for c, _ in cons)
+    return f"  {{ Name {name}; Type {form}; BasisFunction {{\n{bf}    }}\n    Constraint {{\n{cs}    }}\n  }}\n"
+
+
+@dataclass
+class ElecProblem:
+    kind: str                                   # planar or axi
+    epsr: dict[str, float]                      # region name: relative permittivity
+    potentials: dict[str, float]                # conductor surface (a boundary) name: volts
+    shell: tuple | None = None
+    depth: float = 1.0
+    order: int = 2
+    fields: bool = True
+    field_regions: list[str] = field(default_factory=list)   # where the peak field is reported
+    probes: list[tuple[float, float]] = field(default_factory=list)
+
+    @property
+    def geo(self) -> float:
+        return 2 * math.pi if self.kind == "axi" else self.depth
+
+
+def electrostatic(p: ElecProblem, tags: dict[str, int]) -> str:
+    """v formulation. Every conductor is a surface held at a potential, and its charge comes back as the global
+    quantity associated with that potential, so charge, energy and capacitance are computed independently."""
+    vol = [n for n in tags if tags[n] < 100]
+    conds = [c for c in p.potentials if c in tags]
+    eps = {**{n: 1.0 for n in vol}, **{n: e for n, e in p.epsr.items() if n in tags}}
+    extra = {"Dom": vol, "Cond": conds, "Peak": [r for r in p.field_regions if r in tags] or vol}
+    out = [_groups(tags, extra)]
+    fn = ["Function {", f"  eps0 = {EPS0!r};"] + [f"  epsr[{rname(n)}] = {e:.9g};" for n, e in eps.items()] + ["}"]
+    out.append("\n".join(fn) + "\n")
+    cons = "".join(f"      {{ Region {rname(c)}; Value {p.potentials[c]:.12g}; }}\n" for c in conds)
+    out.append("Constraint {\n  { Name Volt; Case {\n" + cons + "  } }\n}\n")
+    out.append(_jacobian(p.kind, p.shell, scalar=True))
+    out.append(INTEGRATION)
+    # quadratic functions live only on edges off the conductors, which stay exactly at their potential
+    second = ("      { Name sn2; NameOfCoef vn2; Function BF_Node_2E; Support Dom; Entity EdgesOf[All, Not Cond]; }\n"
+              if p.order == 2 else "")
+    out.append("FunctionSpace {\n  { Name Hv; Type Form0; BasisFunction {\n"
+               "      { Name sn; NameOfCoef vn; Function BF_Node; Support Dom; Entity NodesOf[All, Not Cond]; }\n"
+               "      { Name sf; NameOfCoef vf; Function BF_GroupOfNodes; Support Dom; Entity GroupsOfNodesOf[Cond]; }\n"
+               f"{second}    }}\n"
+               "    GlobalQuantity { { Name U; Type AliasOf; NameOfCoef vf; } "
+               "{ Name Q; Type AssociatedWith; NameOfCoef vf; } }\n"
+               "    Constraint { { NameOfCoef U; EntityType GroupsOfNodesOf; NameOfConstraint Volt; } }\n  }\n}\n")
+    out.append("Formulation {\n  { Name E; Type FemEquation;\n    Quantity {\n"
+               "      { Name v; Type Local; NameOfSpace Hv; }\n"
+               "      { Name U; Type Global; NameOfSpace Hv [U]; }\n"
+               "      { Name Q; Type Global; NameOfSpace Hv [Q]; }\n    }\n    Equation {\n"
+               "      Integral { [ eps0 * epsr[] * Dof{d v}, {d v} ]; In Dom; Jacobian Vol; Integration I1; }\n"
+               "      GlobalTerm { [ -Dof{Q}, {U} ]; In Cond; }\n    }\n  }\n}\n")
+    out.append("Resolution {\n  { Name E; System { { Name A; NameOfFormulation E; } }\n"
+               "    Operation { Generate[A]; Solve[A]; SaveSolution[A]; }\n  }\n}\n")
+    geo = f"{p.geo:.12g}"
+    out.append("PostProcessing {\n  { Name E; NameOfFormulation E; Quantity {\n"
+               "      { Name v; Value { Local { [ {v} ]; In Dom; Jacobian Vol; } } }\n"
+               "      { Name e; Value { Local { [ -{d v} ]; In Dom; Jacobian Vol; } } }\n"
+               "      { Name en; Value { Local { [ Norm[{d v}] ]; In Dom; Jacobian Vol; } } }\n"
+               f"      {{ Name W; Value {{ Integral {{ [ {geo} * 0.5 * eps0 * epsr[] * SquNorm[{{d v}}] ]; In Dom; "
+               "Jacobian Vol; Integration I1; } } }\n"
+               f"      {{ Name Q; Value {{ Term {{ [ {geo} * {{Q}} ]; In Cond; }} }} }}\n  }} }}\n}}\n")
+    po = ['Print[ W[Dom], OnGlobal, Format Table, File "W.txt" ];']
+    po += [f'Print[ Q, OnRegion {rname(c)}, Format Table, File "Q_{c}.txt" ];' for c in conds]
+    po.append('Print[ en, OnElementsOf Peak, Format Table, File "epeak.txt" ];')
+    for i, (x, y) in enumerate(p.probes):
+        po.append(f'Print[ e, OnPoint {{{x:.9g}, {y:.9g}, 0}}, Format Table, File "probe{i}.txt" ];')
+    if p.fields:
+        po.append('Print[ v, OnElementsOf Dom, Format NodeTable, File "v.txt" ];')
+        po.append('Print[ en, OnElementsOf Dom, Format Table, File "en.txt" ];')
+    out.append("PostOperation {\n  { Name P; NameOfPostProcessing E; Operation {\n    " + "\n    ".join(po) +
+               "\n  } }\n}\n")
+    return "".join(out)
+
+
+@dataclass
+class SoundProblem:
+    kind: str                                   # planar, axi or 3d
+    c: float = 343.2                            # speed of sound, m/s (air at 20 C)
+    rho: float = 1.204                          # density, kg/m3
+    freq: float = 0.0                           # Hz, 0 for an eigenvalue search
+    inlet: str = ""                             # boundary where a plane wave of amplitude 1 Pa comes in
+    outlets: list[str] = field(default_factory=list)   # anechoic plane wave ends
+    radiation: tuple[str, float] | None = None  # (boundary, radius) of a spherical open boundary
+    piston: tuple[str, float] | None = None     # (boundary, normal velocity in m/s into the air)
+    modes: int = 0                              # eigenvalue search: how many modes
+    shift: float = 0.0                          # eigenvalue search: target frequency, Hz
+    order: int = 2
+    fields: bool = True
+    probes: list[tuple[float, float, float]] = field(default_factory=list)
+    plane: tuple | None = None                  # eigen search: (z, x0, x1, y0, y1, nx, ny) to sample mode shapes on
+    shapes: int = 0                             # how many mode shapes to sample
+
+
+def helmholtz(p: SoundProblem, tags: dict[str, int]) -> str:
+    """Acoustic pressure, time harmonic (e^{j w t}, outgoing waves e^{-j k r}) or as an eigenvalue problem."""
+    dim_vol = [n for n in tags if tags[n] < 100]
+    bnd = [b for b in [p.inlet, *p.outlets, p.radiation[0] if p.radiation else "", p.piston[0] if p.piston else ""]
+           if b and b in tags]
+    out = [_groups(tags, {"Dom": dim_vol, "Bnd": bnd, "All_": dim_vol + bnd})]
+    k = 2 * math.pi * p.freq / p.c if p.freq else 0.0
+    out.append("Function {\n" + f"  k = {k!r};\n  c = {p.c!r};\n  rho = {p.rho!r};\n  w = {2 * math.pi * p.freq!r};\n}}\n")
+    vol = {"axi": "VolAxi", "planar": "Vol", "3d": "Vol"}[p.kind]
+    sur = {"axi": "SurAxi", "planar": "Sur", "3d": "Sur"}[p.kind]
+    out.append("Jacobian {\n"
+               f"  {{ Name Vol; Case {{ {{ Region All; Jacobian {vol}; }} }} }}\n"
+               f"  {{ Name Sur; Case {{ {{ Region All; Jacobian {sur}; }} }} }}\n}}\n")
+    out.append("Integration {\n  { Name I1; Case { { Type Gauss; Case {\n"
+               "      { GeoElement Line; NumberOfPoints 4; } { GeoElement Triangle; NumberOfPoints 6; }\n"
+               "      { GeoElement Tetrahedron; NumberOfPoints 15; } } } } }\n}\n")
+    out.append("FunctionSpace {\n" + _space("Hp", "pn", "All_", [], p.order) + "}\n")
+    eq = ["      Integral { [ Dof{d p}, {d p} ]; In Dom; Jacobian Vol; Integration I1; }"]
+    if p.freq:
+        eq.append("      Integral { [ -k^2 * Dof{p}, {p} ]; In Dom; Jacobian Vol; Integration I1; }")
+        for b in [p.inlet, *p.outlets]:
+            if b in tags:
+                eq.append(f"      Integral {{ [ Complex[0, k] * Dof{{p}}, {{p}} ]; In {rname(b)}; Jacobian Sur; "
+                          "Integration I1; }")
+        if p.inlet in tags:
+            eq.append(f"      Integral {{ [ -Complex[0, 2 * k], {{p}} ]; In {rname(p.inlet)}; Jacobian Sur; "
+                      "Integration I1; }")
+        if p.radiation and p.radiation[0] in tags:
+            r = p.radiation[1]
+            eq.append(f"      Integral {{ [ Complex[{1 / r!r}, k] * Dof{{p}}, {{p}} ]; In {rname(p.radiation[0])}; "
+                      "Jacobian Sur; Integration I1; }")
+        if p.piston and p.piston[0] in tags:
+            eq.append(f"      Integral {{ [ -Complex[0, w * rho * {p.piston[1]!r}], {{p}} ]; In {rname(p.piston[0])}; "
+                      "Jacobian Sur; Integration I1; }")
+        system = "Type Complex; Frequency " + repr(p.freq)
+        ops = "Generate[A]; Solve[A]; SaveSolution[A];"
+    else:
+        eq.append("      Integral { DtDtDof [ 1 / c^2 * Dof{p}, {p} ]; In Dom; Jacobian Vol; Integration I1; }")
+        system = "Type Complex"
+        ops = (f"GenerateSeparate[A]; EigenSolve[A, {max(p.modes, 1)}, {(2 * math.pi * p.shift) ** 2!r}, 0]; "
+               "SaveSolutions[A];")
+    out.append("Formulation {\n  { Name H; Type FemEquation;\n    Quantity { { Name p; Type Local; NameOfSpace Hp; } }\n"
+               "    Equation {\n" + "\n".join(eq) + "\n    }\n  }\n}\n")
+    out.append(f"Resolution {{\n  {{ Name H; System {{ {{ Name A; NameOfFormulation H; {system}; }} }}\n"
+               f"    Operation {{ {ops} }}\n  }}\n}}\n")
+    geo = "2 * Pi * " if p.kind == "axi" else ""
+    pq = ["      { Name p; Value { Local { [ {p} ]; In All_; Jacobian Vol; } } }",
+          "      { Name pa; Value { Local { [ Norm[{p}] ]; In All_; Jacobian Vol; } } }",
+          f"      {{ Name S; Value {{ Integral {{ [ {geo}1 ]; In Bnd; Jacobian Sur; Integration I1; }} }} }}",
+          f"      {{ Name P1; Value {{ Integral {{ [ {geo}{{p}} ]; In Bnd; Jacobian Sur; Integration I1; }} }} }}",
+          f"      {{ Name P2; Value {{ Integral {{ [ {geo}SquNorm[{{p}}] ]; In Bnd; Jacobian Sur; Integration I1; }} }} }}"]
+    out.append("PostProcessing {\n  { Name H; NameOfFormulation H; Quantity {\n" + "\n".join(pq) + "\n  } }\n}\n")
+    po = []
+    if p.freq:
+        for b in bnd:
+            po += [f'Print[ S[{rname(b)}], OnGlobal, Format Table, File "S_{b}.txt" ];',
+                   f'Print[ P1[{rname(b)}], OnGlobal, Format Table, File "P1_{b}.txt" ];',
+                   f'Print[ P2[{rname(b)}], OnGlobal, Format Table, File "P2_{b}.txt" ];']
+    for i, pt in enumerate(p.probes):
+        po.append(f'Print[ p, OnPoint {{{pt[0]:.9g}, {pt[1]:.9g}, {pt[2]:.9g}}}, Format Table, File "probe{i}.txt" ];')
+    if p.plane and not p.freq:
+        z, x0, x1, y0, y1, nx, ny = p.plane
+        for i in range(p.shapes):
+            po.append(f'Print[ p, OnPlane {{{{{x0!r}, {y0!r}, {z!r}}}{{{x1!r}, {y0!r}, {z!r}}}{{{x0!r}, {y1!r}, {z!r}}}}} '
+                      f'{{{int(nx)}, {int(ny)}}}, TimeStep {i}, Format SimpleTable, File "mode{i}.txt" ];')
+    if p.fields:
+        po.append('Print[ pa, OnElementsOf Dom, Format NodeTable, File "pa.txt" ];')
+    out.append("PostOperation {\n  { Name P; NameOfPostProcessing H; Operation {\n    " + "\n    ".join(po or [""]) +
+               "\n  } }\n}\n")
+    return "".join(out)
+
+
+@dataclass
+class WaveProblem:
+    """A wire antenna on a ground plane, axisymmetric, solved for the azimuthal magnetic field H.
+
+    The wire is a hole in the mesh, so its surface and the ground plane are perfect conductors without any
+    boundary term. A gap on the wire surface carries a uniform axial field, the delta gap feed, and the outer
+    boundary absorbs outgoing waves (first order Silver-Muller condition on a sphere)."""
+    freq: float
+    gap: str = "gap"
+    gap_length: float = 0.0
+    volts: float = 1.0
+    absorber: str = "outer"
+    axis: str = "axis"
+    order: int = 2
+    probe_line: tuple | None = None             # (x, y0, y1, n): sample H along the wire surface
+    fields: bool = False
+
+
+def fullwave_axi(p: WaveProblem, tags: dict[str, int]) -> str:
+    vol = [n for n in tags if tags[n] < 100]
+    out = [_groups(tags, {"Dom": vol + [b for b in (p.gap, p.absorber) if b in tags], "Air": vol,
+                          "Axis_": [p.axis]})]
+    k0 = 2 * math.pi * p.freq / C0
+    ez = p.volts / p.gap_length
+    out.append("Function {\n" + f"  k0 = {k0!r};\n  we = {2 * math.pi * p.freq * EPS0!r};\n  ez = {ez!r};\n" +
+               f"  eta = {MU0 * C0!r};\n}}\n")
+    out.append("Constraint {\n  { Name Hax; Case { { Region Axis_; Value 0; } } }\n}\n")
+    out.append("Jacobian {\n  { Name Vol; Case { { Region All; Jacobian VolAxiSqu; } } }\n"
+               "  { Name Sur; Case { { Region All; Jacobian SurAxi; } } }\n}\n")
+    out.append(INTEGRATION)
+    second = ("      { Name se2; NameOfCoef he2; Function BF_PerpendicularEdge_2E; Support Dom; Entity EdgesOf[All]; }\n"
+              if p.order == 2 else "")
+    second_c = "      { NameOfCoef he2; EntityType EdgesOf; NameOfConstraint Hax; }\n" if p.order == 2 else ""
+    out.append("FunctionSpace {\n  { Name Hh; Type Form1P; BasisFunction {\n"
+               "      { Name se; NameOfCoef he; Function BF_PerpendicularEdge; Support Dom; Entity NodesOf[All]; }\n"
+               f"{second}    }}\n    Constraint {{\n"
+               "      { NameOfCoef he; EntityType NodesOf; NameOfConstraint Hax; }\n"
+               f"{second_c}    }}\n  }}\n}}\n")
+    out.append("Formulation {\n  { Name F; Type FemEquation;\n    Quantity { { Name h; Type Local; NameOfSpace Hh; } }\n"
+               "    Equation {\n"
+               "      Integral { [ Dof{d h}, {d h} ]; In Air; Jacobian Vol; Integration I1; }\n"
+               "      Integral { [ -k0^2 * Dof{h}, {h} ]; In Air; Jacobian Vol; Integration I1; }\n"
+               f"      Integral {{ [ Complex[0, k0] * Dof{{h}}, {{h}} ]; In {rname(p.absorber)}; Jacobian Sur; "
+               "Integration I1; }\n"
+               f"      Integral {{ [ Complex[0, we] * Vector[0, 0, ez], {{h}} ]; In {rname(p.gap)}; Jacobian Sur; "
+               "Integration I1; }\n    }\n  }\n}\n")
+    out.append("Resolution {\n  { Name F; System { { Name A; NameOfFormulation F; Type Complex; "
+               f"Frequency {p.freq!r}; }} }}\n    Operation {{ Generate[A]; Solve[A]; SaveSolution[A]; }}\n  }}\n}}\n")
+    pq = ["      { Name h; Value { Local { [ CompZ[{h}] ]; In Dom; Jacobian Vol; } } }",
+          "      { Name hn; Value { Local { [ Norm[{h}] ]; In Dom; Jacobian Vol; } } }",
+          f"      {{ Name Ig; Value {{ Integral {{ [ CompZ[{{h}}] * 2 * Pi / {p.gap_length!r} ]; In {rname(p.gap)}; "
+          "Jacobian Sur; Integration I1; } } }",
+          f"      {{ Name Prad; Value {{ Integral {{ [ 0.5 * eta * SquNorm[{{h}}] * 2 * Pi ]; In {rname(p.absorber)}; "
+          "Jacobian Sur; Integration I1; } } }"]
+    out.append("PostProcessing {\n  { Name F; NameOfFormulation F; Quantity {\n" + "\n".join(pq) + "\n  } }\n}\n")
+    po = [f'Print[ Ig[{rname(p.gap)}], OnGlobal, Format Table, File "ig.txt" ];',
+          f'Print[ Prad[{rname(p.absorber)}], OnGlobal, Format Table, File "prad.txt" ];']
+    if p.probe_line:
+        x, y0, y1, n = p.probe_line
+        po.append(f'Print[ h, OnLine {{{{{x!r}, {y0!r}, 0}}{{{x!r}, {y1!r}, 0}}}} {{{int(n)}}}, Format Table, '
+                  'File "hwire.txt" ];')
+    if p.fields:
+        po.append('Print[ hn, OnElementsOf Air, Format NodeTable, File "hn.txt" ];')
+    out.append("PostOperation {\n  { Name P; NameOfPostProcessing F; Operation {\n    " + "\n    ".join(po) +
                "\n  } }\n}\n")
     return "".join(out)
