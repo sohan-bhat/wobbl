@@ -18,6 +18,9 @@ cards:
   - title: "wobbl circuit"
     href: "/guides/cli/circuit/"
     text: "LED, RC, buck and MOSFET checks, or any netlist."
+  - title: "wobbl motion"
+    href: "/guides/cli/motion/"
+    text: "Drops, throws and rocket flights."
   - title: "wobbl fix"
     href: "/guides/cli/fix/"
     text: "List fixes, or build them and solve each one again."
@@ -30,6 +33,7 @@ cards:
 | [`wobbl inspect`](/guides/cli/inspect/) | lists the holes, fillets, sharp corners, walls and faces of a part |
 | [`wobbl thermal`](/guides/cli/thermal/) | runs a steady or transient heat study |
 | [`wobbl circuit`](/guides/cli/circuit/) | checks an LED, RC network, buck converter or MOSFET, or runs a netlist |
+| [`wobbl motion`](/guides/cli/motion/) | flies a drop, a throw or a rocket spec through air, wind, thrust and parachutes |
 | [`wobbl check`](/guides/cli/check/) | shows the checks and confidence of a finished run |
 | [`wobbl report`](/guides/results/files/) | rebuilds and opens the HTML report of a finished run, covered with the result files |
 | [`wobbl fix`](/guides/cli/fix/) | lists fixes, or applies them and solves each version again |

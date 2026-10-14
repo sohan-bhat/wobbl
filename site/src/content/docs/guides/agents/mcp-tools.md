@@ -28,6 +28,7 @@ often with a `hint` that says what to change, instead of failing the call.
 | `suggest_fix` | `result_dir`, `apply`, `which` | the fixes with numbers, or for a strength result with `apply=true` the before and after of each one, while heat and circuit fixes come back with a note to solve again with the new value |
 | `solve_thermal` | `path`, `material`, `power`, `heat_faces`, `film`, `ambient`, `fixed_temp`, `duration`, `limit`, `radiation` | the steady or transient heat result |
 | `solve_circuit` | `template` or `netlist`, and `params` | the circuit result |
+| `solve_motion` | `spec`, or `diameter` with `mass` or `density`, plus `cd`, `height`, `speed`, `angle`, `wind`, `name` and `question` | the flight with its events, checks, fixes and trajectory |
 | `list_materials` | none | every material with its stiffness, limit, criterion, density, conductivity and service temperature |
 
 Loads, supports, films and selectors use exactly the syntax of the command line, so the
@@ -66,6 +67,16 @@ crosses its limit, and the usual confidence, checks, assumptions, fixes, images 
 circuit, pass the netlist as a file path or as the text itself, and list the signals to read in
 `params.vectors`. It returns the verdict, the headline, the main figures in `metrics`, the raw
 `values` and the usual checks and files.
+
+## solve_motion
+
+`solve_motion` flies a round body from its quantities, as in
+`solve_motion(name="rock", diameter="9 cm", density="2700 kg/m3", cd=0.6, height="300 m")`, or a
+rocket from `spec`, a TOML file path or the TOML text itself, with the tables that
+[Motion](/guides/simulations/motion/) describes. With a spec only `wind` can change, since it is
+the one thing that differs from day to day. It returns the verdict, the headline, the main figures
+in `metrics`, the raw `values`, the `events` from liftoff or release to the ground, the usual
+confidence, checks, assumptions, fixes, images and report, and the path of `trajectory.csv`.
 
 ## The server's own instructions
 
