@@ -432,6 +432,9 @@ def _register():
         cli.add_command(c)
     for c in (motor, flame, propellant):
         cli.add_command(c)
+    from .life import buckling, fatigue, vibration
+    for c in (buckling, vibration, fatigue):
+        cli.add_command(c)
 
 
 _register()

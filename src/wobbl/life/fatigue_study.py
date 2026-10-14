@@ -286,13 +286,14 @@ def _checks(src, blocks, curve, data, lives, model, spread, target, kt, kf, q, q
     ny = F.first_cycle_yield(max(b.amplitude for b in blocks), max(b.mean for b in blocks), curve.sy)
     finite = [n for n in lives if math.isfinite(n)]
     short = bool(finite) and min(finite) < 1e3
-    s = f"the highest peak, {fmt(peak)} MPa, is {fmt(curve.sy)} MPa yield over {ny:.2f}"
     if ny >= 1:
-        out.append(Check("first cycle yield", "pass", s + ", so the part stays elastic and the stress life method "
-                                                          "applies"))
+        out.append(Check("first cycle yield", "pass", f"the highest stress in a cycle, {fmt(peak)} MPa, stays under "
+                                                      f"the {fmt(curve.sy)} MPa yield (factor {ny:.2f}), so the part "
+                                                      "stays elastic and the stress life method applies"))
     else:
         out.append(Check("first cycle yield", "fail" if short else "warn",
-                         s + ". The notch yields a little every cycle. " +
+                         f"the highest stress in a cycle, {fmt(peak)} MPa, is {1 / ny:.2f} times the {fmt(curve.sy)} "
+                         "MPa yield, so the notch yields a little every cycle. " +
                          ("Under 1000 cycles this is low cycle fatigue, where stress life does not apply; use strain "
                           "life data or lower the stress" if short else
                           "The S-N line still covers lives past 1000 cycles, though strain life data would be more "
