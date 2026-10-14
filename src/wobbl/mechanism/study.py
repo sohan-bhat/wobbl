@@ -1,0 +1,253 @@
+"""Mechanisms: whether the servos lift it, how far a linkage swings and where it binds, what a gearbox gives, how
+hard parts hit and whether something tips.
+
+A template, a spec file or an MJCF or URDF model becomes a Mechanism and MuJoCo runs it. Every answer is checked
+the same way: against a closed form wherever the case reduces to one, again at half the time step, with its energy
+account closed over every force, and with its contacts and constraints inspected. Bodies are rigid and contacts
+are stiff springs, and every report says so.
+"""
+from __future__ import annotations
+
+import csv
+import math
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+
+from ..outcome_generic import GenericOutcome
+from ..units import fmt
+from ..verify.checks import Check, confidence
+from .sim import Run
+from .spec import Mechanism, SpecError
+
+MAX_ROWS = 500
+LIMITS = [
+    "Bodies are rigid, so links do not bend. A long or thin printed link flexes and rings more than this shows.",
+    "Contacts are stiff springs that let parts sink into each other by the depth the contact check reports.",
+    "Joints and gears have no backlash, and friction acts only where the inputs give it.",
+]
+
+
+@dataclass
+class MechanismOutcome(GenericOutcome):
+    events: list[dict] = field(default_factory=list)
+    runtime_s: float = 0.0
+    model: dict = field(default_factory=dict)
+
+    def write(self, out_dir, sections_extra: list[str] | None = None) -> "MechanismOutcome":
+        from ..report.html import table
+
+        rows = [[e["name"], f"{e['t_s']:.3f} s", e.get("detail", "")] for e in self.events]
+        extra = ["<h2>Events</h2>" + table(["event", "time", "detail"], rows, {1})] if rows else []
+        return super().write(out_dir, extra + (sections_extra or []))
+
+
+@dataclass
+class Answer:
+    """What one analysis hands back before the outcome is written."""
+    verdict: str
+    headline: str
+    metrics: list[tuple[str, str]]
+    checks: list[Check]
+    assumptions: list[str]
+    values: dict = field(default_factory=dict)
+    fixes: list[dict] = field(default_factory=list)
+    events: list[dict] = field(default_factory=list)
+    figures: list[list[str]] = field(default_factory=list)
+    images: dict = field(default_factory=dict)
+    run: Run | None = None                 # the run the trajectory table comes from
+    extra: list[tuple[str, str]] = field(default_factory=list)      # (level, reason) for the confidence
+    model: dict = field(default_factory=dict)
+
+
+def event(name: str, t: float, detail: str = "") -> dict:
+    return {"name": name, "t_s": round(float(t), 4) + 0.0, "detail": detail}
+
+
+# --- checks every answer shares ---------------------------------------------------------------------------
+def step_check(a: float, b: float, label: str, unit: str = "", tol: tuple = (0.01, 0.05)) -> Check:
+    d = abs(a - b) / max(abs(b), 1e-12)
+    st = "pass" if d < tol[0] else ("warn" if d < tol[1] else "fail")
+    return Check("time step convergence", st, f"{label} {fmt(a)}{unit} with the normal step and {fmt(b)}{unit} "
+                                              f"with half the step ({100 * d:.2g}% apart)",
+                 {"normal": a, "half": b, "change": d})
+
+
+def typical_size(run: Run) -> float:
+    """A typical part size from the geoms, for judging penetration, drift and energy."""
+    sizes = [max(g["size"][:3]) for g in run.model_info["geoms"] if g["type"] != "plane"]
+    return float(np.median(sizes)) * 2 if sizes else 0.1
+
+
+def energy_check(run: Run, passive: bool = False) -> Check:
+    """With nothing driving or damping it the energy has to stay put; otherwise the work of every force has to
+    add up to the change in kinetic and potential energy. A hundredth of the energy to lift the whole mechanism
+    by its own size sets the smallest scale, so a run where almost nothing moves is not judged on its settling."""
+    floor = 1e-2 * run.model_info.get("mass_kg", 0.0) * 9.80665 * typical_size(run)
+    end, worst, info = run.energy_residual(floor)
+    st = "pass" if worst < 0.01 else ("warn" if worst < 0.03 else "fail")
+    if passive:
+        return Check("energy conservation", st, f"with nothing driving or damping it, kinetic plus potential energy "
+                                                f"stayed within {100 * worst:.2g}% of the largest energy in the run",
+                     {**info, "worst": worst})
+    parts = ", ".join(f"{k} {fmt(v)} J" for k, v in info.items() if k not in ("scale_J", "delta_E_J") and abs(v) > 1e-9)
+    return Check("energy account", st, f"the work of the forces ({parts or 'none'}) matches the change in kinetic and "
+                                       f"potential energy, {fmt(info['delta_E_J'])} J, to {100 * worst:.2g}% of the "
+                                       "largest energy flow", {**info, "worst": worst, "end": end})
+
+
+def contact_check(run: Run, size: float, support_only: bool = False) -> Check | None:
+    """MuJoCo's contacts are springs, so a deep sink means the contact is too soft for the numbers to hold.
+    ``support_only`` judges only what rests on the floor, for a run where a part that fell is already the answer."""
+    contacts = [c for c in run.contacts.values() if c["support"] or not support_only]
+    if not contacts:
+        return None
+    depth = max(c["depth_m"] for c in contacts)
+    rel = depth / max(size, 1e-9)
+    st = "pass" if rel < 0.01 or depth < 2e-4 else ("warn" if rel < 0.05 else "fail")
+    return Check("contact settings", st, f"the deepest contact sinks {fmt(depth * 1000)} mm, {100 * rel:.2g}% of the "
+                                         f"{fmt(size * 1000)} mm part, so the soft contact model is not hiding a "
+                                         "real overlap" if st == "pass" else
+                 f"the deepest contact sinks {fmt(depth * 1000)} mm, {100 * rel:.2g}% of the part, which is deep "
+                 "enough to change the forces and positions", {"depth_m": depth, "relative": rel})
+
+
+def constraint_check(run: Run, scale: float, unit: str = "mm", label: str = "loop") -> Check | None:
+    if not run.model_info.get("neq"):
+        return None
+    err = float(np.max(run.eq_err)) if len(run.eq_err) else 0.0
+    shown, ref = (err * 1000, scale * 1000) if unit == "mm" else (math.degrees(err), math.degrees(scale))
+    rel = err / max(scale, 1e-12)
+    st = "pass" if rel < 1e-3 else ("warn" if rel < 1e-2 else "fail")
+    return Check("constraint drift", st, f"the {label} held together to {fmt(shown)} {unit} at worst "
+                                         f"({100 * rel:.2g}% of {fmt(ref)} {unit})", {"max": err, "relative": rel})
+
+
+def warnings_check(run: Run) -> Check | None:
+    w = run.model_info.get("warnings") or {}
+    if not w:
+        return None
+    return Check("solver warnings", "fail", "MuJoCo warned about " + ", ".join(f"{k} ({v} times)" for k, v in w.items())
+                 + ". The run went unstable or ran out of room, so its numbers are not reliable", w)
+
+
+def model_info(m: Mechanism, run: Run) -> dict:
+    c = m.contact
+    contact = (f"linear spring and dashpot, {fmt(math.sqrt(c['stiffness']) / (2 * math.pi))} Hz natural frequency "
+               f"per unit mass, damping ratio {fmt(c.get('damping', 0) / (2 * math.sqrt(c['stiffness'])))}"
+               if "stiffness" in c else f"stiff contact settling in {fmt(c.get('timeconst', 0.005) * 1000)} ms")
+    return {"bodies": run.model_info["nbody"] - 1, "joints": run.model_info["njnt"],
+            "degrees_of_freedom": run.model_info["nv"], "constraints": run.model_info["neq"],
+            "timestep_s": run.dt, "steps": run.steps, "integrator": "semi implicit Euler", "contact": contact}
+
+
+# --- outputs ----------------------------------------------------------------------------------------------
+def write_trajectory(path: Path, run: Run, events: list[dict], slide: set | None = None) -> None:
+    """trajectory.csv: time, then each joint's angle, speed and drive torque, then where each point mass is. At most
+    MAX_ROWS rows, evenly spread in time, with a row at every event."""
+    slide = slide or set()
+    cols = ["t_s"]
+    for j in run.joints:
+        key = j.replace(" ", "_")
+        cols += [f"{key}_mm", f"{key}_mm_s", f"{key}_N"] if j in slide else [f"{key}_deg", f"{key}_rpm", f"{key}_Nm"]
+    pts = list(run.points)
+    for p in pts:
+        key = p.replace(" ", "_")
+        cols += [f"{key}_x_m", f"{key}_y_m", f"{key}_z_m"]
+    free = list(run.free.values())
+    for f in free:
+        key = f["body"].replace(" ", "_")
+        cols += [f"{key}_x_m", f"{key}_y_m", f"{key}_z_m", f"{key}_speed_mps", f"{key}_tilt_deg"]
+    touching = any(not c["support"] for c in run.contacts.values())
+    if touching:
+        cols.append("contact_N")
+    n = len(run.t)
+    keep = set(np.linspace(0, n - 1, min(n, MAX_ROWS - len(events))).round().astype(int).tolist())
+    for e in events:
+        keep.add(int(np.argmin(np.abs(run.t - e["t_s"]))))
+    with open(path, "w", newline="") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(cols)
+        for i in sorted(keep):
+            row = [round(float(run.t[i]), 5) + 0.0]
+            for c, j in enumerate(run.joints):
+                if j in slide:
+                    row += [run.q[i, c] * 1000, run.v[i, c] * 1000, run.tau[i, c]]
+                else:
+                    row += [math.degrees(run.q[i, c]), run.v[i, c] * 60 / (2 * math.pi), run.tau[i, c]]
+            for p in pts:
+                row += list(run.points[p][i])
+            for f in free:
+                row += [*f["xy"][i], f["z"][i], float(np.linalg.norm(f["vel"][i])), f["tilt"][i]]
+            if touching:
+                row.append(run.peak_force[i])
+            w.writerow([row[0]] + [round(float(x), 5) + 0.0 for x in row[1:]])
+
+
+def load_target(target: str, params: dict) -> Mechanism:
+    """A spec file, or an MJCF or URDF model run as it is (its own gravity and contacts, nothing driven)."""
+    from . import quantities as Q
+    from .spec import read_spec
+
+    p = Path(target)
+    if not p.exists():
+        raise SpecError(f"no mechanism template or file called '{target}' (the templates are pendulum, arm, fourbar, "
+                        "gears, impact and tip)")
+    suffix = p.suffix.lower()
+    if suffix in (".toml", ".json"):
+        if params:
+            raise SpecError("a spec file carries its own values, so edit the file rather than passing --set")
+        return read_spec(str(p))
+    if suffix in (".xml", ".mjcf", ".urdf"):
+        extra = set(params) - {"duration", "timestep"}
+        if extra:
+            raise SpecError(f"a model file takes only duration and timestep, not {', '.join(sorted(extra))}. To drive "
+                            "its joints, write a spec with model = \"" + p.name + "\" and a move")
+        return Mechanism(name=p.stem, model_file=str(p.resolve()), duration=Q.time(params.get("duration", "2 s")),
+                         timestep=Q.time(params.get("timestep", "1 ms"), "ms"))
+    raise SpecError(f"'{p.name}' is not a mechanism spec (.toml, .json) or model (.xml, .urdf)")
+
+
+def run_mechanism(target: str, params: dict | None, out_dir: str | Path, question: str = "",
+                  progress=None) -> MechanismOutcome:
+    """Build, run, check and write a mechanism study: outcome.json, summary.txt, report.html, trajectory.csv,
+    model.xml and the pictures."""
+    from .analyses import ANALYSES, generic
+    from .install import require
+    from .mjcf import to_mjcf
+    from .templates import is_template, template
+
+    t0 = time.time()
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    say = progress or (lambda a, b: None)
+    mj = require()
+    params = dict(params or {})
+    if is_template(target):
+        b = template(target, params)
+        mech, part = b.mech, b.kind
+        say("solve", f"MuJoCo {mj.__version__}, {b.kind}")
+        a = ANALYSES[b.kind](b, out / "images", say)
+    else:
+        mech = load_target(target, params)
+        part = str(Path(target).resolve())
+        say("solve", f"MuJoCo {mj.__version__}, {Path(target).name}")
+        a = generic(mech, out / "images", say)
+    say("outputs", "trajectory table, pictures and report")
+    values = {**a.values, "_figures": a.figures}
+    if a.run is not None:
+        write_trajectory(out / "trajectory.csv", a.run, a.events, {j.name for j in mech.joints if j.kind == "slide"})
+        values["trajectory"] = "trajectory.csv"
+    if not mech.model_file:
+        (out / "model.xml").write_text(to_mjcf(mech), encoding="utf-8")
+        values["model_file"] = "model.xml"
+    level, reasons = confidence(a.checks, a.extra)
+    o = MechanismOutcome("mechanism", part, question or mech.question, a.verdict, a.headline, a.metrics, level,
+                         reasons, a.checks, a.assumptions + LIMITS, values, a.images, a.fixes,
+                         solver=f"MuJoCo {mj.__version__}")
+    o.events = a.events
+    o.model = a.model
+    o.runtime_s = o.t_total = round(time.time() - t0, 3)
+    return o.write(out)
