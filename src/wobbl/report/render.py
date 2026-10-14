@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
@@ -520,76 +521,133 @@ class Panel:
     text_size: float = 15
 
 
-def compose(path: str | Path, panels: list[Panel]) -> str:
-    """Lay the panels side by side, add their bars, marks and captions, and save a PNG.
+FONTS = Path(__file__).with_name("fonts")
+# the glyphs the report's subset fonts carry (see scripts/subset_report_fonts.py); other text falls back
+SUBSET = set(chr(c) for c in range(0x20, 0x7F)) | set("\u00a0°±²³µ·×\u2019\u201c\u201d\u2026")
+PT = 100 / 72                         # pixels per point, the scale the pictures' type was set at
 
-    matplotlib draws only the overlays, on a clear figure, which are then blended over the pictures; handing it
-    the pictures themselves would send millions of pixels through its image pipeline for nothing."""
+
+@lru_cache(maxsize=None)
+def _font(px: int, bold: bool, plain: bool = False):
+    """IBM Plex Mono at a pixel size, or DejaVu Sans Mono from matplotlib when this Pillow cannot read woff2 or
+    the text needs glyphs outside the subset."""
+    from PIL import ImageFont
+
+    if not plain:
+        try:
+            return ImageFont.truetype(str(FONTS / ("plex-mono-600.woff2" if bold else "plex-mono-400.woff2")), px)
+        except OSError:
+            pass
     import matplotlib
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib.cm import ScalarMappable
-    from matplotlib.colors import Normalize
-    from PIL import Image
+    name = "DejaVuSansMono-Bold.ttf" if bold else "DejaVuSansMono.ttf"
+    return ImageFont.truetype(str(Path(matplotlib.get_data_path()) / "fonts" / "ttf" / name), px)
+
+
+def _text_font(text: str, pt: float, bold: bool = False):
+    return _font(round(pt * PT), bold, not set(text) <= SUBSET)
+
+
+def _smooth(size: tuple[int, int], paint_fn, scale: int = 4):
+    """A small RGBA patch drawn scale times larger and scaled down, so its curves come out smooth."""
+    from PIL import Image, ImageDraw
+
+    big = Image.new("RGBA", (size[0] * scale, size[1] * scale), (0, 0, 0, 0))
+    paint_fn(ImageDraw.Draw(big), scale)
+    return big.resize(size, Image.LANCZOS)
+
+
+def _rgba(color: str, alpha: float = 1.0) -> tuple[int, int, int, int]:
+    r, g, b = (_rgb(color) * 255 + 0.5).astype(int)
+    return int(r), int(g), int(b), int(alpha * 255 + 0.5)
+
+
+def _mark(img, x: float, y: float, m: Mark, W: int, x0: int):
+    """A marked point, a disc ringed in near black, with its label in a rounded box above and to one side."""
+    from PIL import ImageDraw
+
+    r, ring = (5.4 if m.small else 7.3), 3.0
+    R_ = r + ring / 2
+    pad = int(R_ + 2)
+    disc = _smooth((2 * pad, 2 * pad), lambda d, k: d.ellipse(
+        [(pad - R_) * k, (pad - R_) * k, (pad + R_) * k, (pad + R_) * k], fill=_rgba(m.color),
+        outline=_rgba("#111111"), width=round(ring * k)))
+    img.alpha_composite(disc, (round(x0 + x) - pad, round(y) - pad))
+    if not m.label:
+        return
+    font = _text_font(m.label, 10 if m.small else 13, bold=True)
+    l, t, rr, bb = font.getbbox(m.label)
+    padx = round(0.3 * font.size)
+    bw, bh = rr - l + 2 * padx, font.size + 2 * padx
+    off = round(9 * PT)
+    left = x > 0.72 * W
+    bx = round(x0 + x - off - bw) if left else round(x0 + x + off)
+    by = round(y - off - bh)
+    box = _smooth((bw, bh), lambda d, k: d.rounded_rectangle([0, 0, bw * k - 1, bh * k - 1], radius=padx * k,
+                                                            fill=_rgba(m.color, 0.95)))
+    img.alpha_composite(box, (bx, by))
+    ImageDraw.Draw(img).text((bx + padx - l, by + bh / 2), m.label, font=font, fill=_rgba("#111111"), anchor="lm")
+
+
+def _bar(img, bar, W: int, H: int, x0: int):
+    """The color bar: the scale with six values beside it, the swatch for values over it, and its title."""
+    from matplotlib import colormaps
+    from PIL import Image, ImageDraw
+
+    cmap, (lo, hi), title = bar[:3]
+    above = bar[3] if len(bar) > 3 else None
+    hi = hi if hi > lo else lo + max(abs(lo), 1.0) * 1e-9
+    left, top, width, height = x0 + round(0.885 * W), round(0.2 * H), round(0.016 * W), round(0.675 * H)
+    cm = colormaps[cmap] if isinstance(cmap, str) else cmap
+    ramp = (cm(np.linspace(1, 0, height))[:, :3] * 255 + 0.5).astype(np.uint8)
+    img.paste(Image.fromarray(np.repeat(ramp[:, None, :], width, axis=1), "RGB"), (left, top))
+    d = ImageDraw.Draw(img)
+    for t in np.linspace(lo, hi, 6):
+        label = f"{t:.3g}"
+        y = top + (hi - t) / (hi - lo) * (height - 1)
+        d.text((left + width + round(5 * PT), y), label, font=_text_font(label, 10), fill=_rgba(FG), anchor="lm")
+    head = top
+    if above:   # the color of values over the scale, as VTK's bar showed it
+        sh = round(0.022 * H)
+        sy = top - round(0.008 * H) - sh
+        d.rectangle([left, sy, left + width - 1, sy + sh - 1], fill=_rgba(above))
+        d.text((left - round(0.004 * W), sy + sh / 2), "above", font=_text_font("above", 10), fill=_rgba(FG),
+               anchor="rm")
+        head -= round(0.03 * H)
+    rows = title.split("\n")
+    step = round(11.5 * PT * 1.1)
+    for i, row in enumerate(reversed(rows)):
+        d.text((x0 + 0.893 * W, head - round(0.015 * H) - i * step), row, font=_text_font(row, 11.5),
+               fill=_rgba(FG), anchor="md")
+
+
+def compose(path: str | Path, panels: list[Panel]) -> str:
+    """Lay the panels side by side, add their bars, marks and captions, and save a PNG."""
+    from PIL import Image, ImageDraw
 
     Wt, Ht = sum(p.rgb.shape[1] for p in panels), max(p.rgb.shape[0] for p in panels)
-    fig = plt.figure(figsize=(Wt / 100, Ht / 100), dpi=100, facecolor="none")
-    base = np.tile(_rgb(BG).astype(np.float32), (Ht, Wt, 1))
+    base = np.empty((Ht, Wt, 3), np.uint8)
+    base[:] = (_rgb(BG) * 255 + 0.5).astype(np.uint8)
     x0 = 0
     for p in panels:
         H, W = p.rgb.shape[:2]
-        fx, fw, fh = x0 / Wt, W / Wt, H / Ht
-        base[:H, x0:x0 + W] = np.clip(p.rgb, 0, 1)
-        ax = fig.add_axes([fx, 1 - fh, fw, fh])
-        ax.set_xlim(0, W)
-        ax.set_ylim(H, 0)
-        ax.axis("off")
+        base[:H, x0:x0 + W] = (np.clip(p.rgb, 0, 1) * 255 + 0.5).astype(np.uint8)
+        x0 += W
+    img = Image.fromarray(base, "RGB").convert("RGBA")
+    x0 = 0
+    for p in panels:
+        H, W = p.rgb.shape[:2]
         for m in p.marks:
             px, py, _ = p.cam.project(m.xyz)
-            px, py = float(px[0]), float(py[0])
-            ax.scatter([px], [py], s=60 if m.small else 110, c=m.color, edgecolors="#111111", linewidths=2.2,
-                       zorder=5)
-            if m.label:
-                left = px > 0.72 * W
-                ax.annotate(m.label, (px, py), xytext=(-9 if left else 9, 9), textcoords="offset points",
-                            ha="right" if left else "left", va="bottom", color="#111111", family="monospace",
-                            fontweight="bold", fontsize=10 if m.small else 13, zorder=6,
-                            bbox=dict(boxstyle="round,pad=0.3", fc=m.color, ec="none", alpha=0.95))
+            if np.isfinite(px[0]) and np.isfinite(py[0]):
+                _mark(img, float(px[0]), float(py[0]), m, W, x0)
         if p.text:
-            ax.text(8, 8, p.text, ha="left", va="top", color=FG, family="monospace", fontsize=p.text_size)
+            ImageDraw.Draw(img).text((x0 + 8, 8), p.text, font=_text_font(p.text, p.text_size), fill=_rgba(FG),
+                                     anchor="la")
         if p.bar:
-            cmap, (lo, hi), title = p.bar[:3]
-            above = p.bar[3] if len(p.bar) > 3 else None
-            hi = hi if hi > lo else lo + max(abs(lo), 1.0) * 1e-9
-            left, bottom, width, height = fx + 0.885 * fw, 1 - fh + 0.125 * fh, 0.016 * fw, 0.675 * fh
-            cax = fig.add_axes([left, bottom, width, height])
-            cb = fig.colorbar(ScalarMappable(Normalize(lo, hi), cmap), cax=cax)
-            cb.outline.set_visible(False)
-            ticks = np.linspace(lo, hi, 6)
-            cb.set_ticks(ticks, labels=[f"{t:.3g}" for t in ticks])
-            cax.tick_params(colors=FG, labelsize=10, length=0, pad=5)
-            for lb in cax.get_yticklabels():
-                lb.set_family("monospace")
-            top = bottom + height
-            if above:   # the color of values over the scale, as VTK's bar showed it
-                sw = fig.add_axes([left, top + 0.008 * fh, width, 0.022 * fh], facecolor=above)
-                sw.set_xticks([])
-                sw.set_yticks([])
-                for sp in sw.spines.values():
-                    sp.set_visible(False)
-                fig.text(left - 0.004 * fw, top + 0.019 * fh, "above", ha="right", va="center", color=FG,
-                         family="monospace", fontsize=10)
-                top += 0.03 * fh
-            fig.text(fx + 0.893 * fw, top + 0.015 * fh, title, ha="center", va="bottom", color=FG,
-                     family="monospace", fontsize=11.5, linespacing=1.1)
+            _bar(img, p.bar, W, H, x0)
         x0 += W
-    fig.canvas.draw()
-    over = np.asarray(fig.canvas.buffer_rgba(), np.float32) / 255.0     # straight, not premultiplied, alpha
-    plt.close(fig)
-    a = over[..., 3:]
-    rgb = base * (1.0 - a) + over[..., :3] * a
-    Image.fromarray((rgb * 255 + 0.5).astype(np.uint8)).save(path, compress_level=6)
+    img.convert("RGB").save(path, compress_level=6)
     return str(path)
 
 

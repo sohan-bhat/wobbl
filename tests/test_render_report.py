@@ -73,3 +73,13 @@ def test_rasterizer_fills_without_cracks_and_keeps_the_nearest():
     tri = tri.reshape(48, 64)
     assert tri[12, 12] == 2 and tri[35, 45] in (0, 1)
     assert 0 <= w1.min() and w1.max() <= 1 and 0 <= w2.min() and w2.max() <= 1
+
+
+def test_picture_labels_use_plex_mono_and_fall_back_for_other_glyphs():
+    """Labels in the pictures are set in the report's IBM Plex Mono subset; text it cannot show, such as Greek,
+    falls back to DejaVu Sans Mono, which matplotlib always carries."""
+    from wobbl.report.render import _text_font
+
+    name = _text_font("52.3 MPa", 13, bold=True).getname()[0]
+    assert name.startswith("IBM Plex Mono") or name.startswith("DejaVu Sans Mono")   # DejaVu if no woff2 support
+    assert _text_font("ε 0.2%", 13).getname()[0].startswith("DejaVu Sans Mono")
