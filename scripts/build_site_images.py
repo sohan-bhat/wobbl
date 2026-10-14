@@ -2,7 +2,8 @@
 
 Every picture on the site is a real Wobbl output from ``examples/``. This
 script trims the empty background around each one and writes two widths so
-the page can pick the right one with ``srcset``.
+the page can pick the right one with ``srcset``. The circuit drawings are SVG
+and are copied as they are, since the pages inline them.
 
     python scripts/build_site_images.py            # writes site/public/img/*.webp
     python scripts/build_site_images.py enclosure-stress   # only the images named
@@ -36,6 +37,8 @@ IMAGES = {
     "heat-sink-temperature": (EX / "heat-sink/output/images/temperature.png", True, (1200, 800)),
     "battery-history": (EX / "battery-pack/output/images/history.png", False, (1200, 800)),
     "buck-waveform": (EX / "circuits/buck/images/waveform.png", False, (1200, 800)),
+    **{f"{run}-{kind}": (EX / f"circuits/{run}/images/{kind}.svg", False, ()) for run in ("led", "buck", "mosfet")
+       for kind in ("setup", "schematic")},
     "falling-rock-flight": (EX / "falling-rock/output/images/flight.png", False, (1200, 800)),
     "rocket-flight": (EX / "rocket-launch/output/images/flight.png", False, (1200, 800)),
     "rocket-path": (EX / "rocket-launch/output/images/path.png", False, (1200, 800)),
@@ -68,6 +71,11 @@ def main(only: list[str]) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     for name, (src, do_trim, widths) in IMAGES.items():
         if only and name not in only:
+            continue
+        if src.suffix == ".svg":
+            out = OUT / f"{name}.svg"
+            out.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            print(f"{out.relative_to(ROOT)}  {out.stat().st_size // 1024} KB")
             continue
         img = Image.open(src).convert("RGB")
         if do_trim:
