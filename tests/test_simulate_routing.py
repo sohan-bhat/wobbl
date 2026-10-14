@@ -75,7 +75,7 @@ CASES = [
          ("vibration",)),
     Case(str(PARTS / "shelf_bracket_sharp.step"), "how fast does a crack grow from the hole?", "part", "step",
          ("stress", "crack")),
-    Case(str(EX / "bracket-crack" / "bracket.py"), "damage tolerance check with a 1 mm flaw at the pin hole",
+    Case(str(EX / "bracket-crack" / "bracket.py"), "damage tolerance check with a 1 mm flaw at the hole",
          "part", "parametric", ("stress", "crack")),
     Case(str(PARTS / "cast_motor_mount.step"), "how often should we inspect it for cracks?", "part", "step",
          ("stress", "crack")),

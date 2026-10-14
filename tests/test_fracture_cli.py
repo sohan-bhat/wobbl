@@ -41,7 +41,7 @@ def test_studies_start_from_strength_and_fatigue_results():
 
 
 @pytest.mark.parametrize("question,expect", [
-    ("how long until a crack from the bolt hole grows critical", ["stress", "crack"]),
+    ("how long until a crack from the hole grows critical", ["stress", "crack"]),
     ("damage tolerance check with a 1 mm flaw at the hole", ["stress", "crack"]),
     ("will it crack under 200 N?", ["stress"]),
 ])
