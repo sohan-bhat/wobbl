@@ -38,6 +38,25 @@
   "wall_s": 7.9
  },
  {
+  "id": "elastic-root",
+  "title": "Cantilever on an elastic root",
+  "domain": "strength",
+  "source": "Timoshenko beam on a Winkler bed",
+  "quantity": "tip deflection",
+  "unit": "mm",
+  "expected": 2.00181,
+  "wobbl": 2.001555263157895,
+  "error": 0.0001272532568550889,
+  "tolerance": 0.03,
+  "pass": true,
+  "exact_theory": true,
+  "confidence": "high",
+  "levels": 3,
+  "nodes": 5772,
+  "time_s": 15.3,
+  "wall_s": 19.0
+ },
+ {
   "id": "plate-hole",
   "title": "Plate with a hole in tension",
   "domain": "strength",

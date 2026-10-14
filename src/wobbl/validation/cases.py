@@ -76,6 +76,21 @@ def cantilever_stress(out: Path):
     return float(f["S"][i, 0]), expected, _info(o)
 
 
+def elastic_root(out: Path):
+    """The cantilever of cantilever-tip held by a bed of springs at its root instead of a rigid wall. The bed turns
+    under the root moment F L by F L / (k I), I the second moment of the root face, which adds F L^2 / (k I) at the
+    tip, and sinks by F / (k A)."""
+    L, b, h, F, k = 200.0, 20.0, 10.0, 100.0, 2000.0
+    part = G.box(out / "bar.step", L, b, h)
+    o, f = _strength(part, STEEL, [f"{F} N -z @ x=max"], [f"elastic {k:g} N/mm3 @ x=min"], out / "run")
+    X, U = f["X"], f["U"]
+    end = np.abs(X[:, 0] - L) < 1e-6
+    I = b * h ** 3 / 12
+    Gm = E_STEEL / (2 * (1 + NU))
+    beam = F * L ** 3 / (3 * E_STEEL * I) + F * L / (5 / 6 * Gm * b * h)
+    return float(-U[end, 2].mean()), beam + F * L ** 2 / (k * I) + F / (k * b * h), _info(o)
+
+
 def plate_hole(out: Path):
     Lp, W, t, d, s = 400.0, 200.0, 4.0, 20.0, 10.0
     part = G.plate_with_hole(out / "plate.step", Lp, W, t, d)
@@ -586,6 +601,8 @@ CASES = [
          "mm", 0.03, True, cantilever_tip),
     Case("cantilever-stress", "Cantilever bending stress at mid span", "strength", "Euler-Bernoulli, M c / I",
          "sigma_xx at mid span", "MPa", 0.03, True, cantilever_stress),
+    Case("elastic-root", "Cantilever on an elastic root", "strength", "Timoshenko beam on a Winkler bed",
+         "tip deflection", "mm", 0.03, True, elastic_root),
     Case("plate-hole", "Plate with a hole in tension", "strength", "Kirsch with Peterson finite width Kt",
          "peak von Mises at the hole", "MPa", 0.04, True, plate_hole),
     Case("lame", "Thick walled pressure vessel", "strength", "Lame, plane strain", "von Mises at the bore",
