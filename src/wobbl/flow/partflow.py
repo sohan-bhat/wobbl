@@ -54,6 +54,7 @@ class PartFlowStudy:
     outlet: str = ""                     # face selector for a fluid volume's outlets
     params: dict = field(default_factory=dict)
     quality: str = "normal"
+    turbulence: str = "auto"             # auto, laminar, rans, or des and les for a time accurate run
     max_dp: float = 0.0                  # Pa
     max_force: float = 0.0               # N
     keep: bool = False
@@ -178,12 +179,26 @@ class Setup:
     heat: bool = False
     temp: float = 20.0           # C, the fluid's
     pr: float = 0.71             # the fluid's Prandtl number
+    unsteady: str = ""           # des or les for a time accurate run, else steady
+    unsteady_spans: tuple = (6.0, 20.0)   # flow through times to build the wake, then to average over
 
 
 def build_setup(st: PartFlowStudy, g: PartGeometry, p: Plan, q: dict, flow: float | None = None) -> Setup:
     s = _build_setup(st, g, p, q, flow)
     fl = get_fluid(st.fluid, st.temp)
     s.temp, s.pr = st.temp, fl.Pr
+    model = (st.turbulence or "auto").lower()
+    if model in ("des", "les"):
+        s.unsteady = model
+        s.turb = foam.Turbulence.free_stream(model, s.speed, s.nu, s.ref_length, intensity=0.01, scale=0.1)
+        s.unsteady_spans = {"fast": (4.0, 10.0), "normal": (6.0, 20.0), "fine": (8.0, 40.0)}[st.quality]
+    elif model == "laminar":
+        s.turb = foam.Turbulence()
+    elif model == "rans" and s.turb.model == "laminar":
+        s.turb = foam.Turbulence.free_stream("rans", s.speed, s.nu, s.ref_length,
+                                             intensity=0.01 if s.mode == "external" else 0.05)
+    elif model not in ("auto", "rans"):
+        raise ValueError(f"turbulence is auto, laminar, rans, des or les, not '{st.turbulence}'")
     return s
 
 
@@ -336,6 +351,17 @@ def run_level(s: Setup, work: Path, scale: float, tag: str, fields: bool = False
     if grid.patches.get(s.inlet, 0) == 0:
         raise RuntimeError("the grid lost the inlet; the lid may not seal the passage")
     foam.write_fields(case, s.u_in, s.turb, scalar={"inlet": 0.0, "wall": 1.0} if s.heat else None)
+    if s.unsteady:
+        from .transient import run_transient
+        out = {"size": size, "cells": grid.cells, "grid": grid, "t_mesh": time.time() - t0}
+        out.update(run_transient(case, s, grid, tag, fields))
+        out["iterations"] = len(out.get("history", []))
+        out["swing"] = abs(out["halves"][0] - out["halves"][1]) / max(abs(out["cd"]), 1e-300) \
+            if "halves" in out else 0.0
+        if fields:
+            out["fields"] = _fields(case, s)
+        case.clean()
+        return out
     fo = _functions(s, grid)
     foam.write_steady(case, s.turb, s.iters, fo, scalar=s.heat, tol=1e-5)
     _non_orthogonal(case, grid)

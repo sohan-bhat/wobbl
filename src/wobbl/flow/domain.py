@@ -167,6 +167,11 @@ def _part_study(job):
     curve = job.value("fan") or job.value("pump") or w.fan
     pressure = job.value("pressure")
     mode = job.value("mode") or ""
+    turb = job.value("turbulence")
+    if not turb and re.search(r"vortex|vortices|shedding|unsteady|\bles\b|\bdes\b|eddy|buffet|flutter|"
+                              r"\bwake\b.*\b(?:swing|oscillat)", job.focus.lower()):
+        turb = "des"
+        job.use("turbulence", turb)
     if not mode and w.mode == "internal" and speed and not flow:
         mode = "internal"
     if not (speed or flow or curve or pressure):
@@ -177,6 +182,7 @@ def _part_study(job):
                        outlet=job.value("outlet") or "",
                        params=dict(p.split("=", 1) for p in job.values("param") if "=" in p),
                        quality=job.value("quality") or ("fast" if job.quick else "normal"),
+                       turbulence=turb or "auto",
                        max_dp=qty(job.value("max-dp"), "pressure") if job.value("max-dp") else 0.0,
                        max_force=qty(job.value("max-force"), "force") if job.value("max-force") else 0.0,
                        keep=job.flag("keep"), question=job.question)
@@ -286,6 +292,8 @@ CAD_OPTIONS = (
     Option("inlet", "Inlet opening: 'opening 2', 'near x,y,z' or a face selector", "the largest opening"),
     Option("outlet", "Outlet faces of a fluid volume, as a face selector"),
     Option("mode", "external, internal, volume or ducted; worked out from the part and the question when left out"),
+    Option("turbulence", "auto (steady RANS, or laminar when slow), laminar, rans, or des and les for a time "
+                         "accurate run that resolves the wake's eddies and its shedding frequency", "auto"),
     Option("max-dp", "Most pressure drop allowed, e.g. '5 kPa'"),
     Option("max-force", "Most drag allowed, e.g. '20 N'"),
     Option("keep", "Keep the OpenFOAM case folders", flag=True))

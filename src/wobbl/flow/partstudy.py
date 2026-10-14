@@ -42,7 +42,7 @@ def run_partflow(st: PartFlowStudy, out_dir: str | Path, progress=None, geometry
     op = operating_point(st, g, p, q, work, say) if st.curve else None
     s = build_setup(st, g, p, q, op["flow"] if op else None)
     s.heat = heat
-    scales = [q["ratio"] ** k for k in range(q["levels"])]
+    scales = [q["ratio"] ** k for k in range(q["levels"])] if not s.unsteady else [1.0]
     say("cfd", f"{p.mode} flow, {s.turb.model}, on {len(scales)} grids, {WORKERS} at a time")
     with ThreadPoolExecutor(WORKERS) as pool:
         levels = list(pool.map(lambda k: run_level(s, work, scales[k], f"grid{k}", fields=k == 0),
@@ -106,7 +106,9 @@ def _checks(st, g, p, s, levels, fl, op):
                         {"cells": fine["cells"], "non_ortho": grid.max_non_ortho, "skewness": grid.max_skewness}))
     label, unit = ("drag", "N") if s.mode == "external" else ("pressure drop", "Pa")
     vals = [L["value"] for L in levels]
-    if len(levels) >= 3:
+    if s.unsteady:
+        checks += _unsteady_checks(s, fine)
+    elif len(levels) >= 3:
         checks.append(gci_check(gci(vals, [L["cells"] ** (-1 / 3) for L in levels]), label, unit, tol=0.05))
     else:
         ch = abs(vals[0] - vals[1]) / max(abs(vals[0]), 1e-300)
@@ -115,17 +117,23 @@ def _checks(st, g, p, s, levels, fl, op):
                             f"{fine['cells']:,} cells, {100 * ch:.2g}% apart, on two grids only (fast quality)",
                             {"values": vals, "cells": [L["cells"] for L in levels]}))
     sw = fine["swing"]
-    checks.append(Check("iterative convergence", "pass" if sw < 0.01 else ("warn" if sw < 0.05 else "fail"),
-                        f"{label} swings {100 * sw:.2g}% over the last fifth of {fine['iterations']} iterations" +
-                        ("" if sw < 0.01 else ", so the flow does not settle into one steady state, as behind a "
-                                              "bluff body that sheds vortices, and the mean is reported")))
+    if not s.unsteady:
+        checks.append(Check("iterative convergence", "pass" if sw < 0.01 else ("warn" if sw < 0.05 else "fail"),
+                            f"{label} swings {100 * sw:.2g}% over the last fifth of {fine['iterations']} "
+                            "iterations" + ("" if sw < 0.01 else ", so the flow does not settle into one steady "
+                                                                 "state, as behind a bluff body that sheds vortices, "
+                                                                 "and the mean is reported, so a time accurate run "
+                                                                 "(--turbulence des) would describe it better")))
     if s.mode != "external":
         checks.append(mass_check(fine["q_in"], fine["q_out"], "m3/s", tol=1e-3))
-    checks.append(residual_check(fine["log"], 1e-3))
-    if s.turb.model != "laminar":
+    checks.append(residual_check(fine["log"], 1e-3, steady=not s.unsteady))
+    if s.turb.model != "laminar" and not s.unsteady:
         checks.append(yplus_check(fine.get("yplus", {}), "wall functions"))
         from .verify import model_reason
         extra.append(model_reason("rans", "separated" if s.mode == "external" else "internal"))
+    if s.unsteady:
+        from .verify import model_reason
+        extra.append(model_reason(s.unsteady, "separated"))
     checks.append(_regime(s))
     checks.append(_hand(g, p, s, fine))
     if s.mode == "external":
@@ -138,6 +146,34 @@ def _checks(st, g, p, s, levels, fl, op):
                             f"needs {fmt_pressure(mine)} there ({100 * err:.2g}% apart)" +
                             ("" if err < 0.1 else ", so the coarse grid's fit set the flow a little off"), op))
     return checks, [e for e in extra if e]
+
+
+def _unsteady_checks(s, fine) -> list:
+    """Checks a time accurate run has in place of grid ladders and residuals."""
+    out = [Check("grid convergence", "warn", f"one grid of {fine['cells']:,} cells, since a scale resolving run on "
+                                             "a ladder of grids costs too much here, so the discretization error is "
+                                             "unmeasured beyond the resolved energy below")]
+    if "halves" in fine:
+        a, b = fine["halves"]
+        ch = abs(a - b) / max(abs(fine["cd"]), 1e-300)
+        out.append(Check("statistical convergence", "pass" if ch < 0.03 else ("warn" if ch < 0.1 else "fail"),
+                         f"the mean drag coefficient over the first and second halves of the averaging window is "
+                         f"{a:.3g} and {b:.3g}, {100 * ch:.2g}% apart", {"halves": [a, b]}))
+        cyc = fine.get("cycles", 0.0)
+        if fine.get("frequency"):
+            out.append(Check("shedding", "pass" if cyc >= 8 else "warn",
+                             f"the {fine['swing_key']} force swings at {fmt(fine['frequency'])} Hz, and the window "
+                             f"spans {cyc:.1f} of its cycles" + ("" if cyc >= 8 else ", too few for a firm mean")))
+    co = fine.get("courant", float("nan"))
+    if co == co:
+        out.append(Check("time step", "pass" if co <= 1.05 else "warn", f"largest Courant number {co:.2g}"))
+    r = fine.get("resolved", {}).get("resolved_fraction")
+    if r is not None and r == r:
+        out.append(Check("resolved turbulence", "pass" if r >= 0.8 else ("warn" if r >= 0.6 else "fail"),
+                         f"the grid resolves {100 * r:.0f}% of the turbulent energy where the flow swings, against "
+                         "the 80% Pope gives for a sound large eddy simulation" +
+                         ("" if r >= 0.8 else ", so a finer grid would change the answer"), fine["resolved"]))
+    return out
 
 
 def _regime(s) -> Check:
@@ -233,6 +269,17 @@ def _outcome(st, g, p, s, levels, fl, op, checks, level, reasons, out):
         values.update(drag_N=drag, lift_N=lift, side_N=side, cd=fine["cd"], cl=fine["cl"], cs=fine["cs"],
                       frontal_area_m2=s.ref_area, speed_m_s=s.speed, length_m=s.ref_length,
                       direction=p.R[0].tolist(), up=p.R[2].tolist())
+        if s.unsteady and fine.get("frequency"):
+            ext = np.ptp((g.xyz.reshape(-1, 3) - (g.lo + g.hi) / 2) @ p.R.T, axis=0) * 1e-3
+            cross = float(min(ext[1], ext[2]))
+            st_no = fine["frequency"] * cross / s.speed
+            values.update(frequency_Hz=fine["frequency"], strouhal=st_no, cross_size_m=cross,
+                          swing_rms=fine["swing_rms"], swing_force=fine["swing_key"])
+            head = head[:-1] + (f", averaged over a {s.unsteady.upper()} run in which the "
+                                f"{'lift' if fine['swing_key'] == 'Cl' else 'side force'} swings at "
+                                f"{fmt(fine['frequency'])} Hz (Strouhal number {st_no:.3g} on the "
+                                f"{fmt(cross * 1e3)} mm cross size).")
+            metrics.append(("shedding", f"{fmt(fine['frequency'])} Hz"))
         limit, got, unit = st.max_force, drag, "N"
     else:
         dp = fine["dp_total"]
@@ -295,7 +342,7 @@ def surface_values(o, name: str = "p"):
     return np.asarray(vals)[i]
 
 
-def _slice(g, p, s, fine):
+def _slice(g, p, s, fine, U=None):
     """Cells cut by a plane through the middle of the flow, as 2D points in mm with their in plane velocity. The
     plane holds the stream and the up direction for external flow (a side view), the stream and the side direction
     for ducted flow (a view down between fins), and the passage's two longest extents for internal flow. A cell is
@@ -305,7 +352,7 @@ def _slice(g, p, s, fine):
 
     f = fine["fields"]
     pts = f["C"] * 1e3
-    U = f["U"]
+    U = f["U"] if U is None else U
     if s.mode == "external":
         u_ax, v_ax, n_ax = np.eye(3)[0], np.eye(3)[2], np.eye(3)[1]
         mid = np.zeros(3)
@@ -358,8 +405,18 @@ def _playback(o, g, p, s, fine, out, fl):
                                 spacing=h)
     hist = np.asarray(fine["history"])
     step = max(1, len(hist) // 200)
-    curves = {"convergence": playback.series(np.arange(len(hist))[::step], hist[::step], "iteration",
-                                             "N" if s.mode == "external" else "Pa")}
+    frames = []
+    if s.unsteady and fine.get("frames"):        # the last stretch of the run, a few snapshots of the swinging wake
+        for t, U in fine["frames"]:
+            _, _, fu, fv, _, _, _ = _slice(g, p, s, fine, U)
+            frames.append({"t": round(t, 6), "fields": [playback.grid_field(
+                "flow", x, y, {"u": fu, "v": fv}, {"u": "m/s", "v": "m/s"}, nx=128, ny=max(16, int(ny * 0.8)),
+                unit="mm", plane=plane, spacing=h)]})
+        ser = fine["series"]
+        curves = {k: playback.series(ser["t"], ser[k], "s", "") for k in ("Cd", "Cl", "Cs") if k in ser}
+    else:
+        curves = {"convergence": playback.series(np.arange(len(hist))[::step], hist[::step], "iteration",
+                                                 "N" if s.mode == "external" else "Pa")}
     scal = {"reynolds": (o.values["re"], "")}
     if s.mode == "external":
         scal.update(speed=(s.speed, "m/s"), drag=(o.values["drag_N"], "N"), lift=(o.values["lift_N"], "N"))
@@ -369,6 +426,11 @@ def _playback(o, g, p, s, fine, out, fl):
              "plane's grid runs along u and v from its origin, all in the part's coordinates, and the u and v "
              "components are the velocity along those axes. Move particles through the plane to show the stream "
              + ("passing the part." if s.mode == "external" else "through the part."))
+    if frames:
+        about += (" frames hold the in plane velocity at the last few saved times of the time accurate run, t in "
+                  "seconds, to play in a loop, and the series are the force coefficients over the whole run.")
+        scal["frequency"] = (o.values.get("frequency_Hz", 0.0), "Hz")
     playback.write(out, "partflow", f"{fl.name} {'around' if s.mode == 'external' else 'through'} "
-                                    f"{Path(o.part).stem}", about, [field], curves=curves, scalars=scal,
-                   mesh=mesh_b, surface=surf, units={"length": "mm", "velocity": "m/s", "pressure": "Pa"})
+                                    f"{Path(o.part).stem}", about, [field], frames=frames, curves=curves,
+                   scalars=scal, mesh=mesh_b, surface=surf,
+                   units={"length": "mm", "velocity": "m/s", "pressure": "Pa", "time": "s"})
