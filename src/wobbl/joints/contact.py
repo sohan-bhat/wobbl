@@ -74,7 +74,7 @@ def run_contact(study: ContactStudy, out_dir: str | Path, progress=None, asm: As
                           "to solve. Check that the file holds separate bodies, or run 'wobbl run' for one part")
     base = StructuralStudy(str(study.part), study.material, [parse_load(x) for x in study.loads],
                            [parse_fixture(x) for x in study.fixtures])
-    loads, fixtures, _ = S.resolve(asm, base.loads, base.fixtures)
+    loads, fixtures, selections = S.resolve(asm, base.loads, base.fixtures)
     moves = [S.parse_move(m) for m in study.moves]
     move_sel = [S.select(asm, m.faces) for m in moves]
     levels, last = [], None
@@ -98,6 +98,11 @@ def run_contact(study: ContactStudy, out_dir: str | Path, progress=None, asm: As
     if study.playback:
         o.images["playback"] = playback(out / "playback.json", study, last, bool(moves))
     o.notes = list(asm.prep.notes)
+    try:
+        from .scene import write_scene
+        write_scene(out, "contact", study, o, last, base, selections)
+    except Exception as e:  # noqa: BLE001  a view that cannot be built never costs the result
+        o.notes.append(f"The 3D view could not be built ({str(e)[:120]}).")
     o.write(out)
     clean_work(work, study.keep)
     return o

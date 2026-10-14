@@ -381,7 +381,7 @@ def run_bolts(study: BoltStudy, out_dir: str | Path, progress=None, asm: Assembl
                         "through coaxial holes in the parts they clamp, or into a tapped hole in the last one")
     base = StructuralStudy(str(study.part), study.material, [parse_load(x) for x in study.loads],
                            [parse_fixture(x) for x in study.fixtures])
-    loads, fixtures, _ = S.resolve(asm, base.loads, base.fixtures)
+    loads, fixtures, selections = S.resolve(asm, base.loads, base.fixtures)
     levels, last = [], None
     for k, sizing in enumerate(level_sizes(asm, lines, study)):
         say("mesh", f"level {k}: element size {sizing.h:.3g} mm")
@@ -404,6 +404,11 @@ def run_bolts(study: BoltStudy, out_dir: str | Path, progress=None, asm: Assembl
     if study.playback:
         o.images["playback"] = playback(out / "playback.json", study, last)
     o.notes = list(asm.prep.notes)
+    try:
+        from .scene import write_scene
+        write_scene(out, "bolts", study, o, last, base, selections, lines)
+    except Exception as e:  # noqa: BLE001  a view that cannot be built never costs the result
+        o.notes.append(f"The 3D view could not be built ({str(e)[:120]}).")
     o.write(out)
     clean_work(work, study.keep)
     return o
