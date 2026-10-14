@@ -470,6 +470,98 @@ def scope(s: Svg, x, y, w, h, traces, sweep, marks=(), inputs=("1", "2")) -> dic
     return at
 
 
+def toroid(s: Svg, cx, cy, r, wave=None):
+    """A wound toroid from above: a ferrite ring under copper turns, the leads leaving at the top."""
+    ri = 0.45 * r
+    s.add("circle", cx=cx, cy=cy, r=r, fill="#3a3f45", stroke="#1d2024")
+    s.add("circle", cx=cx, cy=cy, r=ri, fill="#1d4a33", stroke="#1d2024")
+    turns = "".join(
+        f"M{num(cx + ri * math.cos(a))} {num(cy + ri * math.sin(a))}"
+        f"L{num(cx + r * math.cos(a))} {num(cy + r * math.sin(a))}"
+        for a in (math.radians(300 + 300 * k / 21) for k in range(22)))
+    s.add("path", d=turns, stroke="#6e3a17", stroke_width=5.4, stroke_linecap="round")
+    s.add("path", d=turns, stroke="#c8773a", stroke_width=3.6, stroke_linecap="round")
+    a = {"data_wave": nums(wave, 3), "data_period": "1", "opacity": 0.5} if wave is not None else {"opacity": 0}
+    s.add("path", d=turns, stroke="#ffc27a", stroke_width=2.2, stroke_linecap="round", **a)
+    return [(cx + r * math.cos(math.radians(a)), cy + r * math.sin(math.radians(a))) for a in (285, 255)]
+
+
+def terminal(s: Svg, cx, cy, polarity):
+    """A two way screw terminal block from above, wire entries on the far side."""
+    s.add("rect", x=cx - 34, y=cy - 15, width=68, height=30, rx=2, fill="#2a6cb3", stroke="#163f6e")
+    at = {}
+    for i, name in enumerate(polarity):
+        x = cx - 16 + 32 * i
+        s.add("rect", x=x - 6, y=cy - 15, width=12, height=5, fill="#10273f")
+        s.add("circle", cx=x, cy=cy + 2, r=8, fill="#c9cdd2", stroke="#7d848b")
+        s.add("path", d=f"M{num(x - 5)} {num(cy + 5)}L{num(x + 5)} {num(cy - 1)}", stroke="#5d636b", stroke_width=1.8)
+        at[name] = (x, cy - 13)
+    return at
+
+
+def power_resistor(s: Svg, cx, cy, ohms: float):
+    """An aluminum housed power resistor: a finned gold body on a flange, solder lugs at each end."""
+    s.add("rect", x=cx - 76, y=cy - 31, width=152, height=62, rx=3, fill="#000", opacity=0.45,
+          transform="translate(3 5)")
+    s.add("rect", x=cx - 70, y=cy - 30, width=140, height=60, rx=3, fill="#a8873a", stroke="#6e5824")
+    for hx in (cx - 60, cx + 60):
+        for hy in (cy - 20, cy + 20):
+            s.add("circle", cx=hx, cy=hy, r=4, fill=BG, stroke="#6e5824")
+    s.add("rect", x=cx - 48, y=cy - 22, width=96, height=44, rx=4,
+          fill=s.grad("linear", [(0, "#e6c66e", 1), (0.5, "#c9a24c", 1), (1, "#8f7230", 1)], x2="0", y2="1"))
+    s.add("path", d="".join(f"M{num(cx - 44)} {num(cy + dy)}H{num(cx + 44)}" for dy in (-14, -7, 7, 14)),
+          stroke="#8f7230", stroke_width=1.2)
+    s.text(cx, cy + 28, eng(ohms, "Ω"), size=7, fill="#3d2f10", anchor="middle", weight=600)
+    for sx in (-1, 1):
+        x = cx + sx * 56
+        s.add("rect", x=x - 8 + sx * 18, y=cy - 6, width=16, height=12, rx=2, fill="#c7ccd1", stroke="#80868c")
+        s.add("circle", cx=x + sx * 21, cy=cy, r=2.6, fill="#5d636b")
+    return (cx - 77, cy), (cx + 77, cy)
+
+
+def to220(s: Svg, cx, cy, tab: str, tab_cool: str, body_rot: float = 90):
+    """A TO-220 seen from the front, turned so its legs point left: gate at the top, drain, source."""
+    s.open(transform=f"translate({num(cx)} {num(cy)}) rotate({num(body_rot)})")
+    s.add("path", d="M-35 -30V-74Q-35 -78 -31 -78H31Q35 -78 35 -74V-30Z", fill=tab, stroke="#6d737a",
+          data_heat=f"{tab_cool} {tab}")
+    s.add("circle", cy=-56, r=12.5, fill="#b9bec4", stroke="#6d737a")
+    s.add("circle", cy=-56, r=8.5, fill="#8d9399")
+    s.add("path", d="M-6 -56H6M0 -62V-50", stroke="#4a4f57", stroke_width=2)
+    for x in (-18, 0, 18):
+        s.add("path", d=f"M{x} 34V44", stroke="#9aa0a6", stroke_width=8)
+        s.add("path", d=f"M{x} 44V110", stroke="#9aa0a6", stroke_width=5)
+        s.add("path", d=f"M{x - 1} 44V110", stroke="#d7dade", stroke_width=1.6)
+    s.add("rect", x=-35, y=-30, width=70, height=64, rx=2, fill="#17191c", stroke="#000")
+    s.add("rect", x=-35, y=-30, width=70, height=64, rx=2,
+          fill=s.grad("linear", [(0, "#ffffff", 0.08), (1, "#000000", 0.2)], x2="1", y2="0"))
+    s.close()
+    rot = math.radians(body_rot)
+
+    def at(x, y):
+        return cx + x * math.cos(rot) - y * math.sin(rot), cy + x * math.sin(rot) + y * math.cos(rot)
+
+    return {"g": at(-18, 110), "d": at(0, 110), "s": at(18, 110), "g_in": at(-18, 40), "d_in": at(0, 40),
+            "s_in": at(18, 40), "tab": at(0, -56)}
+
+
+def heatsink(s: Svg, x, y, w, h, color: str, cool: str):
+    """An extruded aluminum heatsink from above, its fins running across."""
+    s.add("rect", x=x + 3, y=y + 5, width=w, height=h, rx=3, fill="#000", opacity=0.5)
+    s.add("rect", x=x, y=y, width=w, height=h, rx=3, fill=color, stroke="#4b5159", data_heat=f"{cool} {color}")
+    n = max(4, int(w / 11))
+    fins = "".join(f"M{num(x + 6 + (w - 12) * k / (n - 1))} {num(y + 4)}V{num(y + h - 4)}" for k in range(n))
+    s.add("path", d=fins, stroke="#ffffff", stroke_opacity=0.22, stroke_width=3)
+    s.add("path", d=fins, stroke="#000", stroke_opacity=0.25, stroke_width=1, transform="translate(2.5 0)")
+
+
+def clip(s: Svg, x, y, ang, color):
+    """A minigrabber clip on a lead, its jaws at (x, y)."""
+    s.open(transform=f"translate({num(x)} {num(y)}) rotate({num(ang)})")
+    s.add("rect", x=-22, y=-4.5, width=18, height=9, rx=4, fill=color, stroke=mix(color, "#000000", 0.5))
+    s.add("path", d="M-5 -2.5L2 -1M-5 2.5L2 1", stroke="#c3c8cd", stroke_width=1.6, stroke_linecap="round")
+    s.close()
+
+
 def eng(x: float, unit: str) -> str:
     """A value with an SI prefix and three significant digits: 10 µF, 500 kHz, 100 ms."""
     for scale, pre in ((1e9, "G"), (1e6, "M"), (1e3, "k"), (1, ""), (1e-3, "m"), (1e-6, "µ"), (1e-9, "n")):

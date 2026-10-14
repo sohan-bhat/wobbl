@@ -64,3 +64,40 @@ def test_rc_bench_traces_the_charge_and_picks_the_capacitor():
     small, _ = draw.rc_setup({"r": 1e4, "c": 1e-7, "v": 5.0, "tau": 1e-3}, {"v_at_tau": 3.16},
                              {"time": t / 100, "v(out)": data["v(out)"]}, "ok")
     assert ">104<" in small  # a ceramic disc marked with its code
+
+
+def _buck_data(f=5e5, cycles=300):
+    t = np.linspace(0, cycles / f, cycles * 200 + 1)
+    phase = (t * f) % 1
+    il = 2 + 0.3 * np.where(phase < 0.437, phase / 0.437 * 2 - 1, 1 - (phase - 0.437) / 0.563 * 2)
+    return {"time": t, "v(out)": 5.07 + 0.00428 * np.sin(2 * np.pi * f * t), "i(l1)": il}
+
+
+def test_buck_bench_switches_and_scopes_the_ripple():
+    p = {"vin": 12.0, "vout": 5.0, "current": 2.0, "frequency": 5e5, "duty": 0.437, "max_ripple": "0.05"}
+    svg, label = draw.buck_setup(p, {"ripple_V": 0.00856, "vout_avg": 5.07}, _buck_data(), "ok")
+    well_formed(svg)
+    assert "8.56 mV" in svg and "50 mV limit" in svg and "12.00" in svg and "2.03" in svg
+    assert 'data-pwm="0.437 1"' in svg and "0.437 1 inverted" in svg and 'data-sweep="3"' in svg
+    assert "data-wave" in svg and "500 kHz" in label
+
+
+def _mosfet(theta):
+    t = np.linspace(0, 40 / 2e4, 4001)
+    on = (t * 2e4) % 1 < 0.5
+    p = {"current": 15.0, "rds_on": 0.008, "vbus": 12.0, "frequency": 2e4, "duty": 0.5, "theta_ja": theta,
+         "ambient": "50"}
+    res = {"tj_C": 110.4, "p_total_W": 1.51, "p_cond_W": 1.366, "p_sw_W": 0.144}
+    return draw.mosfet_setup(p, res, {"time": t, "i(vs)": np.where(on, 15.0, 0), "v(d)": np.where(on, 0.12, 12)},
+                             "ok")
+
+
+def test_mosfet_bench_heats_up_to_the_runs_junction_temperature():
+    svg, label = _mosfet("40")
+    well_formed(svg)
+    assert "110 °C" in svg and "150 °C limit" in svg and ">7.5" in svg and "20.00" in svg and "data-heat" in svg
+    series = [float(v) for v in re.search(r'data-series="([^"]+)" data-fmt="0 °C"', svg).group(1).split()]
+    assert series[0] == 50 and series[-1] == pytest.approx(110.4) and series == sorted(series)
+    bare, bare_label = _mosfet("62")
+    assert "40 C/W heatsink" in label and "no heatsink" in bare_label and svg.count("data-heat") > \
+        bare.count("data-heat")
