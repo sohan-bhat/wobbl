@@ -27,6 +27,8 @@ export const RUN_IMAGES: Record<string, Record<string, string>> = {
   'heat-sink/output': { temperature: 'heat-sink-temperature' },
   'battery-pack/output': { temperature: 'battery-temperature', history: 'battery-history' },
   'circuits/buck': { waveform: 'buck-waveform' },
+  'falling-rock/output': { flight: 'falling-rock-flight' },
+  'rocket-launch/output': { flight: 'rocket-flight', path: 'rocket-path' },
 };
 
 const DOMAIN: Record<string, string> = { strength: 'Strength', thermal: 'Heat', circuit: 'Circuits', motion: 'Motion' };
