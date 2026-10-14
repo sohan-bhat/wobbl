@@ -19,6 +19,12 @@ MEASURED = {
 }
 
 
+@pytest.fixture(autouse=True)
+def idle(monkeypatch):
+    """Numbers on this machine are compared as if it were idle, whatever else is running."""
+    monkeypatch.setattr(E, "load", lambda: 0.0)
+
+
 def grid(nx, ny, nz, lx, ly, lz):
     g = np.stack(np.meshgrid(np.linspace(0, lx, nx), np.linspace(0, ly, ny), np.linspace(0, lz, nz),
                              indexing="ij"), -1)
@@ -137,3 +143,16 @@ def test_options_when_it_does_not_fit(tmp_path, monkeypatch):
     crash = E.predict(E.explicit_cost(1_520_000, 1_490_000, 0.2), machine(), max_hours=12, target="yaris.k")
     assert crash.verdict == "too long"
     assert [o["kind"] for o in crash.options] == ["coarser", "remote"]
+
+
+def test_a_busy_machine_slows_the_estimate_and_its_runs_count_as_idle(tmp_path, monkeypatch):
+    monkeypatch.setenv("WOBBL_HOME", str(tmp_path))
+    monkeypatch.setattr(E, "physical_cores", lambda: 6)
+    here = E.Machine("this machine", 6, 2, 16e9, 500e9)
+    calm = E.predict(E.calculix_cost(20000), here)
+    monkeypatch.setattr(E, "load", lambda: 22.0)
+    assert E.busy(2) == pytest.approx(4.0) and E.busy(included=True) == pytest.approx(22 / 6)
+    loaded = E.predict(E.calculix_cost(20000), here)
+    assert loaded.seconds == pytest.approx(4.0 * calm.seconds)
+    assert any("busy, with a load of 22 on 6 cores" in b for b in loaded.basis)
+    assert E.predict(E.calculix_cost(20000), E.Machine("box", 6, 2, 16e9, 500e9)).seconds < loaded.seconds

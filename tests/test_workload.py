@@ -13,6 +13,12 @@ from wobbl.jobs import workload as WL
 M = E.Machine("test box", 6, 4, 16e9, 500e9)
 
 
+@pytest.fixture(autouse=True)
+def idle(monkeypatch):
+    """Numbers on this machine are compared as if it were idle, whatever else is running."""
+    monkeypatch.setattr(E, "load", lambda: 0.0)
+
+
 @pytest.fixture
 def home(tmp_path, monkeypatch):
     monkeypatch.setenv("WOBBL_HOME", str(tmp_path / "home"))

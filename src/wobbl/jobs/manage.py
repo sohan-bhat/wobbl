@@ -54,6 +54,23 @@ def kind_of(target: str, args: list[str]) -> str:
                    "as wobbl jobs start run part.step -m pla --fix 'x=min' --load '50 N down @ top'")
 
 
+def job_name(args: list[str]) -> str:
+    """A job's name from what it works on: the first file it reads, else the thing it simulates, else its
+    command."""
+    from . import workload as WL
+
+    try:
+        w = WL.parse(args)
+    except WL.WorkloadError:
+        return "job"
+    if w.inputs:
+        return w.inputs[0].stem
+    thing = w.params.get("thing")
+    if isinstance(thing, str) and thing not in ("", "-"):
+        return thing[:24]
+    return w.command.split()[-1]
+
+
 def find(job_id: str = "") -> Job:
     if job_id:
         return Job.load(job_id)
@@ -85,7 +102,7 @@ def start(target: str = "", args: list[str] | None = None, on: str = "", threads
     if cloud:
         entry = {"host": cloud["host"], "root": "wobbl-jobs", "ccx": cloud.get("ccx", CLOUD_CCX), "cloud": True,
                  "cores": cloud.get("cores"), "ram": cloud.get("ram")}
-    job = Job(new_id(target if kind != "wobbl" else (args[1] if len(args) > 1 else "study")), kind,
+    job = Job(new_id(target if kind != "wobbl" else job_name(args)), kind,
               str(Path(target).resolve()) if kind != "wobbl" else " ".join(args), on or ("cloud" if cloud else "local"),
               checkpoint=checkpoint and kind == "calculix", args=args, cloud=cloud or {})
     if entry:
@@ -221,11 +238,15 @@ def merge(parts: dict) -> dict:
 
 def finish(job: Job, st: dict, code, ru, cancelled: bool = False):
     """Settle the final state, keep the measured run for calibration and say what happened."""
-    from ..estimate import amdahl, duration, record
+    from ..estimate import amdahl, busy, duration, record
 
     log = (job.folder / "solver.log").read_text(errors="replace")[-6000:] if (job.folder / "solver.log").exists() \
         else ""
-    errors = [ln.strip() for ln in log.splitlines() if "*ERROR" in ln]
+    lines = [ln.strip() for ln in log.splitlines() if ln.strip()]
+    errors = [ln for ln in lines if "*ERROR" in ln]
+    if job.kind == "wobbl" and code not in (0, None) and not cancelled:
+        # the CLI's own error line, else the last line of a traceback
+        errors = [ln for ln in lines if ln.startswith("error ")][-1:] or lines[-1:]
     st["exit_code"] = code
     st["finished"] = time.time()
     wall = st.get("elapsed_s") or 0.0
@@ -239,7 +260,7 @@ def finish(job: Job, st: dict, code, ru, cancelled: bool = False):
         st["detail"] = f"Finished in {duration(wall)}."
         est = job.estimate or {}
         if job.kind == "calculix" and job.restarts == 0 and est.get("core_seconds") and wall > 0:
-            core = wall * amdahl(job.threads, est.get("parallel", 0.6))
+            core = wall * amdahl(job.threads, est.get("parallel", 0.6)) / busy(job.threads, included=True)
             record("calculix", est["core_seconds"], core, est.get("peak_bytes", 0.0),
                    st.get("peak_memory_gb", 0.0) * 1e9, est.get("size", {}), "job")
     else:

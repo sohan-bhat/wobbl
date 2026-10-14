@@ -19,6 +19,12 @@ M = E.Machine("test box", 6, 4, 16e9, 500e9)
 SRC = Path(__file__).resolve().parents[1] / "src"
 
 
+@pytest.fixture(autouse=True)
+def idle(monkeypatch):
+    """Numbers on this machine are compared as if it were idle, whatever else is running."""
+    monkeypatch.setattr(E, "load", lambda: 0.0)
+
+
 @pytest.fixture
 def home(tmp_path, monkeypatch):
     from wobbl.solvers import base

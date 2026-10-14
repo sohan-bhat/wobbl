@@ -27,7 +27,9 @@ def _show_estimate(d: dict):
     size = d["size"]
     what = ", ".join(f"{v:,} {k.replace('_', ' ')}" for k, v in size.items()
                      if isinstance(v, int) and k in ("nodes", "elements", "cells", "cycles", "solves", "dof"))
-    if d["solver"].startswith("wobbl "):
+    if size.get("analyses"):
+        name, kind = d["target"][:70] + ("..." if len(d["target"]) > 70 else ""), " and ".join(size["analyses"])
+    elif d["solver"].startswith("wobbl "):
         name, kind = "wobbl " + (d["target"][:70] + ("..." if len(d["target"]) > 70 else "")), d["procedure"]
     else:
         name = Path(d["target"]).name if d["target"] else "a run given by size"
@@ -306,7 +308,10 @@ def run_plan_cmd(thing, question, domain, kind, physics, opts, quick, out):
     options: dict[str, list[str]] = {}
     for k, v in opts:
         options.setdefault(k, []).append(v)
-    steps = run_plan(plan, options, Path(out), lambda stage, msg: click.echo(f"{stage}: {msg}"), quick)
+    try:
+        steps = run_plan(plan, options, Path(out), lambda stage, msg: click.echo(f"{stage}: {msg}"), quick)
+    except Exception as e:  # noqa: BLE001  a plan of one analysis raises its error, said the way the CLI says it
+        ui.fail(str(e).strip("'\""), getattr(e, "hint", ""))
     for s in steps:
         click.echo(f"{s.analysis.key}: {s.error or s.get('headline', '')}")
     if all(s.error for s in steps):

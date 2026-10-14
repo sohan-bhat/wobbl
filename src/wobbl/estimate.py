@@ -143,6 +143,22 @@ def amdahl(threads: int, parallel: float) -> float:
     return 1.0 / ((1.0 - parallel) + parallel / max(1, threads))
 
 
+def load() -> float:
+    """Runnable threads on this machine, averaged over the last five minutes. 0 where the platform cannot say."""
+    try:
+        return float(os.getloadavg()[1])
+    except (AttributeError, OSError):
+        return 0.0
+
+
+def busy(threads: int = 1, included: bool = False) -> float:
+    """How many times slower a run goes on this machine right now than on an idle one. Other work shares the
+    physical cores, so ``threads`` more threads on top of the load slow down by the load over the cores, once the
+    cores are all taken. With ``included`` the run's own threads are already part of the load."""
+    total = load() + (0 if included else threads)
+    return max(1.0, total / max(1, physical_cores()))
+
+
 # ------------------------------------------------------------------------------------------------ dissection
 def dissection(sample: np.ndarray, n: int) -> tuple[float, float]:
     """The sums of cut sizes cubed and squared over a nested dissection of ``n`` nodes, in nodes.
@@ -299,7 +315,7 @@ def calibrate(log=print, threads: int | None = None) -> dict:
             if code != 0:
                 raise RuntimeError(f"CalculiX failed on the calibration {shape} (exit {code})")
             cost = calculix_cost(len(X), len(mesh.tets), X)
-            core = wall * amdahl(n_threads, cost.parallel)
+            core = wall * amdahl(n_threads, cost.parallel) / busy(n_threads, included=True)
             record("calculix", cost.core_seconds, core, cost.peak_bytes, rss,
                    {"nodes": len(X), "threads": n_threads, "wall_s": round(wall, 2)}, "calibration")
             runs.append({"shape": shape, "nodes": len(X), "wall_s": round(wall, 2),
@@ -528,6 +544,12 @@ def predict(cost: Cost, machine: Machine | None = None, max_hours: float | None 
         basis.append(f"Calibrated on this machine from {nt} measured run{'s' if nt != 1 else ''}." if nt else
                      f"Not calibrated on this machine yet, so the reference machine's speed is used. {how}")
     seconds = cost.core_seconds * tf * m.speed / amdahl(m.threads, cost.parallel)
+    if m.name == "this machine":
+        b = busy(m.threads)
+        if b > 1.2:
+            seconds *= b
+            basis.append(f"This machine is busy, with a load of {load():.0f} on {physical_cores()} cores, which "
+                         f"slows the run about {b:.1f} times. It goes faster once the other work ends.")
     mem, disk = cost.peak_bytes * mf, cost.disk_bytes
     problems = []
     if mem > 0.85 * m.ram:
@@ -720,7 +742,8 @@ def estimate_command(argv: list[str], machine: Machine | None = None, max_hours:
     w = WL.parse(argv)
     est = predict(WL.cost(w), machine or this_machine(), max_hours, " ".join(argv))
     if est.known and not est.cost.measured and (machine is None or machine.name == "this machine"):
-        WL.remember_prediction(w, est.cost.core_seconds, est.cost.peak_bytes)
+        m = machine or this_machine()
+        WL.remember_prediction(w, est.cost.core_seconds / amdahl(m.threads, est.cost.parallel), est.cost.peak_bytes)
     return est
 
 

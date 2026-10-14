@@ -305,16 +305,19 @@ def _store(solver: str, sig: str, outcome: dict, out_dir, peak: float):
     if out_dir:
         disk = float(sum(p.stat().st_size for p in Path(out_dir).rglob("*") if p.is_file()))
     cal = E.load_calibration()
-    if any(r.get("solver") == solver and r.get("size", {}).get("signature") == sig and r.get("measured_time") == wall
-           for r in cal.get("runs", [])[-20:]):
+    if any(r.get("solver") == solver and r.get("size", {}).get("signature") == sig
+           and r.get("size", {}).get("wall", r.get("measured_time")) == wall for r in cal.get("runs", [])[-20:]):
         return                                   # the same result saved again, after a fix or a new report
     pred = cal.get("predictions", {}).get(sig, {}) if sig else {}
-    E.record(solver, pred.get("time", 0.0), wall, pred.get("memory", 0.0), peak,
-             {"domain": outcome.get("domain", ""), "signature": sig, "disk": disk}, "run")
+    b = E.busy(included=True)          # a run slowed by other work counts at what it would take on an idle machine
+    E.record(solver, pred.get("time", 0.0), wall / b, pred.get("memory", 0.0), peak,
+             {"domain": outcome.get("domain", ""), "signature": sig, "disk": disk, "wall": wall,
+              "load": round(E.load(), 1)}, "run")
 
 
 def remember_prediction(w: Workload, seconds: float, peak_bytes: float):
-    """Keep what an estimate said, so the run that follows can be scored against it."""
+    """Keep what an estimate said, as wall seconds on an idle machine at the threads the run will get, so the run
+    that follows can be scored against it."""
     from .. import estimate as E
 
     cal = E.load_calibration()
@@ -441,7 +444,8 @@ def plan_cost(plan, options: dict, here: bool = True):
         w = analysis_workload(a, plan.thing, options)
         c = cost(w)
         if here and c.known and not c.measured:     # so the run that follows is scored against it, analysis by analysis
-            remember_prediction(w, c.core_seconds, c.peak_bytes)
+            t = min(E.default_threads(), E.physical_cores())
+            remember_prediction(w, c.core_seconds / E.amdahl(t, c.parallel), c.peak_bytes)
         parts.append((a, c))
     known = [(a, c) for a, c in parts if c.known]
     missing = [a.key for a, c in parts if not c.known]
