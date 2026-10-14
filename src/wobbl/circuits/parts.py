@@ -260,6 +260,23 @@ BJT_ALIAS = {"2N2222": "2N2222A", "PN2222A": "2N2222A", "PN2222": "2N2222A", "2N
              "TIP41": "TIP41C", "TIP42": "TIP42C", "TIP126": "TIP125"}
 
 
+# pin numbers by package, as the parts sit in their packages (TO-92 flat side facing, TO-220 tab at the back)
+BJT_PINOUT = {"EBC": {"e": 1, "b": 2, "c": 3}, "CBE": {"c": 1, "b": 2, "e": 3}, "BCE": {"b": 1, "c": 2, "e": 3},
+              "ECB": {"e": 1, "c": 2, "b": 3}, "BEC": {"b": 1, "e": 2, "c": 3}}
+
+
+def bjt_pinout(name: str, pkg: str) -> dict:
+    if pkg == "SOT-23":
+        return BJT_PINOUT["BEC"]
+    if name.startswith(("BC", "MPSA")):
+        return BJT_PINOUT["CBE"]
+    if name.startswith("BD"):
+        return BJT_PINOUT["ECB"]
+    if pkg in ("TO-220", "TO-3"):
+        return BJT_PINOUT["BCE"]
+    return BJT_PINOUT["EBC"]
+
+
 def _gp(beta: float, ic: float, pol: str) -> str:
     """A Gummel Poon set scaled to a part's current rating and typical gain."""
     s = ic / 0.2
@@ -274,19 +291,20 @@ def bjt(name: str) -> Part:
     m = f"Q_{name}"
     r = {"vceo_V": vceo, "vebo_V": vebo, "ic_A": ic, "theta_ja": thja, "theta_jc": thjc or None, "tj_max_C": tj}
     typ = pol.upper()
+    pk = {"package": pkg, "pinout": bjt_pinout(key, pkg)}
     if isinstance(gp, str):
         return Part(name, pol, r, "q", m, f".model {m} {typ}({_GP[gp]})", source=f"standard SPICE parameters for "
-                    f"the 2N{gp}, {vceo} V {ic:g} A {pkg}", params={"beta": 150})
+                    f"the 2N{gp}, {vceo} V {ic:g} A {pkg}", params={"beta": 150, **pk})
     if gp > 0:
         return Part(name, pol, r, "q", m, f".model {m} {typ}({_gp(gp, ic, pol)})",
-                    source=f"{name} datasheet: hFE {gp}, {vceo} V {ic:g} A {pkg}", params={"beta": gp})
+                    source=f"{name} datasheet: hFE {gp}, {vceo} V {ic:g} A {pkg}", params={"beta": gp, **pk})
     # Darlington: a driver and an output transistor with the usual 8k and 120 ohm base resistors
     d1, d2 = (f"{_gp(100, ic / 20, pol)}", f"{_gp(30, ic, pol)}")
     cd = "e c" if pol == "npn" else "c e"
     text = (f".subckt {m} c b e\nQ1 c b m {m}_1\nQ2 c m e {m}_2\nR1 b m 8k\nR2 m e 120\nD1 {cd} {m}_d\n"
             f".model {m}_1 {typ}({d1})\n.model {m}_2 {typ}({d2})\n.model {m}_d D(IS=1e-10 N=1.5 RS=0.05)\n.ends")
     return Part(name, pol, r, "x", m, text, ("c", "b", "e"),
-                source=f"{name} datasheet: Darlington, hFE {-gp}, {vceo} V {ic:g} A {pkg}", params={"beta": -gp})
+                source=f"{name} datasheet: Darlington, hFE {-gp}, {vceo} V {ic:g} A {pkg}", params={"beta": -gp, **pk})
 
 
 # --- MOSFETs -------------------------------------------------------------------------------------------------
@@ -374,7 +392,9 @@ def mosfet(name: str) -> Part:
     return Part(name, f"{pol}mos", r, "m", m, text,
                 source=f"VDMOS fitted to the {name} datasheet: {spec}, threshold {vth:g} V, {vds} V {idc:g} A {pkg}",
                 params={"vth": vth, "vth_range": vrange, "rds": pts, "spec_vgs": min(v for v, _ in pts),
-                        "rds_tempco": 0.006})
+                        "rds_tempco": 0.006, "package": pkg,
+                        "pinout": {"TO-220": {"g": 1, "d": 2, "s": 3}, "SOT-23": {"g": 1, "s": 2, "d": 3}}.get(
+                            pkg, {"d": 1, "g": 2, "s": 3} if key == "BS170" else {"s": 1, "g": 2, "d": 3})})
 
 
 # --- lookup -----------------------------------------------------------------------------------------------

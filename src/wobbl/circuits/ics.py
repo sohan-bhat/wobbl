@@ -58,6 +58,16 @@ REGS = {
 }
 
 
+REG_PINOUT = {"78XX": {"in": 1, "gnd": 2, "out": 3}, "78LXX": {"out": 1, "gnd": 2, "in": 3},
+              "1117": {"gnd": 1, "adj": 1, "out": 2, "in": 3}, "LM317": {"adj": 1, "out": 2, "in": 3},
+              "LM2940": {"in": 1, "gnd": 2, "out": 3}, "MCP1700": {"gnd": 1, "out": 2, "in": 3},
+              "XC6206": {"gnd": 1, "out": 2, "in": 3}, "HT73XX": {"gnd": 1, "in": 2, "out": 3}}
+# DIP pin of each port on channel A of single, dual and quad op amps and comparators
+DIP_OPAMP = {1: ({"inn": 2, "inp": 3, "vee": 4, "out": 6, "vcc": 7}, 8),
+             2: ({"out": 1, "inn": 2, "inp": 3, "vee": 4, "vcc": 8}, 8),
+             4: ({"out": 1, "inn": 2, "inp": 3, "vcc": 4, "vee": 11}, 14)}
+
+
 def _reg_name(u: str) -> tuple[str, float | None] | None:
     """The regulator family a part number belongs to and its fixed output, or None for an adjustable part."""
     m = re.match(r"^(?:LM|L|MC|UA|KA|NJM|CJ)?78(L)?(\d\d)", u)
@@ -122,7 +132,8 @@ def regulator(name: str) -> Part | None:
                 source=f"{name} datasheet: {what}, {vdo:g} V dropout at {irated:g} A, {ilim:g} A limit, "
                        f"{vin_max:g} V most in, {pkg}",
                 params={"vout": vout, "vref": vref if adj else None, "dropout": vdo, "irated": irated,
-                        "min_load": minload or (0.005 if adj else 0), "adjustable": adj, "package": pkg})
+                        "min_load": minload or (0.005 if adj else 0), "adjustable": adj, "package": pkg,
+                        "pinout": REG_PINOUT.get(fam, {"in": 1, "gnd": 2, "out": 3})})
 
 
 # --- op amps and comparators --------------------------------------------------------------------------------
@@ -176,7 +187,8 @@ def opamp(name: str) -> Part | None:
                 source=f"{name} datasheet: {gbw / 1e6:g} MHz, {sr:g} V/us, swing to {voh:g} V of V+ and {vol:g} V "
                        f"of V-, {isc * 1000:g} mA short circuit, {vsmin:g} to {vsmax:g} V supply",
                 params={"gm": gm, "aol": aol, "gbw": gbw, "channels": ch, "vs_min": vsmin, "cm_low": cml,
-                        "cm_high": cmh, "voh": voh, "vol": vol, "rr_node": "n1"})
+                        "cm_high": cmh, "voh": voh, "vol": vol, "rr_node": "n1", "package": f"DIP-{DIP_OPAMP[ch][1]}",
+                        "pinout": DIP_OPAMP[ch][0], "pin_count": DIP_OPAMP[ch][1]})
 
 
 def comparator(name: str) -> Part | None:
@@ -191,7 +203,9 @@ def comparator(name: str) -> Part | None:
                 m, text, ("inp", "inn", "vcc", "vee", "out"),
                 source=f"{name} datasheet: open collector output sinking up to {isink * 1000:g} mA, {vsmin:g} to "
                        f"{vsmax:g} V supply", params={"channels": ch, "vs_min": vsmin, "cm_low": -0.3,
-                                                      "cm_high": cmh, "open_collector": True})
+                                                      "cm_high": cmh, "open_collector": True,
+                                                      "package": f"DIP-{DIP_OPAMP[ch][1]}", "pinout": DIP_OPAMP[ch][0],
+                                                      "pin_count": DIP_OPAMP[ch][1]})
 
 
 # --- 555 timer ----------------------------------------------------------------------------------------------
@@ -226,7 +240,9 @@ def timer(name: str) -> Part | None:
                 "x", m, text, ("gnd", "trig", "out", "reset", "ctrl", "thres", "disch", "vcc"),
                 source=f"{name} datasheet: {tech}, {vsmin:g} to {vsmax:g} V, output {isrc * 1000:g} mA source and "
                        f"{isnk * 1000:g} mA sink, {iq * 1000:.3g} mA supply current",
-                params={"vs_min": vsmin, "vs_max": vsmax, "tech": tech})
+                params={"vs_min": vsmin, "vs_max": vsmax, "tech": tech, "package": "DIP-8", "pin_count": 8,
+                        "pinout": {p: k + 1 for k, p in enumerate(("gnd", "trig", "out", "reset", "ctrl", "thres",
+                                                                   "disch", "vcc"))}})
 
 
 # --- chargers, references, optocouplers -----------------------------------------------------------------------
@@ -250,7 +266,9 @@ def charger(name: str) -> Part | None:
                 ("vin", "gnd", "bat", "prog", "stat"),
                 source=f"{key} datasheet: charge current {k} V over the PROG resistor, {vfloat} V float, up to "
                        f"{imax:g} A, thermal regulation at {treg} C, {pkg}",
-                params={"k": k, "vfloat": vfloat, "vin_min": vinmin, "t_reg": treg})
+                params={"k": k, "vfloat": vfloat, "vin_min": vinmin, "t_reg": treg, "package": pkg,
+                        **({"pin_count": 8, "pinout": {"prog": 2, "gnd": 3, "vin": 4, "bat": 5, "stat": 7}}
+                           if key == "TP4056" else {})})
 
 
 def tl431(name: str) -> Part | None:
@@ -261,7 +279,7 @@ def tl431(name: str) -> Part | None:
             "Rref ref a 1meg\n.ends")
     return Part(name, "reference", {"vka_V": 37, "ika_A": 0.1, "theta_ja": 160, "tj_max_C": 150}, "x", m, text,
                 ("k", "a", "ref"), source="TL431 datasheet: 2.495 V reference, 1 to 100 mA cathode current, 37 V",
-                params={"vref": 2.495, "ik_min": 1e-3})
+                params={"vref": 2.495, "ik_min": 1e-3, "package": "TO-92", "pinout": {"ref": 1, "a": 2, "k": 3}})
 
 
 def opto(name: str) -> Part | None:
@@ -274,7 +292,7 @@ def opto(name: str) -> Part | None:
     return Part(name, "opto", {"if_A": 0.05, "vr_V": 6, "vceo_V": 35, "ic_A": 0.05, "pd_W": 0.2, "theta_ja": 500,
                                "tj_max_C": 125}, "x", m, text, ("a", "k", "c", "e"),
                 source=f"{name} datasheet: 100% current transfer ratio, LED 50 mA most, 35 V 50 mA output",
-                params={"ctr": 1.0})
+                params={"ctr": 1.0, "package": "DIP-4", "pin_count": 4, "pinout": {"a": 1, "k": 2, "e": 3, "c": 4}})
 
 
 # --- microcontrollers ---------------------------------------------------------------------------------------------

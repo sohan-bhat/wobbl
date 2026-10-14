@@ -245,10 +245,11 @@ def plan(c: Circuit, data: dict | None = None) -> dict:
         vs = [0.0 if n == "0" else (_steady(volts[n]) if n in volts else None) for n in e.nodes]
         known = [(v, i) for v, i in zip(vs, into) if v is not None and i is not None]
         power = sum(v * i for v, i in known) if len(known) == len(e.nodes) else None
-        rated = next((float(v) for k, v in (e.part.get("ratings") or {}).items() if k in ("power", "pd", "p_max")),
-                     0.25 if kd == "resistor" else None)
+        rated = next((float(v) for k, v in (e.part.get("ratings") or {}).items()
+                      if k in ("power", "pd", "p_max", "power_W", "pd_W") and v), 0.25 if kd == "resistor" else None)
         if kd == "led" and cur is not None:
-            heat = abs(cur) / float((e.part.get("ratings") or {}).get("current", 0.03))
+            r_ = e.part.get("ratings") or {}
+            heat = abs(cur) / float(r_.get("if_A") or r_.get("current") or 0.03)
         else:
             heat = abs(power) / rated if power is not None and rated else None
         body = body or _package(e, c, kd)
@@ -289,7 +290,14 @@ def plan(c: Circuit, data: dict | None = None) -> dict:
         nodes = e.nodes + ctrl_nodes(e)
         kd = kind_of(e, c)
         body = "axial-resistor" if e in later else _package(e, c, kd)
-        if body == "dip":
+        prm = e.part.get("params") or {}
+        pinout, count = prm.get("pinout") or {}, prm.get("pin_count")
+        if body == "dip" and count and all(p in pinout for p in e.pins):     # the real pinout from the library
+            half = count // 2
+            holes = [[col + pinout[p] - 1, "e"] if pinout[p] <= half else [col + count - pinout[p], "f"]
+                     for p in e.pins] + [[col + half + i, "c"] for i in range(len(nodes) - len(e.pins))]
+            width = half
+        elif body == "dip":
             half = math.ceil(len(nodes) / 2)
             holes = ([[col + i, "e"] for i in range(half)] +  # pin 1 top left, counting round anticlockwise
                      [[col + half - 1 - i, "f"] for i in range(len(nodes) - half)])
@@ -420,9 +428,17 @@ def _hz(f: float) -> list[str]:
 
 
 def _package(e: Element, c: Circuit, kind: str) -> str:
-    """The body a part comes in: a MOSFET is a TO-92 unless it is rated or modeled as a power part."""
+    """The body a part comes in: the library's package when it knows it, else a MOSFET is a TO-92 unless it is
+    rated or modeled as a power part."""
+    pkg = str((e.part.get("params") or {}).get("package", "")).upper()
+    if pkg.startswith(("DIP", "SOIC", "SOP")):
+        return "dip"
+    if pkg.startswith(("TO-220", "TO-126", "TO-3", "TO-263", "D2PAK", "SOT-223", "DPAK")):
+        return "to220"
+    if pkg.startswith(("TO-92", "SOT-23", "SOT-89")):
+        return "to92"
     if kind in ("nmos", "pmos"):
-        rated = float((e.part.get("ratings") or {}).get("id", 0) or 0)
+        rated = float((e.part.get("ratings") or {}).get("id", 0) or (e.part.get("ratings") or {}).get("id_A", 0) or 0)
         kp = re.search(r"\bkp\s*=\s*([0-9.eE+-]+)", c.models.get(e.model.lower(), "").lower()) if e.model else None
         power = rated >= 2 or (kp is not None and float(kp.group(1)) >= 0.5)
         return "to220" if power else "to92"
