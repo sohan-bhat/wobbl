@@ -139,6 +139,47 @@
 - Four new agent tools and a skill section, six validation cases,
   and the cast mount credibility example with clearly synthetic readings.
 
+**Crack growth**
+- Crack growth follows a fatigue crack through any part. Ask
+  `wobbl simulate part.step "how long until a crack from the hole grows
+  critical?"`, or start from a finished strength or fatigue result, whose
+  part, material, loads, supports and governing point it reuses, and a
+  fatigue result's duty cycle and required life with them. `wobbl crack` and
+  the `grow_crack` tool stay as the direct way in.
+- The starting crack is automatic unless one is given: the damage tolerance
+  flaw of MIL-A-83444 and JSSG-2006 at the most stressed point, a corner crack
+  at a hole, a surface crack elsewhere or a crack through a thin wall, made
+  smaller when the part leaves no room. A through, corner, surface or center
+  crack can also start at any faces or point.
+- The crack is cut into the CAD and gmsh meshes it with a fine tube along the
+  front and quarter point elements. K_I, K_II and K_III come from the opening
+  of the crack faces, and every front point turns by the maximum tangential
+  stress angle and moves at its own growth rate, with a fresh mesh each step,
+  so the path comes from the geometry. The path ends when the crack cuts
+  through the wall it grows across.
+- Growth follows the NASGRO equation with threshold and toughness, or Paris,
+  with sourced constants for 7075-T6, the common aluminum alloys and three
+  classes of steel. Other metals get BS 7910's steel law scaled by their
+  stiffness, flagged as estimated, and plastics take measured constants.
+  Loads cycle at an R ratio, as a file of cycles or as blocks such as
+  `100% x 3650 R=0`, and Wheeler retardation is used when its exponent is
+  given.
+- The K table from the path is the surrogate for a Monte Carlo over the
+  starting flaw, the growth constants, the load and the toughness, so 20,000
+  parts take seconds. Results give B50, B10 and B1 with their sampling bands,
+  the chance of failing before a target life and damage tolerance inspection
+  times, with fixes for the stress at the origin, the material and the
+  inspection interval.
+- Each run checks K on a coarser front mesh, against a weight function or
+  Newman and Raju, the force balance, the integration step, the Monte Carlo
+  sample count and, when retardation is on, a cycle by cycle reference. It
+  writes `playback.json`, a compact record of the part, every front and the
+  spread of lives for a viewer to animate.
+- Five validation cases, a center and an edge crack against Tada, a surface
+  crack against Newman and Raju, Paris life against its closed form and the
+  turn of a crack at 45 degrees, a run over the strength and fatigue examples
+  it was not tuned for, and the bracket crack example.
+
 ## 0.1.1 (2026-10-13)
 
 **Heat**
