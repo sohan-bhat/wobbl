@@ -72,7 +72,7 @@ def _rel(p: str, out: Path) -> str:
     if not q.is_absolute() or not q.exists():
         return p
     try:
-        return os.path.relpath(q, out.resolve())
+        return Path(os.path.relpath(q, out.resolve())).as_posix()   # forward slashes read back on any system
     except ValueError:      # another drive on Windows
         return p
 
