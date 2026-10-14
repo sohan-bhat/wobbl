@@ -69,6 +69,9 @@ def count(text) -> float:
 def cycles_text(n: float) -> str:
     if not math.isfinite(n):
         return "infinite"
+    if n >= 1e9:
+        e = int(math.floor(math.log10(n)))
+        return f"{n / 10 ** e:.3g}e{e}"
     if n >= 1e6:
         return f"{n / 1e6:.3g} million"
     if n >= 100:
@@ -380,16 +383,17 @@ def _headline(single, life, need, sf, target, curve, blocks, src, repeats, D) ->
         return (f"No block reaches the endurance limit{at}, so the duty cycle does no fatigue damage; the stresses "
                 f"could rise {sf:.2f} times before it would (target {target:g}).")
     run = "test" if src.get("duration") else "duty cycle"
-    return (f"The {run} uses {100 * D * repeats:.3g}% of the fatigue life{at} (Miner's rule), so it runs about "
+    lead = f"The {run} uses" if repeats == 1 else f"{fmt(repeats)} runs of the {run} use"
+    return (f"{lead} {100 * D * repeats:.3g}% of the fatigue life{at} (Miner's rule), so it can run about "
             f"{cycles_text(life)} times before cracks start; the stresses could rise {sf:.2f} times before the "
-            f"required {cycles_text(need)} would (target {target:g}).")
+            f"required {cycles_text(need)} runs would start a crack (target {target:g}).")
 
 
 def _assumptions(mat, data, curve, model, src, surface, study) -> list[str]:
     a = ["Stress life method for crack initiation (Shigley's approach): an S-N line from f Sut at 1000 cycles to the "
          "corrected endurance strength. It does not cover crack growth after a crack starts, which is a separate "
          "damage tolerance question.",
-         f"S-N data for {mat.name}: {data.strength:g} MPa at {cycles_text(data.cycles)} cycles, smooth specimens, "
+         f"S-N data for {mat.name}: {fmt(data.strength)} MPa at {cycles_text(data.cycles)} cycles, smooth specimens, "
          f"fully reversed ({data.source}).",
          f"Marin factors: surface {surface} ({curve.factors['surface ka'][0]:.2f}), size "
          f"{curve.factors['size kb'][0]:.2f}, load {curve.factors['load kc'][0]:.2f}, reliability "
@@ -397,7 +401,11 @@ def _assumptions(mat, data, curve, model, src, surface, study) -> list[str]:
          f"Mean stress by {model.capitalize()}; a compressive mean gets no credit.",
          "Fatigue lives scatter by a factor of three to ten at the same stress, so the life is an estimate and the "
          "safety factor on stress is the steadier number."]
-    if src["kind"] == "strength result":
+    if src["kind"] == "strength result" and study.blocks:
+        a.append("Each block scales the studied load and cycles it between R times its peak and the peak (or at the "
+                 "study's load ratio when the block gives none), and the stress field keeps its shape, as it does "
+                 "for a linear part.")
+    elif src["kind"] == "strength result":
         a.append(f"The peak stress cycles with the load, between {study.ratio:g} times the studied load and the load "
                  "itself, and the stress field keeps its shape, as it does for a linear part.")
     if src["kind"] == "vibration result":
