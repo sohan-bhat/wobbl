@@ -33,4 +33,6 @@ The run checks itself before the verdict. Halving the time step moves the impuls
 burn time by at most 0.1%, the propellant burned matches what left through the throat to 0.006%,
 the pressure at the peak sits on the closed form (a rho c* Kn)^(1/(1-n)), and the grain geometry
 sweeps out its own volume. The output folder holds `thrust.csv` and a RASP `motor.eng`, which
-`wobbl motion` flies when a rocket spec says `design = "motor.toml"` under `[motor]`.
+`wobbl motion` flies when a rocket spec says `design = "motor.toml"` under `[motor]`, and
+`playback.json`, the burn frame by frame with each grain's burning cross section, the chamber
+pressure, thrust and the casing's safety factor.

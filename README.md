@@ -246,6 +246,18 @@ burn rate law rather than resolved flame chemistry, and erosive burning, ignitio
 delay and throat erosion are flagged rather than modeled. Wobbl models given
 designs only and gives no guidance on making or handling propellants.
 
+`wobbl runaway` asks whether a lithium ion cell can run away on its own. A charged
+cell's SEI, electrodes and electrolyte decompose at Arrhenius rates, and Wobbl
+finds the surrounding temperature at which that heat outruns the cell's
+convection and radiation, by Semenov's criterion and by a transient with the
+reactants used up, then gives the margin and the cooling that would restore it.
+It can take its surroundings from a finished heat study, so the
+[cell runaway](examples/cell-runaway) example reads the 74.5 C hottest point of the
+battery pack example and finds runaway would need 155 C. The kinetics are
+Hatchard's for a fully charged LiCoO2 18650, which Wobbl places within a kelvin
+of the published 155 C oven onset, so for other chemistries the answer is
+indicative, and agents get the same as `solve_runaway`.
+
 ## Mechanisms
 
 `wobbl mechanism` runs linkages, gear trains, robot arms and parts that collide in
@@ -465,7 +477,7 @@ where the two servo idealizations disagree, a load cell in service and coupons.
 
 ## Validation
 
-Forty nine cases with known answers run through the same pipeline you get. Every
+Fifty cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
@@ -478,6 +490,7 @@ modeled setup lands within 2%.
 | Motion (free fall, drag fall, a throw, a constant thrust rocket's burnout speed and altitude, parachute descent) | 6 | 0.0000014%, the rocket's burnout altitude |
 | Combustion (methane flame against Turns, LOX and LH2 c* and Isp against NASA CEA, KNSU c* against PROPEP) | 4 | 0.05%, the LOX and LH2 c* |
 | Solid motors (steady Kn against the closed form, a neutral grain's web time, two MIT static fires) | 4 | 9.26%, the impulse of the O3800 static fire, whose peak pressure came out 7% low |
+| Battery (a charged LiCoO2 18650's runaway onset against Hu et al. and Hatchard's oven tests) | 1 | 0.62%, 155.96 C against 155 C |
 | Uncertainty and calibration (a cantilever's mean and spread of deflection against lognormal propagation, Ishigami Sobol indices, two calibrations from synthetic data) | 5 | 0.97%, a film coefficient from a cooling curve |
 | Mechanisms (a pendulum's large swing, a four bar's sweep, a two link arm's holding torque, a gear train's output speed, an elastic and a half elastic collision) | 6 | 0.05%, the struck ball's speed after the half elastic hit |
 | Buckling, vibration and fatigue (Euler's column, a cantilever's first three bending frequencies, a simply supported plate's first three modes, a sine peak on a tip mass, Shigley's fatigue example) | 5 | 2.28%, Shigley's example, where the book reads f off a chart |
@@ -507,6 +520,7 @@ reports, heatmaps and summaries, and each has a page [on the website](https://so
 | [rocket-launch](examples/rocket-launch) | Will an L class rocket fly straight, reach 11,000 ft and land softly? | motion, rocketry |
 | [knsb-motor](examples/knsb-motor) | Will a 54 mm KNSB motor hold its casing, and what thrust curve does it give? | solid motors |
 | [propane-flame](examples/propane-flame) | How hot does a propane flame get, and how much CO and NO does it make? | combustion |
+| [cell-runaway](examples/cell-runaway) | Can a cell at the hottest point of a sealed battery pack run away on its own? | battery, heat |
 | [desktop-arm](examples/desktop-arm) | Can hobby servos lift 500 g through a desktop arm's pick and place? | mechanisms |
 | [wiper-linkage](examples/wiper-linkage) | Does a wiper linkage sweep 95 degrees, and can its motor drive it over dry glass? | mechanisms |
 | [circuits](examples/circuits) | Will this LED fry? What is the ripple? How hot is the MOSFET? | circuits |

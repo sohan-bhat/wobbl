@@ -65,6 +65,14 @@
 - Eight new validation cases, against Turns, NASA CEA, Nakka's PROPEP run,
   closed forms and two MIT static fires, and two examples, a KNSB motor and a
   propane flame.
+- `wobbl runaway` finds the surrounding temperature at which a charged
+  lithium ion cell's own decomposition outruns its cooling, by Semenov's
+  criterion and a transient with the reactants used up, and can take its
+  surroundings from a heat study. A LiCoO2 18650 runs away at 156 C against
+  the published 155 C, and a new example checks the battery pack's hottest
+  cell. Agents get `solve_runaway`.
+- Every motor, flame, propellant and runaway run writes `playback.json`, its
+  own data thinned for a viewer to animate.
 
 **Motion**
 - A new motion domain flies a body from release or ignition to the ground
