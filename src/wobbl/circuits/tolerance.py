@@ -105,10 +105,12 @@ def analyze(c: Circuit, work: Path, ta: float, dynamic: bool = False, monte_carl
             st = evaluate(cc, w, ta)
             corners.append(("with " + ", ".join(text), st))
         merged = worst_of(stress, corners)
-        if not known:      # a 10% guess at a plain source's range: going over there is a warning, not a failure
+        if not known:      # over only at a guessed end of a plain source's range is a warning, not a failure
+            nominal = {(s.ref, it.what): it.status for s in stress for it in s.items}
             for s in merged:
                 for it in s.items:
-                    if it.status == "over" and any(lbl in it.note for lbl, _ in corners):
+                    if it.status == "over" and nominal.get((s.ref, it.what)) != "over" and \
+                            any(lbl in it.note for lbl, _ in corners):
                         it.status = "warn"
                         it.note += " (the supply range is a 10% guess)"
         stress = merged

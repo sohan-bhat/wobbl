@@ -229,8 +229,7 @@ def verdict_of(stress: list[Stress], c: Circuit) -> tuple[str, str]:
         s, it = (warn or near)[0] if not near else max(near, key=lambda x: x[1].use or 0)
         if warn and (not near or warn[0][1].status == "warn"):
             s, it = warn[0]
-        what = it.text() + (f" ({it.note})" if it.note and it.status == "near" else "") if it.status == "near" \
-            else (it.note or it.text())
+        what = it.text() + (f" ({it.note})" if it.note else "") if it.limit is not None else (it.note or it.text())
         return "marginal", f"Nothing burns, but {s.ref} ({s.part}) needs a look: {what}."
     if rated:
         s, it = max(rated, key=lambda x: x[1].use or 0)

@@ -361,13 +361,13 @@ def _switch(b: _B, rail: str, vr: float, sup: str, vs: float) -> bool:
         rly = ics.relay(vload)
         b.c.subckts[rly.mname.lower()] = _sub(rly)
         from .bind import _as_dict
-        b.add("x", [top, d], [rly.mname], ["p", "n"], **{"as": _as_dict(rly)})
+        b.add("x", [top, d], [rly.mname], ["p", "n"], ref="K1", **{"as": _as_dict(rly)})
         inductive = True
     elif b.has(r"motor|fan"):
         mot = ics.motor(vload)
         b.c.subckts[mot.mname.lower()] = _sub(mot)
         from .bind import _as_dict
-        b.add("x", [top, d], [mot.mname], ["p", "n"], **{"as": _as_dict(mot)})
+        b.add("x", [top, d], [mot.mname], ["p", "n"], ref="M1", **{"as": _as_dict(mot)})
         inductive = True
     else:
         il = b.val("load_current", rf"{NUM}\s*a\b", "1", "load current", "")
@@ -408,7 +408,7 @@ def _hbridge(b: _B, rail: str, vr: float, sup: str, vs: float) -> bool:
     b.add("m", [c, off_p, sup], [pn], ["d", "g", "s"])
     b.add("m", [a, off_n, "0"], [nn], ["d", "g", "s"])
     b.add("m", [c, on_n, "0"], [nn], ["d", "g", "s"])
-    b.add("x", [a, c], [mot.mname], ["p", "n"], **{"as": _as_dict(mot)})
+    b.add("x", [a, c], [mot.mname], ["p", "n"], ref="MOT1", **{"as": _as_dict(mot)})
     b.say("the bridge drives the motor one way from standstill, so the start up current flows through one "
           "diagonal", "")
     return True
