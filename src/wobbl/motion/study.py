@@ -244,7 +244,10 @@ def run_motion(st: MotionStudy, out_dir: str | Path, progress=None) -> MotionOut
     a = analyze(st, say)
     fl = a.flight
     say("outputs", "trajectory table, charts and report")
-    rows = table_rows(fl, a.points)
+    # the peaks need a few dozen points per segment, but a flight of few segments, like a drop, gets more for its
+    # table so it still fills the rows it is allowed
+    dense = MAX_ROWS // len(fl.segments)
+    rows = table_rows(fl, points(fl, dense) if dense > 60 else a.points)
     write_csv(out / "trajectory.csv", rows)
     events = event_list(fl)
     img = {}

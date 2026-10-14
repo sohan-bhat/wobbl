@@ -37,10 +37,10 @@ def _speed(y) -> float:
 
 
 # --- the flight's numbers ---------------------------------------------------------------
-def points(fl: Flight) -> list[dict]:
+def points(fl: Flight, per_segment: int = 60) -> list[dict]:
     """Every sample of the flight with what the table and the peaks need."""
     out = []
-    for t, y, ph in fl.samples():
+    for t, y, ph in fl.samples(per_segment):
         f = fl.model.forces(t, y, ph)
         out.append({"t": t, "y": y, "phase": ph.name, "held": ph.held, "accel": math.hypot(f["ax"], f["az"]),
                     "felt": 0.0 if ph.held else math.hypot(f["ax"], f["az"] + f["g"]), "mach": f["mach"],
