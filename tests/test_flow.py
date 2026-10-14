@@ -1,4 +1,5 @@
-"""Flow correlations and fluid properties against published values. Nothing here needs OpenFOAM."""
+"""Flow correlations, fluid properties and the checks every flow answer runs, against published values. Nothing here
+needs OpenFOAM."""
 from __future__ import annotations
 
 import math
@@ -7,6 +8,7 @@ import pytest
 
 from wobbl.flow import correlations as C
 from wobbl.flow import fluids as F
+from wobbl.flow import verify as V
 
 
 def test_friction_factors_match_the_moody_chart():
@@ -70,6 +72,41 @@ def test_flow_quantities_read_in_si():
     assert F.qty("15 W", "power") == pytest.approx(15)
     with pytest.raises(ValueError):
         F.qty("20 furlongs", "velocity")
+
+
+def test_gci_reproduces_celik_2008():
+    # Celik et al. (2008), Table 1: p 1.53, extrapolated 6.1685, fine grid index 2.17%
+    g = V.gci([6.063, 5.972, 5.863], [1.0, 1.5, 2.0])
+    assert g.kind == "monotone"
+    assert g.order == pytest.approx(1.53, abs=0.01)
+    assert g.extrapolated == pytest.approx(6.1685, abs=1e-3)
+    assert g.gci_fine == pytest.approx(0.0217, abs=2e-4)
+    assert V.gci_check(g, "drag", "N", tol=0.03).status == "pass"
+
+
+def test_gci_flags_grids_that_do_not_converge():
+    assert V.gci([1.0, 1.02, 0.99], [1, 1.5, 2.25]).kind == "oscillatory"
+    g = V.gci([1.0, 0.9, 0.85], [1, 2, 4])
+    assert g.kind == "diverging" and V.gci_check(g, "x", "").status == "fail"
+    assert V.gci([2.0, 2.0, 2.0], [1, 2, 4]).gci_fine == 0.0
+    assert V.gci_check(None, "x", "", values_only=[1.0]).status == "warn"
+
+
+def test_residuals_mass_and_wall_checks():
+    log = "\n".join(f"smoothSolver:  Solving for Ux, Initial residual = {r}, Final residual = 1e-9, No Iterations 2\n"
+                    f"GAMG:  Solving for p, Initial residual = {10 * r}, Final residual = 1e-9, No Iterations 9"
+                    for r in (1.0, 1e-3, 1e-6))
+    assert V.residuals(log)["p"] == pytest.approx((10.0, 1e-5))
+    assert V.residual_check(log).status == "pass"
+    assert V.residual_check(log.replace("1e-06", "0.01")).status == "fail"
+    assert V.residual_check("").status == "fail"
+    assert V.mass_check(1.0, 0.999).status == "pass" and V.mass_check(1.0, 0.95).status == "fail"
+    assert V.yplus_check({"wall": (0.1, 1.2, 0.6)}, "resolved").status == "pass"
+    assert V.yplus_check({"wall": (5, 40, 20)}, "resolved").status == "fail"
+    assert V.yplus_check({"wall": (30, 90, 60)}, "wall functions").status == "pass"
+    assert V.model_reason("laminar", "pipe") is None
+    level, why = V.model_reason("rans", "separated")
+    assert level == "medium" and "25%" in why
 
 
 def test_first_cell_height_scales_with_y_plus():
