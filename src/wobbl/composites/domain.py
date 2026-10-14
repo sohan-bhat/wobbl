@@ -27,7 +27,9 @@ def composite(job):
     from .study import run_laminate
     from .tools import study_from
 
-    q = job.question
+    # a layup is what the walls are made of, so it holds for every load the question gives, not one clause
+    job.part = ""
+    q = job.focus
     lay = job.value("layup") or layup_in(q)
     if lay:
         job.use("layup", lay)
@@ -49,6 +51,7 @@ def composite(job):
                      "fast" if job.quick else "normal", q, st.params)
     lam.scale = st.scale
     job.situate(supports=[f.text for f in st.fixtures], loads=[x.text for x in st.loads])
+    job.ready()
     o = run_laminate(lam, job.out, job.log, pre=pre, render=not job.quick)
     job.criterion("first ply failure", "strength_ratio", 1.0, "min")
     return o
@@ -56,7 +59,8 @@ def composite(job):
 
 register(Analysis(
     "part", "composite", "Composite layup on the walls: ply stresses, first ply failure by Tsai-Wu and Hashin, "
-    "and layup changes that reach the target", composite, kinds=PART_KINDS, default=False, covers=("stress",),
+    "and layup changes that reach the target", composite, dry=True, kinds=PART_KINDS, default=False,
+    covers=("stress",),
     keywords=(r"\bcomposite\b", r"\bcarbon fib(?:er|re)\b", r"\bcfrp\b", r"\bgfrp\b", r"\bfiberglass\b",
               r"\bglass fib(?:er|re)\b", r"\blay ?up\b", r"\bplies\b", r"\bply\b", r"\blaminate\b", LAYUP),
     aliases=("laminate", "layup", "composites"), legacy="wobbl run --layup",

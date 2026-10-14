@@ -46,7 +46,7 @@ def drop(job):
 
     if job.path is None:
         raise ValueError(f"file not found: {job.thing}")
-    q = job.question
+    q = job.focus
     found = height_in(q)
     if found and not job.value("height"):
         job.use("height", found)
