@@ -10,6 +10,7 @@ Register physics from a package's domain.py:
 and route or run with route(thing, question) and run_plan(plan, options, out).
 """
 from .registry import Analysis, Domain, Option, analyses, domain, domains, errors, find, get, load, register, rerun
+from .runner import Job, Step, grade, overall, run_plan
 
-__all__ = ["Analysis", "Domain", "Option", "register", "analyses", "domain", "domains", "find", "get", "load", "rerun",
-           "errors"]
+__all__ = ["Analysis", "Domain", "Option", "Job", "Step", "register", "run_plan", "analyses", "domain", "domains", "find",
+           "get", "load", "rerun", "errors", "grade", "overall"]
