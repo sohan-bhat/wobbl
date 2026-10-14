@@ -173,7 +173,8 @@ def instrument(s: Svg, x, y, w, h, name, rows, lamp="CV", posts=("-", "+")) -> d
     for i, (val, unit, *live) in enumerate(rows):
         by = dy + 30 + 26 * i
         a = {"data_series": live[0], "data_fmt": live[1]} if live else {}
-        s.text(dx + dw - 26, by, val, size=20, fill=YEL, anchor="end", weight=600, **a)
+        fs = min(20.0, (dw - 32) / (0.6 * max(len(val), 4)))  # a narrow display gets smaller digits
+        s.text(dx + dw - 26, by, val, size=round(fs, 1), fill=YEL, anchor="end", weight=600, **a)
         s.text(dx + dw - 21, by, unit, size=10, fill=MUTED)
     knob(s, x + w - 29, y + 36, 30)
     knob(s, x + w - 29, y + 64, 130)
@@ -218,8 +219,8 @@ def flow(s: Svg, d: str, speed: float, **a):
     s.close()
 
 
-def readout(s: Svg, label: str, value: float, unit: str, series, limit: float, note: str, verdict: str):
-    """The one live number: a value, a bar against its limit and the verdict, top right."""
+def readout(s: Svg, label: str, value: float, unit: str, series, limit: float | None, note: str, verdict: str):
+    """The one live number: a value, a bar against its limit when it has one, and the verdict, top right."""
     x, y, w, h = W - 216, 18, 196, 100
     s.add("rect", x=x, y=y, width=w, height=h, rx=3, fill="#0a0b0c", fill_opacity=0.92, stroke=LINE2)
     s.text(x + 14, y + 22, label, size=10.5, fill=MUTED, ls=1.3, weight=500)
@@ -231,6 +232,9 @@ def readout(s: Svg, label: str, value: float, unit: str, series, limit: float, n
     s.add("rect", x=x + w - 14 - cw, y=y + 9, width=cw, height=19, fill=VERDICT.get(verdict, YEL), data_after=True)
     s.text(x + w - 14 - cw / 2, y + 22.5, word, size=11, fill=INK, anchor="middle", weight=700, data_after=True)
     gx, gy, gw = x + 14, y + 68, w - 28
+    if limit is None:
+        s.text(gx, y + 84, note, size=10, fill=MUTED)
+        return
     top = max(limit, max(series)) * 1.2
     s.add("rect", x=gx, y=gy, width=gw, height=6, fill="#23272c")
     lim_x = gw * limit / top
@@ -568,3 +572,120 @@ def eng(x: float, unit: str) -> str:
         if abs(x) >= scale * 0.9999:
             return f"{fmt(x / scale)} {pre}{unit}"
     return f"{fmt(x * 1e12)} p{unit}"
+
+
+def _axial(s: Svg, a, b, p: float, fill: str, code: list[str] | None, band_at: float | None = None,
+           length: float = 2.6, height: float = 0.95):
+    """An axial body between holes a and b: leads, a capsule body, color bands or one cathode band, shading."""
+    (ax, ay), (bx, by) = a, b
+    span, ang = math.hypot(bx - ax, by - ay), math.degrees(math.atan2(by - ay, bx - ax))
+    bl, bh, cx = min(length * p, span - 4), height * p, span / 2
+    s.open(transform=f"translate({num(ax)} {num(ay)}) rotate({num(ang)})")
+    s.add("path", d=f"M0 0H{num(span)}", stroke="#80858c", stroke_width=2.8, stroke_linecap="round")
+    s.add("path", d=f"M0 0H{num(span)}", stroke="#d7dade", stroke_width=1.4, stroke_linecap="round")
+    s.add("rect", x=cx - bl / 2, y=-bh / 2, width=bl, height=bh, rx=bh / 2, fill=fill)
+    for i, c in enumerate(code or []):
+        s.add("rect", x=cx - bl / 2 + (0.22 + 0.16 * i) * bl, y=-bh / 2, width=0.07 * bl, height=bh, fill=c)
+    if band_at is not None:
+        s.add("rect", x=cx - bl / 2 + band_at * bl - 0.06 * bl, y=-bh / 2, width=0.12 * bl, height=bh, fill="#c7cbd0")
+    s.add("rect", x=cx - bl / 2, y=-bh / 2, width=bl, height=bh, rx=bh / 2,
+          fill=s.grad("linear", [(0, "#ffffff", 0.4), (0.4, "#ffffff", 0), (0.65, "#000000", 0),
+                                 (1, "#000000", 0.35)], x2="0", y2="1"))
+    s.close()
+
+
+def diode_axial(s: Svg, anode, cathode, p: float):
+    """A glass or epoxy diode lying between its holes, the band at the cathode."""
+    _axial(s, anode, cathode, p, "#1d1f22", None, band_at=0.84, length=2.0, height=0.8)
+
+
+def inductor_axial(s: Svg, a, b, henries: float | None, p: float):
+    """An axial inductor: a green body banded with its value in microhenries."""
+    code = bands(henries * 1e6) if henries else None
+    _axial(s, a, b, p, "#5e9a6b", code[:3] if code else None, length=2.4, height=1.05)
+
+
+def inductor_drum(s: Svg, a, b, p: float):
+    """A radial drum inductor from above: copper winding round a ferrite core, legs to its two holes."""
+    (ax, ay), (bx, by) = a, b
+    cx, cy = (ax + bx) / 2, (ay + by) / 2
+    for x0, y0 in (a, b):
+        s.add("path", d=f"M{num(x0)} {num(y0)}L{num(cx)} {num(cy)}", stroke="#80858c", stroke_width=2.8)
+    r = 1.1 * p
+    s.add("circle", cx=cx, cy=cy, r=r, fill="#2b2f34", stroke="#15171a")
+    s.add("circle", cx=cx, cy=cy, r=0.72 * r, fill="none", stroke="#c8773a", stroke_width=0.32 * r,
+          stroke_dasharray="1.6 0.8")
+    s.add("circle", cx=cx, cy=cy, r=0.42 * r, fill="#3a3f45")
+
+
+def to92(s: Svg, holes, p: float, label: str):
+    """A TO-92 transistor standing in three neighbouring holes, its flat face toward the viewer's bottom."""
+    (x0, y), (x2, _) = holes[0], holes[-1]
+    cx, w, d = (x0 + x2) / 2, 1.95 * p, 1.5 * p
+    for x, yy in holes:
+        s.add("path", d=f"M{num(x)} {num(yy)}V{num(yy - 0.3 * p)}", stroke="#c3c8cd", stroke_width=2)
+    top = y - 0.45 * p - d
+    s.add("path", d=f"M{num(cx - w / 2)} {num(top + d)}A{num(w / 2)} {num(d)} 0 0 1 {num(cx + w / 2)} {num(top + d)}Z",
+          fill="#17191c", stroke="#000")
+    s.add("path", d=f"M{num(cx - w / 2 + 2)} {num(top + d - 1)}H{num(cx + w / 2 - 2)}", stroke="#3a3f45",
+          stroke_width=1.2)
+    s.text(cx, top - 3, label, size=max(7.0, 0.6 * p), fill=FG2, anchor="middle")
+
+
+def to220_standing(s: Svg, holes, p: float, label: str):
+    """A TO-220 standing in three neighbouring holes, seen from above: the epoxy body and its metal tab."""
+    (x0, y), (x2, _) = holes[0], holes[-1]
+    cx, w = (x0 + x2) / 2, 4.0 * p
+    top = y - 0.35 * p - 1.8 * p
+    for x, yy in holes:
+        s.add("path", d=f"M{num(x)} {num(yy)}V{num(top + 1.8 * p)}", stroke="#c3c8cd", stroke_width=2.2)
+    s.add("rect", x=cx - w / 2, y=top - 0.5 * p, width=w, height=0.6 * p, fill="#b9bec4", stroke="#6d737a")
+    s.add("rect", x=cx - w / 2, y=top, width=w, height=1.8 * p, rx=1.5, fill="#17191c", stroke="#000")
+    s.text(cx, top + 1.15 * p, label, size=max(7.0, 0.6 * p), fill=FG2, anchor="middle")
+
+
+def dip(s: Svg, top_holes, bottom_holes, p: float, label: str):
+    """A DIP IC straddling the channel: pin 1 at the top left, counting round anticlockwise."""
+    xs = [x for x, _ in top_holes + bottom_holes]
+    ty, by = top_holes[0][1], (bottom_holes[0][1] if bottom_holes else top_holes[0][1] + 3 * p)
+    x0, x1 = min(xs) - 0.5 * p, max(xs) + 0.5 * p
+    for x, y in top_holes + bottom_holes:
+        s.add("rect", x=x - 0.18 * p, y=min(y, (ty + by) / 2), width=0.36 * p, height=abs(y - (ty + by) / 2),
+              fill="#c3c8cd")
+    s.add("rect", x=x0, y=ty + 0.45 * p, width=x1 - x0, height=by - ty - 0.9 * p, rx=1.5, fill="#17191c",
+          stroke="#000")
+    s.add("path", d=f"M{num(x0)} {num((ty + by) / 2 - 0.35 * p)}A{num(0.35 * p)} {num(0.35 * p)} 0 0 1 {num(x0)} "
+                    f"{num((ty + by) / 2 + 0.35 * p)}", fill="#0b0c0d")
+    s.add("circle", cx=x0 + 0.45 * p, cy=ty + 0.85 * p, r=0.16 * p, fill="#3a3f45")
+    s.text((x0 + x1) / 2, (ty + by) / 2 + 3, label[:max(3, int((x1 - x0) / (0.6 * max(7.0, 0.62 * p))))],
+           size=max(7.0, 0.62 * p), fill="#c9ccc5", anchor="middle")
+
+
+def module(s: Svg, holes, p: float, label: str):
+    """A small breakout board on header pins in a row of holes."""
+    xs = [x for x, _ in holes]
+    y = holes[0][1]
+    x0, x1 = min(xs) - 0.7 * p, max(xs) + 0.7 * p
+    s.add("rect", x=x0, y=y - 2.2 * p, width=x1 - x0, height=2.75 * p, rx=2, fill="#1f4f8f", stroke="#123158")
+    s.add("rect", x=x0 + 0.2 * p, y=y - 0.35 * p, width=x1 - x0 - 0.4 * p, height=0.7 * p, fill="#151618")
+    for x in xs:
+        s.add("rect", x=x - 0.16 * p, y=y - 0.16 * p, width=0.32 * p, height=0.32 * p, fill="#d9b85a")
+    s.text((x0 + x1) / 2, y - 1.0 * p, label[:max(2, int((x1 - x0) / (0.6 * max(7.0, 0.62 * p))))],
+           size=max(7.0, 0.62 * p), fill="#e8ebe6", anchor="middle")
+
+
+def meter(s: Svg, x, y, w, h, value: str, unit: str, posts=("-", "+")) -> dict:
+    """A handheld multimeter in its yellow holster: the reading, the dial and its two jacks."""
+    s.add("rect", x=x + 3, y=y + 5, width=w, height=h, rx=10, fill="#000", opacity=0.5)
+    s.add("rect", x=x, y=y, width=w, height=h, rx=10, fill="#e2b91f", stroke="#8c7410")
+    s.add("rect", x=x + 7, y=y + 7, width=w - 14, height=h - 14, rx=6, fill="#232629")
+    s.add("rect", x=x + 14, y=y + 14, width=w - 28, height=30, rx=3, fill="#b9c4a6")
+    s.text(x + w - 34, y + 36, value, size=18, fill="#1d2418", anchor="end", weight=600)
+    s.text(x + w - 30, y + 36, unit, size=10, fill="#3c4535")
+    knob(s, x + w / 2, y + 66, 300)
+    at = {}
+    for i, name in enumerate(posts):
+        px = x + w / 2 - 14 + 28 * i
+        at[name] = (px, y + h - 16)
+        post(s, px, y + h - 16, "#c8342b" if name == "+" else "#2a2d31")
+    return at
