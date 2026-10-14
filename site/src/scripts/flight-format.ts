@@ -8,5 +8,11 @@ export const secs = (t: number) => `${t >= 100 ? Math.round(t) : Number(t.toPrec
 export const meters = (m: number) =>
   `${(Math.abs(m) >= 10 ? Math.round(m) : Number(m.toPrecision(2))).toLocaleString('en-US')} m`;
 
+/** A running clock with a fixed number of decimals, so its width holds: 1.45 s, 14.5 s. */
+export const clock = (t: number, decimals: number) => `${t.toFixed(decimals)} s`;
+
+/** A running speed to a tenth: 9.7 m/s, 427.3 m/s. */
+export const pace = (v: number) => `${v.toFixed(1)} m/s`;
+
 /** Meters per second with three figures: 5.2 m/s, 58.6 m/s, 291 m/s. */
 export const mps = (v: number) => `${Number(v.toPrecision(3)).toLocaleString('en-US')} m/s`;

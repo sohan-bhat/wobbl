@@ -1,0 +1,72 @@
+---
+// A motion run played back from its trajectory.csv: the body or rocket to scale over the ground,
+// the path so far, a flag as each event happens and a few readouts that tick with the data, then
+// the answer. The page draws the last moment, so it reads in full without script and under
+// reduced motion, and scripts/sim.ts plays it from the start once it is on screen.
+import { H, W, sim } from '../lib/sim';
+import { COLOR, type Run } from '../lib/examples';
+// answer: the answer under the readouts, left out where the page states it right after
+interface Props { run: Run; name?: { label: string; href: string }; compact?: boolean; answer?: boolean }
+const { run, name, compact = false, answer = true } = Astro.props;
+const s = sim(run);
+const ground = s.ground;
+const rate = s.speedup === 1 ? 'Real time' : `${s.speedup}x real time`;
+const verdict = COLOR[run.outcome.verdict] ?? 'marginal';
+// each body stands on the point of the path it follows, so it rests on the ground where it lands,
+// the rocket points up from its tail and each parachute hangs from its nose
+const ROCK = 'M-6 -8L-3 -12L3 -11.5L6.5 -7L4.5 -1L-2 0L-6 -3Z';
+const ROCKET = 'M0 -24.5L2.2 -19L2.2 -5.5L5.5 0L2.2 -1L-2.2 -1L-5.5 0L-2.2 -5.5L-2.2 -19Z';
+const FLAME = 'M-1.8 -0.5L0 7.5L1.8 -0.5Z';
+const both = s.chutes.length === 2;
+---
+<figure class:list={['sim', { 'sim-compact': compact }]} data-sim={compact ? undefined : ''}
+        data-frames={compact ? undefined : s.frames} data-phases={compact ? undefined : s.phases}
+        data-events={compact ? undefined : s.events} data-speed={s.speedup} data-decimals={s.decimals}
+        data-scale={s.scale.toPrecision(6)} data-ground={s.ground} data-w={W} data-h={H}
+        data-ghost={s.ghost && !compact ? `${s.ghost.t},${s.ghost.x},${s.ghost.top}` : undefined}>
+  <div class="sim-stage">
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
+      <rect class="sim-earth" x="0" y={ground} width={W} height={H - ground} />
+      <path class="sim-ground" d={`M0 ${ground}H${W}`} />
+      {s.cliff && <path class="sim-cliff" d={s.cliff} />}
+      {s.rail && <path class="sim-rail" d={s.rail} />}
+      <path class="sim-trail" d={s.trail} />
+      {s.ghost && <path class="sim-ghost" d={ROCK} transform={`translate(${s.ghost.x} ${ground})`} />}
+      <g class="sim-obj" transform={`translate(${s.end.x} ${s.end.y})`}>
+        {s.rocket ? (
+          <>
+            <g class="sim-chute" data-chute="drogue" transform={both ? 'translate(0 -18)' : undefined}
+               style={s.chutes.includes('drogue') ? undefined : 'display: none'}>
+              <path class="sim-lines" d="M-5 -36.5L0 -24.5L5 -36.5" /><path class="sim-canopy" d="M-5 -36.5A5 4 0 0 1 5 -36.5Z" />
+            </g>
+            <g class="sim-chute" data-chute="main" style={s.chutes.includes('main') ? undefined : 'display: none'}>
+              <path class="sim-lines" d="M-12 -44.5L0 -24.5L12 -44.5" /><path class="sim-canopy" d="M-12 -44.5A12 9 0 0 1 12 -44.5Z" />
+            </g>
+            <g class="sim-rot" transform={`rotate(${s.end.a})`}>
+              <path class="sim-flame" d={FLAME} style="display: none" />
+              <path class="sim-body" d={ROCKET} />
+            </g>
+          </>
+        ) : <path class="sim-body" d={ROCK} />}
+      </g>
+    </svg>
+    {!compact && (
+      <>
+        {name && <a class="sim-name" href={name.href}>{name.label}</a>}
+        <span class="sim-rate">{rate}</span>
+        <span class="sim-scale" style={`--w: ${s.bar.pct.toFixed(2)}`}><i></i>{s.bar.label}</span>
+        <span class="sim-flag" aria-hidden="true" hidden></span>
+        <button type="button" class="btn-outline btn-sm sim-toggle" hidden>Pause</button>
+      </>
+    )}
+  </div>
+  {!compact && (
+    <>
+      <dl class="sim-read">
+        {s.readouts.map(([k, v]) => <div><dt>{k}</dt><dd style={`min-width: ${s.widths[k]}ch`}>{v}</dd></div>)}
+      </dl>
+      {answer && <p class="sim-answer answer-line" data-verdict={verdict}>{s.answer}</p>}
+      <p class="visually-hidden">{s.said}</p>
+    </>
+  )}
+</figure>
