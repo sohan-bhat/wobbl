@@ -94,10 +94,12 @@ class Query:
 
     def resolved(self) -> list[str]:
         """One line per name saying what it was taken to be and from where."""
-        out = []
+        out, low = [], self.text.lower()
         for s in self.species:
-            if s.text and s.source:
-                out.append(f"'{s.text}' is {s.label()}, from {s.source}")
+            if s.text and s.source and s.text.lower() in low:
+                line = f"'{s.text}' is {s.label()}, from {s.source}"
+                if line not in out:
+                    out.append(line)
         return out + self.notes
 
 
