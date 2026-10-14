@@ -30,7 +30,7 @@ from ..structural.spec import SpecError
 from ..units import fmt
 from . import ccx, modal
 from .common import QUALITY, REFINE, change, excluded_nodes, governing, level_sizes, prepare
-from .outcome import LifeOutcome, clean_work
+from .outcome import LifeOutcome, clean_work, save_study
 from .vibspec import (VibrationStudy, default_damping, default_duration, parse_mass, parse_sine, seconds,
                       unit_vector)
 
@@ -126,6 +126,7 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
                     vc.fixes(values, mat, p.features), deck.notes + p.prep.notes,
                     solver=f"CalculiX {adapter.version()}", t_total=time.time() - t0)
     o.write(out)
+    save_study(study, out)
     clean_work(work, study.keep)
     return o
 

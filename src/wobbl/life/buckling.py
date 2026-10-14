@@ -28,7 +28,7 @@ from . import ccx
 from .common import QUALITY, REFINE, change, excluded_nodes, governing, level_sizes, prepare
 from .knockdown import (Column, classify, column_curve, column_info, euler_check, johnson, knockdown,
                         separation_check)
-from .outcome import LifeOutcome, clean_work, verdict_for
+from .outcome import LifeOutcome, clean_work, save_study, verdict_for
 
 SHAPES = ("auto", "column", "plate", "cylinder", "dome", "general")
 
@@ -172,6 +172,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
         images, fixes(shape, design, target, col, mat, p.features), deck.notes + p.prep.notes,
         solver=f"CalculiX {adapter.version()}", t_total=time.time() - t0)
     o.write(out)
+    save_study(study, out)
     clean_work(work, study.keep)
     return o
 

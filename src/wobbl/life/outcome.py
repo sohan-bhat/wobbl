@@ -63,6 +63,20 @@ def html_table(title: str, headers: list[str], rows: list[list], note: str = "")
     return f"<h2>{esc(title)}</h2>" + (f"<p class='muted'>{esc(note)}</p>" if note else "") + table(headers, rows)
 
 
+def save_study(study, out: Path):
+    """study.json next to the result, with the part path relative to it, so a later step (a fatigue estimate from
+    this result) can read the material and inputs back."""
+    import json
+
+    from ..verify.checks import rel_up
+
+    d = study.to_dict()
+    base = d.get("base") or {}
+    if base.get("part"):
+        base["part"] = rel_up(base["part"], out)
+    (Path(out) / "study.json").write_text(json.dumps(d, indent=1, default=str))
+
+
 def clean_work(work: Path, keep: bool):
     """Remove the solver scratch of a finished run unless it is wanted for a closer look."""
     if not keep and work.exists():
