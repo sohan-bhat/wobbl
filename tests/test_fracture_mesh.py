@@ -2,6 +2,8 @@
 import numpy as np
 import pytest
 
+from conftest import needs_ccx
+from wobbl.fracture import handbook as H
 from wobbl.fracture import shapes
 from wobbl.fracture.crackmesh import CRACK_FACE, Sizing, build_cracked_mesh
 from wobbl.structural.run import describe_part
@@ -45,3 +47,30 @@ def test_edge_crack_at_a_hole_keeps_the_part_whole(tmp_path):
     hole = [f.id for f in feat.faces.values() if f.role == "hole"]
     assert np.isin(cm.mesh.tri_surf, hole).any()      # the hole's faces are still found after the cut
 
+
+@pytest.mark.solver
+@needs_ccx
+def test_center_crack_k_matches_tada(plate, tmp_path):
+    from wobbl.fe import NodeConstraint, StaticModel
+    from wobbl.fracture.sif import extract
+    from wobbl.fracture.solve import solve_displacements
+    from wobbl.solvers.calculix import CalculiX
+    from wobbl.structural.build import traction_forces
+
+    prep, feat = plate
+    crack = shapes.center((50, 75, 2), (0, 1, 0), (1, 0, 0), 15.0, (2.0, 2.0), 1.0)
+    cm = build_cracked_mesh(prep, crack, Sizing(h=8.0, h_front=1.0, h_crack=3.75))
+    mesh = cm.mesh
+    top = np.isin(mesh.tri_surf, [f.id for f in feat.faces.values() if f.normal and f.normal[1] > 0.9])
+    bot = np.isin(mesh.tri_surf, [f.id for f in feat.faces.values() if f.normal and f.normal[1] < -0.9])
+    F = traction_forces(mesh, top, np.array([0, 100.0, 0])) + traction_forces(mesh, bot, np.array([0, -100.0, 0]))
+    corner = [int(np.argmin(np.linalg.norm(mesh.X - p, axis=1))) for p in ((0, 0, 0), (100, 0, 0), (0, 150, 0))]
+    model = StaticModel(mesh, 70000.0, 0.0, 2.7e-9, [NodeConstraint("a", np.array([corner[0]]), (1, 2, 3)),
+                                                      NodeConstraint("b", np.array([corner[1]]), (2, 3)),
+                                                      NodeConstraint("c", np.array([corner[2]]), (3,))], forces=F)
+    U, _ = solve_displacements(CalculiX(), model, tmp_path / "solve")
+    want = H.center_crack(100.0, 15.0, 100.0)
+    for f in extract(cm, U, 70000.0, 0.0):
+        assert f.at(0.5)[0] == pytest.approx(want, rel=0.02)
+        assert abs(f.at(0.5)[1]) < 0.02 * want and abs(f.at(0.5)[2]) < 0.02 * want
+    assert not list((tmp_path / "solve").glob("crack.*"))   # the solve leaves no files behind
