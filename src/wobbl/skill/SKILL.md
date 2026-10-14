@@ -1,6 +1,6 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice or a scipy flight integrator, checks its own answer and returns a picture, a confidence level and fixes.
+description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice, Cantera or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
 ---
 
 # Wobbl: simulate before you build
@@ -74,6 +74,27 @@ Pressure drop through a pipe or duct with its fittings comes from Darcy Weisbach
 and drag on a sphere, cylinder, plate or cube from published drag curves, as in
 `wobbl flow drag sphere --size "22 cm" --speed "20 m/s"`. A drag result near the drag crisis comes back
 with low confidence, because roughness and turbulence decide it there.
+
+For a solid rocket motor design, run `wobbl motor motor.toml` (MCP `solve_motor`) instead of working the
+ballistics by hand. The spec lists the propellant (knsb, kndx, knsu, ocean-water or cherry-limeade, or its
+own burn rate and combustion data), the grains from the forward end (bates, tube, endburner, star, finocyl,
+moon or xcore), the nozzle and the casing, as in examples/knsb-motor/motor.toml, and the same design also
+runs as flags, as in
+`wobbl motor --propellant knsb --grain "bates d=48 core=18 L=80 x4" --throat 13 --exit 33 --casing "6061-t6 od=54 wall=1.6 L=400"`.
+Wobbl burns the grains back, integrates chamber pressure and thrust, and checks the time step, the mass
+balance, the closed form pressure at the peak and the propellant's c* against Cantera's equilibrium. The
+verdict comes from the casing's hoop stress at peak pressure against its yield, the port to throat ratio
+and core mass flux for erosive burning, and nozzle separation, and each fix is simulated with its new peak
+pressure and impulse. The run writes `thrust.csv` and a RASP `motor.eng`, and a rocket spec for motion can
+fly the design directly with `design = "motor.toml"` under `[motor]`. For a flame, run
+`wobbl flame methane --phi 1` or `wobbl flame propane --phi 0.9 --limit "1800 C"` (MCP `solve_flame`) for
+the adiabatic flame temperature and the equilibrium CO and NO. For propellant performance, run
+`wobbl propellant knsb --pressure "5 MPa" --area-ratio 8` or give a composition, as in
+`wobbl propellant "ap:70,al:16,htpb:14" --pressure "6.9 MPa" --area-ratio 10` (MCP `solve_propellant`),
+for c* and Isp in shifting and frozen flow the way NASA's CEA reports them. Cantera installs itself the
+first time (about 6 MB). The burning in a motor comes from the propellant's burn rate law rather than
+resolved flame chemistry, so say so when quoting a pressure, and keep the casing's safety factor margin.
+Wobbl models given designs only and gives no guidance on making or handling propellants.
 
 When someone asks how likely a part is to fail, which input matters most, whether the model matches
 their tests, or which physical tests they can skip, build the evidence on a finished run's folder.

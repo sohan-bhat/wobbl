@@ -85,7 +85,8 @@ def check_values(name: str, p: dict):
 
 def test_the_skill_names_every_kind_of_command():
     names = {dry_parse(shlex.split(c)[1:])[0] for c in skill_commands()}
-    assert {"inspect", "run", "materials", "fix", "thermal", "circuit", "motion"} <= names, names
+    assert {"inspect", "run", "materials", "fix", "thermal", "circuit", "motion", "motor", "flame",
+            "propellant"} <= names, names
 
 
 @pytest.mark.parametrize("command", skill_commands())
