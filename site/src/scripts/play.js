@@ -75,7 +75,8 @@ function surface(run, bytes) {
  *   value     float      the run's stress measure in MPa
  *   disp      float x3   displacement in mm
  *   excl      uint8      255 in a zone Wobbl excludes from the answer
- * A heat run adds frames: the temperature above the air at every saved time, frame after frame.
+ * A heat run adds frames: the temperature above the air at every saved time, frame after frame, and,
+ * when it was cut open, the cut faces with their own frames (see section).
  */
 export function decodePlay(run, buf) {
   const bytes = new Uint8Array(buf);
@@ -115,6 +116,43 @@ export function decodePlay(run, buf) {
       for (let v = 0; v < nv; v++) frames[f * nv + v] = sum[vNode[v]] * step;
     }
     arrays.frames = frames;
+    if (run.cut) Object.assign(arrays, section(run.cut, L, bytes, buf, F, step));
   }
   return { arrays, vertices: nv };
+}
+
+/**
+ * The cut faces of a heat run whose hottest point is inside the part: a grid on each face, two triangles
+ * a cell where all four corners are in the part, a normal facing the side that was cut away, and the
+ * temperature above the air at every grid point for every saved frame.
+ */
+function section(cut, L, bytes, buf, F, step) {
+  const np = cut.points;
+  const inside = new Uint8Array(buf, L.cut_inside.offset, np);
+  const d = planes(bytes, L.cut_frames.offset, F * np);
+  const cutFrames = new Float32Array(F * np);
+  for (let i = 0; i < np; i++) {
+    let sum = 0;
+    for (let f = 0; f < F; f++) { sum += d[f * np + i]; cutFrames[f * np + i] = sum * step; }
+  }
+  const cutPosition = new Float32Array(np * 3), cutNormal = new Int8Array(np * 3), tris = [];
+  let base = 0;
+  for (const face of cut.faces) {
+    const [ua, u0, u1, nu] = face.u, [va, v0, v1, nv] = face.v;
+    for (let i = 0; i < nu; i++) {
+      for (let j = 0; j < nv; j++) {
+        const k = base + i * nv + j;
+        cutPosition[k * 3 + face.axis] = face.at;
+        cutPosition[k * 3 + ua] = u0 + ((u1 - u0) * i) / (nu - 1);
+        cutPosition[k * 3 + va] = v0 + ((v1 - v0) * j) / (nv - 1);
+        cutNormal[k * 3 + face.axis] = 127 * cut.sign[face.axis];
+        if (i < nu - 1 && j < nv - 1) {
+          const a = k, b = k + nv, c = k + nv + 1, e = k + 1;
+          if (inside[a] && inside[b] && inside[c] && inside[e]) tris.push(a, b, c, a, c, e);
+        }
+      }
+    }
+    base += nu * nv;
+  }
+  return { cutPosition, cutNormal, cutIndex: np < 65536 ? Uint16Array.from(tris) : Uint32Array.from(tris), cutFrames };
 }

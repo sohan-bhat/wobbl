@@ -21,6 +21,9 @@ export interface HeatRun extends Base {
   kind: 'heat'; air_C: number; limit_C: number; t_max_C: number; hot_xyz: number[]; scale_C: [number, number];
   marker?: boolean; transient: boolean; times_s?: number[]; hottest_C?: number[]; cross_s?: number | null;
   warmup?: { t_s: number[]; theta: number[]; lumped_C: number; tau_s: number };
+  /** isotherm spacing in C, and the corner cut away at the hottest point when that point is inside the part */
+  iso_C?: number;
+  cut?: { point: number[]; sign: number[]; points: number; faces: { axis: number; at: number; u: number[]; v: number[] }[] };
 }
 export type PlayRun = StrengthRun | HeatRun;
 
@@ -106,5 +109,6 @@ export function pace(p: PlayRun): { tag: string; seconds: number; speed: number;
   const span = p.transient ? p.times_s![p.times_s!.length - 1] : p.warmup!.t_s[p.warmup!.t_s.length - 1];
   const nice = [50, 100, 150, 200, 300, 400, 500, 600, 800, 1000];
   const speed = nice.reduce((a, b) => (Math.abs(b - span / 8.5) < Math.abs(a - span / 8.5) ? b : a));
-  return { tag: `${speed}× speed`, seconds: span / speed, speed, span };
+  const lines = p.iso_C ? `, lines every ${p.iso_C} C` : '';
+  return { tag: `${speed}× speed${lines}`, seconds: span / speed, speed, span };
 }

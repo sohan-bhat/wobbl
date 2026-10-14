@@ -66,16 +66,21 @@ attribute float t1;
 uniform float uMix;
 uniform float uK;
 uniform vec2 uScale;
+uniform float uAir;
 varying vec3 vC;
 varying float vE;
 varying vec3 vN;
 varying vec3 vV;
+varying vec3 vW;
+varying float vT;
 ${INFERNO}
 void main() {
   // the temperature above the air, between two saved frames (or the steady field scaled for the warm up)
   float rise = uK * mix(t0, t1, uMix);
   vC = ramp((rise - uScale.x) / uScale.y);
   vE = 0.0;
+  vW = position;
+  vT = uAir + rise;
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vN = normalize(normalMatrix * normal);
   vV = -mv.xyz;
@@ -88,7 +93,19 @@ varying vec3 vC;
 varying float vE;
 varying vec3 vN;
 varying vec3 vV;
+#ifdef HEAT
+uniform float uIso;
+uniform vec3 uCutP;
+uniform vec3 uCutS;
+varying vec3 vW;
+varying float vT;
+#endif
 void main() {
+#ifdef HEAT
+  // the corner cut away to show the inside: nothing of the outer surface is drawn there
+  vec3 r = (vW - uCutP) * uCutS;
+  if (r.x > 0.0 && r.y > 0.0 && r.z > 0.0) discard;
+#endif
   vec3 v = normalize(vV);
   vec3 n = normalize(vN);
   n = faceforward(n, -v, n);
@@ -101,10 +118,21 @@ void main() {
     float k = mod(gl_FragCoord.x - gl_FragCoord.y, 9.0 * uPx);
     if (k < 2.5 * uPx) col = mix(col, vec3(0.055, 0.059, 0.067), 0.72);
   }
+#ifdef HEAT
+  // isotherms, a thin dark line at every multiple of uIso degrees, as wide on screen wherever they fall
+  if (uIso > 0.0) {
+    float f = vT / uIso, w = fwidth(f), d = abs(fract(f + 0.5) - 0.5);
+    col = mix(col, vec3(0.055, 0.059, 0.067), 0.55 * (1.0 - smoothstep(0.6 * w, 1.6 * w, d)));
+  }
+#endif
   gl_FragColor = vec4(col, 1.0);
 }`;
 
 const YELLOW = 0xffd400;
+
+const heatMaterial = (uniforms) => new ShaderMaterial({
+  vertexShader: HEAT_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms, defines: { HEAT: '' }, extensions: { derivatives: true },
+});
 
 /** The load as an arrow: a solid one, and a faint copy that shows through the part when it is behind it. */
 function arrow() {
@@ -159,18 +187,37 @@ export function createStage({ canvas, w, h, px, kind }) {
       geo.setAttribute('t0', new BufferAttribute(new Float32Array(arrays.frames.subarray(0, nv)), 1));
       geo.setAttribute('t1', new BufferAttribute(new Float32Array(arrays.frames.subarray(0, nv)), 1));
       const [lo, hi] = run.scale_C;
-      Object.assign(uniforms, { uMix: { value: 0 }, uScale: { value: [lo - run.air_C, hi - lo] } });
-      material = new ShaderMaterial({ vertexShader: HEAT_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms });
+      Object.assign(uniforms, {
+        uMix: { value: 0 }, uScale: { value: [lo - run.air_C, hi - lo] }, uAir: { value: run.air_C }, uIso: { value: run.iso_C ?? 0 },
+        uCutP: { value: new Vector3(...(run.cut ? run.cut.point : [0, 0, 0])) },
+        uCutS: { value: new Vector3(...(run.cut ? run.cut.sign : [0, 0, 0])) },
+      });
+      material = heatMaterial(uniforms);
     }
     const mesh = new Mesh(geo, material);
     mesh.frustumCulled = false;
     scene.add(mesh);
+    // the cut faces of a part cut open at its hottest point: the same colors and isotherms, never cut themselves
+    let cut = null;
+    if (kind === 'heat' && arrays.cutIndex) {
+      const g = new BufferGeometry();
+      g.setIndex(new BufferAttribute(arrays.cutIndex, 1));
+      g.setAttribute('position', new BufferAttribute(arrays.cutPosition, 3));
+      g.setAttribute('normal', new BufferAttribute(arrays.cutNormal, 3, true));
+      const np = arrays.cutPosition.length / 3;
+      g.setAttribute('t0', new BufferAttribute(new Float32Array(arrays.cutFrames.subarray(0, np)), 1));
+      g.setAttribute('t1', new BufferAttribute(new Float32Array(arrays.cutFrames.subarray(0, np)), 1));
+      const m = new Mesh(g, heatMaterial({ ...uniforms, uCutS: { value: new Vector3(0, 0, 0) } }));
+      m.frustumCulled = false;
+      scene.add(m);
+      cut = { geo: g, np };
+    }
     let load = null;
     if (kind === 'strength' && run.arrow) {
       load = arrow();
       scene.add(load);
     }
-    const part = { run, arrays, scene, geo, uniforms, load, nv, row, pair: [-1, -1] };
+    const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, pair: [-1, -1] };
     parts.push(part);
     return part;
   }
@@ -208,15 +255,18 @@ export function createStage({ canvas, w, h, px, kind }) {
     }
   }
 
-  /** The heat frames either side of a moment: copy the pair in only when it changes. */
+  /** The heat frames either side of a moment, on the surface and the cut faces: copied in only when they change. */
   function frames(part, i0, i1) {
     if (part.pair[0] === i0 && part.pair[1] === i1) return;
-    const { frames: all } = part.arrays, nv = part.nv;
-    const a = part.geo.getAttribute('t0'), b = part.geo.getAttribute('t1');
-    a.array.set(all.subarray(i0 * nv, (i0 + 1) * nv));
-    b.array.set(all.subarray(i1 * nv, (i1 + 1) * nv));
-    a.needsUpdate = true;
-    b.needsUpdate = true;
+    const pairs = [[part.geo, part.arrays.frames, part.nv]];
+    if (part.cut) pairs.push([part.cut.geo, part.arrays.cutFrames, part.cut.np]);
+    for (const [geo, all, n] of pairs) {
+      const a = geo.getAttribute('t0'), b = geo.getAttribute('t1');
+      a.array.set(all.subarray(i0 * n, (i0 + 1) * n));
+      b.array.set(all.subarray(i1 * n, (i1 + 1) * n));
+      a.needsUpdate = true;
+      b.needsUpdate = true;
+    }
     part.pair = [i0, i1];
   }
 
