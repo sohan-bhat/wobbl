@@ -36,6 +36,61 @@ def test_every_metal_curve_rises_from_zero_plastic_strain(key):
         assert p1 > p0 and s1 >= s0
 
 
+def test_plastic_section_of_a_rectangle_is_sigma_y_b_h2_over_4(parts, tmp_path):
+    """The 200 x 20 x 10 cantilever with 100 N down at the tip: at mid span M = 10 kN mm, Z = 20 x 10^2 / 4."""
+    import numpy as np
+
+    from wobbl.fe import NodeConstraint, StaticModel
+    from wobbl.mesh.mesher import Sizing, build_mesh
+    from wobbl.plastic.section import plastic_section
+    from wobbl.structural.run import describe_part
+
+    prep, _ = describe_part(parts["cantilever"], tmp_path)
+    mesh = build_mesh(prep, Sizing(h=4.0))
+    root = np.nonzero(np.abs(mesh.X[:, 0]) < 1e-6)[0]
+    tip = np.nonzero(np.abs(mesh.X[:, 0] - 200) < 1e-6)[0]
+    F = np.zeros((mesh.n_nodes, 3))
+    F[tip, 2] = -100.0 / len(tip)
+    sm = StaticModel(mesh, 200000.0, 0.3, 7.85e-9, [NodeConstraint("fix1", root)], forces=F)
+    s, why = plastic_section(mesh, [100.0, 10.0, 5.0], sm, 250.0)
+    assert s is not None, why
+    assert s["Z_mm3"] == pytest.approx(500.0, rel=0.005)
+    assert s["factor"] == pytest.approx(250 * 500 / 1e4, rel=0.005)
+    assert s["depth_mm"] == pytest.approx(10.0, rel=0.01) and s["bending_share"] == pytest.approx(1.0)
+
+
+def test_verdicts_separate_yielding_from_collapse():
+    from wobbl.plastic.study import verdict_for
+
+    assert verdict_for(1.4, 2.5, 1.5) == "holds"
+    assert verdict_for(0.6, 2.0, 1.5) == "yields"      # yields locally but carries the load with margin
+    assert verdict_for(0.6, 1.2, 1.5) == "marginal"
+    assert verdict_for(0.6, 0.9, 1.5) == "collapses"
+
+
+def test_brittle_and_plastic_materials_are_turned_away():
+    from wobbl.plastic.study import check_metal
+    from wobbl.structural.spec import SpecError
+
+    for name in ("pla", "petg", "wood"):
+        with pytest.raises(SpecError):
+            check_metal(get_material(name))
+    check_metal(get_material("6061-t6"))
+    check_metal(parse_custom("custom:E=200000,nu=0.3,yield=250"))
+
+
+def test_collapse_fixes_aim_at_the_hinge_and_scale_with_the_shortfall():
+    from wobbl.plastic.study import fixes
+
+    section = {"depth_mm": 10.0, "area_mm2": 200.0, "bending_share": 1.0}
+    out = fixes("collapses", get_material("mild-steel"), 0.5, 0.8, 1.5, section, "on face 3 at (0, 0, 0)")
+    kinds = [f["kind"] for f in out]
+    assert kinds == ["section", "material", "load"]
+    assert "13.7 mm" in out[0]["summary"]          # sqrt(1.5 / 0.8) times deeper
+    assert "469 MPa" in out[1]["title"] and "4140" in out[1]["summary"]
+    assert fixes("yields", get_material("mild-steel"), 0.5, 2.0, 1.5, section, "") == []
+
+
 def test_custom_metal_without_a_tensile_strength_is_perfectly_plastic():
     h = hardening_curve(parse_custom("custom:E=200000,nu=0.3,yield=250"))
     assert h.points == ((pytest.approx(250 * (1 + 250 / 200000)), 0.0),) and h.kind == "bilinear"
