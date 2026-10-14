@@ -18,7 +18,10 @@ Heat questions: solve_thermal. Circuits: solve_circuit. Falling, thrown and rock
 Pipe pressure drop, drag, propellers, drones and boat hulls: solve_flow.
 Solid rocket motor designs: solve_motor. Flame temperatures: solve_flame. Propellant c* and Isp: solve_propellant.
 Buckling of struts, plates and shells: solve_buckling. Natural frequencies against motor or propeller speed, sine
-sweeps and random vibration: solve_vibration. Fatigue life of a finished strength or vibration result: fatigue_life."""
+sweeps and random vibration: solve_vibration. Fatigue life of a finished strength or vibration result: fatigue_life.
+Odds of failure under scatter, comparison with test readings, credibility evidence and a test plan for a
+finished study: quantify_uncertainty, validate_against_tests, assess_credibility and plan_tests. Wobbl
+supplies evidence and never certifies a model."""
 
 
 def _protect_stdout():
