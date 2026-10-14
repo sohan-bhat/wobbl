@@ -43,6 +43,11 @@ class Job:
         p = Path(self.thing).expanduser() if self.thing else None
         return p.resolve() if p is not None and p.exists() else None
 
+    @property
+    def text(self) -> str:
+        """Every word the user gave: the thing when it is a description or a name, and the question."""
+        return " ".join(x for x in ("" if self.path else self.thing, self.question) if x and x != "-")
+
     def value(self, name: str, default: str | None = None, why: str = "") -> str | None:
         """The option as given, or the default with the guess recorded. why reads like 'drop height not given'."""
         if self.options.get(name):
@@ -51,7 +56,7 @@ class Job:
             return None
         else:
             v = default
-            self.assume(f"{why or name + ' not given'}: assumed {default}", f"--{name} {_quote(default)}")
+            self.assume(f"{why or name + ' not given'}, so Wobbl assumed {default}", f"--{name} {_quote(default)}")
         self.used[name] = [v]
         return v
 
@@ -60,7 +65,7 @@ class Job:
         vs = list(self.options.get(name) or [])
         if not vs and default:
             vs = list(default)
-            self.assume(f"{why or name + ' not given'}: assumed {', '.join(vs)}",
+            self.assume(f"{why or name + ' not given'}, so Wobbl assumed {', '.join(vs)}",
                         " ".join(f"--{name} {_quote(v)}" for v in vs))
         if vs:
             self.used[name] = vs
@@ -205,13 +210,16 @@ def run_plan(plan, options: dict[str, list[str]], out: Path, log=None, quick: bo
     """Run each analysis of a plan. With more than one, each writes into its own folder under out, and a later
     one can read an earlier one's outcome through job.earlier, as fatigue reads the stress result. Every run ends
     with simulation.json in out, which the 3D view reads."""
+    from .registry import domain
     log = log or (lambda stage, msg: None)
     many = len(plan.analyses) > 1
     earlier: dict[str, Any] = {}
     steps = []
+    shared = {o.name for o in domain(plan.domain).options}
+    carry = {k: list(v) for k, v in options.items()}    # a material or support settled once holds for every physics
     for a in plan.analyses:
-        job = Job(a, plan.thing, plan.kind, plan.question, options, out / a.name if many else out, quick, earlier,
-                  log)
+        job = Job(a, plan.thing, plan.kind, plan.question, dict(carry), out / a.name if many else out, quick,
+                  earlier, log)
         job.situate(objects=objects_named(plan.question))
         step = Step(a, job)
         t0 = time.time()
@@ -220,6 +228,7 @@ def run_plan(plan, options: dict[str, list[str]], out: Path, log=None, quick: bo
                 log("physics", f"{a.name}: {a.summary[:70]}")
             step.outcome = run_job(job)
             earlier[a.name] = step.outcome
+            carry.update({k: v for k, v in job.used.items() if k in shared and k not in carry})
         except Exception as e:  # noqa: BLE001  one failed analysis must not lose the others
             if not many:
                 raise

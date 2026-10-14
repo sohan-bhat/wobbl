@@ -61,7 +61,7 @@ def trajectory(job):
         raise ValueError("a rocket needs its spec, with its motor, nose, fins, balance point, rail and parachutes, "
                          "as in examples/rocket-launch/rocket.toml")
     else:
-        r = read_flight(" ".join(x for x in (job.thing, job.question) if x))
+        r = read_flight(job.text)
         for k in ("name", "mass", "density", "diameter", "cd", "height", "speed", "angle"):
             if k in r and not job.options.get(k):
                 job.use(k, r[k])

@@ -65,6 +65,8 @@ def study(job, need_load: bool = True, need_fix: bool = True):
         job.use("load", [x.text for x in st.loads])
     if st.fixtures and need_fix:
         job.use("fix", [f.text for f in st.fixtures])
+    job.situate(supports=[f.text for f in st.fixtures] if need_fix or job.values("fix") else [],
+                loads=[x.text for x in st.loads], material=st.material)
     return st, pre
 
 
