@@ -241,7 +241,8 @@ def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome")
         dur = float(t[-1] - t[0]) if len(t) > 1 else 0.0
         doc = {
             "manifest": {
-                "format": "wobbl-playback", "version": 1, "domain": "mechanism", "title": mech.name,
+                "format": "wobbl-playback", "kind": "mechanism", "version": 1, "generator": "wobbl mechanism",
+                "domain": "mechanism", "title": mech.name,
                 "question": o.question, "verdict": o.verdict, "headline": o.headline, "solver": o.solver,
                 "frames": int(len(keep)), "duration_s": round(dur, 6),
                 "suggested_seconds": round(min(max(dur, 2.0), 12.0), 3),

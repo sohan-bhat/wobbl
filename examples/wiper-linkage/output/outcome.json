@@ -155,7 +155,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 20.752,
+ "t_total": 12.738,
  "solver": "MuJoCo 3.10.0",
  "events": [
   {
@@ -199,7 +199,7 @@
    "detail": "50.1 deg"
   }
  ],
- "runtime_s": 20.752,
+ "runtime_s": 12.738,
  "model": {
   "bodies": 3,
   "joints": 3,

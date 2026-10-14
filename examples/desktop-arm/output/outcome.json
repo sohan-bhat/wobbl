@@ -222,7 +222,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 31.198,
+ "t_total": 39.405,
  "solver": "MuJoCo 3.10.0",
  "events": [
   {
@@ -281,7 +281,7 @@
    "detail": ""
   }
  ],
- "runtime_s": 31.198,
+ "runtime_s": 39.405,
  "model": {
   "bodies": 5,
   "joints": 4,
