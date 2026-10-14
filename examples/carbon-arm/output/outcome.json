@@ -53,7 +53,7 @@
   {
    "name": "force balance",
    "status": "pass",
-   "summary": "reactions balance the loads to 4.1e-09% (forces; shell supports also hold rotations, whose reaction moments are not compared)",
+   "summary": "reactions balance the loads to 4.3e-09% (forces; shell supports also hold rotations, whose reaction moments are not compared)",
    "detail": {
     "applied_N": [
      0.0,
@@ -227,7 +227,7 @@
     "level": 0,
     "h": 6.25,
     "n_nodes": 6228,
-    "t_solve": 56.411452,
+    "t_solve": 71.14986,
     "node": 23,
     "ply": 0,
     "strength_ratio": 4.696175,
@@ -246,7 +246,7 @@
     "level": 1,
     "h": 4.375,
     "n_nodes": 7864,
-    "t_solve": 72.158769,
+    "t_solve": 96.411528,
     "node": 1099,
     "ply": 1,
     "strength_ratio": 5.012673,
@@ -265,7 +265,7 @@
     "level": 2,
     "h": 3.125,
     "n_nodes": 15356,
-    "t_solve": 168.036021,
+    "t_solve": 260.855918,
     "node": 38,
     "ply": 0,
     "strength_ratio": 5.169214,
@@ -322,7 +322,7 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 386.676613,
+ "t_total": 540.712276,
  "solver": "CalculiX 2.23",
  "criteria": [
   {

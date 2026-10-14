@@ -24,7 +24,8 @@
     "domain": "part",
     "score": 100
    }
-  ]
+  ],
+  "focus": {}
  },
  "verdict": "pass",
  "situation": {

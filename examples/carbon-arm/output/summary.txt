@@ -10,7 +10,7 @@ Ex (CLT): 103979 MPa
 
 Checks:
   [warn] mesh convergence: load factor at first ply failure still moving: 4.7 -> 5.01 -> 5.17 x, last change 3.0% (stopped by level limit); expect about that much error
-  [pass] force balance: reactions balance the loads to 4.1e-09% (forces; shell supports also hold rotations, whose reaction moments are not compared)
+  [pass] force balance: reactions balance the loads to 4.3e-09% (forces; shell supports also hold rotations, whose reaction moments are not compared)
   [pass] hand calculation: beam theory with the laminate's CLT moduli, 103979 MPa stretching and 118322 MPa bending through a section 120 mm from the supports gives a peak axial strain of 750 microstrain; the shell model gives 751 (1x)
   [info] layup: 0/45/-45/0/0/-45/45/0: under 10% of the plies at 90 degrees, so loads off the main axis fall on the matrix
   [info] singularities: within 3.12 mm of the supports and rigid attachments the first ply reads 4.05x, set by how the model holds the laminate there; Wobbl reports the value away from them. A real clamp spreads the load over its length, so check the joint itself with a test or a detailed model
