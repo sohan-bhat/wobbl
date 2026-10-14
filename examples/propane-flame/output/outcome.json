@@ -1,0 +1,111 @@
+{
+ "domain": "combustion",
+ "part": "propane flame",
+ "question": "How hot does a propane flame in air get, and how much CO and NO does it make?",
+ "verdict": "ok",
+ "headline": "Adiabatic flame temperature 2266 K (1992 C) for propane in air at an equivalence ratio of 1, with 1.25% CO and 0.234% NO at equilibrium.",
+ "metrics": [
+  [
+   "flame temperature",
+   "2266 K"
+  ],
+  [
+   "equivalence ratio",
+   "1"
+  ],
+  [
+   "CO",
+   "1.25%"
+  ],
+  [
+   "NO",
+   "0.234%"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed element balance, energy balance, thermo data, no dissociation bound"
+ ],
+ "checks": [
+  {
+   "name": "element balance",
+   "status": "pass",
+   "summary": "every element of the reactants is in the products to 6e-16",
+   "detail": {}
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "the products at 2266 K hold the reactants' enthalpy to 2e-09 of cp T",
+   "detail": {}
+  },
+  {
+   "name": "thermo data",
+   "status": "pass",
+   "summary": "GRI-Mech 3.0's own thermodynamic data give 2266 K for the same flame, 0.0694 K from NASA's (0.0031% apart)",
+   "detail": {}
+  },
+  {
+   "name": "no dissociation bound",
+   "status": "pass",
+   "summary": "burning completely to CO2 and H2O with nothing breaking apart would reach 2392 K, and dissociation takes 126 K off it",
+   "detail": {}
+  },
+  {
+   "name": "flammability",
+   "status": "pass",
+   "summary": "propane burns in air from 2.1% to 9.5% by volume, an equivalence ratio of 0.51 to 2.50, and this mixture is 4.03% fuel",
+   "detail": {
+    "phi_range": [
+     0.510521,
+     2.498343
+    ]
+   }
+  }
+ ],
+ "assumptions": [
+  "Propane (C3H8) and air as O2 + 3.76 N2 at 298 K and 101 kPa, fully mixed.",
+  "Adiabatic and at constant pressure, with the products in chemical equilibrium on NASA's thermodynamic data (McBride, Gordon and Reno, NASA TM-4513). A real flame loses heat by radiation and to walls, so its peak runs below this temperature.",
+  "Equilibrium NO is an upper bound on what a flame makes, since forming NO takes longer than most flames last."
+ ],
+ "values": {
+  "fuel": "propane",
+  "oxidizer": "air",
+  "phi": 1.0,
+  "T_ad_K": 2265.631824,
+  "T_no_dissociation_K": 2391.903551,
+  "T_gri30_K": 2265.701269,
+  "pressure_Pa": 101325.0,
+  "reactant_T_K": 298.15,
+  "products": {
+   "N2": 0.720808,
+   "H2O": 0.148485,
+   "CO2": 0.102706,
+   "CO": 0.012503,
+   "O2": 0.005884,
+   "H2": 0.003289,
+   "OH": 0.003213,
+   "NO": 0.002336,
+   "H": 0.000463,
+   "O": 0.000311
+  },
+  "CO_ppm": 12503.25227,
+  "NO_ppm": 2336.368433,
+  "fuel_fraction": 0.040323,
+  "_figures": [
+   [
+    "sweep",
+    "Adiabatic flame temperature against equivalence ratio"
+   ]
+  ]
+ },
+ "images": {
+  "sweep": "images/sweep.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 20.444647,
+ "solver": "Cantera 3.2.0"
+}

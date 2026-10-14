@@ -1,0 +1,22 @@
+OK. Adiabatic flame temperature 2266 K (1992 C) for propane in air at an equivalence ratio of 1, with 1.25% CO and 0.234% NO at equilibrium.
+
+Confidence: high. passed element balance, energy balance, thermo data, no dissociation bound
+flame temperature: 2266 K
+equivalence ratio: 1
+CO: 1.25%
+NO: 0.234%
+
+Checks:
+  [pass] element balance: every element of the reactants is in the products to 6e-16
+  [pass] energy balance: the products at 2266 K hold the reactants' enthalpy to 2e-09 of cp T
+  [pass] thermo data: GRI-Mech 3.0's own thermodynamic data give 2266 K for the same flame, 0.0694 K from NASA's (0.0031% apart)
+  [pass] no dissociation bound: burning completely to CO2 and H2O with nothing breaking apart would reach 2392 K, and dissociation takes 126 K off it
+  [pass] flammability: propane burns in air from 2.1% to 9.5% by volume, an equivalence ratio of 0.51 to 2.50, and this mixture is 4.03% fuel
+
+Assumptions:
+  - Propane (C3H8) and air as O2 + 3.76 N2 at 298 K and 101 kPa, fully mixed.
+  - Adiabatic and at constant pressure, with the products in chemical equilibrium on NASA's thermodynamic data (McBride, Gordon and Reno, NASA TM-4513). A real flame loses heat by radiation and to walls, so its peak runs below this temperature.
+  - Equilibrium NO is an upper bound on what a flame makes, since forming NO takes longer than most flames last.
+
+Images: sweep: images/sweep.png
+Report: report.html

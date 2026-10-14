@@ -246,7 +246,10 @@ def _flame_sweep(out, fuel, oxidizer, T, P, phi, t_here, limit, in_air, o2, lim)
     lo, hi = (0.5, 1.6)
     if in_air and lim:
         lo, hi = max(0.3, _phi_at(lim[0] / 100, o2)), min(2.5, _phi_at(min(lim[1], 60) / 100, o2))
-    phis = np.linspace(min(lo, phi), max(hi, phi), 12)
+    lo, hi = min(lo, phi), max(hi, phi)
+    # finer near stoichiometric, where the temperature peaks, and through the operating point
+    phis = np.unique(np.concatenate([np.linspace(lo, hi, 20), np.linspace(0.8, 1.3, 6), [phi]]))
+    phis = phis[(phis >= lo) & (phis <= hi)]
     temps = [adiabatic(fuel, oxidizer, p, T, P)[1].T for p in phis]
     return sweep_chart(out / "images" / "sweep.png", phis, temps, "equivalence ratio", "flame temperature, K",
                        (phi, t_here), limit, f"limit {fmt(limit)} K" if limit else "")
