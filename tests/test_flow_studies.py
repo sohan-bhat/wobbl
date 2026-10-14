@@ -75,3 +75,40 @@ def test_finite_cylinder_and_a_drag_limit(tmp_path):
     assert o.verdict == "fails" and {f["kind"] for f in o.fixes} == {"shape", "speed"}
     with pytest.raises(ValueError):
         _run("drag", {"shape": "banana", "size": "1 m", "speed": "1 m/s"}, tmp_path)
+
+
+def test_playback_quantizes_fields_and_stays_small(tmp_path):
+    import base64
+    import json
+
+    import numpy as np
+
+    from wobbl.flow import playback
+
+    x, y = np.meshgrid(np.linspace(0, 2, 30), np.linspace(0, 1, 15))
+    u = np.sin(x) * y
+    f = playback.grid_field("flow", x.ravel(), y.ravel(), {"u": u.ravel()}, {"u": "m/s"}, nx=40, ny=20,
+                            solid=lambda gx, gy: np.hypot(gx - 1, gy - 0.5) < 0.2)
+    c = f["components"]["u"]
+    q = np.frombuffer(base64.b64decode(c["data"]), np.uint8).reshape(20, 40)
+    assert (q == 255).sum() > 0 and q[q < 255].max() <= 254
+    back = c["lo"] + q[0, -1] / 254 * (c["hi"] - c["lo"])         # the bottom row is y 0, where u is 0
+    assert back == pytest.approx(0.0, abs=(c["hi"] - c["lo"]) / 254)
+    path = playback.write(tmp_path, "test", "a test", "u on a grid", [f],
+                          curves={"c": playback.series([0, 1], [2, 3], "s", "N")}, scalars={"g": (9.81, "m/s2")})
+    doc = json.loads(open(path).read())
+    assert doc["format"] == "wobbl-playback" and doc["scalars"]["g"]["unit"] == "m/s2"
+    with pytest.raises(ValueError):
+        playback.write(tmp_path, "big", "too big", "", curves={"c": playback.series(range(60000), range(60000),
+                                                                                    "", "")})
+
+
+def test_heat_sink_geometry_and_losses():
+    from wobbl.flow.heatsink import FanSinkStudy, entry_exit_k, sink_geometry
+
+    part = "examples/fan-heat-sink/heatsink.py"
+    g = sink_geometry(FanSinkStudy(part))
+    assert g["fins"] == 9 and g["gap"] == pytest.approx(5.8125e-3) and g["channels"] == 8
+    assert entry_exit_k(1.0) == 0 and entry_exit_k(0.5) == pytest.approx(0.42 * 0.75 + 0.25)
+    with pytest.raises(ValueError):
+        sink_geometry(FanSinkStudy(part, geometry={"fin": 9.0}))

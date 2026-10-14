@@ -34,3 +34,17 @@ def test_installed_openfoam_is_lean_and_passes_its_check():
     info = install.installed()
     if info:      # an OpenFOAM of the user's own carries no marker
         assert info["kept_MB"] < 260 and info["full_MB"] > 3 * info["kept_MB"]
+
+
+def test_heated_gap_between_fins_matches_stephan_and_shah(tmp_path):
+    """Developing laminar flow and heat between two plates, against Stephan's heat transfer at Re 100 and Shah's
+    apparent friction at Re 1000."""
+    from wobbl.flow import correlations as C
+    from wobbl.flow.heatsink import channel_run, shah_london_dp
+
+    r = channel_run(100.0, 0.71, 3.55, (90, 27), tmp_path)
+    assert r["nu"] == pytest.approx(C.nu_plates_developing(100.0, 0.71, 7.1, 2.0), rel=0.03)
+    assert abs(r["q_in"] - r["q_out"]) < 1e-6 * r["q_in"]
+    r = channel_run(1000.0, 0.71, 5.16, (90, 27), tmp_path)
+    assert r["dp"] == pytest.approx(shah_london_dp(1000.0, 5.16), rel=0.05)
+    assert not any(tmp_path.iterdir())

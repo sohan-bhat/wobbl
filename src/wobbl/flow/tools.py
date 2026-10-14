@@ -5,7 +5,7 @@ import uuid
 
 from .fluids import qty
 
-KINDS = ("pipe", "drag", "prop", "hull")
+KINDS = ("pipe", "drag", "heatsink", "prop", "hull")
 
 
 def _num(params: dict, key: str, kind: str, default: float = 0.0) -> float:
@@ -25,6 +25,22 @@ def build(kind: str, params: dict):
                          _num(p, "speed", "velocity"), _num(p, "length", "length"), str(p.get("fluid") or "air"),
                          _num(p, "temp", "temperature", 20.0), _num(p, "cd", "plain"), _num(p, "max_drag", "force"),
                          str(p.get("question", ""))), run_drag
+    if kind == "heatsink":
+        from .heatsink import FanSinkStudy, run_fansink
+        if not p.get("part"):
+            raise ValueError("give the heat sink part, a parametric .py with base, size, fins, fin and fin_height")
+        fan = [x.strip() for x in str(p.get("fan") or "").split(",") if x.strip()]
+        if fan and len(fan) != 2:
+            raise ValueError("give the fan as its free flow and shut off pressure, like '10 CFM, 20 Pa'")
+        if not fan and not p.get("velocity"):
+            raise ValueError("give a fan ('10 CFM, 20 Pa') or the air speed between the fins")
+        return FanSinkStudy(str(p["part"]), str(p.get("material") or "6063-t5"), _num(p, "power", "power"),
+                            str(p.get("heat_faces") or ""), qty(fan[0], "flowrate") if fan else 0.0,
+                            qty(fan[1], "pressure") if fan else 0.0, _num(p, "velocity", "velocity"),
+                            _num(p, "ambient", "temperature", 25.0),
+                            _num(p, "limit", "temperature") if p.get("limit") else None,
+                            _num(p, "radiation", "plain"), keep=bool(p.get("keep", False)),
+                            question=str(p.get("question", ""))), run_fansink
     if kind == "prop":
         from .propeller import PropStudy, run_prop
         return PropStudy(str(p.get("prop", "apcsf_10x4.7")), rpm=_num(p, "rpm", "plain"),
