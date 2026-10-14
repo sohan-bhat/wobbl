@@ -73,7 +73,8 @@ def curve_for(mat: Material, which: str = "auto") -> Hardening:
     return hardening_curve(mat)
 
 
-def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=None) -> NonlinearOutcome:
+def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=None,
+                render_images: bool = True) -> NonlinearOutcome:
     t0 = time.time()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -122,8 +123,9 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
             service = {"error": str(e)[:200]}
     o = evaluate(study, mat, curve, prep, feats, loads, mesh, built, lin, y, lim, levels, service)
     o.t_total = time.time() - t0
-    say("render", "drawing the plastic strain and the load path")
-    o.images = render(out / "images", mesh, feats, y, lim, service)
+    if render_images:
+        say("render", "drawing the plastic strain and the load path")
+        o.images = render(out / "images", mesh, feats, y, lim, service)
     o.notes = list(prep.notes)
     o.write(out)
     clean_work(work, study.keep)

@@ -680,6 +680,16 @@ CASES += [
 ]
 
 
+# --- past yield, contact and bolted joints (the case functions are in nonlinear.py) -------------------------------
+from . import nonlinear as NL  # noqa: E402
+
+CASES += [
+    Case("plastic-cantilever", "Steel cantilever bent past yield by an end moment", "plasticity",
+         "fully plastic moment sigma_y b h^2 / 4", "collapse moment", "N m", 0.02, True, NL.plastic_cantilever),
+    Case("plastic-cylinder", "Thick steel tube under internal pressure, plane strain", "plasticity",
+         "Hill (1950), (2 / sqrt 3) sigma_y ln(b / a)", "collapse pressure", "MPa", 0.02, True, NL.plastic_cylinder),
+]
+
 def run_cases(out_dir: str | Path, ids: list[str] | None = None, log=print) -> list[dict]:
     out = Path(out_dir)
     results = []
