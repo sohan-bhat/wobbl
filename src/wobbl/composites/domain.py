@@ -60,7 +60,7 @@ def composite(job):
 register(Analysis(
     "part", "composite", "Composite layup on the walls: ply stresses, first ply failure by Tsai-Wu and Hashin, "
     "and layup changes that reach the target", composite, dry=True, kinds=PART_KINDS, default=False,
-    covers=("stress",),
+    covers=("stress",), covers_all=True,
     keywords=(r"\bcomposite\b", r"\bcarbon fib(?:er|re)\b", r"\bcfrp\b", r"\bgfrp\b", r"\bfiberglass\b",
               r"\bglass fib(?:er|re)\b", r"\blay ?up\b", r"\bplies\b", r"\bply\b", r"\blaminate\b", LAYUP),
     aliases=("laminate", "layup", "composites"), legacy="wobbl run --layup",
