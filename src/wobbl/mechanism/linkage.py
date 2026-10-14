@@ -132,9 +132,9 @@ def answer(b, img: Path, say) -> Answer:
                 f"the hardest part of the turn, where the linkage needs more torque than its line gives.")
     elif mu_lo < MU_BIND[0] or mu_hi > MU_BIND[1]:
         verdict = "fails"
-        head = (f"The linkage nearly locks, as its transmission angle falls to {fmt(mu_lo)} degrees" if mu_lo < MU_BIND[0]
-                else f"The linkage nearly locks, as its transmission angle reaches {fmt(mu_hi)} degrees") + \
-               ", where the coupler pushes almost along the rocker and friction can jam it."
+        worst = mu_lo if mu_lo < MU_BIND[0] else mu_hi
+        head = (f"The linkage nearly locks, as its transmission angle {'falls' if worst == mu_lo else 'rises'} to "
+                f"{fmt(worst)} degrees, where the coupler pushes almost along the rocker and friction can jam it.")
     elif hot:
         verdict = "fails"
         head = (f"The linkage moves, but the motor runs hot, drawing {fmt(rms)} N m RMS against about "

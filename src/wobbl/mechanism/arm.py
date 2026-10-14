@@ -156,8 +156,8 @@ def answer(b, img: Path, say) -> Answer:
     elif need["worst"] > MARGIN or need["hot"] > MARGIN:
         verdict = "marginal"
         j = max(joints, key=lambda x: max(J[x]["peak"], J[x]["heat"]))
-        head = (f"The arm makes the move with little to spare, as the {j} servo uses {100 * J[j]['peak']:.0f}% of what it "
-                f"can give at speed and {100 * J[j]['heat']:.0f}% of its continuous rating.")
+        head = (f"The arm makes the move with little to spare, as the {j} servo uses {100 * J[j]['peak']:.0f}% of "
+                f"what it can give at speed and {100 * J[j]['heat']:.0f}% of its continuous rating.")
     else:
         verdict = "ok"
         head = (f"Every servo keeps up with margin. The busiest, the {worst_j}, uses {100 * J[worst_j]['peak']:.0f}% "

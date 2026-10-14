@@ -147,7 +147,8 @@ def install(log: Log = print, force: bool = False) -> dict:
         f = pick_wheel(json.loads(meta.read_text()).get("urls", []))
         if f is None:
             raise SetupError(f"MuJoCo {MUJOCO_VERSION} has no wheel for Python {sys.version_info.major}."
-                             f"{sys.version_info.minor} on this platform, and 'pip install mujoco' may find a newer one")
+                             f"{sys.version_info.minor} on this platform, and 'pip install mujoco' may find a newer "
+                             "one")
         log(f"downloading {f['filename']} ({f['size'] / 1e6:.1f} MB)")
         whl = download(f["url"], tmp / f["filename"], log)
         want = (f.get("digests") or {}).get("sha256", "")
