@@ -32,6 +32,7 @@ from .spec import SpecError, StructuralStudy
 LEVELS = {"fast": (1.0, 0.7), "normal": (1.0, 0.7, 0.5), "fine": (1.0, 0.7, 0.5, 0.35)}
 TOL = {"fast": 0.05, "normal": 0.03, "fine": 0.02}
 AUTO_RATIO = 0.06        # the stress analysis takes the shell path on its own below this wall to size ratio
+CROSS_NODES = 60000      # the most nodes, estimated, the solid cross check spends
 CROSS_SIZE = 1.5         # the solid cross check's element size, in typical walls
 
 
@@ -186,7 +187,8 @@ def analyze_auto(study: StructuralStudy, out_dir: str | Path, progress=None, ren
     else:
         cross = next((c for c in o.checks if c.name == "solid cross check"), None)
         raiser = stress_raiser(o.governing_xyz, pre[1])
-        if cross is not None and cross.status in ("pass", "warn") and not raiser:
+        sized_out = cross is not None and (cross.detail or {}).get("skipped") == "size"
+        if cross is not None and (cross.status in ("pass", "warn") or sized_out) and not raiser:
             shutil.rmtree(out / "work", ignore_errors=True)
             return o
         reason = (f"the peak sits at {raiser}, whose stress a shell model cannot resolve" if raiser else
@@ -315,10 +317,17 @@ def solid_cross_check(prep, features, loads, fixtures, material, first: dict, sh
     from .build import build_static
     from .run import failure_measure
 
+    t = features.thickness_typical
+    estimate = 9.4 * max(prep.volume, 1e-9) / min(CROSS_SIZE * t, t) ** 3
+    if estimate > CROSS_NODES:
+        return Check("solid cross check", "info",
+                     f"skipped: even a coarse solid of these {fmt(t)} mm walls takes about {estimate / 1000:.0f} "
+                     "thousand nodes, the cost the shell model is there to avoid; the shell's own force balance, "
+                     "convergence and beam checks stand", {"skipped": "size", "nodes_estimate": estimate}), None
     try:
         # elements a wall and a half across: one second order element through each wall, which carries bending
         # well enough to show what the shell idealization changes
-        mesh = build_mesh(prep, Sizing(h=CROSS_SIZE * features.thickness_typical, curvature=8))
+        mesh = build_mesh(prep, Sizing(h=CROSS_SIZE * t, curvature=8))
         built = build_static(mesh, loads, fixtures, material, features.faces)
         res = solvers.for_domain("structural").solve_static(built.model, work)
     except Exception as e:  # noqa: BLE001  the cross check is a check, never a reason to fail
