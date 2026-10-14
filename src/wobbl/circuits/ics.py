@@ -167,8 +167,9 @@ def opamp(name: str) -> Part | None:
             f"B1 0 n1 I = max(-{_g(isr)}, min({_g(isr)}, {_g(gm)}*(V(inp,inn)+{_g(vos)})))\n"
             f"R1 n1 0 1meg\nC1 n1 0 {_g(c1)}\n"
             f"B2 n1 0 I = 10*max(0, V(n1)-V(vcc)+{_g(voh)}) + 10*min(0, V(n1)-V(vee)-{_g(vol)})\n"
-            f"Bsrc vcc out I = max(0, min({isc}, (V(n1)-V(out))/{rout}))\n"
-            f"Bsnk out vee I = max(0, min({isc}, (V(out)-V(n1))/{rout}))\n"
+            f"G2 0 n2 n1 0 1\nR2 n2 0 1\nC2 n2 0 {_g(1 / (2 * math.pi * 2 * gbw))}\n"
+            f"Bsrc vcc out I = max(0, min({isc}, (V(n2)-V(out))/{rout}))\n"
+            f"Bsnk out vee I = max(0, min({isc}, (V(out)-V(n2))/{rout}))\n"
             f"Iq vcc vee {_g(iq)}\n.ends")
     r = {"vsupply_V": vsmax, "iout_A": isc, "theta_ja": thja, "tj_max_C": 150}
     return Part(name, "opamp", r, "x", m, text, ("inp", "inn", "vcc", "vee", "out"),

@@ -112,6 +112,7 @@ def simulate_circuit(source: str, question: str = "", params: dict | None = None
             res = ac.analyze(c, work, runs.get("op") or run_op(c, work, "op_ac"), q, probes)
             checks += res.get("checks", [])
             values["ac"] = res.get("values", {})
+            ac.attach(stress, res)
         except Exception as e:  # noqa: BLE001  the AC sweep must not lose the rest of the result
             checks.append(Check("AC response", "skip", f"not run: {e}"))
     if focus == "tolerance" or re.search(TOL_WORDS, q) or (focus == "ratings" and not quick):
