@@ -45,8 +45,10 @@
 - `wobbl uncertainty` carries load, material, geometry and boundary condition
   scatter through a finished run and returns the probability of failure with
   its 95% interval, the spread of the answer and Sobol indices. Strength runs
-  scale exactly, and geometry, heat and circuit inputs get new solves and a
-  polynomial chaos surrogate with its leave one out error.
+  scale exactly, several loads scatter one at a time through an exact sum of
+  one solve per load on the final mesh, and Poisson's ratio, geometry, heat and
+  circuit inputs get new solves and a polynomial chaos surrogate with its leave
+  one out error.
 - `wobbl validate-against` compares a run with gauge, temperature, circuit or
   scope readings as ASME V&V 20 does, adds the area metric, calibrates the
   uncertain inputs and says which load attachment the readings favour.

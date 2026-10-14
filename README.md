@@ -442,9 +442,9 @@ Each folder has a `run.sh` that regenerates its outputs.
   once, and erosive burning, throat erosion and slag are flagged but not modeled.
   Against two MIT static fires the predicted peak pressure was 7% low on one and
   12% high on the other.
-- In a strength study's uncertainty the loads scatter together as one factor, the
-  supports stay rigid with the two load attachments as bounds, and Poisson's ratio
-  is fixed, because each of those would need its own solves on the final mesh.
+- In a strength study's uncertainty the supports stay rigid, with the rigid and
+  distributed load attachments as the bounds on how the load gets in, because a
+  strength support has no stiffness of its own to vary.
 
 Shell elements, fatigue estimates and bolt preload come next in 0.2, then CFD with
 OpenFOAM in 0.3 and multibody mechanisms with MuJoCo in 0.4.

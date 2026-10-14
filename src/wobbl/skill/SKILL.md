@@ -102,9 +102,10 @@ their tests, or which physical tests they can skip, build the evidence on a fini
 (MCP `quantify_uncertainty`) gives the probability of failure with its 95% interval, the spread of the
 answer and Sobol indices that rank the inputs. Scatter is written as a percentage, an `sd`, a `tol`
 band or a range, as in `"thickness tol 0.2"` or `"film uniform 3..8"`. Load, stiffness and strength
-scatter on a strength run scale the solution exactly and take seconds, while geometry, heat and circuit
-inputs need new solves and a polynomial chaos surrogate whose leave one out error comes back with the
-answer. `wobbl validate-against wobbl-out/part readings.csv` (MCP `validate_against_tests`) compares the
+scatter on a strength run scale the solution exactly and take seconds. With several loads, `load1`,
+`load2` and so on scatter on their own through one solve per load on the final mesh, and `nu` takes a
+few solves there. Geometry, heat and circuit inputs need new solves and a polynomial chaos surrogate
+whose leave one out error comes back with the answer. `wobbl validate-against wobbl-out/part readings.csv` (MCP `validate_against_tests`) compares the
 run with strain, displacement, temperature or circuit readings as ASME V&V 20 does, adds the area metric
 and calibrates the uncertain inputs. `wobbl credibility wobbl-out/part --influence high --consequence medium`
 (MCP `assess_credibility`) maps all of it to a V&V 40 style assessment, writes `credibility.html` for a
