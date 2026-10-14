@@ -202,14 +202,23 @@ def pot_estimate(s: Spec, gap: float) -> float:
 
 # --- permanent magnet holding a steel plate --------------------------------------------------
 MAGNET_KEYS = {"diameter", "height", "grade", "cup", "cup_gap", "plate", "plate_d", "stroke", "min_gap", "points",
-               "material", "need"}
+               "material", "need", "shape", "width", "depth"}
 
 
 def magnet_spec(p: dict) -> Spec:
     check_known(p, MAGNET_KEYS, "magnet")
     rm = value(p, "diameter", 20, "length") / 2
     d = {"rm": rm, "hm": value(p, "height", 10, "length"), "tc": value(p, "cup", 0, "length"),
-         "gc": value(p, "cup_gap", 1, "length"), "ta": value(p, "plate", 5, "length")}
+         "gc": value(p, "cup_gap", 1, "length"), "ta": value(p, "plate", 5, "length"),
+         "shape": text(p, "shape", "cylinder")}
+    if d["shape"] not in ("cylinder", "block"):
+        raise ParamError("shape is cylinder (axisymmetric) or block (3D)")
+    if d["shape"] == "block":
+        if d["tc"]:
+            raise ParamError("a steel cup is only modeled around a cylinder magnet")
+        d["a"] = value(p, "width", 20, "length")
+        d["b"] = value(p, "depth", d["a"] * 1e3, "length")
+        d["pa"] = value(p, "plate_d", 2 * max(d["a"], d["b"]) * 1e3 + 10, "length")
     d["rpl"] = value(p, "plate_d", 2 * (rm + (d["tc"] + d["gc"] if d["tc"] else 0)) * 1e3 + 20, "length") / 2
     stroke = value(p, "stroke", 5, "length")
     grade = text(p, "grade", "n42")
@@ -308,11 +317,14 @@ def run_magnetic(template: str, params: dict, out_dir: str | Path, question: str
     shutil.rmtree(work, ignore_errors=True)
     if s.air_core:
         return _air_core(s, out, work, question, keep, t_start, log)
+    if s.dims.get("shape") == "block":
+        from .magnet3d import run_block
+        return run_block(s, out, work, question, keep, t_start, log)
     sweep = []
     for i, g in enumerate(s.gaps):
         log("solve", f"gap {g * 1e3:.3g} mm ({i + 1} of {len(s.gaps)})")
         m, p, view = geom_fn(s, g, LEVELS[0])
-        sweep.append(_solve(m, p, work, f"g{i}"))
+        sweep.append(_solve(m, p, work, f"g{i}", fields=True))      # fields feed the playback frames
     forces = np.array([s.pull * r["F"] for r in sweep])
     gi = int(np.argmin(forces))                 # the weakest point of the stroke governs
     g = s.gaps[gi]
@@ -445,9 +457,49 @@ def run_magnetic(template: str, params: dict, out_dir: str | Path, question: str
                         "_figures": [["force", "Pull force over the stroke"],
                                      ["field", "Flux density and flux lines at the weakest gap"]]},
                        images, fixes, solver=f"GetDP {solve.getdp().version()} with gmsh", t_total=time.time() - t_start)
+    _playback(s, sweep, f_sweep, values.get("inductance_H"), geom_fn, out)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
+
+
+def _playback(s: Spec, sweep: list[dict], f_sweep, L, geom_fn, out: Path) -> str:
+    """One frame per gap of the stroke: |B| and the flux function r a on the r-z half plane, the parts at that
+    gap and the pull force there."""
+    from . import playback as pb
+
+    views = [geom_fn(s, g, LEVELS[0])[2] for g in s.gaps]
+    win = (0.0, max(v[1] for v in views), min(v[2] for v in views), max(v[3] for v in views))
+    nx = 40
+    ny = int(min(96, max(24, round(nx * (win[3] - win[2]) / (win[1] - win[0])))))
+    frames = []
+    for i, (g, r) in enumerate(zip(s.gaps, sweep)):
+        frames.append({"gap_mm": round(g * 1e3, 4), "force_N": round(float(f_sweep[i]), 5) if len(f_sweep) else None,
+                       "inductance_mH": round(L[i] * 1e3, 5) if L else None,
+                       **_frame(r, win, (nx, ny)), "parts": pb.shapes_mm(geom_fn(s, g, LEVELS[0])[0].shapes)})
+    manifest = {"frames": "one per gap of the stroke, from closed to open",
+                "frames[].gap_mm": "air gap between the moving part and the pole, mm",
+                "frames[].force_N": "pull force on the moving part after the mesh refinement correction, N",
+                "frames[].inductance_mH": "coil inductance, flux linkage over current, mH (null without a coil)",
+                "frames[].b": "flux density magnitude |B| on the grid, T, packed",
+                "frames[].flux": "flux function r a_phi on the grid, Wb/rad, packed; its contours are flux lines",
+                "frames[].parts": "the model's parts in mm (x is the radius, y the axis), drawn over the grid",
+                "grid": "x0, x1, y0, y1 in mm and nx by ny points; the model is axisymmetric about x = 0, so "
+                        "mirror it for the full section"}
+    return pb.write(out, "magnetic-stroke", manifest,
+                    {"template": s.template, "grid": {"x0": 0.0, "x1": round(win[1] * 1e3, 4),
+                                                      "y0": round(win[2] * 1e3, 4), "y1": round(win[3] * 1e3, 4),
+                                                      "nx": nx, "ny": ny, "mirror": True},
+                     "frames": frames, "need_N": s.need or None, "units": {"length": "mm", "b": "T", "force": "N"}})
+
+
+def _frame(r: dict, win: tuple, n: tuple) -> dict:
+    from . import playback as pb
+
+    msh = r["mesh"]
+    b = pb.grid(msh.X, msh.tris, win, n, tri_vals=np.where(msh.mask("shell"), np.nan, r["bt"]))
+    flux = pb.grid(msh.X, msh.tris, win, n, node_vals=r["az"] * msh.X[:, 0])
+    return {"b": pb.pack(b, 0.0, clip=99.5), "flux": pb.pack_signed(flux)}
 
 
 def _bare_magnet_check(s: Spec, work: Path, geom_fn) -> Check:
@@ -508,6 +560,18 @@ def _air_core(s: Spec, out: Path, work: Path, question, keep, t_start, log) -> G
                        {"b_center_T": bc[-1], "b_levels_T": bc, "b_exact_T": exact, "inductance_H": L,
                         "_figures": [["field", "Flux density and flux lines"]]}, images,
                        solver=f"GetDP {solve.getdp().version()} with gmsh", t_total=time.time() - t_start)
+    from . import playback as pb
+    win = (0.0, d["ro"] * 2.5, -d["lc"] * 0.8, d["lc"] * 0.8)
+    n = (32, int(min(96, max(24, round(32 * 1.6 * d["lc"] / (2.5 * d["ro"]))))))
+    pb.write(out, "magnetic-stroke", {"frames": "a single frame, the air core coil",
+                                      "frames[].b": "flux density magnitude |B| on the grid, T, packed",
+                                      "frames[].flux": "flux function r a_phi, Wb/rad, packed; contours are flux lines",
+                                      "grid": "x0, x1, y0, y1 in mm and nx by ny points, axisymmetric about x = 0"},
+             {"template": "solenoid", "grid": {"x0": 0.0, "x1": round(win[1] * 1e3, 4), "y0": round(win[2] * 1e3, 4),
+                                               "y1": round(win[3] * 1e3, 4), "nx": n[0], "ny": n[1], "mirror": True},
+              "frames": [{"gap_mm": None, "force_N": None, "inductance_mH": round(L * 1e3, 5), **_frame(fine, win, n),
+                          "parts": pb.shapes_mm(solenoid_geometry(s, 0.0, 1.0)[0].shapes)}],
+              "units": {"length": "mm", "b": "T"}})
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)

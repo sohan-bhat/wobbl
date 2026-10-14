@@ -331,6 +331,11 @@ def run_electric(template: str, params: dict, out_dir: str | Path, question: str
                         "_figures": [["field", "Field strength with equipotential lines"]]},
                        images, fixes, solver=f"GetDP {solve.getdp().version()} with gmsh",
                        t_total=time.time() - t_start)
+    from .playback import static_field
+    win = (max(view[0], 0.0) if template != "coax" else view[0], view[1], view[2], view[3])
+    static_field(out, f"electric-{template}", msh, win, fine["en"], fine["v"], geom_fn(s, LEVELS[-1])[0].shapes,
+                 {"capacitance_F": C, "peak_field_V_per_m": e_max, "breakdown_V_per_m": strength, "margin": margin,
+                  "volts": s.volts}, mirror=template == "sphere")
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)

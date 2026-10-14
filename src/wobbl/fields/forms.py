@@ -436,7 +436,7 @@ def helmholtz(p: SoundProblem, tags: dict[str, int]) -> str:
             po.append(f'Print[ p, OnPlane {{{{{x0!r}, {y0!r}, {z!r}}}{{{x1!r}, {y0!r}, {z!r}}}{{{x0!r}, {y1!r}, {z!r}}}}} '
                       f'{{{int(nx)}, {int(ny)}}}, TimeStep {i}, Format SimpleTable, File "mode{i - 1}.txt" ];')
     if p.fields:
-        po.append('Print[ pa, OnElementsOf Dom, Format NodeTable, File "pa.txt" ];')
+        po.append('Print[ p, OnElementsOf Dom, Format NodeTable, File "p.txt" ];')
     out.append("PostOperation {\n  { Name P; NameOfPostProcessing H; Operation {\n    " + "\n    ".join(po or [""]) +
                "\n  } }\n}\n")
     return "".join(out)
@@ -509,7 +509,7 @@ def fullwave_axi(p: WaveProblem, tags: dict[str, int]) -> str:
         po.append(f'Print[ h, OnLine {{{{{x!r}, {y0!r}, 0}}{{{x!r}, {y1!r}, 0}}}} {{{int(n)}}}, Format Table, '
                   'File "hwire.txt" ];')
     if p.fields:
-        po.append('Print[ hn, OnElementsOf Air, Format NodeTable, File "hn.txt" ];')
+        po.append('Print[ h, OnElementsOf Air, Format NodeTable, File "h.txt" ];')
     out.append("PostOperation {\n  { Name P; NameOfPostProcessing F; Operation {\n    " + "\n    ".join(po) +
                "\n  } }\n}\n")
     return "".join(out)

@@ -379,6 +379,10 @@ def run_board(template: str, params: dict, out_dir: str | Path, question: str = 
                        {**values, "params": {k: str(v) for k, v in params.items()},
                         "_figures": [["field", "Electric field around the trace"]]}, images, fixes,
                        solver=f"GetDP {solve.getdp().version()} with gmsh", t_total=time.time() - t_start)
+    from .playback import static_field
+    parts = geometry(s, LEVELS[-1], s.epsr, s.conductors[0])[0].shapes
+    static_field(out, f"board-{template}", msh, f["view"], f["en"], f["v"], parts,
+                 {k: v for k, v in values.items() if isinstance(v, (int, float))}, mirror=False, unit_e="V/m at 1 V")
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
