@@ -34,6 +34,7 @@ class CrackPath:
     section_force: float = 0.0    # force that section carries at the loads given, N
     small: Callable[[np.ndarray], np.ndarray] | None = None   # K below the smallest crack solved
     end: str = ""                 # why the path stops
+    end_fails: bool = False       # the path stops because the part has failed there (the crack cut through it)
 
     def k_at(self, s) -> np.ndarray:
         """K at crack sizes s, a power law between solved cracks; below the first, ``small`` or constant beta.
@@ -112,24 +113,34 @@ def failure_size(path: CrackPath, inp: LifeInputs, grid: np.ndarray, kgrid: np.n
     return np.where(hit.any(axis=-1), g0 + np.clip(t, 0, 1) * (g1 - g0), grid[-1])
 
 
-def cumulative(grid: np.ndarray, rate: np.ndarray, block: int) -> np.ndarray:
-    """Cycles to grow from grid[0] to each grid size, by the trapezoid rule in log size."""
+def cumulative(grid: np.ndarray, rate: np.ndarray, block: int) -> tuple[np.ndarray, np.ndarray]:
+    """Cycles to grow from grid[0] to each grid size, by the trapezoid rule in log size, counting only sizes where
+    the crack grows, and how many sizes up to each one it does not grow at (below threshold)."""
     with np.errstate(divide="ignore"):
-        dn = np.where(rate > 0, block * grid / np.where(rate > 0, rate, 1.0), np.inf)    # cycles per unit ln s
+        dn = np.where(rate > 0, block * grid / np.where(rate > 0, rate, 1.0), 0.0)    # cycles per unit ln s
     du = np.diff(np.log(grid))
     seg = 0.5 * (dn[..., 1:] + dn[..., :-1]) * du
-    return np.concatenate([np.zeros(seg.shape[:-1] + (1,)), np.cumsum(seg, axis=-1)], axis=-1)
+    zero = np.zeros(seg.shape[:-1] + (1,))
+    return np.concatenate([zero, np.cumsum(seg, axis=-1)], axis=-1), np.cumsum(rate <= 0, axis=-1)
+
+
+def _stuck(stuck: np.ndarray, grid: np.ndarray, lo: np.ndarray, hi: np.ndarray) -> np.ndarray:
+    """Whether a crack growing from lo to hi meets a size where it stops (from the counts of cumulative)."""
+    j0 = np.clip(np.searchsorted(grid, lo, side="left"), 0, grid.size - 1)
+    j1 = np.clip(np.searchsorted(grid, hi, side="right") - 1, 0, grid.size - 1)
+    rows = np.arange(stuck.shape[0])
+    before = np.where(j0 > 0, stuck[rows, np.maximum(j0 - 1, 0)], 0)
+    return stuck[rows, j1] - before > 0
 
 
 def _interp_rows(x: np.ndarray, grid: np.ndarray, rows: np.ndarray) -> np.ndarray:
-    """rows[i] (on grid) read at x[i], linearly in log size; infinite segments stay infinite."""
+    """rows[i] (on grid) read at x[i], linearly in log size."""
     lx, lg = np.log(np.clip(x, grid[0], grid[-1])), np.log(grid)
     j = np.clip(np.searchsorted(lg, lx) - 1, 0, grid.size - 2)
     t = (lx - lg[j]) / (lg[j + 1] - lg[j])
     a = np.take_along_axis(rows, j[:, None], 1)[:, 0]
     b = np.take_along_axis(rows, (j + 1)[:, None], 1)[:, 0]
-    with np.errstate(invalid="ignore"):
-        return np.where(np.isinf(a) | np.isinf(b), np.where(t <= 0, a, np.inf), a + t * (b - a))
+    return a + t * (b - a)
 
 
 def lives(path: CrackPath, inp: LifeInputs, a0, scale, cmult, kc, n_grid: int = 400,
@@ -148,11 +159,13 @@ def lives(path: CrackPath, inp: LifeInputs, a0, scale, cmult, kc, n_grid: int = 
         sl = slice(i, i + chunk)
         sc, cm, kk = scale[sl, None], cmult[sl, None], kc[sl, None]
         rate = block_rate(inp, kgrid[None, :], grid[None, :], sc, cm, kk, types)
-        cum = cumulative(grid, rate, inp.spectrum.cycles)
+        cum, stuck = cumulative(grid, rate, inp.spectrum.cycles)
         fail = failure_size(path, inp, grid, kgrid[None, :], sc, kk)
         start = np.minimum(a0[sl], fail)
-        out[sl] = np.maximum(_interp_rows(fail, grid, cum) - _interp_rows(start, grid, cum), 0.0)
-        ran_out[sl] = fail >= grid[-1] * (1 - 1e-12)
+        life = np.maximum(_interp_rows(fail, grid, cum) - _interp_rows(start, grid, cum), 0.0)
+        # a crack that meets a size below threshold on its way stops there and never fails
+        out[sl] = np.where(_stuck(stuck, grid, start, fail) & (fail > start), np.inf, life)
+        ran_out[sl] = (fail >= grid[-1] * (1 - 1e-12)) & (not path.end_fails)
     return out, ran_out
 
 
@@ -161,8 +174,11 @@ def growth_curve(path: CrackPath, inp: LifeInputs, a0: float, n_grid: int = 400)
     grid = np.geomspace(min(a0, path.s[0]), path.s[-1], n_grid)
     kgrid = path.k_at(grid)
     rate = block_rate(inp, kgrid, grid, 1.0, 1.0, inp.law.kc)
-    cum = cumulative(grid, rate, inp.spectrum.cycles)
+    cum, _ = cumulative(grid, rate, inp.spectrum.cycles)
     fail = float(failure_size(path, inp, grid, kgrid, 1.0, inp.law.kc))
+    stop = grid[(grid >= a0) & (rate <= 0)]
+    if len(stop):     # below threshold: the crack grows up to there and stops
+        fail = min(fail, float(stop[0]))
     keep = (grid >= a0) & (grid <= fail)
     n0 = float(np.interp(math.log(a0), np.log(grid), cum))
     return grid[keep], cum[keep] - n0

@@ -75,3 +75,26 @@ def test_wheeler_block_factors_against_cycle_by_cycle():
     ref = wheeler_reference(path, slow, 1.0, 503.0)
     assert n_slow > 1.5 * n_plain
     assert n_slow == pytest.approx(ref, rel=0.03)
+
+
+def test_threshold_stops_small_cracks_only():
+    # K rises with size; at 30 MPa the smallest cracks sit below the 1.8 MPa sqrt(m) threshold and never grow
+    path, y = _path(stress=30.0, end=40.0)
+    law = law_for("7075-t6")
+    inp = LifeInputs(law, parse_spectrum(r_ratio=0.1), 400.0)
+    small = law.threshold(0.1) / (0.9 * y)
+    a_stop = 0.9 * small ** 2
+    n, _ = lives(path, inp, np.array([0.5 * a_stop, 2.0 * a_stop]), 1.0, 1.0, law.kc)
+    assert np.isinf(n[0]) and np.isfinite(n[1]) and n[1] > 0
+    size, cycles = growth_curve(path, inp, 2.0 * a_stop)
+    assert np.all(np.diff(cycles) >= 0) and np.isfinite(cycles).all()
+
+
+def test_a_path_that_ends_by_cutting_through_counts_as_failure():
+    path, _ = _path(end=5.0)
+    inp = LifeInputs(GrowthLaw("paris", 2.71e-8, 3.7), parse_spectrum(r_ratio=0.0), 0.0)
+    _, ran = lives(path, inp, 1.0, 1.0, 1.0, 0.0)
+    assert ran[0]
+    path.end_fails = True
+    n, ran = lives(path, inp, 1.0, 1.0, 1.0, 0.0)
+    assert not ran[0] and np.isfinite(n[0])
