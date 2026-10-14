@@ -80,6 +80,48 @@ def advance(front: dict, law: GrowthLaw, spectrum: Spectrum, nu: float, size: fl
     return pts, da, theta
 
 
+def _arc(p: np.ndarray) -> np.ndarray:
+    return np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(p, axis=0), axis=1))])
+
+
+def _param(p: np.ndarray, u: np.ndarray, q: np.ndarray) -> float:
+    """Arc length along the polyline p (with arc lengths u) of the point nearest q."""
+    best, at = np.inf, 0.0
+    for j in range(len(p) - 1):
+        ab = p[j + 1] - p[j]
+        ll = float(ab @ ab)
+        t = float(np.clip((q - p[j]) @ ab / ll, 0.0, 1.0)) if ll > 0 else 0.0
+        d = float(np.linalg.norm(p[j] + t * ab - q))
+        if d < best:
+            best, at = d, u[j] + t * (u[j + 1] - u[j])
+    return at
+
+
+def relay(section: np.ndarray, front: np.ndarray, moved: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The live section rewritten through the measured front, and the next section laid out point for point the
+    same way, so the strip between them is never twisted.
+
+    A front can be shorter than the section it was cut from, where part of the section lies outside the part (a
+    surface crack on a curved face, say). The section's points beyond each end of the front stay, moving with the
+    front's end, and ``moved`` (the moved front with one extra point past each end) gives the new front."""
+    p = np.asarray(section, float)
+    front = np.asarray(front, float)
+    u = _arc(p)
+    u0, u1 = _param(p, u, front[0]), _param(p, u, front[-1])
+    if u0 > u1:
+        front, moved, u0, u1 = front[::-1], moved[::-1], u1, u0
+    tol = 1e-3 * max(float(u[-1]), 1e-9)
+    head, tail = p[u < u0 - tol], p[u > u1 + tol]
+    new_front = moved[1:-1]
+    if not len(head):
+        head = (front[0] + moved[0] - new_front[0])[None]
+    if not len(tail):
+        tail = (front[-1] + moved[-1] - new_front[-1])[None]
+    old = np.vstack([head, front, tail])
+    new = np.vstack([head + (new_front[0] - front[0]), new_front, tail + (new_front[-1] - front[-1])])
+    return old, new
+
+
 def orient(fk: FrontK, section: np.ndarray) -> FrontK:
     """Turn a front's node order to run the same way as the crack section it grew from."""
     a, b = fk.xyz[0], fk.xyz[-1]
@@ -115,6 +157,7 @@ class PathResult:
     balance: tuple | None = None
     notes: list[str] = field(default_factory=list)
     end_fails: bool = False       # the crack has cut through, so reaching the end of the path is failure
+    stuck: bool = False           # a step could not be meshed or solved, so the path stops short of failure
 
 
 def front_size(size: float, crack: Crack, h: float, wall: float, quality: str) -> float:
@@ -144,7 +187,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
     size = crack.size
     E, nu = material.E, material.nu
     end = f"the step limit ({max_steps})"
-    end_fails = False
+    end_fails = stuck = False
     for j in range(max_steps + 1):
         t0 = time.time()
         hf = front_size(size, crack, h, wall, quality)
@@ -167,7 +210,8 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
             if j == 0:
                 raise
             notes.append(f"Step {j} could not be solved ({str(e)[:160]}), so the path stops at step {j - 1}.")
-            end = f"a failed step ({str(e)[:80]})"
+            end = f"a step that could not be meshed or solved ({str(e)[:80]})"
+            stuck = True
             break
         if j == 0:
             first = fks
@@ -175,6 +219,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
         if len(fronts) < len(crack.front_sections()):
             notes.append(f"At step {j} a front was lost, so the path stops there.")
             end = "a lost front"
+            stuck = True
             break
         n_pts = {i: int(np.clip(round(f.length / (1.5 * hf)), 7, 31)) for i, f in fronts.items()}
         sampled = {i: resample(f, n_pts[i]) for i, f in fronts.items()}
@@ -221,14 +266,17 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
         step.advance = da_max
         step.kink_lead = math.degrees(float(moved[lead_i][2][lead]))
         for i, (pts, _, _) in moved.items():
+            old, new = relay(crack.sections[0 if i == 0 else -1], sampled[i]["xyz"], pts)
             if i == 0:
-                crack.sections.insert(0, pts)
+                crack.sections[0] = old
+                crack.sections.insert(0, new)
             else:
-                crack.sections.append(pts)
+                crack.sections[-1] = old
+                crack.sections.append(new)
         size += da_max
         if not keep:
             shutil.rmtree(workdir / f"step{j}", ignore_errors=True)
-    return PathResult(steps, crack, end, first, convergence, balance, notes, end_fails)
+    return PathResult(steps, crack, end, first, convergence, balance, notes, end_fails, stuck)
 
 
 def _leaves(part, old: np.ndarray, new: np.ndarray, da: np.ndarray) -> bool:

@@ -64,3 +64,19 @@ def test_front_element_size():
     assert front_size(1.4, None, 6.0, 0.0, "normal") == pytest.approx(0.1)
     assert front_size(30.0, None, 6.0, 5.0, "normal") == pytest.approx(5.0 / 6)
     assert front_size(100.0, None, 6.0, 0.0, "normal") == pytest.approx(1.5)
+
+
+def test_relay_keeps_the_section_layout_when_part_of_it_is_outside():
+    from wobbl.fracture.path import relay
+
+    # a section along x from -2 to 12, of which only 0..10 lies in the part, measured as an 11 point front
+    section = np.column_stack([np.linspace(-2, 12, 15), np.zeros(15), np.zeros(15)])
+    front = np.column_stack([np.linspace(0, 10, 11), np.zeros(11), np.zeros(11)])
+    moved = np.vstack([[-1, 1, 0], front + [0, 1, 0], [11, 1, 0]])
+    old, new = relay(section, front, moved)
+    assert len(old) == len(new) == 2 + 11 + 2
+    assert np.allclose(old[2:13], front) and np.allclose(new[2:13], front + [0, 1, 0])
+    assert np.allclose(new[:2], section[:2] + [0, 1, 0]) and np.allclose(old[-2:], section[-2:])
+    # a two point section spanning a wall gets the front put in and keeps its ends
+    old, new = relay(section[[0, -1]], front, moved)
+    assert len(old) == len(new) == 13 and np.allclose(old[0], section[0]) and np.allclose(new[-1], [12, 1, 0])
