@@ -136,16 +136,32 @@ def block_mesh(case: Case, vertices, blocks: list[str], patches: list[Patch], ed
 
 
 def channel(case: Case, length: float, height: float, nx: int, ny: int, gx: float = 1.0, gy: float = 1.0,
-            depth: float | None = None, top: str = "symmetry"):
+            depth: float | None = None, top: str = "symmetry", lead: float = 0.0):
     """A 2D channel from x 0 to length and y 0 (a wall) to height, one cell deep. top is 'symmetry' for half a
-    channel or 'wall'. gx and gy are blockMesh gradings, last cell over first."""
+    channel or 'wall'. gx and gy are blockMesh gradings, last cell over first. lead adds that much slip walled
+    approach before x 0, so the air meets the wall's leading edge inside the grid rather than at the inlet."""
     dz = depth or height / ny
-    v = [(0, 0, 0), (length, 0, 0), (length, height, 0), (0, height, 0),
-         (0, 0, dz), (length, 0, dz), (length, height, dz), (0, height, dz)]
-    pats = [Patch("inlet", "inlet", [(0, 4, 7, 3)]), Patch("outlet", "outlet", [(1, 2, 6, 5)]),
-            Patch("wall", "wall", [(0, 1, 5, 4)]), Patch("top", top, [(3, 7, 6, 2)]),
-            Patch("frontAndBack", "empty", [(0, 3, 2, 1), (4, 5, 6, 7)])]
-    block_mesh(case, v, [f"hex (0 1 2 3 4 5 6 7) ({nx} {ny} 1) simpleGrading ({val(gx)} {val(gy)} 1)"], pats)
+    L, h = length, height
+    if not lead:
+        v = [(0, 0, 0), (L, 0, 0), (L, h, 0), (0, h, 0), (0, 0, dz), (L, 0, dz), (L, h, dz), (0, h, dz)]
+        pats = [Patch("inlet", "inlet", [(0, 4, 7, 3)]), Patch("outlet", "outlet", [(1, 2, 6, 5)]),
+                Patch("wall", "wall", [(0, 1, 5, 4)]), Patch("top", top, [(3, 7, 6, 2)]),
+                Patch("frontAndBack", "empty", [(0, 3, 2, 1), (4, 5, 6, 7)])]
+        block_mesh(case, v, [f"hex (0 1 2 3 4 5 6 7) ({nx} {ny} 1) simpleGrading ({val(gx)} {val(gy)} 1)"], pats)
+    else:
+        q = gx ** (1 / max(nx - 1, 1))
+        first = L * (q - 1) / (q ** nx - 1) if q != 1 else L / nx
+        nl = max(4, int(round(math.log(1 + lead * (q - 1) / first) / math.log(q)))) if q != 1 else \
+            max(4, int(round(lead / first)))
+        gl = 1 / geometric(first, lead, nl)
+        v = [(-lead, 0, 0), (0, 0, 0), (L, 0, 0), (L, h, 0), (0, h, 0), (-lead, h, 0)]
+        v += [(x, y, dz) for x, y, _ in v]
+        pats = [Patch("inlet", "inlet", [(0, 6, 11, 5)]), Patch("outlet", "outlet", [(2, 3, 9, 8)]),
+                Patch("wall", "wall", [(1, 2, 8, 7)]), Patch("approach", "symmetry", [(0, 1, 7, 6)]),
+                Patch("top", top, [(5, 11, 10, 4), (4, 10, 9, 3)]),
+                Patch("frontAndBack", "empty", [(0, 5, 4, 1), (1, 4, 3, 2), (6, 7, 10, 11), (7, 8, 9, 10)])]
+        block_mesh(case, v, [f"hex (0 1 4 5 6 7 10 11) ({nl} {ny} 1) simpleGrading ({val(gl)} {val(gy)} 1)",
+                             f"hex (1 2 3 4 7 8 9 10) ({nx} {ny} 1) simpleGrading ({val(gx)} {val(gy)} 1)"], pats)
     case.depth = dz
 
 
@@ -308,21 +324,23 @@ def write_steady(case: Case, turb: Turbulence, iterations: int, functions: str, 
     resid = {"p": tol, "U": tol / 10}
     if turb.model == "rans":
         resid['"(k|omega)"'] = tol
+    if scalar:
+        resid["T"] = tol / 10
     case.write("system/fvSolution", "fvSolution", {
         "solvers": {"p": ({"solver": "PCG", "preconditioner": "DIC"} if small else
                           {"solver": "GAMG", "smoother": "GaussSeidel"}) | {"tolerance": 1e-9, "relTol": 0.05},
                     '"(U|k|omega|T)"': {"solver": "smoothSolver", "smoother": "symGaussSeidel", "tolerance": 1e-10,
                                         "relTol": 0.1}},
         "SIMPLE": {"consistent": "yes", "nNonOrthogonalCorrectors": 0, "residualControl": resid, **_p_ref(case)},
-        "relaxationFactors": {"equations": {"U": relax[0], '"(k|omega|T)"': relax[1]}}})
+        "relaxationFactors": {"equations": {"U": relax[0], '"(k|omega)"': relax[1], "T": 1.0}}})
 
 
 def write_transient(case: Case, turb: Turbulence, end: float, dt: float, functions: str, write_every: float,
-                    max_co: float = 0.9):
-    """pimpleFoam in PISO mode with an adjustable time step held under max_co."""
+                    max_co: float = 0.9, keep: int = 1):
+    """pimpleFoam in PISO mode with an adjustable time step held under max_co, keeping the last keep writes."""
     case.write("system/controlDict", "controlDict", entries(
         {"application": "pimpleFoam", "startFrom": "startTime", "startTime": 0, "stopAt": "endTime", "endTime": end,
-         "deltaT": dt, "writeControl": "adjustable", "writeInterval": write_every, "purgeWrite": 1,
+         "deltaT": dt, "writeControl": "adjustable", "writeInterval": write_every, "purgeWrite": keep,
          "writeFormat": "ascii", "writePrecision": 8, "writeCompression": "off", "timeFormat": "general",
          "timePrecision": 8, "runTimeModifiable": "false", "adjustTimeStep": "yes", "maxCo": max_co}) +
                f"\nfunctions\n{{\n{functions}}}\n")
@@ -338,7 +356,7 @@ def write_transient(case: Case, turb: Turbulence, end: float, dt: float, functio
     case.write("system/fvSolution", "fvSolution", {
         "solvers": {"p": {"solver": "GAMG", "smoother": "GaussSeidel", "tolerance": 1e-7, "relTol": 0.01},
                     "pFinal": {"solver": "GAMG", "smoother": "GaussSeidel", "tolerance": 1e-7, "relTol": 0},
-                    '"(U|k|omega|nuTilda)(|Final)"': {"solver": "smoothSolver", "smoother": "symGaussSeidel",
+                    '"(U|k|omega|nuTilda)(Final)?"': {"solver": "smoothSolver", "smoother": "symGaussSeidel",
                                                       "tolerance": 1e-8, "relTol": 0}},
         "PIMPLE": {"momentumPredictor": "yes", "nOuterCorrectors": 1, "nCorrectors": 2,
                    "nNonOrthogonalCorrectors": 0, **_p_ref(case)}})
@@ -373,8 +391,21 @@ def fo_yplus() -> str:
 def fo_scalar(pr: float) -> str:
     """Temperature as a passive scalar carried by the flow: laminar diffusivity nu / Pr, turbulent nut / Prt."""
     return (f"    T\n    {{\n        type scalarTransport; libs (solverFunctionObjects); field T;\n"
-            f"        alphaD {val(1 / pr)}; alphaDt {val(1 / PRANDTL_T)}; nCorr 0; bounded01 false;\n"
+            f"        alphaD {val(1 / pr)}; alphaDt {val(1 / PRANDTL_T)}; nCorr 3; bounded01 false;\n"
             f"        writeControl writeTime;\n    }}\n")
+
+
+def fo_average(start: float, nut: bool = False) -> str:
+    """Time averages from start on: the mean velocity and its fluctuations, and the mean eddy viscosity."""
+    extra = "            nut { mean on; prime2Mean off; base time; }\n" if nut else ""
+    return (f"    average\n    {{\n        type fieldAverage; libs (fieldFunctionObjects); writeControl writeTime;\n"
+            f"        timeStart {val(start)};\n        fields\n        (\n"
+            f"            U {{ mean on; prime2Mean on; base time; }}\n{extra}        );\n    }}\n")
+
+
+def fo_cell_volumes() -> str:
+    return ("    volumes\n    {\n        type writeCellVolumes; libs (fieldFunctionObjects); writeControl writeTime;\n"
+            "    }\n")
 
 
 def fo_cell_centres() -> str:
