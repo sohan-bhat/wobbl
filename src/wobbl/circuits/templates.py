@@ -134,7 +134,7 @@ D1 0 sw SCHOTTKY
 L1 sw out {L} IC={iout}
 C1 out cmid {C} IC={vout}
 R2 cmid 0 {esr}
-R1 out 0 {rload}
+RLOAD out 0 {rload}
 .end
 """
     return Template("buck", net, ["v(out)", "i(l1)"], dict(p, vin=vin, vout=vout, current=iout, frequency=f,

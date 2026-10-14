@@ -1,8 +1,6 @@
 """Run a circuit check with ngspice and verify it: textbook comparison, time step convergence, power balance."""
 from __future__ import annotations
 
-import math
-import re
 import time
 from pathlib import Path
 
@@ -12,7 +10,7 @@ from ..outcome_generic import GenericOutcome
 from ..solvers import base as solvers
 from ..units import fmt
 from ..verify.checks import Check, confidence
-from .draw import FIGURES, write_drawings, write_schematic
+from .draw import FIGURES, write_drawings
 from .templates import TEMPLATES, Template, e24_above
 
 
@@ -221,6 +219,12 @@ def run_circuit(template: str, params: dict, out_dir: str | Path, question: str 
                        f"Switching loss from {fmt(trf * 1e9)} ns edges: 0.5 V I (tr + tf) f.",
                        f"Junction to air {fmt(theta)} C/W (datasheet, no heatsink unless included)."]
     imgs.update(write_drawings(out / "images", template, p, data, values, verdict, tpl.netlist))
+    try:      # every part of the template's netlist against its ratings, and playback.json, like any circuit
+        from .pictures import template_parts
+        values["parts"] = template_parts(tpl.netlist, tpl.analysis, tpl.tran, out, float(p.get("ambient", 25)),
+                                         verdict)
+    except Exception:  # noqa: BLE001  the template's own answer stands without them
+        pass
     out_o = GenericOutcome("circuit", template, question, verdict, head, metrics, "high", [], checks, assumptions,
                            {**values, "params": {k: (v if isinstance(v, (int, float, str, bool)) else str(v))
                                                  for k, v in p.items()},
@@ -241,38 +245,6 @@ def _step_check(a: float, b: float, label: str) -> Check:
 
 
 def run_netlist(path: str, probes: list[str], out_dir: str | Path, question: str = "") -> GenericOutcome:
-    """Any user netlist: run it, report the probed vectors, and recheck with half the time step."""
-    from ..report.render import line_plot
-
-    t0 = time.time()
-    out = Path(out_dir)
-    text = Path(path).read_text()
-    if not probes:
-        raise ValueError("say which signals to read, for example --probe 'v(out)' --probe 'i(V1)'")
-    body = re.sub(r"(?ims)^\.control.*?^\.endc\s*$", "", text)
-    tran = re.search(r"(?im)^\.tran\s+(\S+)\s+(\S+)(.*)$", body)
-    tpl = Template(Path(path).stem, body, probes, {}, "dc")
-    data = _ngspice().run(body, out / "work", probes, "run")[0]
-    checks = []
-    if tran:
-        from ..units import parse_spice_value
-        step = parse_spice_value(tran.group(1))
-        half = body[:tran.start()] + f".tran {step / 2:.6e} {tran.group(2)}{tran.group(3)}" + body[tran.end():]
-        d2 = _ngspice().run(half, out / "work", probes, "half")[0]
-        for pr in probes:
-            a, b = float(np.max(np.abs(data[pr]))), float(np.max(np.abs(d2[pr])))
-            checks.append(_step_check(a, b, f"peak |{pr}|"))
-    vals = {pr: {"min": float(np.min(data[pr])), "max": float(np.max(data[pr])), "mean": float(np.mean(data[pr])),
-                 "final": float(data[pr][-1])} for pr in probes}
-    xkey = "time" if "time" in data else next(iter(data))
-    imgs = {"waveform": line_plot(out / "images" / "waveform.png", data[xkey], {pr: data[pr] for pr in probes},
-                                  xkey, "value"), **write_schematic(out / "images", body)}
-    lvl, reasons = confidence(checks)
-    head = "; ".join(f"{pr}: min {fmt(v['min'])}, max {fmt(v['max'])}, final {fmt(v['final'])}" for pr, v in
-                     vals.items())
-    o = GenericOutcome("circuit", path, question, "ok", head, [(pr, fmt(v["final"])) for pr, v in vals.items()][:4],
-                       lvl, reasons, checks, ["Simulated as written; models come from the netlist."],
-                       {"probes": vals, "_figures": [["waveform", "Simulated signals"], FIGURES[1]]}, imgs,
-                       solver=f"ngspice {_ngspice().version()}", t_total=time.time() - t0)
-    _ = tpl, math
-    return o.write(out)
+    """Any user netlist, as the general circuit study runs it, with the probed signals reported."""
+    from .study import simulate_circuit
+    return simulate_circuit(str(path), question, {}, out_dir, list(probes))

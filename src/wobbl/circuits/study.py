@@ -132,8 +132,12 @@ def simulate_circuit(source: str, question: str = "", params: dict | None = None
         except Exception as e:  # noqa: BLE001
             checks.append(Check("fixes", "skip", f"could not try fixes: {e}"))
     verdict, head = verdict_of(stress, c)
+    from .pictures import draw
     o = _outcome(c, source, question, verdict, head, stress, checks, extra, values, main, probes, fixes, runs,
                  t0, out, sections, ta)
+    o.images.update(draw(out, c, main, stress, verdict))
+    from .draw import FIGURES
+    o.values["_figures"] = FIGURES + o.values.get("_figures", [])
     try:
         from .playback import write as write_playback
         write_playback(out, c, main, stress, o.verdict)
