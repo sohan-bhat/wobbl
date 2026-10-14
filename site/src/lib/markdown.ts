@@ -53,7 +53,7 @@ export function term(code: string, lang = 'sh', label?: string): string {
         lines.push(comment ? `<span class="ln"><span class="c">${esc(comment)}</span></span>` : '<span class="ln"> </span>');
         continue;
       }
-      const prompt = cont ? '' : '<span class="p">$ </span>';
+      const prompt = cont ? '' : '<span class="p" data-pagefind-ignore>$ </span>';
       const tail = comment ? ` <span class="c">${esc(comment)}</span>` : '';
       lines.push(`<span class="ln">${prompt}${esc(cmd)}${tail}</span>`);
       copy.push(cmd);

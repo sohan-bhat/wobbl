@@ -574,7 +574,9 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
   box-shadow: 0 var(--lip) 0 var(--line-2); font: 600 12px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase;
   transition: transform 70ms ease-out, box-shadow 70ms ease-out;
 }
-#search-ui .pagefind-ui__search-clear { height: auto; top: 10px; right: 10px; bottom: 12px; padding: 0 10px; }
+/* sized to the input, since its positioned parent is the whole form and the results grow inside it */
+#search-ui .pagefind-ui__search-clear { top: 10px; right: 10px; bottom: auto; height: calc(64px * var(--pagefind-ui-scale) - 22px); padding: 0 10px; }
+#search-ui .pagefind-ui__search-input { padding-right: 96px; }
 #search-ui .pagefind-ui__search-clear:active, #search-ui .pagefind-ui__button:active { transform: translateY(var(--lip)); box-shadow: 0 0 0 var(--line-2); }
 
 /* A run: the question, the command and the checks beside the result */
