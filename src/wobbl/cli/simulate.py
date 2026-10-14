@@ -178,7 +178,7 @@ def show_catalog() -> None:
     from ..simulate import analyses, domains, errors
     for d in domains():
         mine = analyses(d.name)
-        ui.section(f"{d.name}: {d.summary}")
+        ui.console.print(f"\n[bold yellow]{d.name}[/bold yellow]  [dim]{d.summary}[/dim]")
         if not mine:
             ui.console.print("  [dim]no analyses registered yet[/dim]")
         for a in mine:
