@@ -584,6 +584,23 @@ def sdof_harmonic(out: Path):
                                           "transmissibility": round(tip["transmissibility"], 3)}
 
 
+def sdof_force(out: Path):
+    """The same strip and tip mass, now held still and pushed at the tip by a 1 N force swept through resonance: the
+    peak motion of a single degree of freedom, F / (k 2 zeta sqrt(1 - zeta^2)), with k = 3 E I / L^3."""
+    from ..life.api import vibration
+
+    L, b, h, zeta = 300.0, 12.0, 6.0, 0.02
+    part = G.box(out / "strip.step", L, b, h)
+    M = 20 * RHO_STEEL * L * b * h
+    o = vibration(part, STEEL, ["x=min"], loads=["1 N z @ x=max"], masses=[f"{M * 1e6:.6g} g at {L},{b / 2},{h / 2} "
+                                                                           "@ x=max"],
+                  modes=6, sine="2-60 Hz", damping=zeta, out=out / "run")
+    k = 3 * E_STEEL * (b * h ** 3 / 12) / L ** 3
+    expected = 1.0 / (k * 2 * zeta * math.sqrt(1 - zeta ** 2))
+    tip = o.values["harmonic"]["masses"][0]
+    return tip["relative_mm"], expected, {**_life_info(o), "peak_Hz": round(o.values["harmonic"]["frequency_Hz"], 4)}
+
+
 def shigley_fatigue(out: Path):
     """Shigley's Example 6-2: a polished rotating beam of 1050 HR steel (Sut 90 kpsi) at 55 kpsi fully reversed."""
     from ..life.fatigue import KPSI, shigley_f
@@ -676,6 +693,9 @@ CASES = [
     Case("sdof-harmonic", "Tip mass on a strip shaken through resonance", "vibration",
          "single degree of freedom, X = a / (2 zeta wn^2 sqrt(1 - zeta^2))", "peak motion of the mass on its base",
          "mm", 0.02, False, sdof_harmonic),
+    Case("sdof-force", "Tip mass on a strip pushed through resonance by a swept force", "vibration",
+         "single degree of freedom, X = F / (k 2 zeta sqrt(1 - zeta^2))", "peak motion of the mass", "mm", 0.02, False,
+         sdof_force),
     Case("shigley-fatigue", "Shigley Example 6-2, 1050 HR steel at 55 kpsi", "fatigue",
          "Shigley's S-N line with f = 0.86 read off Fig. 6-18, about 77 500 cycles", "cycles to failure", "cycles",
          0.03, False, shigley_fatigue),
