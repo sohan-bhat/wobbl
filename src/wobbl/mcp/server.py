@@ -89,13 +89,14 @@ def build_server():
     def solve_structural(study_id: str = "", path: str = "", material: str = "", loads: list[str] | None = None,
                          fixtures: list[str] | None = None, target_sf: float | None = None,
                          quality: str = "normal", budget: float = 300.0, question: str = "",
-                         print_direction: str | None = None) -> dict:
+                         print_direction: str | None = None, shell: bool = False) -> dict:
         """Run the verified static strength study (mesh convergence, equilibrium, beam theory check,
         singularity detection). Returns verdict, governing stress and location, safety factor, deflection,
         confidence with reasons, checks, assumptions, fixes, image paths and the HTML report path.
-        Simple shapes finish in under a minute, and real parts take one to seven minutes on a 2018 laptop."""
+        Simple shapes finish in under a minute, and real parts take one to seven minutes on a 2018 laptop.
+        shell=True solves a thin walled part (enclosure, cover, tube) as shells, checked against a coarse solid."""
         return tools.solve_structural(study_id, path, material, loads, fixtures, target_sf, quality, budget,
-                                      question, print_direction)
+                                      question, print_direction, shell)
 
     @srv.tool()
     def verify(result_dir: str) -> dict:

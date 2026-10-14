@@ -140,8 +140,10 @@ def add_fixture(study_id: str, fixture: str) -> dict:
 
 def solve_structural(study_id: str = "", path: str = "", material: str = "", loads: list[str] | None = None,
                      fixtures: list[str] | None = None, target_sf: float | None = None, quality: str = "normal",
-                     budget: float = 300.0, question: str = "", print_direction: str | None = None) -> dict:
-    """Run the verified strength study. Either pass study_id or path + material + loads + fixtures."""
+                     budget: float = 300.0, question: str = "", print_direction: str | None = None,
+                     shell: bool = False) -> dict:
+    """Run the verified strength study. Either pass study_id or path + material + loads + fixtures. shell=True
+    solves thin walls as shells, checked against a coarse solid."""
     from ..structural.pipeline import analyze_strength
     from ..structural.spec import StructuralStudy, parse_fixture, parse_load
 
@@ -170,7 +172,11 @@ def solve_structural(study_id: str = "", path: str = "", material: str = "", loa
             guesses = read_question(question, pre[1], study).guesses
         else:
             out = _results_root() / f"{Path(path).stem}-{uuid.uuid4().hex[:6]}"
-        o = analyze_strength(study, out, pre=pre)
+        if shell:
+            from ..structural.shell_path import analyze_shell
+            o = analyze_shell(study, out, pre=pre)
+        else:
+            o = analyze_strength(study, out, pre=pre)
     except Exception as e:  # noqa: BLE001
         return _err(e)
     if guesses:

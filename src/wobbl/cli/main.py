@@ -64,6 +64,8 @@ def _strength_options(f):
         click.option("--out", "-o", default=None, help="Output folder (default wobbl-out/<part>)."),
         click.option("--json", "as_json", is_flag=True, help="Print the result as JSON."),
         click.option("--no-images", is_flag=True, help="Skip heatmap rendering."),
+        click.option("--shell", is_flag=True, help="Solve thin walls as shells on their midsurface, checked against "
+                                                    "a coarse solid. Faster on enclosures, covers and tubes."),
         click.option("--quiet", "-q", is_flag=True, help="No progress lines."),
     ]
     for o in reversed(opts):
@@ -157,7 +159,11 @@ def _strength(part, question, kw, interpret: bool):
                 guesses = reading.guesses
                 for g in guesses:
                     cb("assume", g)
-            o = analyze_strength(st, out, cb, render=not kw.get("no_images"), pre=pre)
+            if kw.get("shell"):
+                from ..structural.shell_path import analyze_shell
+                o = analyze_shell(st, out, cb, render=not kw.get("no_images"), pre=pre)
+            else:
+                o = analyze_strength(st, out, cb, render=not kw.get("no_images"), pre=pre)
     except (SpecError, SelectionError, GeometryError, MeshError, SolverError, KeyError, ValueError) as e:
         hint = getattr(e, "hint", "")
         ui.fail(str(e).strip("'\""), hint if hint and hint not in str(e) else "")
