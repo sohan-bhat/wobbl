@@ -1,5 +1,5 @@
-"""CalculiX for nonlinear statics: elastic plastic materials, load and unload steps, contact with friction and bolt
-pretension.
+"""CalculiX for nonlinear statics: elastic plastic materials, load and unload steps, contact with friction and
+pretensioned bolts.
 
 The linear adapter in calculix.py writes one step and reads one result. A run here has several steps, each one
 ramping the model's loads to a multiple of their value, and the solver may stop inside a step on purpose: a load
@@ -51,12 +51,29 @@ class ContactPair:
 
 
 @dataclass
-class Pretension:
-    """A bolt pretension section: a cut through a bolt whose two sides are pulled together by ``force``."""
+class BoltSpring:
+    """A bolt between a rigid ring under its head and one under its nut, the way VDI 2230 idealizes it.
+
+    The shank is an axial spring with the bolt's own stiffness, cut by a turnbuckle: a force on the turnbuckle node
+    pulls the spring to the preload, and locking the node afterwards keeps that length, so the external load then
+    shares itself between bolt and clamped parts by their stiffness. Springs for bending, shear and twist keep the
+    clamped parts from turning about the bolt once they open or slide. The bolt runs along x, y or z.
+    """
     name: str
-    faces: np.ndarray            # (k, 2) element index and CalculiX face number on one side of the cut
-    normal: np.ndarray
-    force: float                 # N
+    head: np.ndarray             # nodes the head clamps (a ring from the hole to the bearing diameter)
+    nut: np.ndarray              # nodes the nut clamps
+    head_point: np.ndarray       # on the axis, at the head's bearing face
+    nut_point: np.ndarray
+    axial: float                 # N/mm
+    lateral: float = 0.0         # N/mm, each direction across the axis
+    bending: float = 0.0         # N mm/rad
+    torsion: float = 0.0         # N mm/rad
+    preload: float = 0.0         # N
+
+    @property
+    def axis(self) -> np.ndarray:
+        a = np.asarray(self.nut_point, float) - np.asarray(self.head_point, float)
+        return a / np.linalg.norm(a)
 
 
 @dataclass
@@ -70,8 +87,8 @@ class Step:
     max_increments: int = 300
     every_increment: bool = False   # full fields at every increment rather than only at the end of the step
     prescribed: list[tuple[str, int, float]] = field(default_factory=list)   # (node set, dof, value) this step
-    preload: bool = False        # pull the pretension sections to their force in this step
-    lock: bool = False           # hold the pretension sections at their length from now on
+    preload: bool = False        # pull the bolts to their preload in this step
+    lock: bool = False           # hold the bolts at their length from now on
     may_stop: bool = False       # a ramp toward collapse: stopping inside this step is the expected end
 
 
@@ -82,7 +99,7 @@ class NonlinearModel:
     steps: list[Step]
     contact: list[ContactPair] = field(default_factory=list)
     springs: list[tuple[np.ndarray, float]] = field(default_factory=list)   # (nodes, stiffness each) to ground
-    pretension: list[Pretension] = field(default_factory=list)
+    bolts: list[BoltSpring] = field(default_factory=list)
     monitor: dict[str, np.ndarray] = field(default_factory=dict)            # node sets whose U goes to the .dat
     node_sets: dict[str, np.ndarray] = field(default_factory=dict)          # extra named sets (prescribed steps)
     fields: tuple[str, ...] = ("U", "RF", "S", "PEEQ")
@@ -100,12 +117,12 @@ class NonlinearResult:
     solver: str = ""
     increments: int = 0
     iterations: int = 0
-    pretension_disp: dict[str, np.ndarray] = field(default_factory=dict)   # name -> (increments,) opening
+    bolt_force: dict[str, np.ndarray] = field(default_factory=dict)        # name -> force at each frame, N
     last_attempt: float = float("nan")       # increment of the last attempt, as a fraction of its step
 
 
 def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
-    """Write the deck. Returns names the reader needs: rigid body nodes, pretension nodes, constraint sets."""
+    """Write the deck. Returns names the reader needs: rigid body nodes, bolt nodes, constraint sets."""
     sm = model.static
     mesh = sm.mesh
     n = mesh.n_nodes
@@ -113,12 +130,13 @@ def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
     for k, r in enumerate(sm.rigid):
         extra_pts += [np.asarray(r.ref_point, float), np.asarray(r.ref_point, float)]
         rigid[r.name] = (n + 2 * k, n + 2 * k + 1)
-    pre_nodes = {}
-    for k, p in enumerate(model.pretension):
-        c = mesh.X[mesh.tets[p.faces[:, 0], :4]].mean(1).mean(0)
-        pre_nodes[p.name] = n + len(extra_pts)
-        extra_pts.append(c)
-    info = {"rigid": rigid, "pretension": pre_nodes, "sets": []}
+    bolts = {}
+    for b in model.bolts:
+        # head, head rotation, nut, nut rotation, the far end of the spring and the turnbuckle
+        i = n + len(extra_pts)
+        bolts[b.name] = dict(zip(("H", "HR", "N", "NR", "Q", "P"), range(i, i + 6)))
+        extra_pts += [b.head_point, b.head_point, b.nut_point, b.nut_point, b.nut_point, b.nut_point]
+    info = {"rigid": rigid, "bolts": bolts, "sets": []}
     with open(path, "w") as f:
         f.write("*HEADING\nWobbl nonlinear static\n")
         _write_mesh(f, mesh, extra_pts)
@@ -131,23 +149,32 @@ def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
                 for i in nodes:
                     n_el += 1
                     f.write(f"{n_el},{int(i) + 1}\n")
-                spring_sets.append((name, d + 1, kk))
+                spring_sets.append((name, f"{d + 1}", kk))
+        for k, b in enumerate(model.bolts):
+            ids = bolts[b.name]
+            n_el += 1
+            f.write(f"*ELEMENT, TYPE=SPRINGA, ELSET=EBA{k + 1}\n{n_el},{ids['H'] + 1},{ids['Q'] + 1}\n")
+            spring_sets.append((f"EBA{k + 1}", "", b.axial))
+            ax = int(np.argmax(np.abs(b.axis)))
+            for d in range(3):
+                for kind, (i, j), kk in (("L", ("H", "Q"), b.lateral),
+                                         ("R", ("HR", "NR"), b.torsion if d == ax else b.bending)):
+                    if (kind == "L" and d == ax) or kk <= 0:
+                        continue
+                    n_el += 1
+                    name = f"EB{kind}{k + 1}_{d + 1}"
+                    f.write(f"*ELEMENT, TYPE=SPRING2, ELSET={name}\n{n_el},{ids[i] + 1},{ids[j] + 1}\n")
+                    spring_sets.append((name, f"{d + 1},{d + 1}", kk))
         for c in [*sm.constraints, *_axis_rollers(sm)]:
             _nset(f, _setname(c.name), c.nodes)
             info["sets"].append(_setname(c.name))
         for name, nodes in {**model.monitor, **model.node_sets}.items():
             _nset(f, name, nodes)
-        if pre_nodes:
-            _nset(f, _PRE_SET, np.array(list(pre_nodes.values())))
         for k, r in enumerate(sm.rigid):
             _nset(f, f"RB{k + 1}", r.nodes)
         for cp in model.contact:
             _surface(f, f"{cp.name}S", mesh, cp.slave)
             _surface(f, f"{cp.name}M", mesh, cp.master)
-        for k, p in enumerate(model.pretension):
-            f.write(f"*SURFACE, NAME=PT{k + 1}, TYPE=ELEMENT\n")
-            for e, fc in p.faces:
-                f.write(f"{int(e) + 1},S{int(fc)}\n")
         for k, mat in enumerate(model.materials):
             elset = "EALL"
             if mat.elements is not None and len(model.materials) > 1:
@@ -161,18 +188,15 @@ def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
             if mat.hardening:
                 f.write("*PLASTIC\n" + "".join(f"{s:.10g},{e:.10g}\n" for s, e in mat.hardening))
             f.write(f"*SOLID SECTION, ELSET={elset}, MATERIAL=MAT{k + 1}\n")
-        for name, dof, kk in spring_sets:
-            f.write(f"*SPRING, ELSET={name}\n{dof}\n{kk:.10g}\n")
+        for name, dofs, kk in spring_sets:
+            f.write(f"*SPRING, ELSET={name}\n{dofs}\n{kk:.10g}\n")
         if any(s.nlgeom for s in model.steps):
             for k, r in enumerate(sm.rigid):
                 ref, rot = rigid[r.name]
                 f.write(f"*RIGID BODY, NSET=RB{k + 1}, REF NODE={ref + 1}, ROT NODE={rot + 1}\n")
         else:
             _rigid_equations(f, sm, rigid)
-        for k, p in enumerate(model.pretension):
-            nv = np.asarray(p.normal, float) / np.linalg.norm(p.normal)
-            f.write(f"*PRE-TENSION SECTION, SURFACE=PT{k + 1}, NODE={pre_nodes[p.name] + 1}\n"
-                    f"{nv[0]:.10g},{nv[1]:.10g},{nv[2]:.10g}\n")
+        _bolt_equations(f, mesh, model.bolts, bolts)
         for cp in model.contact:
             f.write(f"*CONTACT PAIR, INTERACTION={cp.name}I, TYPE=SURFACE TO SURFACE\n{cp.name}S,{cp.name}M\n")
             f.write(f"*SURFACE INTERACTION, NAME={cp.name}I\n*SURFACE BEHAVIOR, PRESSURE-OVERCLOSURE=LINEAR\n"
@@ -187,7 +211,7 @@ def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
         _write_boundaries(f, sm)
         prev = 0.0
         for s in model.steps:
-            _write_step(f, model, s, prev, rigid, pre_nodes, info["sets"])
+            _write_step(f, model, s, prev, rigid, bolts, info["sets"])
             prev = s.factor
     return info
 
@@ -219,6 +243,38 @@ def _rigid_equations(f, sm: StaticModel, rigid: dict):
         f.write("*EQUATION\n")
         for t in rows:
             f.write(f"{len(t)}\n" + ",".join(f"{n + 1},{d},{c:.10g}" for n, d, c in t) + "\n")
+
+
+def _bolt_equations(f, mesh, bolts: list[BoltSpring], ids: dict):
+    """Rigid rings under each bolt's head and nut (small rotations), and the turnbuckle: the spring's far end Q
+    follows the nut N, shifted along the axis by the turnbuckle node P, u_Q = u_N + a u_P."""
+    rows = []
+    for b in bolts:
+        i = ids[b.name]
+        for nodes, ref, rot, at in ((b.head, i["H"], i["HR"], b.head_point), (b.nut, i["N"], i["NR"], b.nut_point)):
+            rr = mesh.X[nodes] - np.asarray(at, float)
+            for node, (x, y, z) in zip(nodes, rr):
+                for d, terms in ((1, ((rot, 2, -z), (rot, 3, y))), (2, ((rot, 3, -x), (rot, 1, z))),
+                                 (3, ((rot, 1, -y), (rot, 2, x)))):
+                    rows.append([(int(node), d, 1.0), (ref, d, -1.0)] + [t for t in terms if abs(t[2]) > 1e-12])
+        a = b.axis
+        for d in range(3):
+            rows.append([(i["Q"], d + 1, 1.0), (i["N"], d + 1, -1.0)] + ([(i["P"], 1, -a[d])] if abs(a[d]) > 1e-12
+                                                                         else []))
+    if rows:
+        f.write("*EQUATION\n")
+        for t in rows:
+            f.write(f"{len(t)}\n" + ",".join(f"{n + 1},{d},{c:.10g}" for n, d, c in t) + "\n")
+
+
+def bolt_forces(bolts: list[BoltSpring], ids: dict, U_extra: np.ndarray, n: int) -> dict[str, float]:
+    """Tension in each bolt from its spring's stretch: (u_N - u_H) along the axis plus the turnbuckle's travel."""
+    out = {}
+    for b in bolts:
+        i = ids[b.name]
+        uh, un, up = U_extra[i["H"] - n], U_extra[i["N"] - n], U_extra[i["P"] - n, 0]
+        out[b.name] = float(b.axial * ((un - uh) @ b.axis + up))
+    return out
 
 
 def _write_equations(f, sm: StaticModel):
@@ -265,7 +321,7 @@ def _axis_rollers(sm: StaticModel) -> list:
     return [nc for nc in sm.normal_constraints if np.count_nonzero(np.abs(np.asarray(nc.normal, float)) > 1e-9) == 1]
 
 
-def _write_step(f, model: NonlinearModel, s: Step, prev: float, rigid: dict, pre_nodes: dict, sets: list[str]):
+def _write_step(f, model: NonlinearModel, s: Step, prev: float, rigid: dict, bolts: dict, sets: list[str]):
     sm = model.static
     head = f"*STEP, INC={s.max_increments}" + (", NLGEOM" if s.nlgeom else "")
     f.write(f"{head}\n*STATIC\n{s.first:.6g},1.,{s.smallest:.6g},{s.largest:.6g}\n")
@@ -278,24 +334,24 @@ def _write_step(f, model: NonlinearModel, s: Step, prev: float, rigid: dict, pre
         f.write("*BOUNDARY\n")
         for name, dof, val in s.prescribed:
             f.write(f"{name},{dof},{dof},{val:.10g}\n")
-    if s.lock:
-        f.write("*BOUNDARY, FIXED\n" + "".join(f"{i + 1},1,1\n" for i in pre_nodes.values()))
+    if s.lock and bolts:
+        f.write("*BOUNDARY, FIXED\n" + "".join(f"{b['P'] + 1},1,1\n" for b in bolts.values()))
     F = sm.nodal_forces() + rigid_as_nodal(sm)
     rows = np.nonzero(np.abs(F).max(1) > 0)[0]
-    loaded = len(rows) or (s.preload and model.pretension) or (s.lock and model.pretension)
+    loaded = len(rows) or (s.preload and model.bolts) or (s.lock and model.bolts)
     if loaded:
         f.write("*CLOAD\n")
         for i in rows:
             for d in range(3):
                 if F[i, d] != 0.0:
                     f.write(f"{i + 1},{d + 1},{s.factor * F[i, d]:.10e}\n")
-        for p in model.pretension:
-            # the preload pulls the section in its own step; once locked, the section keeps its length and the
-            # force on its node is released
+        for b in model.bolts:
+            # the preload pulls the turnbuckle in its own step; once it is locked the bolt keeps its length and the
+            # force on the turnbuckle node is released
             if s.preload:
-                f.write(f"{pre_nodes[p.name] + 1},1,{p.force:.10e}\n")
+                f.write(f"{bolts[b.name]['P'] + 1},1,{b.preload:.10e}\n")
             elif s.lock:
-                f.write(f"{pre_nodes[p.name] + 1},1,0.\n")
+                f.write(f"{bolts[b.name]['P'] + 1},1,0.\n")
     if sm.gravity is not None and np.linalg.norm(sm.gravity) > 0:
         g = np.asarray(sm.gravity, float)
         mag = np.linalg.norm(g)
@@ -318,12 +374,9 @@ def _write_step(f, model: NonlinearModel, s: Step, prev: float, rigid: dict, pre
             f.write(f"*NODE PRINT, NSET={name}, TOTALS=ONLY\nRF\n")
         for name in model.monitor:
             f.write(f"*NODE PRINT, NSET={name}\nU\n")
-        if pre_nodes:
-            f.write(f"*NODE PRINT, NSET={_PRE_SET}\nU\n")
     f.write("*END STEP\n")
 
 
-_PRE_SET = "NPRETENSION"
 
 
 def rigid_as_nodal(sm: StaticModel) -> np.ndarray:
@@ -385,7 +438,7 @@ def solve_nonlinear(model: NonlinearModel, workdir: str | Path, job: str = "nonl
             raise _explain(errs, log, r.returncode)
     n = model.static.mesh.n_nodes
     dat = read_dat(work / f"{job}.dat")
-    frames = read_frames(work / f"{job}.frd", n + len(info["rigid"]) * 2 + len(info["pretension"]), n)
+    frames = read_frames(work / f"{job}.frd", n + len(info["rigid"]) * 2 + 6 * len(info["bolts"]), n)
     if not finished:
         # CalculiX writes the attempt that failed too, for debugging; only converged increments are results
         done = [t for blocks in dat.values() for t, _ in blocks]
@@ -397,12 +450,10 @@ def solve_nonlinear(model: NonlinearModel, workdir: str | Path, job: str = "nonl
     for name, nodes in model.monitor.items():
         rows = dat.get(("displacements", name), [])
         monitor[name] = np.array([v[:, 1:4] for _, v in rows]) if rows else np.zeros((0, len(nodes), 3))
-    pre = {}
-    for name, idx in info["pretension"].items():   # the first dof of a pretension node is how far the cut opens
-        j = idx - n
-        pre[name] = np.array([fr["U_extra"][j, 0] if len(fr.get("U_extra", ())) > j else np.nan for fr in frames])
+    forces = {b.name: np.array([bolt_forces([b], info["bolts"], fr["U_extra"], n)[b.name] if "U_extra" in fr
+                                else np.nan for fr in frames]) for b in model.bolts}
     return NonlinearResult(times, reactions, monitor, frames, finished, log, t, f"CalculiX {_version()}",
-                           incs, iters, pre, last_attempt(work / f"{job}.sta"))
+                           incs, iters, forces, last_attempt(work / f"{job}.sta"))
 
 
 def read_sta(path: Path) -> tuple[int, int, int]:

@@ -50,24 +50,30 @@ def test_a_collapse_ramp_saves_every_increment_and_gives_up_early(bar, tmp_path)
     assert "*NODE PRINT, NSET=NFIX1, TOTALS=ONLY\nRF\n" in deck and "*NODE PRINT, NSET=MON\nU\n" in deck
 
 
-def test_contact_springs_and_pretension_are_written(bar, tmp_path):
+def test_contact_springs_and_bolts_are_written(bar, tmp_path):
     top = np.isclose(bar.X[bar.tris[:, :3], 2], 10).all(1)
     bottom = np.isclose(bar.X[bar.tris[:, :3], 2], 0).all(1)
     cp = nl.ContactPair("C1", top, bottom, 5e4, mu=0.2, stick=500.0, tension=0.01, clearance=0.0)
-    cut = np.column_stack([bar.tri_elem[top][:3], bar.tri_face[top][:3]])
-    pt = nl.Pretension("bolt1", cut, np.array([0, 0, 1.0]), 12000.0)
+    ring_top = np.nonzero(np.isclose(bar.X[:, 2], 10) & (np.linalg.norm(bar.X[:, :2] - [100, 10], axis=1) < 6))[0]
+    ring_bot = np.nonzero(np.isclose(bar.X[:, 2], 0) & (np.linalg.norm(bar.X[:, :2] - [100, 10], axis=1) < 6))[0]
+    bolt = nl.BoltSpring("bolt1", ring_top, ring_bot, np.array([100, 10, 10.0]), np.array([100, 10, 0.0]),
+                         2.5e5, lateral=6e4, bending=1e6, torsion=8e5, preload=12000.0)
     m = _model(bar, [nl.Step(0.0, preload=True), nl.Step(1.0, lock=True)], contact=[cp],
-               springs=[(np.array([3, 4]), 0.5)], pretension=[pt])
+               springs=[(np.array([3, 4]), 0.5)], bolts=[bolt])
     info = nl.write_nonlinear_inp(tmp_path / "c.inp", m)
     deck = (tmp_path / "c.inp").read_text()
     assert "*CONTACT PAIR, INTERACTION=C1I, TYPE=SURFACE TO SURFACE\nC1S,C1M\n" in deck
     assert "*FRICTION\n0.2,500\n" in deck and "*CLEARANCE, MASTER=C1M, SLAVE=C1S, VALUE=0\n" in deck
     assert deck.count("TYPE=SPRING1") == 3 and "*SPRING, ELSET=ESPR1_3\n3\n0.5\n" in deck
-    node = info["pretension"]["bolt1"] + 1
-    assert f"*PRE-TENSION SECTION, SURFACE=PT1, NODE={node}\n0,0,1\n" in deck
+    ids = {k: v + 1 for k, v in info["bolts"]["bolt1"].items()}
+    # the shank runs from the head to the turnbuckle's far end, which follows the nut shifted along -z
+    assert f"TYPE=SPRINGA, ELSET=EBA1\n" in deck and f",{ids['H']},{ids['Q']}\n" in deck
+    assert "*SPRING, ELSET=EBA1\n\n250000\n" in deck
+    assert f"3\n{ids['Q']},3,1,{ids['N']},3,-1,{ids['P']},1,1\n" in deck
+    assert deck.count("TYPE=SPRING2") == 5          # shear in x and y, bending about x and y, twist about z
     preload, lock = deck.split("*END STEP\n")[:2]
-    assert f"{node},1,1.2000000000e+04\n" in preload
-    assert f"*BOUNDARY, FIXED\n{node},1,1\n" in lock and f"{node},1,0.\n" in lock
+    assert f"{ids['P']},1,1.2000000000e+04\n" in preload
+    assert f"*BOUNDARY, FIXED\n{ids['P']},1,1\n" in lock and f"{ids['P']},1,0.\n" in lock
 
 
 def test_rigid_attachments_stay_small_unless_a_step_is_large_deflection(bar, tmp_path):
