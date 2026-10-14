@@ -1,0 +1,20 @@
+# Synthetic readings, not from a real test. Made by make_readings.py from Wobbl's own solution with
+# E = 70.6 GPa and gauge noise, to show the workflow. They say nothing about how well the model matches
+# a real mount.
+name,quantity,x,y,z,direction,load,value,uncertainty,unit
+SG1,strain,43.84,8.91,79.39,"-0.1792,-0.6271,0.7581",500,374.8,7.6,microstrain
+SG1,strain,43.84,8.91,79.39,"-0.1792,-0.6271,0.7581",1000,765.4,15.2,microstrain
+SG1,strain,43.84,8.91,79.39,"-0.1792,-0.6271,0.7581",1500,1099.3,22.9,microstrain
+SG1,strain,43.84,8.91,79.39,"-0.1792,-0.6271,0.7581",2000,1566.0,30.5,microstrain
+SG2,strain,12.15,0.00,100.96,"-0.9502,0.0000,0.3116",500,212.9,5.0,microstrain
+SG2,strain,12.15,0.00,100.96,"-0.9502,0.0000,0.3116",1000,417.0,8.4,microstrain
+SG2,strain,12.15,0.00,100.96,"-0.9502,0.0000,0.3116",1500,625.2,12.6,microstrain
+SG2,strain,12.15,0.00,100.96,"-0.9502,0.0000,0.3116",2000,844.0,16.8,microstrain
+SG3,strain,-34.39,0.00,29.42,"-0.8635,0.0000,0.5043",500,-71.0,5.0,microstrain
+SG3,strain,-34.39,0.00,29.42,"-0.8635,0.0000,0.5043",1000,-140.4,5.0,microstrain
+SG3,strain,-34.39,0.00,29.42,"-0.8635,0.0000,0.5043",1500,-205.3,5.0,microstrain
+SG3,strain,-34.39,0.00,29.42,"-0.8635,0.0000,0.5043",2000,-275.7,5.6,microstrain
+D1,displacement,24.23,0.00,112.00,"-0.1898,-0.9722,-0.1372",500,0.0676,0.005,mm
+D1,displacement,24.23,0.00,112.00,"-0.1898,-0.9722,-0.1372",1000,0.1354,0.005,mm
+D1,displacement,24.23,0.00,112.00,"-0.1898,-0.9722,-0.1372",1500,0.2045,0.005,mm
+D1,displacement,24.23,0.00,112.00,"-0.1898,-0.9722,-0.1372",2000,0.2686,0.005,mm
