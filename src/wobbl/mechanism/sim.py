@@ -122,9 +122,10 @@ def _names(model, kind) -> list[str]:
 
 
 def simulate(m: Mechanism, timestep: float | None = None, end: float | None = None, samples: int = 800,
-             frames: int = 9, ideal: bool = False, poses: int = 150) -> Run:
+             frames: int = 9, ideal: bool = False, poses: int = 150, late: float | None = None) -> Run:
     """Simulate ``m`` to ``end`` (default its move plus hold, or its duration). ``ideal`` drops every motor limit,
-    which shows what a move needs."""
+    which shows what a move needs. From time ``late`` on, each contact's force and where it acts are averaged,
+    for the forces a model settles to."""
     mujoco = _mj()
 
     t_wall = time.time()
@@ -134,6 +135,9 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
     if end <= 0:
         raise SpecError("nothing to simulate: give a move, a duration or a hold time")
     d = mujoco.MjData(model)
+    ks = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "wobbl_start")
+    if ks >= 0:     # the pose Wobbl chose to start from: a home keyframe, nudged or set on a floor
+        mujoco.mj_resetDataKeyframe(model, d, ks)
     di = mujoco.MjData(model)
     jnames = _names(model, "joint")
     bnames = _names(model, "body")
@@ -144,6 +148,10 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
     qadr = np.array([model.jnt_qposadr[i] for i in hinge], int)
     dadr = np.array([model.jnt_dofadr[i] for i in hinge], int)
     free = [i for i in range(model.njnt) if model.jnt_type[i] == mujoco.mjtJoint.mjJNT_FREE]
+    # a planar root, which lifts off on a vertical slide, is tracked like a free body under its body's name
+    planar = [i for i in range(model.njnt) if model.body_parentid[model.jnt_bodyid[i]] == 0 and
+              model.jnt_type[i] == mujoco.mjtJoint.mjJNT_SLIDE and abs(model.jnt_axis[i][2]) > 0.5 and
+              not any(model.jnt_bodyid[f] == model.jnt_bodyid[i] for f in free)]
 
     # starting state: joint start values, then the move's first waypoint
     start = {j.name: j.start for j in m.joints}
@@ -201,8 +209,11 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
     peak, depth, eqerr = np.zeros(nrec), np.zeros(nrec), np.zeros(nrec)
     cop = np.full((nrec, 2), np.nan)
     mom = np.zeros((nrec, 3))
-    fr = {jnames[i]: {"body": bnames[model.jnt_bodyid[i]], "tilt": np.zeros(nrec), "z": np.zeros(nrec),
-                      "xy": np.zeros((nrec, 2)), "vel": np.zeros((nrec, 3))} for i in free}
+    tracked_roots = [(jnames[i], i) for i in free] + [(bnames[model.jnt_bodyid[i]] + "_root", i) for i in planar]
+    fr = {k: {"body": bnames[model.jnt_bodyid[i]], "tilt": np.zeros(nrec), "z": np.zeros(nrec),
+              "xy": np.zeros((nrec, 2)), "vel": np.zeros((nrec, 3))} for k, i in tracked_roots}
+    nlate = 0
+    last_contacts = []
     frame_at = set(np.linspace(0, steps, frames).round().astype(int).tolist()) if frames else set()
     pose_at = set(np.linspace(0, steps, poses).round().astype(int).tolist()) if poses else set()
     pose_t, pose_x, pose_m = [], [], []
@@ -225,7 +236,7 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
     di_qacc, di_applied = di.qacc, di.qfrc_applied
     plan = [(dr, dof, int(model.jnt_qposadr[jid[dr.joint]]), motor, follows) for dr, dof, motor, follows in drives]
     servo_plan = [x for x in plan if x[4]]
-    probe = [x[3].stall_torque if x[3] is not None else 1.0 for x in servo_plan]
+    madr = np.array([model.dof_Madr[dof] for dof in servo_dofs], int)
     A = np.zeros((len(servo_plan), len(servo_plan)))
     a_cmd = np.zeros(len(servo_plan))
     W_d = W_l = W_g = W_p = W_c = 0.0
@@ -265,6 +276,9 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
             di.qvel[:] = qvel
             mujoco.mj_forward(model, di)
             a0 = di_qacc[servo_dofs].copy()
+            # a probe worth about 10 rad/s2 of the joint's own inertia, small enough that contacts answer it
+            # linearly
+            probe = np.maximum(di.qM[madr], 1e-9) * 10.0
             for k, dof in enumerate(servo_dofs):
                 di_applied[dof] += probe[k]
                 mujoco.mj_forwardSkip(model, di, mujoco.mjtStage.mjSTAGE_VEL, 1)
@@ -301,13 +315,13 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
                 Wrec[k][r] = v
             mujoco.mj_subtreeVel(model, d)
             mom[r] = d.subtree_linvel[0] * total_mass
-            for i in free:
+            for key, i in tracked_roots:
                 b = model.jnt_bodyid[i]
                 z = d.xmat[b].reshape(3, 3)[:, 2]
-                e = fr[jnames[i]]
+                e = fr[key]
                 e["tilt"][r] = math.degrees(math.acos(max(-1.0, min(1.0, float(z[2])))))
                 e["z"][r], e["xy"][r] = d.xipos[b][2], d.xipos[b][:2]
-                e["vel"][r] = v0[model.jnt_dofadr[i]:model.jnt_dofadr[i] + 3]
+                e["vel"][r] = d.cvel[b][3:] if i in planar else v0[model.jnt_dofadr[i]:model.jnt_dofadr[i] + 3]
             for k, g in tracked.items():
                 pts[k][r] = d.geom_xpos[g]
         if step in frame_at:
@@ -319,19 +333,34 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
         # contacts and constraints belong to the state at the start of this step
         pk = dp = fsum = 0.0
         fxy = [0.0, 0.0]
+        averaging = sample and late is not None and t >= late
+        if averaging:
+            nlate += 1
+        final = step == steps
         for i in range(d.ncon):
             c = d.contact[i]
             b1, b2 = bnames[model.geom_bodyid[c.geom1]], bnames[model.geom_bodyid[c.geom2]]
             mujoco.mj_contactForce(model, d, i, f6)
             fn, pen = float(f6[0]), float(max(0.0, -c.dist))
+            if final:
+                last_contacts.append({"bodies": (b1, b2), "pos": c.pos.copy(), "fn": fn,
+                                      "fz": fn * abs(float(c.frame[2])), "depth": pen,
+                                      "width": float(max(model.geom_solimp[c.geom1][2],
+                                                         model.geom_solimp[c.geom2][2]))})
             key = " / ".join(sorted((gname[c.geom1], gname[c.geom2])))
             sup = (b1 == "world" and b2 in support_bodies) or (b2 == "world" and b1 in support_bodies)
             e = contacts.setdefault(key, {"bodies": sorted((b1, b2)), "first_s": t, "last_s": t, "peak_N": 0.0,
-                                          "peak_s": t, "depth_m": 0.0, "support": sup})
+                                          "peak_s": t, "depth_m": 0.0, "support": sup,
+                                          "width_m": float(max(model.geom_solimp[c.geom1][2],
+                                                               model.geom_solimp[c.geom2][2]))})
             e["last_s"] = t
             if fn > e["peak_N"]:
                 e["peak_N"], e["peak_s"] = fn, t
             e["depth_m"] = max(e["depth_m"], pen)
+            if averaging:
+                e["late_fz"] = e.get("late_fz", 0.0) + fn * abs(float(c.frame[2]))
+                e["late_pos"] = e.get("late_pos", np.zeros(3)) + fn * c.pos
+                e["late_fn"] = e.get("late_fn", 0.0) + fn
             dp = max(dp, pen)
             if not sup:
                 pk = max(pk, fn)
@@ -378,7 +407,9 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
                {k: v[:n] for k, v in pts.items()},
                frame_list, dt, steps, time.time() - t_wall,
                {"nbody": model.nbody, "njnt": model.njnt, "nv": model.nv, "neq": model.neq, "warnings": warned,
-                "mass_kg": total_mass,
+                "mass_kg": total_mass, "late_samples": nlate, "final_qpos": d.qpos.copy(),
+                "final_contacts": last_contacts,
+                "com": d.subtree_com[0].copy(), "gravity": model.opt.gravity.copy(),
                 "geoms": _geom_table(model, gname)}, _quats(mujoco, pose_t, pose_x, pose_m))
 
 
@@ -419,13 +450,19 @@ def _quats(mujoco, t, xpos, xmat) -> dict:
 
 
 def _geom_table(model, gname) -> list[dict]:
-    """Shape and size of every geom, so a run's frames can be drawn without MuJoCo's renderer."""
+    """Shape and size of every geom, so a run's frames can be drawn without MuJoCo's renderer. A mesh, an
+    ellipsoid or a height field is drawn as the box that bounds it, with that box's offset in the geom's frame."""
     kinds = {0: "plane", 2: "sphere", 3: "capsule", 5: "cylinder", 6: "box"}
     out = []
     for i in range(model.ngeom):
-        out.append({"name": gname[i], "type": kinds.get(int(model.geom_type[i]), "other"),
-                    "size": model.geom_size[i].tolist(), "rgba": model.geom_rgba[i].tolist(),
-                    "body": int(model.geom_bodyid[i])})
+        t = int(model.geom_type[i])
+        entry = {"name": gname[i], "type": kinds.get(t, "box"), "size": model.geom_size[i].tolist(),
+                 "rgba": model.geom_rgba[i].tolist(), "body": int(model.geom_bodyid[i]), "offset": [0.0, 0.0, 0.0]}
+        if t not in kinds:
+            entry["size"] = model.geom_aabb[i, 3:].tolist()
+            entry["offset"] = model.geom_aabb[i, :3].tolist()
+            entry["bounds"] = True
+        out.append(entry)
     return out
 
 
@@ -446,7 +483,7 @@ def inverse_along(m: Mechanism, times: np.ndarray, timestep: float | None = None
     com = np.zeros((len(times), 3))
     loads = [(ld, int(model.jnt_dofadr[jnames.index(ld.joint)])) for ld in m.loads if ld.joint]
     for k, t in enumerate(times):
-        d.qpos[:] = 0
+        d.qpos[:] = model.qpos0
         d.qvel[:] = 0
         d.qacc[:] = 0
         for name, val in start.items():

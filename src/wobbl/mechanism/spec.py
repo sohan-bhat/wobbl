@@ -125,6 +125,7 @@ class Mechanism:
     timestep: float = 1e-3
     contact: dict = field(default_factory=dict)   # timeconst, dampratio, or stiffness and damping (direct)
     model_file: str = ""                  # an MJCF or URDF file used in place of bodies and joints
+    edits: dict = field(default_factory=dict)     # payload, free_base, stand: changes an analysis makes to the model
     question: str = ""
 
     def body(self, name: str) -> Body:

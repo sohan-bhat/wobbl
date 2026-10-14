@@ -31,14 +31,43 @@ class Loaded:
     limits: dict[str, tuple[float, float]] = field(default_factory=dict)   # joint: (N m or N, rad/s or m/s)
     massless: list[str] = field(default_factory=list)   # bodies whose mass came from a file that is missing
 
+    standing: bool = False                # start the base just above the floor
+    nudge: dict = field(default_factory=dict)   # joint: how far to move it from where the model starts
+
     def compile(self):
+        """The MjModel, with the pose it starts from kept in a keyframe named START: the model's home keyframe
+        when it has one, each joint inside its range, any nudge an analysis asks for, and set on its floor when the
+        analysis stands it there. MuJoCo measures every hinge and slide from qpos0, so the start pose never touches
+        qpos0."""
         mujoco = _mj()
+        if not any(k.name == START for k in self.spec.keys):
+            self.spec.add_key(name=START)
         try:
             model = self.spec.compile()
         except ValueError as e:
             raise SpecError(f"MuJoCo could not build {self.path.name}: {e}") from e
         model.opt.enableflags |= int(mujoco.mjtEnableBit.mjENBL_ENERGY)
+        q = model.qpos0.copy()
+        k = home_key(model)
+        if k is not None:
+            q[:] = model.key_qpos[k]
+            self._note(f"It starts from the model's '{mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_KEY, k)}' pose.")
+        out = _into_range(model, q)
+        if out:
+            self._note(f"{_few(out)} start{'s' if len(out) == 1 else ''} outside {'its' if len(out) == 1 else 'their'}"
+                       " joint range, so Wobbl starts them at the nearest end of it.")
+        for name, dq in self.nudge.items():
+            j = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
+            if j >= 0:
+                q[model.jnt_qposadr[j]] += dq
+        model.key_qpos[start_key(model)] = q
+        if self.standing:
+            _set_on_floor(model)
         return model
+
+    def _note(self, text: str) -> None:
+        if text not in self.notes:
+            self.notes.append(text)
 
 
 # --- URDF ------------------------------------------------------------------------------------------------------
@@ -301,7 +330,7 @@ def actuator_limits(model) -> dict[str, tuple[float, float]]:
         elif model.actuator_ctrllimited[a] and model.actuator_gaintype[a] == 0 and model.actuator_biastype[a] == 0:
             lim = float(max(abs(model.actuator_ctrlrange[a]))) * float(model.actuator_gainprm[a, 0])
         else:
-            continue
+            lim = math.inf          # a servo with no stated force: driven, with no limit to judge against
         if lim > 0 and jname:
             out[jname] = (lim * gear, math.inf)
     return out
@@ -312,21 +341,37 @@ def root_bodies(spec) -> list:
     return [b for b in spec.worldbody.bodies]
 
 
-def is_floating(spec) -> bool:
+def _tree(body) -> list:
+    out, stack = [], list(body.bodies)
+    while stack:
+        c = stack.pop()
+        out.append(c)
+        stack.extend(c.bodies)
+    return out
+
+
+def _free(body) -> bool:
     mujoco = _mj()
-    return any(any(j.type == mujoco.mjtJoint.mjJNT_FREE for j in b.joints) for b in root_bodies(spec))
+    return any(j.type == mujoco.mjtJoint.mjJNT_FREE for j in body.joints)
+
+
+def is_floating(spec) -> bool:
+    """Whether the robot's base is free: a free root with jointed bodies below it, not a loose ball or box."""
+    return any(_free(b) and any(c.joints for c in _tree(b)) for b in root_bodies(spec))
 
 
 def free_base(ld: Loaded) -> None:
-    """Let the model's base move, as if it stood loose on a floor."""
+    """Let the robot's base move, as if it stood loose on a floor. The base is the root with the most jointed
+    bodies below it, so a ball or a target lying beside a fixed arm is left alone."""
     if is_floating(ld.spec):
         return
-    roots = root_bodies(ld.spec)
-    if len(roots) != 1:
-        raise SpecError("the model has several separate bases, so Wobbl cannot tell which one stands on the floor")
-    roots[0].add_freejoint()
-    ld.notes.append(f"The base, {roots[0].name or 'the root body'}, stands loose on the floor instead of being "
-                    "fixed in place.")
+    roots = [b for b in root_bodies(ld.spec) if not _free(b)]
+    if not roots:
+        raise SpecError("the model has no fixed base to set loose")
+    base = max(roots, key=lambda b: (sum(len(c.joints) for c in _tree(b)), len(_tree(b))))
+    base.add_freejoint()
+    ld.notes.append(f"The base, {base.name or 'the root body'}, stands loose on the floor instead of being fixed in "
+                    "place.")
 
 
 def has_floor(model) -> bool:
@@ -343,6 +388,8 @@ def add_floor(ld: Loaded, z: float, friction: float = 0.8) -> None:
 def add_payload(ld: Loaded, mass: float, body: str, pos) -> None:
     """A load the robot carries, as a small solid ball rigidly fixed to ``body`` at ``pos`` in its frame."""
     mujoco = _mj()
+    if mass <= 0:
+        return
     target = ld.spec.body(body)
     if target is None:
         raise SpecError(f"no body named '{body}' to carry the payload")
@@ -351,6 +398,123 @@ def add_payload(ld: Loaded, mass: float, body: str, pos) -> None:
                         inertia=[0.4 * mass * r * r] * 3, explicitinertial=True)
     p.add_geom(type=mujoco.mjtGeom.mjGEOM_SPHERE, size=[r, 0, 0], contype=0, conaffinity=0, group=1,
                rgba=[0.85, 0.86, 0.88, 1], mass=0, density=0)
+
+
+def floor_height(model) -> float | None:
+    """Height of the highest horizontal plane on the world body, the floor a robot stands on."""
+    zs = [float(model.geom_pos[g, 2]) for g in range(model.ngeom)
+          if model.geom_type[g] == 0 and model.geom_bodyid[g] == 0]
+    return max(zs) if zs else None
+
+
+HOME = ("home", "stand", "standing", "init", "initial", "default", "ready", "start", "nominal", "neutral")
+START = "wobbl_start"
+
+
+def start_key(model) -> int:
+    mujoco = _mj()
+    return mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, START)
+
+
+def start_qpos(model) -> np.ndarray:
+    """The pose a model starts from: its START keyframe when Wobbl compiled it, otherwise qpos0."""
+    k = start_key(model)
+    return model.key_qpos[k].copy() if k >= 0 else model.qpos0.copy()
+
+
+def start_data(model):
+    """MjData at the start pose, with positions worked out."""
+    mujoco = _mj()
+    d = mujoco.MjData(model)
+    k = start_key(model)
+    if k >= 0:
+        mujoco.mj_resetDataKeyframe(model, d, k)
+    mujoco.mj_forward(model, d)
+    return d
+
+
+def _into_range(model, q: np.ndarray) -> list[str]:
+    """Move each limited hinge or slide whose start ``q`` is outside its range to the nearest end, as the joint
+    stop would at once, and name them."""
+    mujoco = _mj()
+    moved = []
+    for i in range(model.njnt):
+        if not model.jnt_limited[i] or model.jnt_type[i] not in (mujoco.mjtJoint.mjJNT_HINGE,
+                                                                 mujoco.mjtJoint.mjJNT_SLIDE):
+            continue
+        a = model.jnt_qposadr[i]
+        lo, hi = model.jnt_range[i]
+        if not lo <= q[a] <= hi:
+            q[a] = min(max(q[a], lo), hi)
+            moved.append(mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i) or f"joint {i}")
+    return moved
+
+
+def home_key(model) -> int | None:
+    """The keyframe a model names as its resting pose, such as 'home' or 'stand', if it has one."""
+    mujoco = _mj()
+    for k in range(model.nkey):
+        name = (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_KEY, k) or "").lower()
+        if name in HOME:
+            return k
+    return None
+
+
+def stand(ld: Loaded) -> None:
+    """Put the model on a floor, adding one under it when it has none; compiling then starts its base just above
+    it, where it settles under its own weight."""
+    m = ld.compile()
+    if floor_height(m) is None:
+        add_floor(ld, lowest_point(m))
+        ld.notes.append("A floor was added under the model.")
+    ld.standing = True
+
+
+def _set_on_floor(model, gap: float = 5e-4) -> None:
+    """Raise or lower a free or planar base in the start pose so its lowest point starts ``gap`` above the
+    floor."""
+    mujoco = _mj()
+    z = floor_height(model)
+    if z is None:
+        return
+    dz = z + gap - lowest_point(model)
+    k = start_key(model)
+    for i in range(model.njnt):
+        if model.body_parentid[model.jnt_bodyid[i]] != 0:
+            continue
+        a = model.jnt_qposadr[i]
+        if model.jnt_type[i] == mujoco.mjtJoint.mjJNT_FREE:
+            model.key_qpos[k, a + 2] += dz
+            return
+        if model.jnt_type[i] == mujoco.mjtJoint.mjJNT_SLIDE and abs(model.jnt_axis[i, 2]) > 0.5:
+            model.key_qpos[k, a] += dz * np.sign(model.jnt_axis[i, 2])
+            return
+
+
+def apply_edits(ld: Loaded, edits: dict) -> Loaded:
+    """The changes an analysis asks for, in order: a payload, a free base, then standing on a floor."""
+    if edits.get("payload"):
+        add_payload(ld, *edits["payload"])
+    if edits.get("free_base"):
+        free_base(ld)
+    if edits.get("stand"):
+        stand(ld)
+    ld.nudge = dict(edits.get("nudge") or {})
+    return ld
+
+
+def loaded(m) -> Loaded:
+    """A Mechanism as an editable MjSpec: its model file, or the MJCF its own bodies make, with its edits."""
+    mujoco = _mj()
+
+    if m.model_file:
+        ld = load(m.model_file)
+    else:
+        from .mjcf import to_mjcf
+
+        limits = {d.joint: (d.at_joint.stall_torque, d.at_joint.no_load_speed) for d in m.drives if d.motor}
+        ld = Loaded(mujoco.MjSpec.from_string(to_mjcf(m)), Path(m.name), "spec", [], limits)
+    return apply_edits(ld, m.edits)
 
 
 # --- what is in a compiled model ------------------------------------------------------------------------------
@@ -392,13 +556,15 @@ def describe(model) -> Info:
             adjacent.add(frozenset((int(groups[b]), int(groups[model.body_parentid[b]]))))
     # a base that can lift off: a free joint, or a planar root (a vertical slide among its joints) as in many
     # walkers that move only in their own plane
-    floating = any(model.body_parentid[model.jnt_bodyid[i]] == 0 and (
-        int(model.jnt_type[i]) == int(mujoco.mjtJoint.mjJNT_FREE) or
-        int(model.jnt_type[i]) == int(mujoco.mjtJoint.mjJNT_SLIDE) and abs(float(model.jnt_axis[i, 2])) > 0.5)
-        for i in range(model.njnt))
     children = [[] for _ in range(nb)]
     for b in range(1, nb):
         children[model.body_parentid[b]].append(b)
+    # a loose object (a ball, a box to pick up) has a free joint too, but nothing jointed below it
+    floating = any(model.body_parentid[model.jnt_bodyid[i]] == 0 and (
+        int(model.jnt_type[i]) == int(mujoco.mjtJoint.mjJNT_FREE) or
+        int(model.jnt_type[i]) == int(mujoco.mjtJoint.mjJNT_SLIDE) and abs(float(model.jnt_axis[i, 2])) > 0.5)
+        and any(model.body_jntnum[c] > 0 for c in _below(int(model.jnt_bodyid[i]), children))
+        for i in range(model.njnt))
     depth = np.zeros(nb, int)
     for b in range(1, nb):
         depth[b] = depth[model.body_parentid[b]] + (1 if model.body_jntnum[b] else 0)
@@ -425,26 +591,49 @@ def end_effector(model, info: Info) -> tuple[int, np.ndarray]:
 
     if not info.leaves:
         raise SpecError("the model has no moving body to carry a payload")
-    d = mujoco.MjData(model)
-    mujoco.mj_forward(model, d)
+    d = start_data(model)
     tip = info.leaves[0]
     parent = int(model.body_parentid[tip])
     fingers = [b for b in info.leaves if model.body_parentid[b] == parent and model.body_jntnum[b] > 0]
     if parent > 0 and len(fingers) >= 2:
-        body, pts = parent, [d.xipos[b] for b in fingers]
+        body, pts = parent, [_far_point(model, d, b) for b in fingers]
     else:
-        body, pts = tip, [d.xipos[tip]]
+        body, pts = tip, [_far_point(model, d, tip)]
     world = np.mean(pts, axis=0)
     R = d.xmat[body].reshape(3, 3)
     return body, R.T @ (world - d.xpos[body])
 
 
+def end_of(model, body: int) -> np.ndarray:
+    """The end of a link, in its own frame: where a load hung on it sits."""
+    d = start_data(model)
+    R = d.xmat[body].reshape(3, 3)
+    return R.T @ (_far_point(model, d, body) - d.xpos[body])
+
+
+def _far_point(model, d, body: int) -> np.ndarray:
+    """The end of a link: the corner of its shapes' bounding boxes farthest from the joint it turns on, or its
+    center of mass when it has no shape."""
+    anchor = d.xanchor[model.body_jntadr[body]] if model.body_jntnum[body] else d.xpos[model.body_parentid[body]]
+    best, far = d.xipos[body].copy(), -1.0
+    for g in range(model.body_geomadr[body], model.body_geomadr[body] + model.body_geomnum[body]):
+        if model.geom_type[g] == 0:
+            continue
+        R = d.geom_xmat[g].reshape(3, 3)
+        c = d.geom_xpos[g] + R @ model.geom_aabb[g, :3]
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                for sz in (-1, 1):
+                    p = c + R @ (model.geom_aabb[g, 3:] * (sx, sy, sz))
+                    dist = float(np.linalg.norm(p - anchor))
+                    if dist > far:
+                        best, far = p, dist
+    return best
+
+
 def lowest_point(model) -> float:
     """The lowest point of every collision shape at the model's starting pose, m."""
-    mujoco = _mj()
-
-    d = mujoco.MjData(model)
-    mujoco.mj_forward(model, d)
+    d = start_data(model)
     low = math.inf
     for g in range(model.ngeom):
         if model.geom_type[g] == 0 or (model.geom_contype[g] == 0 and model.geom_conaffinity[g] == 0):

@@ -122,17 +122,26 @@ def to_mjcf(m: Mechanism) -> str:
     return ET.tostring(root, encoding="unicode")
 
 
+FILE_STEP = 0.002        # a model file's own time step is kept up to this, so contacts and the checks stay sharp
+
+
 def build(m: Mechanism, timestep: float | None = None):
-    """The compiled MjModel of a mechanism, at its own time step or the one given."""
+    """The compiled MjModel of a mechanism, at its own time step or the one given. A model file keeps its own
+    gravity, contacts and floor, and its own time step up to FILE_STEP unless the mechanism sets one."""
     mujoco = _mj()
 
-    if m.model_file:   # a file keeps its own gravity, contacts and floor
-        model = load_file(m.model_file)
-    else:
-        try:
-            model = mujoco.MjModel.from_xml_string(to_mjcf(m))
-        except ValueError as e:
-            raise SpecError(f"MuJoCo could not build the model: {e}") from e
+    if m.model_file or m.edits:
+        from .model import loaded
+
+        model = loaded(m).compile()
+        model.opt.disableflags |= int(mujoco.mjtDisableBit.mjDSBL_ACTUATION)
+        own = min(float(model.opt.timestep), FILE_STEP) if m.model_file else m.timestep
+        model.opt.timestep = timestep or m.timestep or own
+        return model
+    try:
+        model = mujoco.MjModel.from_xml_string(to_mjcf(m))
+    except ValueError as e:
+        raise SpecError(f"MuJoCo could not build the model: {e}") from e
     model.opt.timestep = timestep or m.timestep
     return model
 
