@@ -478,9 +478,9 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
     imgs = casting_images(out, sv, t_sol, gp if gp is not None else ny, gp is not None, fd, por_xyz)
     notes = list(prep.notes)
     try:
-        casting_playback(out, sv, fd)
+        casting_scene(out, sv, fd, verdict, head, study.question)
     except Exception as e:  # noqa: BLE001  the answer stands without its animation
-        notes.append(f"playback.json was not written: {e}")
+        notes.append(f"the 3D view was not written: {e}")
     metrics = [("freezes in", f"{fmt(t_cast / 60)} min" if solid else "not frozen"),
                ("shrinkage pockets", str(len(pockets)) if study.risers else "no riser"),
                ("worst porosity", f"{fmt(por_max)}%" if por_max is not None else "n/a"),
@@ -552,11 +552,11 @@ def casting_fixes(study, fd, ratio, B, por_max, por_xyz, t_ratio, rm, cn) -> lis
     return fixes
 
 
-def casting_playback(out: Path, sv: Solved, fd: dict) -> str:
-    """The metal cut open through its last spot to freeze, with the time each vertex started and finished
-    freezing, so a page can show the solid growing in from the mold walls."""
-    from . import playback
-    from .render import plane_through
+def casting_scene(out: Path, sv: Solved, fd: dict, verdict: str, head: str, question: str) -> Path:
+    """The metal cut open through its last spot to freeze, its solid fraction growing in from the mold walls frame by
+    frame, from each node's own times to start and finish freezing."""
+    from ..viz import Scene
+    from .render import cut_surface, plane_through
 
     rm, ev = sv.rm, sv.result.events
     metal = np.isin(np.array(rm.kinds)[rm.region], ["casting", "riser"])
@@ -564,33 +564,32 @@ def casting_playback(out: Path, sv: Solved, fd: dict) -> str:
     lut = np.full(len(rm.X), -1)
     lut[used] = np.arange(len(used))
     X, tets = rm.X[used], lut[rm.tets[metal]]
-    riser = np.zeros(len(rm.X))
-    riser[sv.riser_nodes] = 1.0
-    riser[sv.casting_nodes] = 0.0
     hot = fd["pockets"][0]["hot_xyz"] if fd["pockets"] else fd["last_xyz"]
     cut = plane_through(X, hot)
-    surf = playback.surface(X, tets, {"t_liquidus": ev["liquidus"][used], "t_solidus": ev["solidus"][used],
-                                      "riser": riser[used]}, cut)
-    V, F, vals = playback.decimate(surf)
+    V, F, vals = cut_surface(X, tets, {"tl": ev["liquidus"][used], "ts": ev["solidus"][used]}, cut)
+    tl, ts = vals["tl"], vals["ts"]
+    tl = np.where(tl < 0, 0.0, tl)                 # metal that started below the liquidus starts freezing at once
+    ts = np.where(ts < 0, np.inf, ts)              # metal still freezing when the run stopped
     t_end = float(np.nanmax(ev["solidus"][used]))
-    return playback.write(
-        out / "playback.json", "casting", "Casting freezing from the mold walls inward", V, F,
-        {"t_liquidus": (vals["t_liquidus"], "s", "time the metal at the vertex starts to freeze, -1 if it was "
-                        "already below the liquidus", 1),
-         "t_solidus": (vals["t_solidus"], "s", "time the metal at the vertex is fully solid", 1),
-         "riser": (vals["riser"], "", "1 on a riser, 0 on the casting", 0)},
-        {"view": "the metal cut open by a plane through the last spot to freeze",
-         "cut_plane": {"origin": [round(float(v), 2) for v in cut[0]], "normal": [float(v) for v in cut[1]]}},
-        {"time_s": [round(float(t), 1) for t in np.linspace(0.0, 1.05 * t_end, 90)],
-         "rule": "at time t a vertex is liquid while t < t_liquidus, freezing while t_liquidus <= t < t_solidus, "
-                 "and solid once t >= t_solidus; its solid fraction can be drawn as (t - t_liquidus) / "
-                 "(t_solidus - t_liquidus)"},
-        {"events": {"last_to_freeze": {"xyz": [round(float(v), 2) for v in hot],
-                                       "t_s": round(float(fd["pockets"][0]["t_s"] if fd["pockets"]
-                                                          else fd["t_casting_s"]), 1)},
-                    "pockets": [{"xyz": [round(float(v), 2) for v in p["hot_xyz"]],
-                                 "volume_mm3": round(p["volume_mm3"], 1), "t_s": round(p["t_s"], 1)}
-                                for p in fd["pockets"]]}})
+    t = np.linspace(0.0, 1.05 * t_end, 72)
+    span = np.maximum(ts - tl, 1e-9)
+    fs = np.clip((t[:, None] - tl[None, :]) / span[None, :], 0.0, 1.0)
+    w = sv.node_volume[sv.casting_nodes]
+    tsc = np.nan_to_num(ev["solidus"][sv.casting_nodes], nan=np.inf)
+    solid = np.array([float(w[tsc <= x].sum() / w.sum()) for x in t])
+    s = Scene("Casting freezing from the mold walls inward", domain="casting", question=question)
+    s.timeline(t / 60.0, unit="min", label="time after pouring", seconds=10, between="interpolated")
+    lo, hi = rm.box
+    s.body("box", list(hi - lo), pos=list((lo + hi) / 2), color="#c2a878", opacity=0.12, name="sand mold",
+           prop=True)
+    part = s.mesh(V, F, name="casting, cut open")
+    part.color_by("solid fraction", fs, colormap="inferno", range=(0.0, 1.0))
+    s.readout("casting solid", 100.0 * solid, unit="%", digits=3)
+    t_hot = fd["pockets"][0]["t_s"] if fd["pockets"] else fd["t_casting_s"]
+    s.event(t_hot / 60.0, "last spot freezes", f"at ({_xyz(hot)}) mm", kind="fail" if fd["pockets"] else "info")
+    s.label("last to freeze", hot, t0=0.6 * t_hot / 60.0, kind="note")
+    s.verdict(verdict.upper(), head, {"ok": "pass", "marginal": "warn", "fails": "fail"}.get(verdict, "info"))
+    return s.save(out, budget=450_000)
 
 
 def casting_images(out: Path, sv: Solved, t_sol, field_, is_pct: bool, fd: dict, por_xyz) -> dict:

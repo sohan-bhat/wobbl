@@ -98,7 +98,6 @@ def test_niyama_porosity_follows_carlson_and_beckermann():
 def test_a_small_casting_end_to_end(tmp_path):
     """A block given no riser: Wobbl places one over its hot spot, the block then freezes fed with the riser last,
     and the outputs are all there."""
-    import json
 
     from wobbl.validation import geometry as G
 
@@ -112,7 +111,7 @@ def test_a_small_casting_end_to_end(tmp_path):
     names = {c.name: c.status for c in o.checks}
     assert names["energy balance"] == "pass" and names["feeding"] == "pass"
     assert names["mesh convergence"] == "fail"            # fast quality solves one mesh and says so
-    pb = json.loads((tmp_path / "out" / "playback.json").read_text())
-    assert pb["manifest"]["kind"] == "casting" and len(pb["fields"]["t_solidus"]) == pb["manifest"]["vertex_count"]
-    assert (tmp_path / "out" / "playback.json").stat().st_size < 300_000
+    from wobbl.viz import load
+    head, _ = load(tmp_path / "out" / "scene.wobbl")
+    assert head["domain"] == "casting" and head["timeline"]["frames"] > 10
     assert not (tmp_path / "out" / "work").exists()

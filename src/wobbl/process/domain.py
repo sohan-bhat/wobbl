@@ -162,7 +162,7 @@ def print_warp(job):
 
 register(Analysis(
     "part", "print", "3D print warping: flatness and corner lift off the bed, stress while printing", print_warp,
-    dry=True, kinds=PART_KINDS, covers=("heat",),
+    dry=True, kinds=PART_KINDS, covers=("heat", "cfd"),       # a corner lifting off the bed is not aerodynamic lift
     # a printed part asked whether it holds a load is a strength question, so printing alone does not call this up
     keywords=(r"\bwarp", r"\bbed\b", r"\blift(?:s|ing)?\s+off", r"\bcurl", r"first layer", r"\bbrim\b",
               r"\bslicer\b", r"\bcorners?\s+lift", r"when (?:i |you |we )?print", r"\bprint(?:ing)? (?:it|this)\b",

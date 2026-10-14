@@ -1,5 +1,4 @@
 """The manufacturing analyses through wobbl simulate: routing, the plan preview, and a small molding run."""
-import json
 
 import pytest
 
@@ -45,6 +44,6 @@ def test_a_small_plate_fills_end_to_end(tmp_path):
     assert 0 < v["pressure_hot_MPa"] <= v["pressure_cold_MPa"] < v["p_max_MPa"]
     status = {c.name: c.status for c in o.checks}
     assert status["volume balance"] == "pass" and status["thin walls"] == "pass"
-    pb = json.loads((tmp_path / "out" / "playback.json").read_text())
-    assert pb["manifest"]["kind"] == "molding" and pb["frames"]["time_s"]
-    assert (tmp_path / "out" / "playback.json").stat().st_size < 300_000
+    from wobbl.viz import load
+    head, _ = load(tmp_path / "out" / "scene.wobbl")
+    assert head["domain"] == "molding" and head["readouts"][0]["name"] == "gate pressure"

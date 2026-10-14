@@ -73,6 +73,16 @@ def _section_mpl(path, X, v, label, unit, origin, normal, mark_xyz, cmap, lo, hi
     plt.close(fig)
 
 
+def cut_surface(X: np.ndarray, tets: np.ndarray, fields: dict[str, np.ndarray], cut=None):
+    """The surface of a tetrahedral mesh, cut by a plane (origin, normal) keeping the side the normal points away
+    from, as (vertices, triangles, fields at the vertices); nan in a field becomes -1."""
+    from ..mesh.clip import carry, clip_surface
+
+    (a, b, t), faces = clip_surface(X, tets, *(cut if cut is not None else (None, None)))
+    vals = {k: carry(np.nan_to_num(np.asarray(v, float), nan=-1.0), a, b, t) for k, v in fields.items()}
+    return carry(np.asarray(X, float), a, b, t), faces, vals
+
+
 def iso_view(normal) -> np.ndarray:
     """A three quarter view onto a face whose outward normal is given, from above when the face is upright."""
     n = np.asarray(normal, float) / np.linalg.norm(normal)

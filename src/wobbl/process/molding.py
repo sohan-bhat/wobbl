@@ -279,9 +279,9 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
     imgs = molding_images(out, mesh, iso, cold, lv["gsets"], study.p_max, gates_xyz)
     notes = list(prep.notes)
     try:
-        molding_playback(out, mesh, iso, cold, gates_xyz, lines, traps, study.p_max)
+        molding_scene(out, mesh, iso, gates_xyz, lines, traps, study.p_max, verdict, head, study.question)
     except Exception as e:  # noqa: BLE001  the answer stands without its animation
-        notes.append(f"playback.json was not written: {e}")
+        notes.append(f"the 3D view was not written: {e}")
     metrics = [("fill time", f"{fmt(t_end)} s"), ("fill pressure", f"{fmt(p_iso)} to {fmt(worst)} MPa"),
                ("machine limit", f"{fmt(study.p_max)} MPa"), ("weld lines", str(len(lines)))]
     values = {"process": "molding", "resin": resin.key, "melt_C": melt, "mold_C": mold, "fill_time_s": t_end,
@@ -367,22 +367,32 @@ def molding_images(out: Path, mesh, iso, cold, gsets, p_max, gates_xyz) -> dict:
     return imgs
 
 
-def molding_playback(out: Path, mesh, iso, cold, gates_xyz, lines, traps, p_max) -> str:
-    from . import playback
+def molding_scene(out: Path, mesh, iso, gates_xyz, lines, traps, p_max, verdict, head, question) -> Path:
+    """The part filling from its gate, front by front, with the gate pressure ticking along."""
+    from ..viz import Scene
 
-    surf = playback.surface(mesh.X, mesh.tets[:, :4], {"t_fill": iso.t_fill, "t_fill_cold": cold.t_fill})
-    V, F, vals = playback.decimate(surf)
+    tf = np.where(np.isfinite(iso.t_fill), iso.t_fill, np.inf)
     t_end = float(iso.times[-1]) if len(iso.times) else 0.0
-    keep = np.linspace(0, len(iso.times) - 1, min(len(iso.times), 120)).astype(int) if len(iso.times) else []
-    return playback.write(
-        out / "playback.json", "molding", "Injection molding fill front", V, F,
-        {"t_fill": (vals["t_fill"], "s", "time the melt reaches the vertex with the melt hot, -1 if never", 4),
-         "t_fill_cold": (vals["t_fill_cold"], "s", "the same with a frozen skin on the mold walls, -1 if never", 4)},
-        {"view": "the outside of the part", "gates": [[round(float(v), 2) for v in xyz] for xyz, _ in gates_xyz]},
-        {"time_s": [round(float(iso.times[i]), 4) for i in keep],
-         "gate_pressure_MPa": [round(float(iso.gate_pressure[i]), 3) for i in keep],
-         "share_full": [round(float(iso.share[i]), 4) for i in keep] if len(iso.share) else [],
-         "rule": "at time t a vertex holds melt once t >= t_fill; the front is where t_fill crosses t",
-         "t_end_s": round(t_end, 4), "machine_limit_MPa": p_max},
-        {"events": {"weld_lines": [[round(float(v), 2) for v in mesh.X[c].mean(axis=0)] for c in lines[:8]],
-                    "air_traps": [[round(float(v), 2) for v in mesh.X[i]] for i in traps[:8]]}})
+    t = np.linspace(0.0, t_end, 80)
+    s = Scene("Injection molding fill", domain="molding", question=question)
+    s.timeline(t, unit="s", label="time after the screw moves", seconds=8, between="interpolated")
+    part = s.mesh(mesh.X, mesh.tris[:, :3], name="melt", color="#ff8a3d")
+    part.reveal(np.where(np.isfinite(tf), tf, 1e9), t)
+    part.color_by("melt arrives", np.nan_to_num(iso.t_fill, nan=t_end), unit="s", colormap="plasma")
+    s.mesh(mesh.X, mesh.tris[:, :3], name="cavity", color="#9aa0a6", opacity=0.15, prop=True)
+    s.readout("gate pressure", np.interp(t, np.r_[0.0, iso.times], np.r_[0.0, iso.gate_pressure]), unit="MPa",
+              limit=p_max)
+    for xyz, _ in gates_xyz:
+        s.label("gate", xyz, kind="note")
+    for c in lines[:3]:
+        at = mesh.X[c].mean(axis=0)
+        when = float(np.nanmax(iso.t_fill[c]))
+        s.label("weld line", at, t0=when, kind="note")
+    for i in traps[:2]:
+        s.label("last to fill", mesh.X[i], t0=float(iso.t_fill[i]), kind="note")
+    if iso.short:
+        s.event(t_end, "short shot", iso.stalled_by, kind="fail")
+    else:
+        s.event(t_end, "full", "the cavity is full and packing takes over")
+    s.verdict(verdict.upper(), head, {"ok": "pass", "marginal": "warn", "fails": "fail"}.get(verdict, "info"))
+    return s.save(out, budget=450_000)
