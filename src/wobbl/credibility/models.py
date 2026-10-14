@@ -43,11 +43,20 @@ def load_outcome(result_dir) -> dict:
 
 
 def for_result(result_dir) -> "Model":
+    """The model of a finished run. Every domain goes through the same interface: a domain with a faster exact
+    path registers its own model here (strength scales its converged solution, heat solves again on its converged
+    mesh), and every other run, in any domain, is run again from its request.json (generic.py)."""
     d = load_outcome(result_dir)
-    cls = {"strength": StrengthModel, "thermal": ThermalModel, "circuit": CircuitModel}.get(d.get("domain"))
-    if cls is None:
-        raise ModelError(f"cannot carry uncertainty through a '{d.get('domain')}' result")
-    return cls(Path(result_dir), d)
+    cls = FAST.get(d.get("domain"))
+    if cls is not None:
+        try:
+            return cls(Path(result_dir), d)
+        except ModelError:
+            if not (Path(result_dir) / "request.json").exists():
+                raise
+    from .generic import GenericModel
+
+    return GenericModel(Path(result_dir), d)
 
 
 def _check(d: dict, name: str) -> dict:
@@ -88,6 +97,22 @@ class Model:
     def alternatives(self) -> list[dict]:
         """Other idealizations Wobbl solved, which bound a modeling choice no distribution describes."""
         return []
+
+    def alternative_results(self, Y: np.ndarray) -> list[dict]:
+        """The failure odds under each alternative idealization, for the same samples."""
+        return []
+
+    def extras(self) -> dict:
+        """Anything else uncertainty.json keeps for the test plan, such as gauge spots."""
+        return {}
+
+    def predictor(self, readings, inputs, load_unc, progress=None, solves=None):
+        """Predictions at test readings as a cheap function of the uncertain inputs (against.py)."""
+        raise NotImplementedError
+
+    def context(self) -> str:
+        """The context of use, one sentence for the credibility assessment."""
+        return ""
 
     def _col(self, X, inputs, name, default):
         for j, inp in enumerate(inputs):
@@ -295,6 +320,35 @@ class StrengthModel(Model):
         return {"failure": (sf < 1.0, f"the {self.known[self.limit_name].label}"),
                 "below target": (sf < self.target, f"the target safety factor {self.target:g}")}
 
+    def alternative_results(self, Y):
+        out = []
+        for alt in self.alternatives():
+            sf = Y[:, 0] * self.gov0 / alt["governing_MPa"]
+            out.append({**alt, "probability": uq.probability(sf < 1.0),
+                        "below_target": uq.probability(sf < self.target), "safety_factor": uq.stats(sf)})
+        return out
+
+    def extras(self) -> dict:
+        if self.mat is None:
+            return {}
+        from .probes import candidates
+
+        return {"probes": candidates(self.dir, self.o, self.mat.E, self.mat.nu),
+                "study_load": {"nominal": self.load_nominal, "unit": self.known["load"].unit,
+                               "label": self.known["load"].label}}
+
+    def predictor(self, readings, inputs, load_unc, progress=None, solves=None):
+        from .against import StrengthPredictor
+
+        return StrengthPredictor(self, readings, inputs, load_unc, progress)
+
+    def context(self) -> str:
+        o = self.o
+        return (f"A linear elastic static model of {Path(o.get('part', '')).name} in {o.get('material')}, under "
+                f"{'; '.join(o.get('loads', []))}, held by {'; '.join(o.get('fixtures', []))}, used to judge "
+                f"the {o.get('measure')} against {fmt(o.get('allowable_MPa', 0))} MPa with a target safety factor "
+                f"of {o.get('target_sf'):g}.")
+
     def alternatives(self) -> list[dict]:
         lp = _check(self.o, "load introduction").get("detail", {})
         if not lp or "alternative_peak" not in lp:
@@ -416,6 +470,15 @@ class ThermalModel(Model):
             return (a + (t - a) * self._col(X, inputs, "mesh", 1.0))[:, None]
         return f, _surrogate_info(sur, solved, "heat solves on the converged mesh")
 
+    def predictor(self, readings, inputs, load_unc, progress=None, solves=None):
+        from .against import ThermalPredictor
+
+        return ThermalPredictor(self, readings, inputs, 0.0, progress, solves)
+
+    def context(self) -> str:
+        return (f"A heat conduction model of {Path(self.o.get('part', '')).name} used to judge its hottest point "
+                f"against {fmt(self.limit0)} C.")
+
     def fails(self, X, Y, inputs):
         lim = self._col(X, inputs, "limit", self.limit0)
         return {"failure": (Y[:, 0] > lim, f"the {fmt(self.limit0)} C limit"),
@@ -502,6 +565,14 @@ class CircuitModel(Model):
             return (v * self._col(X, inputs, "mesh", 1.0))[:, None]
         return f, _surrogate_info(sur, solved, "ngspice runs")
 
+    def predictor(self, readings, inputs, load_unc, progress=None, solves=None):
+        from .against import CircuitPredictor
+
+        return CircuitPredictor(self, readings, inputs, 0.0, progress, solves)
+
+    def context(self) -> str:
+        return f"An ngspice model of the {self.template} circuit used to judge it against its rating."
+
     def fails(self, X, Y, inputs):
         lim = CIRCUIT_LIMITS.get(self.template)
         if not lim or lim[1] not in self.known:
@@ -539,4 +610,7 @@ def _surrogate_info(sur, solved: list[Input], what: str) -> dict:
                       f"{', '.join(i.name for i in solved)}, leave one out error {100 * worst:.2g}% of the variance"}
 
 
-__all__ = ["for_result", "Model", "StrengthModel", "ThermalModel", "CircuitModel", "ModelError"]
+# domains with a faster exact path than running the whole study again
+FAST = {"strength": StrengthModel, "thermal": ThermalModel, "circuit": CircuitModel}
+
+__all__ = ["for_result", "Model", "StrengthModel", "ThermalModel", "CircuitModel", "ModelError", "FAST"]

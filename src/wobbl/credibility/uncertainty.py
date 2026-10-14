@@ -18,7 +18,7 @@ import numpy as np
 from .. import __version__
 from ..units import fmt
 from . import uq
-from .models import StrengthModel, for_result
+from .models import for_result
 
 SOBOL_N = 2 ** 13
 
@@ -45,12 +45,7 @@ def run_uncertainty(result_dir, vary: list[str], samples: int = 200000, method: 
     if progress:
         progress("sensitivity", "Sobol indices")
     sens = uq.sobol_indices(lambda Z: f(Z)[:, dec], allin, n=SOBOL_N, seed=seed + 1)
-    alts = []
-    if isinstance(model, StrengthModel):
-        for alt in model.alternatives():
-            sf = Y[:, 0] * model.gov0 / alt["governing_MPa"]
-            alts.append({**alt, "probability": uq.probability(sf < 1.0),
-                         "below_target": uq.probability(sf < model.target), "safety_factor": uq.stats(sf)})
+    alts = model.alternative_results(Y)
     y = Y[:, dec]
     lo, hi = np.percentile(y, [0.05, 99.95])
     counts, edges = np.histogram(np.clip(y, lo, hi), bins=40, range=(lo, hi))
@@ -60,12 +55,7 @@ def run_uncertainty(result_dir, vary: list[str], samples: int = 200000, method: 
            "seed": seed, "decision": model.decision, "outputs": outputs, "probability": probs, "alternatives": alts,
            "sensitivity": {"output": model.decision, "base_samples": SOBOL_N, "indices": sens},
            "histogram": {"edges": edges.tolist(), "counts": counts.tolist()}}
-    if isinstance(model, StrengthModel) and model.mat is not None:
-        from .probes import candidates
-
-        res["probes"] = candidates(d, model.o, model.mat.E, model.mat.nu)
-        res["study_load"] = {"nominal": model.load_nominal, "unit": model.known["load"].unit,
-                             "label": model.known["load"].label}
+    res.update(model.extras())
     res["headline"] = headline(res)
     from .report import refresh
 
@@ -78,7 +68,8 @@ def headline(r: dict) -> str:
     """One plain paragraph: the failure odds, the spread of the answer and what drives it."""
     out = r["outputs"][r["decision"]]
     unit = f" {out['unit']}" if out["unit"] else ""
-    name = {"safety_factor": "The safety factor", "t_max_C": "The hottest point"}.get(r["decision"], "The answer")
+    name = {"safety_factor": "The safety factor", "t_max_C": "The hottest point"}.get(
+        r["decision"], f"The {r['decision'].replace('_', ' ')}")
     s = (f"{name} averages {fmt(out['mean'])}{unit} with a standard deviation of {fmt(out['sd'])}{unit}, and 90% "
          f"of samples fall between {fmt(out['p05'])} and {fmt(out['p95'])}{unit}.")
     pf = r["probability"].get("failure")

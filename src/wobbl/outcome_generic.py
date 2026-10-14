@@ -31,6 +31,9 @@ class GenericOutcome:
     workdir: str = ""
     t_total: float = 0.0
     solver: str = ""
+    # what decides the verdict, for uncertainty and credibility in any domain: each {"name", "value" (a key of
+    # values), "limit" (a number) or "limit_key" (a key of values), "sense" ("max" stays under, "min" stays over)}
+    criteria: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         d = asdict(self)

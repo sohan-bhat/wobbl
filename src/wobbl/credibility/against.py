@@ -210,12 +210,7 @@ def run_validation(result_dir, tests: str, vary: list[str] | None = None, load_u
     inputs = _inputs_for(model, list(vary or []), d)
     if progress:
         progress("predict", f"{len(readings)} readings from {meta['file']}")
-    if isinstance(model, StrengthModel):
-        pred = StrengthPredictor(model, readings, inputs, load_uncertainty, progress)
-    elif isinstance(model, ThermalModel):
-        pred = ThermalPredictor(model, readings, inputs, 0.0, progress, solves)
-    else:
-        pred = CircuitPredictor(model, readings, inputs, 0.0, progress, solves)
+    pred = model.predictor(readings, inputs, load_uncertainty, progress, solves)
     num = model.numerical()
     rel_num = num.sd if num else 0.0
     data = np.array([r.value for r in readings])
