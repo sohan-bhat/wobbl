@@ -50,6 +50,20 @@ For circuits, give each template value its own `--set`, as in
 `wobbl circuit led --set supply=5V --set resistor=150 --set led=red`, or run your own netlist with
 `wobbl circuit board.cir --probe "v(out)"` (MCP `solve_circuit`).
 
+For a drop test of a part, run
+`wobbl simulate phone.step "will it survive a 1.2 m drop onto tile?" -m pc --mass "45 g @ 0,0,5"`.
+Its options are height (a bare number is meters), floor (concrete, steel, tile, stone, wood, vinyl, carpet,
+foam, grass, or layer:E=5,t=10 in MPa and mm), orientation (worst by default, which tries every face and corner
+landing; or all, corners, edges, flat, or a direction such as -z), mass for a battery or board, and watch for
+where the accelerometer sits. It answers with the peak stress away from the contact patch, the safety factor,
+the g at the accelerometer filtered at 10 kHz and the worst landing, checked by momentum and energy. For a
+composite part, run
+`wobbl simulate arm.step "is it strong enough?" --physics composite --layup "[0/±45/90]s" --fix "x=min" --load "40 N +z @ x=max"`
+with plies listed from the inner face out and a ply material of t300-5208, im7-8552, as4-3501-6 or
+e-glass-epoxy. It gives the load factor at first ply failure by Tsai-Wu and Hashin, the ply and mode that go
+first, and layup changes checked with lamination theory. A thin walled part goes to a shell model on its own
+inside the strength study, checked against a coarse solid; the solid option keeps the solid.
+
 For anything that falls, flies or launches, use motion (MCP `solve_motion`) instead of writing your own
 integrator. It flies the body through gravity that falls off with altitude, the 1976 standard
 atmosphere, drag, wind, thrust and parachutes, and checks the flight against closed forms, an energy
