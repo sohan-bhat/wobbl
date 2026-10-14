@@ -64,8 +64,9 @@ class Stress:
         order = ["fails", "over", "warn", "near", "unknown", "ok", "info"]
         st = [it.status for it in self.items] or ["ok"]
         worst = min(st, key=lambda s: order.index(s) if s in order else 5)
-        if self.generic and worst == "over":
-            return "warn"
+        if self.generic and worst == "over" and all((it.use or 0) <= 1.5 for it in self.items
+                                                    if it.status == "over"):
+            return "warn"          # a little over a rating that was only assumed: check the real part
         return worst
 
     @property
@@ -168,7 +169,10 @@ def _one(e: Element, w: Wave, ta: float, more: list[Wave]) -> Stress | None:
     every = [w, *more]
     r = e.part.get("ratings", {})
     prm = e.part.get("params", {})
-    s = Stress(e.ref, e.kind, e.part.get("key", ""), generic=bool(e.part.get("generic")),
+    # a stand in for an unknown semiconductor or IC may differ a lot from the real part; an LED by its color or a
+    # resistor without a package is rated as its class is, so going over that counts
+    s = Stress(e.ref, e.kind, e.part.get("key", ""), generic=bool(e.part.get("generic")) and e.kind not in (
+               "led", "resistor", "capacitor", "electrolytic", "inductor"),
                source=e.part.get("source", ""))
     pw = P.power()
     s.p = w.mean(pw)

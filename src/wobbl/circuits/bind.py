@@ -120,6 +120,23 @@ def bind(c: Circuit, overrides: dict | None = None) -> None:
         _bind_one(c, e, n, part_name)
         _apply_overrides(e, {k.split(".", 1)[1]: v for k, v in over.items() if k.split(".", 1)[0] == e.ref.lower()
                              or k.split(".", 1)[0] == e.name.lower()})
+    _windings(c)
+
+
+def _windings(c: Circuit) -> None:
+    """A resistor that meets an inductor on a node nothing else touches is that coil's winding resistance (a relay
+    or solenoid drawn as R and L), so it is reported as part of the coil, not judged as a resistor part."""
+    nets = c.nets()
+    for n, on in nets.items():
+        if n == "0" or len(on) != 2:
+            continue
+        r = next((e for e, _ in on if e.letter == "r" and e.kind == "resistor" and not notes(e).get("pkg")
+                  and not notes(e).get("power")), None)
+        ind = next((e for e, _ in on if e.letter == "l"), None)
+        if r is not None and ind is not None:
+            r.kind = "load"
+            r.part = {"key": "winding", "kind": "load", "ratings": {}, "generic": False, "params": {},
+                      "source": f"the winding resistance of the coil {ind.ref}"}
 
 
 def bind_new(c: Circuit, elements: list[Element]) -> None:
@@ -174,7 +191,8 @@ def _bind_one(c: Circuit, e: Element, n: dict, part_name: str) -> None:
         e.part, e.kind = _as_dict(resistor(n.get("pkg", ""), n.get("power"), None, n.get("tol", 0.05))), "resistor"
         if e.meta.get("as"):            # a fuse, a pot half or a coil that a schematic turned into a resistor
             e.part, e.kind = e.meta["as"], e.meta["as"]["kind"]
-        elif re.match(r"^r_?(l|load|out|lamp|heater)\d*$", e.name, re.I) and not n.get("pkg") and not n.get("power"):
+        elif re.match(r"^r_?(l|load|out|lamp|heat\w*|bulb|element|motor|strip|fan)\d*$", e.name, re.I) and \
+                not n.get("pkg") and not n.get("power"):
             e.kind = "load"              # RL and Rload stand for whatever the circuit drives, not a resistor part
             e.part = {"key": "load", "kind": "load", "ratings": {}, "generic": False, "params": {},
                       "source": "a load the circuit drives, not judged as a resistor"}
@@ -216,13 +234,13 @@ def _bind_one(c: Circuit, e: Element, n: dict, part_name: str) -> None:
             e.part = {"key": name, "kind": e.kind, "ratings": {}, "source": f"model {name} as the netlist defines it, "
                       "no ratings known", "generic": True, "params": {}}
         return
-    if lib is not None and (lib.letter == L or lib.letter == "x" or (L == "x" and lib.kind != "mcu")):
-        return _use_library(c, e, lib)
     if lib is not None and lib.kind == "mcu":
         e.part, e.kind = _as_dict(lib), "mcu"
         if all(x.isdigit() for x in e.pins):       # a netlist line: supply, ground, then the pins it uses
             e.pins = ["vdd", "gnd"] + [f"io{k}" for k in range(1, len(e.nodes) - 1)]
         return
+    if lib is not None and (lib.letter == L or lib.letter == "x" or L == "x"):
+        return _use_library(c, e, lib)
     if L == "x" and not all(x.isdigit() for x in e.pins):
         return _generic_ic(c, e, name)
     _generic(c, e, n, name)

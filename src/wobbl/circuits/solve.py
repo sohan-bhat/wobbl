@@ -21,7 +21,8 @@ from .bind import dc_value
 from .netlist import Circuit
 
 OPTIONS = ".options rshunt=1e10 itl1=400 itl4=60 gmin=1e-12"
-MAX_POINTS = 60000
+MAX_POINTS = 20000
+RESCUE = ".options method=gear reltol=0.003 abstol=1e-10 vntol=1e-5 itl4=200"
 
 
 @dataclass
@@ -226,7 +227,7 @@ def plan_tran(c: Circuit) -> tuple[float, float, list[str]]:
     tau = max(taus) if taus else 0.0
     if periods:
         T = max(periods)
-        stop = max(12 * T, 4 * tau)
+        stop = max(9 * T, 4 * tau)
         step = min(min(periods) / 200, (min(taus) / 10) if taus else 1)
         why.append(f"run for {stop:.3g} s, about {stop / T:.0f} of the longest period")
     elif tau:
@@ -295,6 +296,14 @@ def run_tran(c: Circuit, work: Path, tag: str = "tran", step: float | None = Non
         s = step * factor
         cc = materialize(c, "tran", t_off=0.6 * stop if _toggles(c) else None, period=_pwm_period(c), ramp=ramp)
         w = run(cc, [f"tran {s:.4g} {stop:.4g} 0 {s:.4g} uic"], work, f"{tag}{k}", extra)[0]
+        if w.t[-1] < 0.98 * stop:      # ngspice stopped early (time step too small): gear and looser tolerances
+            w = run(cc, [f"tran {s:.4g} {stop:.4g} 0 {s:.4g} uic"], work, f"{tag}{k}g",
+                    [*(extra or []), RESCUE])[0]
+            if w.t[-1] < 0.98 * stop:
+                from ..solvers.base import SolverError
+                raise SolverError(f"ngspice could not get past {w.t[-1]:.3g} s of the {stop:.3g} s transient",
+                                  "A part switches too abruptly for the time step; give it some capacitance or "
+                                  "a slower edge")
         w.step, w.stop = s, stop
         w.notes = list(why)
         if _toggles(c):

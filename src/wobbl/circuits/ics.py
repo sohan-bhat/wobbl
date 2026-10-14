@@ -197,7 +197,8 @@ def comparator(name: str) -> Part | None:
     ch, vsmax, vsmin, isink, iq, cmh, thja = COMPARATORS[name]
     m = f"U_{name}"
     text = (f".subckt {m} inp inn vcc vee out\nRin inp inn 10meg\n"
-            f"B1 out vee I = 0.5*(1+tanh(2000*(V(inn)-V(inp)))) * min({isink}, max(0, V(out,vee))/15) + 1n\n"
+            f"Bc s 0 V = 0.5*(1+tanh(300*(V(inn)-V(inp))))\n"
+            f"B1 out vee I = V(s) * min({isink}, max(0, V(out,vee))/15) + 1n\nCo out vee 10p\n"
             f"Iq vcc vee {_g(iq)}\n.ends")
     return Part(name, "comparator", {"vsupply_V": vsmax, "iout_A": isink, "theta_ja": thja, "tj_max_C": 150}, "x",
                 m, text, ("inp", "inn", "vcc", "vee", "out"),

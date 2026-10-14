@@ -213,15 +213,17 @@ def verdict_of(stress: list[Stress], c: Circuit) -> tuple[str, str]:
     judged = [s for s in stress if s.kind not in ("supply", "signal", "isource", "source", "switch")
               or any(it.limit for it in s.items)]
     broken = [(s, it) for s in judged for it in s.items if it.status == "fails"]
-    over = [(s, it) for s in judged if not s.generic for it in s.items if it.status == "over"]
-    warn = [(s, it) for s in judged for it in s.items if it.status == "warn" or (s.generic and it.status == "over")]
+    over = [(s, it) for s in judged if s.status == "over" for it in s.items if it.status == "over"]
+    warn = [(s, it) for s in judged for it in s.items if it.status == "warn" or (s.status == "warn" and
+                                                                                it.status == "over")]
     near = [(s, it) for s in judged for it in s.items if it.status == "near"]
     rated = [(s, s.worst) for s in judged if s.worst is not None]
     if over:
         s, it = max(over, key=lambda x: x[1].use or 0)
         others = sorted({x.ref for x, _ in over} - {s.ref})
         more = f" {', '.join(others)} also go over a rating." if others else ""
-        return "fails", f"{s.ref} ({s.part}) is over its {it.what} rating: {it.text()}.{more}"
+        why = f" ({it.note})" if it.note and (it.use or 0) > 5 or "runaway" in it.note else ""
+        return "fails", f"{s.ref} ({s.part}) is over its {it.what} rating: {it.text()}{why}.{more}"
     if broken:
         s, it = broken[0]
         return "fails", f"{s.ref} ({s.part}) does not work as wired: {it.note or it.text()}."
