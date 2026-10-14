@@ -1,0 +1,276 @@
+{
+ "domain": "motion",
+ "part": "../rocket.toml",
+ "question": "Will this L class rocket fly straight, reach 11,000 ft and land softly in a 10 mph wind?",
+ "verdict": "ok",
+ "headline": "Reaches 3439 m (11284 ft) at Mach 1.27 and lands 29.3 m upwind of the pad at 5.72 m/s, with a 1.88 caliber margin and 30.6 m/s off the rail.",
+ "metrics": [
+  [
+   "apogee",
+   "3439 m"
+  ],
+  [
+   "max Mach",
+   "1.27"
+  ],
+  [
+   "stability",
+   "1.88 cal"
+  ],
+  [
+   "off the rail",
+   "30.6 m/s"
+  ],
+  [
+   "landing",
+   "5.72 m/s"
+  ],
+  [
+   "drift",
+   "29.3 m"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed step convergence, delta v budget, parachute descent, energy balance, units and sanity"
+ ],
+ "checks": [
+  {
+   "name": "step convergence",
+   "status": "pass",
+   "summary": "flown again with a tolerance ten times tighter, the flight time 203 s, apogee 3439 m, burnout speed 419 m/s, max Mach 1.27, landing speed 5.72 m/s and drift 29.3 m moved by at most 0.0098% (the drift)",
+   "detail": {
+    "normal": {
+     "flight time": 202.751133,
+     "apogee": 3439.231427,
+     "burnout speed": 418.68539,
+     "max Mach": 1.266617,
+     "landing speed": 5.719701,
+     "drift": 29.25408
+    },
+    "tight": {
+     "flight time": 202.748999,
+     "apogee": 3439.185313,
+     "burnout speed": 418.685433,
+     "max Mach": 1.266617,
+     "landing speed": 5.719701,
+     "drift": 29.251225
+    },
+    "largest_change": 9.8e-05
+   }
+  },
+  {
+   "name": "delta v budget",
+   "status": "pass",
+   "summary": "Tsiolkovsky gives 541 m/s from a 2007 m/s exhaust speed and a mass ratio of 1.31. Gravity takes 25.7 m/s, drag 96.9 m/s and steering 0.0863 m/s, which leaves 419 m/s, and the flight reaches 419 m/s at burnout (7.2e-10% apart)",
+   "detail": {
+    "ideal": 541.427795,
+    "gravity": 25.737113,
+    "drag": 96.919019,
+    "steering": 0.086272,
+    "predicted": 418.68539,
+    "flown": 418.68539,
+    "error": 0.0
+   }
+  },
+  {
+   "name": "parachute descent",
+   "status": "pass",
+   "summary": "Under the drogue sqrt(2 m g / (rho Cd A)) gives 19.9 m/s at 150 m and the flight sinks at 19.9 m/s there. Under the drogue and main it gives 5.72 m/s at the ground against 5.72 m/s from the run (0.097% apart at most)",
+   "detail": {
+    "error": 0.000972
+   }
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "thrust did 867 kJ of work, drag took 798 kJ, gravity took 3.43 kJ and the burned propellant carried off 65.6 kJ, which leaves 160 J of kinetic energy at landing, and the landing speed carries 160 J (apart by 4.4e-06% of the largest term)",
+   "detail": {
+    "thrust_J": 866915.750855,
+    "drag_J": -797762.617106,
+    "gravity_J": -3431.711503,
+    "propellant_J": 65561.51723,
+    "ke_start_J": 0.0,
+    "ke_end_J": 159.942853,
+    "error": 0.0
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "speeds stay under Mach 1.27, all 1.88 kg of propellant burned, an average thrust 18.3 times the liftoff weight, 7.95 kg in a 98 mm by 2.1 m tube, 502 kg/m3 on average",
+   "detail": {}
+  },
+  {
+   "name": "stability margin",
+   "status": "pass",
+   "summary": "1.88 calibers at liftoff, the center of pressure 1.54 m from the nose tip and the balance point 1.36 m, rising to 3.38 at burnout as the propellant burns away. Barrowman's method holds below about Mach 0.8",
+   "detail": {
+    "cp_m": 1.544199,
+    "cg_m": 1.36,
+    "margin_cal": 1.879583
+   }
+  },
+  {
+   "name": "rail exit speed",
+   "status": "pass",
+   "summary": "30.6 m/s after 2.44 m of rail, above the 15 m/s the fins need to steer",
+   "detail": {}
+  },
+  {
+   "name": "max dynamic pressure",
+   "status": "info",
+   "summary": "106 kPa at Mach 1.27 and 574 m, 2.48 s after ignition, the load the fins and their joints have to carry without fluttering",
+   "detail": {}
+  },
+  {
+   "name": "max acceleration",
+   "status": "info",
+   "summary": "20.8 g (204 m/s2) at 0.03 s under thrust. The drogue opens with 1.3 g of drag, pulling 79.2 N on its harness. The main opens with 3.6 g of drag, pulling 214 N on its harness",
+   "detail": {}
+  },
+  {
+   "name": "apogee",
+   "status": "pass",
+   "summary": "3439 m (11284 ft) above the ground at 23.5 s, 2.6% over the 3353 m target",
+   "detail": {}
+  },
+  {
+   "name": "landing speed",
+   "status": "pass",
+   "summary": "descends at 5.72 m/s under the drogue and main, under the 6.1 m/s limit, and with the wind it moves 7.26 m/s over the ground",
+   "detail": {}
+  },
+  {
+   "name": "drift",
+   "status": "info",
+   "summary": "lands 29.3 m upwind of the pad in a 4.47 m/s wind, after reaching 757 m upwind at apogee. The descent from apogee takes 179 s",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "A point mass in a vertical plane, so it does not spin, tumble or move sideways, and its drag acts against the air rushing past it.",
+  "Drag coefficient 0.45 below Mach 0.6, raised through the transonic range to 0.765 near Mach 1.1 by a generic curve for a slender finned rocket, the same whether the motor burns or not.",
+  "The 1976 US standard atmosphere from 0 m above sea level, a standard day.",
+  "Gravity falls off with the square of the distance to the Earth's center, over a flat Earth that does not rotate.",
+  "A steady wind of 4.47 m/s at every height, blowing back toward the start.",
+  "Thrust follows the 75 mm L class curve in straight lines between its points, 3773 N s over 2.65 s, and propellant burns in proportion to thrust, so all 1.88 kg is gone at burnout.",
+  "The rocket travels the full 2.44 m of rail before it leaves it, tilted 5 deg from vertical.",
+  "Off the rail it turns into the wind it feels at its weathercock frequency, from Barrowman's normal force and margin and the pitch inertia of a uniform rod of its length and mass, with no lift at angle of attack and no overshoot.",
+  "Each parachute opens over the time it takes to travel eight of its diameters, its drag area growing with the square of time, and the drogue stays on under the main.",
+  "Under the parachutes only their drag counts, so the descent is slightly faster than with the airframe's drag added, which errs on the safe side for landing speed."
+ ],
+ "values": {
+  "delta_v": {
+   "ideal": 541.427795,
+   "gravity": 25.737113,
+   "drag": 96.919019,
+   "steering": 0.086272,
+   "predicted": 418.68539,
+   "flown": 418.68539
+  },
+  "margin_cal": 1.879583,
+  "margin_burnout_cal": 3.380776,
+  "rail_exit_speed_mps": 30.600457,
+  "max_q_pa": 106224.139628,
+  "max_accel_mps2": 204.40468,
+  "apogee_m": 3439.231427,
+  "apogee_t_s": 23.464145,
+  "landing_speed_mps": 5.719701,
+  "drift_m": 29.25408,
+  "flight_time_s": 202.751133,
+  "impact_speed_mps": 7.259439,
+  "distance_m": 29.25408,
+  "max_speed_mps": 427.48095,
+  "max_mach": 1.266617,
+  "trajectory": "trajectory.csv",
+  "_figures": [
+   [
+    "flight",
+    "Altitude and speed over the flight, by phase"
+   ],
+   [
+    "path",
+    "The path through the air"
+   ]
+  ]
+ },
+ "images": {
+  "flight": "images/flight.png",
+  "path": "images/path.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 4.153,
+ "solver": "scipy 1.18.1 solve_ivp (DOP853)",
+ "events": [
+  {
+   "name": "liftoff",
+   "t_s": 0.0014,
+   "alt_m": 0.0,
+   "x_m": 0.0,
+   "speed_mps": 0.0
+  },
+  {
+   "name": "rail exit",
+   "t_s": 0.1726,
+   "alt_m": 2.43,
+   "x_m": 0.21,
+   "speed_mps": 30.6
+  },
+  {
+   "name": "burnout",
+   "t_s": 2.65,
+   "alt_m": 646.85,
+   "x_m": 95.43,
+   "speed_mps": 418.685
+  },
+  {
+   "name": "apogee",
+   "t_s": 23.4641,
+   "alt_m": 3439.23,
+   "x_m": 756.87,
+   "speed_mps": 23.131
+  },
+  {
+   "name": "drogue deploy",
+   "t_s": 23.4641,
+   "alt_m": 3439.23,
+   "x_m": 756.87,
+   "speed_mps": 23.131
+  },
+  {
+   "name": "main deploy",
+   "t_s": 177.9783,
+   "alt_m": 150.0,
+   "x_m": 140.0,
+   "speed_mps": 20.402
+  },
+  {
+   "name": "landing",
+   "t_s": 202.7511,
+   "alt_m": 0.0,
+   "x_m": 29.25,
+   "speed_mps": 7.259
+  }
+ ],
+ "runtime_s": 4.153,
+ "model": {
+  "states": 6,
+  "effects": [
+   "gravity falling off with altitude",
+   "1976 standard atmosphere",
+   "air drag",
+   "transonic drag rise",
+   "wind",
+   "launch rail",
+   "thrust curve",
+   "propellant burn",
+   "weathercocking",
+   "drogue parachute",
+   "main parachute"
+  ]
+ }
+}
