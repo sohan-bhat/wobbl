@@ -113,7 +113,8 @@ def evaluate(study, mat, modes, mesh, built, levels, stopped_by, tol, zeta, exci
         verdicts.append(verdict_for(sf_h, target))
         sf = sf_h if sf is None else min(sf, sf_h)
         values["harmonic"] = {"peak_MPa": peak, "frequency_Hz": f_at, "xyz": xyz, "sf": sf_h,
-                              "input": sine.text, "solver": "CalculiX" if ok else "Wobbl's modal sum"}
+                              "input": sine.text, "solver": "CalculiX" if ok else "Wobbl's modal sum",
+                              "masses": h.get("masses", [])}
         heads.append(f"The {sine.text} sweep peaks at {fmt(f_at)} Hz with {fmt(peak)} MPa at "
                      f"({', '.join(fmt(v) for v in xyz)}), safety factor {sf_h:.2f} against "
                      f"{mat.criterion.split(' vs ')[1]}.")

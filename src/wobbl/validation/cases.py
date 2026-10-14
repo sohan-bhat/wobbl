@@ -477,6 +477,110 @@ def calibration_cooling(out: Path):
                              "acceptance": round(r["acceptance"], 3)}
 
 
+# --- buckling, vibration and fatigue ------------------------------------------------
+RHO_STEEL = 7850e-12   # t/mm3
+
+
+def _life_info(o):
+    lv = o.values.get("levels") or [{}]
+    return {"confidence": o.confidence, "levels": len(lv), "nodes": lv[-1].get("n_nodes"), "time_s": round(o.t_total, 1)}
+
+
+def euler_column(out: Path):
+    """A 10 mm square steel column 400 mm tall, clamped at the base, pushed down at its free top."""
+    from ..life.buckling import BucklingStudy, run_buckling
+    from ..structural.spec import StructuralStudy, parse_fixture, parse_load
+
+    L, a, P = 400.0, 10.0, 1000.0
+    part = G.box(out / "column.step", L, a, a)
+    base = StructuralStudy(str(part), STEEL, [parse_load(f"{P} N -x @ x=max")], [parse_fixture("x=min")])
+    o = run_buckling(BucklingStudy(base), out / "run")
+    expected = math.pi ** 2 * E_STEEL * (a ** 4 / 12) / (2 * L) ** 2 / P
+    return o.values["load_factor"], expected, {**_life_info(o), "shape": o.values["shape"]}
+
+
+def _worst(got: list[float], want: list[float]) -> tuple[float, float, dict]:
+    k = int(np.argmax([abs(g / w - 1) for g, w in zip(got, want)]))
+    return got[k], want[k], {"wobbl_Hz": [round(g, 3) for g in got], "expected_Hz": [round(w, 3) for w in want],
+                             "worst_mode": k + 1}
+
+
+def cantilever_modes(out: Path):
+    """A 300 x 12 x 6 mm steel strip clamped at one end: its first three bending modes through the 6 mm side."""
+    from ..life.vibration import run_vibration
+    from ..life.vibspec import VibrationStudy
+    from ..structural.spec import StructuralStudy, parse_fixture
+
+    L, b, h = 300.0, 12.0, 6.0
+    part = G.box(out / "strip.step", L, b, h)
+    o = run_vibration(VibrationStudy(StructuralStudy(str(part), STEEL, [], [parse_fixture("x=min")]), modes=8),
+                      out / "run")
+    frac = np.array(o.values["mass_fraction"])
+    got = [f for f, fr in zip(o.values["frequencies"], frac) if fr[2] > 1e-4 and fr[2] > 10 * max(fr[0], fr[1])][:3]
+    c = math.sqrt(E_STEEL * (b * h ** 3 / 12) / (RHO_STEEL * b * h))
+    want = [bl ** 2 / (2 * math.pi * L ** 2) * c for bl in (1.87510407, 4.69409113, 7.85475744)]
+    if len(got) < 3:
+        raise ValueError(f"found only {len(got)} bending modes through the thin side")
+    g, w, info = _worst(got, want)
+    return g, w, {**_life_info(o), **info}
+
+
+def plate_modes(out: Path):
+    """A 300 x 225 x 5 mm steel plate with all four edges simply supported: its first three modes. At 60 times its
+    thickness across, shear and rotary inertia, which thin plate theory leaves out, lower them by about 0.3%."""
+    from ..life.vibration import run_vibration
+    from ..life.vibspec import VibrationStudy
+    from ..structural.spec import StructuralStudy, parse_fixture
+
+    a, b, t = 300.0, 225.0, 5.0
+    part = G.box(out / "plate.step", a, b, t)
+    # every edge face held out of plane and along its own length. Bending moves an edge face along itself by
+    # -z dw/ds, which is zero where w is held, so this is still a simple support, and it stops the plate turning
+    fixes = ["fixed-yz x=min", "fixed-yz x=max", "fixed-xz y=min", "fixed-xz y=max"]
+    o = run_vibration(VibrationStudy(StructuralStudy(str(part), STEEL, [], [parse_fixture(f) for f in fixes]),
+                                     modes=4), out / "run")
+    D = E_STEEL * t ** 3 / (12 * (1 - NU ** 2))
+    want = sorted(math.pi / 2 * ((m / a) ** 2 + (n / b) ** 2) * math.sqrt(D / (RHO_STEEL * t))
+                  for m in range(1, 5) for n in range(1, 5))[:3]
+    g, w, info = _worst(o.values["frequencies"][:3], want)
+    return g, w, {**_life_info(o), **info}
+
+
+def sdof_harmonic(out: Path):
+    """The strip carrying twenty times its own mass at the tip, shaken at its base with 1 g and 2% damping: nearly a
+    single degree of freedom, k = 3 E I / L^3 with a third of the strip's mass added to the tip mass."""
+    from ..life.vibration import run_vibration
+    from ..life.vibspec import VibrationStudy
+    from ..structural.spec import StructuralStudy, parse_fixture
+
+    L, b, h, zeta = 300.0, 12.0, 6.0, 0.02
+    part = G.box(out / "strip.step", L, b, h)
+    mb = RHO_STEEL * L * b * h
+    M = 20 * mb
+    st = VibrationStudy(StructuralStudy(str(part), STEEL, [], [parse_fixture("x=min")]),
+                        masses=[f"{M * 1e6:.6g} g at {L},{b / 2},{h / 2} @ x=max"], modes=6, sine="1 g z 2-60 Hz",
+                        damping=zeta)
+    o = run_vibration(st, out / "run")
+    wn2 = 3 * E_STEEL * (b * h ** 3 / 12) / L ** 3 / (M + 33 / 140 * mb)
+    expected = 9806.65 / wn2 / (2 * zeta * math.sqrt(1 - zeta ** 2))
+    tip = o.values["harmonic"]["masses"][0]
+    return tip["relative_mm"], expected, {**_life_info(o), "peak_Hz": round(o.values["harmonic"]["frequency_Hz"], 4),
+                                          "sdof_Hz": round(math.sqrt(wn2) / (2 * math.pi), 4),
+                                          "transmissibility": round(tip["transmissibility"], 3)}
+
+
+def shigley_fatigue(out: Path):
+    """Shigley's Example 6-2: a polished rotating beam of 1050 HR steel (Sut 90 kpsi) at 55 kpsi fully reversed."""
+    from ..life.fatigue import KPSI, shigley_f
+    from ..life.fatigue_study import FatigueStudy, run_fatigue
+
+    st = FatigueStudy(material=f"custom:E=207000,nu=0.29,yield={49.5 * KPSI:.2f},uts={90 * KPSI:.2f},process=wrought",
+                      amplitude=f"{55 * KPSI:.3f} MPa", surface="polished", reliability=0.5, cycles="1e4")
+    o = run_fatigue(st, out / "run")
+    return o.values["life"], 77500.0, {"confidence": o.confidence, "f_book": 0.86, "f_wobbl": round(shigley_f(90 *
+                                                                                                          KPSI), 4)}
+
+
 CASES = [
     Case("cantilever-tip", "Cantilever tip deflection", "strength", "Timoshenko beam theory", "tip deflection",
          "mm", 0.03, True, cantilever_tip),
@@ -544,6 +648,20 @@ CASES = [
     Case("calibration-cooling", "Film coefficient and air temperature from a synthetic cooling curve",
          "uncertainty", "the values the readings were made with, 12 W/m2K and 22 C", "posterior mean film coefficient",
          "W/m2K", 0.05, True, calibration_cooling),
+    Case("euler-column", "Steel column clamped at the base and free at the top", "buckling",
+         "Euler, P = pi^2 E I / (2 L)^2", "first buckling factor", "x", 0.02, True, euler_column),
+    Case("cantilever-modes", "Cantilever strip, first three bending frequencies", "vibration",
+         "Euler-Bernoulli, f = (beta L)^2 / (2 pi L^2) sqrt(E I / rho A)", "frequency farthest from its value", "Hz",
+         0.02, True, cantilever_modes),
+    Case("plate-modes", "Simply supported plate, first three frequencies", "vibration",
+         "Kirchhoff plate, f = pi / 2 ((m/a)^2 + (n/b)^2) sqrt(D / rho t)", "frequency farthest from its value", "Hz",
+         0.02, True, plate_modes),
+    Case("sdof-harmonic", "Tip mass on a strip shaken through resonance", "vibration",
+         "single degree of freedom, X = a / (2 zeta wn^2 sqrt(1 - zeta^2))", "peak motion of the mass on its base",
+         "mm", 0.02, False, sdof_harmonic),
+    Case("shigley-fatigue", "Shigley Example 6-2, 1050 HR steel at 55 kpsi", "fatigue",
+         "Shigley's S-N line with f = 0.86 read off Fig. 6-18, about 77 500 cycles", "cycles to failure", "cycles",
+         0.03, False, shigley_fatigue),
 ]
 
 

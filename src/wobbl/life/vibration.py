@@ -233,7 +233,25 @@ def _sweep(modes, mesh, built, p, sz, zeta, sine) -> dict:
     curve = modal.vm_amplitude(np.einsum("fm,mc->fc", q, S[:, gi]))
     return {"f_peak": float(f_peak), "peak": float(vm[gi]), "node": gi, "xyz": mesh.X[gi].tolist(), "vm": vm,
             "excluded": excluded, "raw_max": float(vm.max()), "curve_f": curve_f, "curve": curve,
-            "exclusion_radius": r_ex}
+            "exclusion_radius": r_ex, "masses": mass_motion(modes, zeta, force, f_peak, sine)}
+
+
+def mass_motion(modes: modal.Modes, zeta: float, force: np.ndarray, f: float, sine) -> list[dict]:
+    """How far each attached mass moves relative to the base at frequency f, and its acceleration against the
+    input (the transmissibility): a = a_base - w^2 u_relative."""
+    qf = modal.harmonic_coords(np.array([f]), modes, zeta, force)[0]
+    w2 = (2 * math.pi * f) ** 2
+    d = np.asarray(sine.direction, float) / np.linalg.norm(sine.direction)
+    out = []
+    for name, nodes in modes.mass_nodes.items():
+        m = np.asarray(modes.mass_values[name], float)
+        u = np.einsum("m,mkd->kd", qf, modes.shapes[:, nodes].astype(float))
+        u = (u * m[:, None]).sum(0) / m.sum()
+        accel = sine.accel * d - w2 * u
+        out.append({"name": name, "relative_mm": float(np.linalg.norm(np.abs(u))),
+                    "accel_g": float(np.linalg.norm(np.abs(accel)) / modal.G0),
+                    "transmissibility": float(np.linalg.norm(np.abs(accel)) / sine.accel)})
+    return out
 
 
 def _ccx_harmonic(exe, wl: Path, deck, modes, resp, sine, zeta, mesh) -> dict | None:
