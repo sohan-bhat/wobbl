@@ -506,6 +506,21 @@ register(Recipe("getdp", ("magnetic", "electric", "board", "antenna", "sound"), 
                 installer=_getdp("install"), present=_getdp("available")))
 
 
+def _flow(name: str):
+    """A function of wobbl.flow.install, imported only when the registry calls it."""
+    def call(*args):
+        from ..flow import install as flow_install
+        return getattr(flow_install, name)(*args)
+    return call
+
+
+register(Recipe("openfoam", ("flow",), (), platforms=("osx-64", "osx-arm64", "linux-64"), check=_flow("check"),
+                installer=_flow("install"), present=_flow("available"),
+                missing="OpenFOAM has no build Wobbl can install here. Run Wobbl inside WSL on Windows, or point "
+                        "WOBBL_OPENFOAM at an OpenFOAM v2412 folder. Propellers, hulls, pipes and drag curves work "
+                        "without it."))
+
+
 # ---------------------------------------------------------------------- disk
 def remove_all(log: Log = print) -> None:
     home = wobbl_home()

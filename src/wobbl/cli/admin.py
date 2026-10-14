@@ -145,7 +145,7 @@ def doctor(as_json):
     add("motion", True, f"scipy {fp['scipy']}, built in, nothing to download ({fp['code_bytes'] / 1000:.0f} kB of "
                         "code)")
     for a in base.adapters():
-        if a.name in ("OpenFOAM", "Elmer"):
+        if a.name in ("Elmer",):
             add(a.name, None, a.install_hint)
     from ..setup import agents as ag
     for name, s in ag.status().items():

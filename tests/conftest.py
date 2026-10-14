@@ -68,3 +68,4 @@ def _have(domain):
 
 needs_ccx = pytest.mark.skipif(not _have("structural"), reason="CalculiX not installed (run wobbl setup)")
 needs_spice = pytest.mark.skipif(not _have("circuit"), reason="ngspice not installed (run wobbl setup)")
+needs_foam = pytest.mark.skipif(not _have("flow"), reason="OpenFOAM not installed (run wobbl setup --only openfoam)")
