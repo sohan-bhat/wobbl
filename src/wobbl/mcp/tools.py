@@ -141,12 +141,17 @@ def add_fixture(study_id: str, fixture: str) -> dict:
 def solve_structural(study_id: str = "", path: str = "", material: str = "", loads: list[str] | None = None,
                      fixtures: list[str] | None = None, target_sf: float | None = None, quality: str = "normal",
                      budget: float = 300.0, question: str = "", print_direction: str | None = None,
-                     shell: bool = False) -> dict:
+                     shell: bool = False, layup: str = "", ply: str = "t300-5208") -> dict:
     """Run the verified strength study. Either pass study_id or path + material + loads + fixtures. shell=True
-    solves thin walls as shells, checked against a coarse solid."""
+    solves thin walls as shells, checked against a coarse solid; layup gives the walls a composite ply stack and
+    answers with first ply failure."""
     from ..structural.pipeline import analyze_strength
     from ..structural.spec import StructuralStudy, parse_fixture, parse_load
 
+    if layup and path and not study_id:
+        from ..composites.tools import solve_laminate_tool
+        return solve_laminate_tool(path, layup, list(loads or []), list(fixtures or []), ply, None, target_sf, "",
+                                   "fast" if quality == "fast" else "normal", question)
     try:
         if study_id:
             st = _get(study_id)

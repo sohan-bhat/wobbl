@@ -67,6 +67,13 @@ def _strength_options(f):
         click.option("--no-images", is_flag=True, help="Skip heatmap rendering."),
         click.option("--shell", is_flag=True, help="Solve thin walls as shells on their midsurface, checked against "
                                                     "a coarse solid. Faster on enclosures, covers and tubes."),
+        click.option("--layup", default=None, help="Composite ply stack on the walls, inner face out, e.g. "
+                                                    "'[0/±45/90]s'. Gives first ply failure by Tsai-Wu and Hashin."),
+        click.option("--ply", default="t300-5208", show_default=True,
+                     help="Ply material for --layup: t300-5208, im7-8552, as4-3501-6 or e-glass-epoxy."),
+        click.option("--ply-thickness", type=float, default=None, help="Cured ply thickness in mm for --layup."),
+        click.option("--reference", default="", help="Direction the 0 degree plies run along, e.g. x (default the "
+                                                     "part's long axis)."),
         click.option("--quiet", "-q", is_flag=True, help="No progress lines."),
     ]
     for o in reversed(opts):
@@ -160,7 +167,9 @@ def _strength(part, question, kw, interpret: bool):
                 guesses = reading.guesses
                 for g in guesses:
                     cb("assume", g)
-            if kw.get("shell"):
+            if kw.get("layup"):
+                o = _laminate(st, kw, out, cb, pre)
+            elif kw.get("shell"):
                 from ..structural.shell_path import analyze_shell
                 o = analyze_shell(st, out, cb, render=not kw.get("no_images"), pre=pre)
             else:
@@ -168,6 +177,13 @@ def _strength(part, question, kw, interpret: bool):
     except (SpecError, SelectionError, GeometryError, MeshError, SolverError, KeyError, ValueError) as e:
         hint = getattr(e, "hint", "")
         ui.fail(str(e).strip("'\""), hint if hint and hint not in str(e) else "")
+    if kw.get("layup"):
+        from .thermal import show_generic
+        if kw.get("as_json"):
+            click.echo(json.dumps(o.to_dict(), indent=1))
+        else:
+            show_generic(o)
+        return
     if guesses:
         o.assumptions = [f"Wobbl guessed: {g}." for g in guesses] + o.assumptions
         from ..structural.report import write_outputs
@@ -176,6 +192,21 @@ def _strength(part, question, kw, interpret: bool):
         click.echo(json.dumps(o.to_dict(), indent=1))
         return
     show_strength(o)
+
+
+def _laminate(st, kw, out, cb, pre):
+    """The strength study of a composite layup on the part's walls (wobbl run --layup)."""
+    from ..composites.study import run_laminate
+    from ..composites.tools import study_from
+
+    loads = list(kw.get("loads") or []) or [ld.describe() for ld in st.loads]
+    fixes = list(kw.get("fixes") or []) or [fx.describe() for fx in st.fixtures]
+    lam = study_from(st.part, kw["layup"], kw.get("ply") or "t300-5208", loads, fixes, kw.get("ply_thickness"),
+                     st.target_sf,
+                     kw.get("reference") or "", "fast" if st.quality == "fast" else "normal", st.question,
+                     st.params)
+    lam.scale = st.scale
+    return run_laminate(lam, out, cb, pre=pre, render=not kw.get("no_images"))
 
 
 def show_strength(o):

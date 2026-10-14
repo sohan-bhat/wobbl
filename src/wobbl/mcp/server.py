@@ -90,14 +90,18 @@ def build_server():
     def solve_structural(study_id: str = "", path: str = "", material: str = "", loads: list[str] | None = None,
                          fixtures: list[str] | None = None, target_sf: float | None = None,
                          quality: str = "normal", budget: float = 300.0, question: str = "",
-                         print_direction: str | None = None, shell: bool = False) -> dict:
+                         print_direction: str | None = None, shell: bool = False, layup: str = "",
+                         ply: str = "t300-5208") -> dict:
         """Run the verified static strength study (mesh convergence, equilibrium, beam theory check,
         singularity detection). Returns verdict, governing stress and location, safety factor, deflection,
         confidence with reasons, checks, assumptions, fixes, image paths and the HTML report path.
         Simple shapes finish in under a minute, and real parts take one to seven minutes on a 2018 laptop.
-        shell=True solves a thin walled part (enclosure, cover, tube) as shells, checked against a coarse solid."""
+        shell=True solves a thin walled part (enclosure, cover, tube) as shells, checked against a coarse solid.
+        layup (e.g. "[0/±45/90]s", plies from the inner face out) makes the walls a composite of ply material
+        ply (t300-5208, im7-8552, as4-3501-6, e-glass-epoxy) and answers with the load factor at first ply
+        failure by Tsai-Wu and Hashin, the governing ply and layup changes that reach the target."""
         return tools.solve_structural(study_id, path, material, loads, fixtures, target_sf, quality, budget,
-                                      question, print_direction, shell)
+                                      question, print_direction, shell, layup, ply)
 
     @srv.tool()
     def verify(result_dir: str) -> dict:
