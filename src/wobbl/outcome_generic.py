@@ -94,7 +94,8 @@ class GenericOutcome:
         cls = {"ok": "pass", "warm": "warn", "hot": "fail", "fails": "fail"}.get(self.verdict, "warn")
         title = {"thermal": "Heat report", "circuit": "Circuit report", "motion": "Motion report",
                  "combustion": "Combustion report", "motor": "Rocket motor report",
-                 "battery": "Cell runaway report"}.get(self.domain, "Report")
+                 "battery": "Cell runaway report",
+                 "fracture": "Crack growth report"}.get(self.domain, "Report")
         title = FIELD_TITLES.get(self.domain, title)
         title = {"casting": "Casting report", "molding": "Molding report", "warp": "Print warp report"}.get(
             self.domain, title)
