@@ -22,12 +22,13 @@ import numpy as np
 
 from ..geometry.faces import find_sharp_corners
 from ..materials import LIBRARY, Hardening, Material, hardening_curve, resolve_material
-from ..mesh.mesher import Sizing, build_mesh
+from ..mesh.mesher import Sizing, auto_sizing, build_mesh, estimate_nodes
 from ..solvers import base as solvers
 from ..solvers import calculix_nl as nl
 from ..structural.build import build_static
 from ..structural.hotspots import ZoneMap
-from ..structural.run import describe_part, exclusion_radius, initial_sizing, resolve_selections, support_reactions
+from ..structural.run import (describe_part, exclusion_radius, feature_refinements, resolve_selections,
+                              support_reactions)
 from ..structural.spec import SpecError, StructuralStudy, parse_fixture, parse_load
 from ..units import fmt
 from ..verify.checks import Check, balance_check, confidence, convergence_check
@@ -160,14 +161,21 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
         pre = describe_part(base.part, work, base.scale, base.body, base.params)
     prep, feats = pre
     loads, fixtures, _ = resolve_selections(base, feats)
-    q = dict(fineness=1.0, nodes=QUALITY.get(study.quality, QUALITY["normal"]))
-    s0 = initial_sizing(prep, feats, base, q, loads)
+    target = QUALITY.get(study.quality, QUALITY["normal"])
+    s0 = plastic_sizing(prep, feats, target)
     levels, last = [], None
     for k in range(2):
-        sizing = s0 if k == 0 else Sizing(h=s0.h * REFINE, order=s0.order, curvature=s0.curvature,
-                                          refinements=[replace(r, size=r.size * REFINE) for r in s0.refinements])
+        sizing = s0 if k == 0 else _scaled(s0, REFINE)
         say("mesh", f"level {k}: element size {sizing.h:.3g} mm")
         mesh = build_mesh(prep, sizing)
+        # many small holes and fillets can still multiply the nodes well past the estimate: coarsen them and mesh
+        # again, since each increment of the ramp solves the whole mesh
+        for _ in range(3 if k == 0 else 0):
+            if mesh.n_nodes <= 4 * target:
+                break
+            s0 = sizing = _scaled(s0, 1.0, (mesh.n_nodes / (4 * target)) ** (1 / 3))
+            say("mesh", f"level 0 again: {mesh.n_nodes:,} nodes is far over {target:,}, refinements coarsened")
+            mesh = build_mesh(prep, sizing)
         built = build_static(mesh, loads, fixtures, mat, feats.faces)
         say("solve", f"level {k}: elastic solve on {mesh.n_nodes:,} nodes")
         lin = adapter.solve_static(built.model, work / f"level{k}", job="elastic")
@@ -198,6 +206,28 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
     o.write(out)
     clean_work(work, study.keep)
     return o
+
+
+def _scaled(s: Sizing, h: float, refine: float | None = None) -> Sizing:
+    """A sizing with the global size times h and the local refinements times refine (h when not given)."""
+    refine = h if refine is None else refine
+    return Sizing(h=s.h * h, order=s.order, curvature=s.curvature,
+                  refinements=[replace(r, size=min(r.size * refine, s.h * h)) for r in s.refinements])
+
+
+def plastic_sizing(prep, feats, nodes: int) -> Sizing:
+    """The first mesh: holes and fillets resolved as the strength study resolves them, but no refinement at sharp
+    inside corners, whose singular peak a collapse load does not depend on, and coarsened until it is within three
+    times the node target, since every increment of a plastic ramp solves the whole mesh again."""
+    s = auto_sizing(prep, thickness=feats.thickness_typical, max_nodes=nodes)
+    s.curvature = 0
+    s.refinements = feature_refinements(feats, s.h)
+    for _ in range(8):
+        if estimate_nodes(prep, s) <= 3 * nodes:
+            break
+        s = Sizing(h=s.h * 1.25, order=s.order, curvature=0,
+                   refinements=[replace(r, size=r.size * 1.25) for r in s.refinements])
+    return s
 
 
 def first_yield(mesh, built, feats, sizing, lin, mat) -> dict:
