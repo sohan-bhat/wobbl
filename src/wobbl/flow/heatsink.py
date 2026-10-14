@@ -269,8 +269,8 @@ def run_fansink(st: FanSinkStudy, out_dir: str | Path, progress=None):
     playback.write(out, "channel", "Air through one gap of a fan cooled heat sink",
                    "One gap between two fins seen from the side, the fin wall at y0 and the middle of the gap at y1, "
                    "so mirror it about y1 for the whole gap. u and v are the air velocity, theta is how far the air "
-                   "has warmed from the inlet temperature toward the fin's, 0 to 1. Air enters at x0 and the fin begins at x 0, "
-                   "one gap downstream.",
+                   "has warmed from the inlet temperature toward the fin's, 0 to 1. Air enters at x0 and the fin "
+                   "begins at x 0, one gap downstream.",
                    [playback.grid_field("air", x / 1e3, y / 1e3, {"u": f["U"][:, 0] * v, "v": f["U"][:, 1] * v,
                                                                   "theta": f["T"]},
                                         {"u": "m/s", "v": "m/s", "theta": ""}, nx=200, ny=24)],
