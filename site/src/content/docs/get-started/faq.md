@@ -19,8 +19,8 @@ for, the same as with any other tool it calls.
 
 ## How accurate is it?
 
-Twenty five cases with known answers run through the same pipeline you use, and every one lands
-inside its tolerance. The nineteen whose reference is exact for the modeled setup land within
+{{Cases}} cases with known answers run through the same pipeline you use, and every one lands
+inside its tolerance. The {{exact}} whose reference is exact for the modeled setup land within
 2%, and the five real parts land within 4.3% of reference models that were refined until
 they stopped changing. [Validation](/validation/) has the full table. Each answer also
 carries its own checks, so you see on the spot whether a particular run can be trusted.

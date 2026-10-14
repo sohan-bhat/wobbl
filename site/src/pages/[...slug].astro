@@ -8,6 +8,7 @@ import Cards from '../components/Cards.astro';
 import Redirect from '../components/Redirect.astro';
 import ValidationTable from '../components/ValidationTable.astro';
 import { render, esc } from '../lib/markdown';
+import { fillCounts } from '../lib/validation';
 import { repoUrl } from '../lib/site';
 import { MOVED } from '../lib/moved';
 
@@ -29,8 +30,13 @@ const { entry, redirect, stub } = Astro.props as {
 };
 let html = '';
 let headings: ReturnType<typeof render>['headings'] = [];
-if (entry) ({ html, headings } = render(entry.body ?? '', entry.filePath ?? entry.id));
-const d = entry?.data;
+const where = entry?.filePath ?? entry?.id ?? '';
+if (entry) ({ html, headings } = render(fillCounts(entry.body ?? '', where), where));
+// counts of validation cases written as {{cases}} and the like are filled in from the results
+const d = entry && {
+  ...entry.data, description: fillCounts(entry.data.description, where), lead: entry.data.lead && fillCounts(entry.data.lead, where),
+  cards: entry.data.cards?.map((c) => ({ ...c, text: fillCounts(c.text, where) })),
+};
 const isValidation = entry?.id === 'validation';
 ---
 {redirect ? <Redirect to={redirect} /> : entry ? (

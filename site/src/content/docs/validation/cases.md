@@ -1,6 +1,6 @@
 ---
 title: "How the cases are set up"
-description: "The part, the loads, the supports and the reference answer behind each of Wobbl's 25 validation cases."
+description: "The part, the loads, the supports and the reference answer behind each of Wobbl's {{cases}} validation cases."
 lead: "Each case builds its part, meshes it, refines until the answer settles and runs its checks, and the number is then compared with a known answer."
 order: 1
 ---

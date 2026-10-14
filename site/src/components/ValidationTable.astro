@@ -1,26 +1,9 @@
 ---
 // The validation results: one row per case with its known answer, Wobbl's answer, the
 // error drawn on a scale from 0 to the case's tolerance, the result and the confidence.
-// Numbers come from docs/validation-results.json (written by a full `wobbl validate`),
-// and the group and plain description of each case from src/data/validation-notes.json.
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { ROOT } from '../lib/site';
+// The cases, their groups and plain lines come from lib/validation.ts.
+import { ORDER, cases, groupOf, notes } from '../lib/validation';
 
-interface Case {
-  id: string; title: string; domain: string; source: string; quantity: string; unit: string;
-  expected: number; wobbl: number; error: number; tolerance: number; pass: boolean; exact_theory: boolean;
-  confidence: string;
-}
-const cases: Case[] = JSON.parse(readFileSync(resolve(ROOT, 'docs/validation-results.json'), 'utf-8'));
-const notesFile = resolve(process.cwd(), 'src/data/validation-notes.json');
-const notes: Record<string, { group?: string; plain?: string }> = existsSync(notesFile)
-  ? JSON.parse(readFileSync(notesFile, 'utf-8')) : {};
-
-const ORDER = ['Textbook formulas', 'Industry benchmarks', 'Real parts from the bake off', 'Heat', 'Circuits', 'Motion'];
-const groupOf = (c: Case) => notes[c.id]?.group
-  ?? (c.domain === 'heat' ? 'Heat' : c.domain === 'circuit' ? 'Circuits' : c.domain === 'motion' ? 'Motion'
-    : c.id.startsWith('nafems') ? 'Industry benchmarks' : c.exact_theory ? 'Textbook formulas' : 'Real parts from the bake off');
 const groups = [...new Set([...ORDER, ...cases.map(groupOf)])]
   .map((g) => ({ label: g, rows: cases.filter((c) => groupOf(c) === g) }))
   .filter((g) => g.rows.length);
@@ -58,7 +41,7 @@ const passed = cases.filter((c) => c.pass).length;
                 </td>
                 <td class="num">{tol(c.tolerance)}</td>
                 <td>{c.pass ? 'Pass' : 'Fail'}</td>
-                <td>{c.confidence[0].toUpperCase() + c.confidence.slice(1)}</td>
+                <td>{c.confidence ? c.confidence[0].toUpperCase() + c.confidence.slice(1) : 'Not rated'}</td>
               </tr>
             );
           })}

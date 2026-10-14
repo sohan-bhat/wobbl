@@ -1,12 +1,12 @@
 ---
 title: "wobbl validate"
-description: "Run Wobbl's 25 validation cases with known answers on your own machine, all of them or a chosen few."
-lead: "validate runs the 25 cases with known answers through the same pipeline your studies use."
+description: "Run Wobbl's {{cases}} validation cases with known answers on your own machine, all of them or a chosen few."
+lead: "validate runs the {{cases}} cases with known answers through the same pipeline your studies use."
 order: 10
 ---
 
 ```sh
-wobbl validate                       # all 25 cases, about 30 minutes
+wobbl validate                       # all {{cases}} cases, about 30 minutes
 wobbl validate --only lame,led       # a few of them
 ```
 
