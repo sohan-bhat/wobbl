@@ -121,3 +121,19 @@ def test_formatting():
     assert E.duration(42) == "42 s" and E.duration(600) == "10 min" and E.duration(7200) == "2.0 h"
     assert E.duration(60 * 3600) == "2.5 days"
     assert E.nbytes(4.5e8) == "450 MB" and E.nbytes(3.1e9) == "3.1 GB"
+
+
+def test_options_when_it_does_not_fit(tmp_path, monkeypatch):
+    monkeypatch.setenv("WOBBL_HOME", str(tmp_path))
+    huge = E.predict(E.calculix_cost(1_000_000), machine(), target="car.inp")
+    kinds = [o["kind"] for o in huge.options]
+    assert kinds == ["coarser", "submodel", "remote", "cloud"]
+    coarse = huge.options[0]
+    assert coarse["nodes"] < 1_000_000 and coarse["peak_memory_gb"] * 1e9 <= 0.6 * 16e9
+    assert "wobbl remote add" in huge.options[2]["summary"]
+    cloud = huge.options[3]
+    assert cloud["cost_usd"] > 0 and "starts nothing until you confirm" in cloud["summary"]
+    assert "--instance " + cloud["instance"] in cloud["summary"]
+    crash = E.predict(E.explicit_cost(1_520_000, 1_490_000, 0.2), machine(), max_hours=12, target="yaris.k")
+    assert crash.verdict == "too long"
+    assert [o["kind"] for o in crash.options] == ["background", "coarser", "remote"]
