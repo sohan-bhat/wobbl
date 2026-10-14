@@ -41,8 +41,8 @@ def _protect_stdout():
 
 
 # the tools agents should reach for; every other tool is a deprecated alias of simulate and says so
-GENERAL = {"simulate", "physics", "inspect_geometry", "verify", "render", "suggest_fix", "quantify_uncertainty",
-           "validate_against_tests", "assess_credibility", "plan_tests", "estimate_cost", "start_job", "job_status",
+GENERAL = {"simulate", "solve_chemistry", "physics", "inspect_geometry", "verify", "render", "suggest_fix",
+           "quantify_uncertainty", "validate_against_tests", "assess_credibility", "plan_tests", "estimate_cost", "start_job", "job_status",
            "job_logs", "cancel_job", "resume_job", "list_materials"}
 
 
@@ -89,6 +89,25 @@ def build_server():
         from .simulate import simulate_tool
         return simulate_tool(thing, question, physics, domain, kind, material, loads, fixtures, options, plan_only,
                              quick, estimate, background, remote)
+
+    @srv.tool()
+    def solve_chemistry(thing: str, question: str = "", physics: list[str] | None = None, temperature: str = "",
+                        pressure: str = "", solvent: str = "", accuracy: str = "normal", plan_only: bool = False,
+                        quick: bool = False) -> dict:
+        """Chemistry on anything: a name ("caffeine", "table salt", "rust"), a formula, SMILES or InChI, an element,
+        a crystal or CIF file, a mixture ("methane and air at 1 atm") or a reaction written out or in words
+        ("2 H2 + O2 -> 2 H2O", "baking soda and vinegar"). Wobbl resolves it (PubChem for names it does not know)
+        and picks the physics from the question: a molecule's structure, dipole, orbitals, IR spectrum,
+        thermochemistry, conformers, solvation and dynamics (GFN2-xTB, with B3LYP checks on small molecules and
+        as the answer at accuracy high); a reaction's heat, Gibbs energy, equilibrium, gas and temperature rise,
+        or its barrier; a crystal's lattice constant, density, bulk modulus and cohesive energy; a flame;
+        a propellant's Isp; or a battery cell's runaway onset. temperature ('500 K'), pressure ('2 atm'), solvent
+        ('water') and accuracy (fast, normal, high) are optional. The same as simulate with domain chemistry."""
+        from .simulate import simulate_tool
+        options = {k: v for k, v in (("temperature", temperature), ("pressure", pressure), ("solvent", solvent),
+                                     ("accuracy", accuracy if accuracy != "normal" else "")) if v}
+        return simulate_tool(thing, question, physics, "chemistry", "", "", None, None, options, plan_only, quick,
+                             False, False, "")
 
     @srv.tool()
     def physics(domain: str = "") -> dict:

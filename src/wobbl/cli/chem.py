@@ -1,4 +1,5 @@
-"""wobbl motor, wobbl flame and wobbl propellant: solid rocket motors, flame temperatures and propellant performance."""
+"""wobbl chem, which is wobbl simulate for chemistry, and the older motor, flame, propellant and runaway commands,
+kept as hidden aliases so scripts keep working."""
 from __future__ import annotations
 
 import json
@@ -174,3 +175,27 @@ def runaway(cell, ambient, film, emissivity, from_, out, question, as_json):
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e), getattr(e, "hint", ""))
     _finish(o, as_json)
+
+
+def _chem_command():
+    """wobbl chem: wobbl simulate with the domain fixed to chemistry, so any name, formula, SMILES, InChI, element,
+    crystal, mixture or reaction goes straight to the chemistry physics."""
+    from .simulate import simulate as sim
+
+    def run(**kw):
+        kw["domain"] = "chemistry"
+        return sim.callback(**kw)
+
+    params = [p for p in sim.params if p.name != "domain"]
+    return click.Command(
+        "chem", callback=run, params=params,
+        help="Chemistry on anything: a molecule, element, crystal, mixture or reaction.\n\n"
+             "\b\n"
+             "wobbl chem caffeine \"what does its IR spectrum look like?\"\n"
+             "wobbl chem \"baking soda and vinegar\"\n"
+             "wobbl chem \"2 H2 + O2 -> 2 H2O\" --set temperature='500 K'\n"
+             "wobbl chem copper \"how stiff is it?\"\n\n"
+             "Set temperature, pressure, solvent or accuracy (fast, normal, high) with --set name=value.")
+
+
+chem = _chem_command()

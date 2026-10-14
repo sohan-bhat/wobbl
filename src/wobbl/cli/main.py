@@ -493,7 +493,7 @@ def mcp():
 
 def _register():
     from .admin import doctor, setup, uninstall
-    from .chem import flame, motor, propellant, runaway
+    from .chem import chem, flame, motor, propellant, runaway
     from .circuits import circuit
     from .crack import crack
     from .credibility import credibility, test_plan, uncertainty, validate_against
@@ -506,7 +506,7 @@ def _register():
     for c in (setup, doctor, uninstall, thermal, circuit, motion, uncertainty, flow, validate_against, credibility,
               test_plan, crack):
         cli.add_command(c)
-    for c in (motor, flame, propellant, runaway, mechanism):
+    for c in (chem, motor, flame, propellant, runaway, mechanism):
         cli.add_command(c)
     from .life import buckling, fatigue, vibration
     for c in (buckling, vibration, fatigue):
