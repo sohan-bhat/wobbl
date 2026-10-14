@@ -236,3 +236,340 @@ def mesh_sizes(feats, quality: str) -> tuple[float, float]:
         h *= 1.4
     return max(h, 0.6), max(3.0 * h, 6.0)
 
+
+def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: bool = False):
+    from ..outcome_generic import GenericOutcome
+    from ..structural.run import describe_part
+    from ..verify.checks import convergence_check
+
+    t0 = time.time()
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    say = progress or (lambda a, b: None)
+    alloy, mold = get_alloy(study.alloy), get_mold(study.mold)
+    pour = float(study.pour if study.pour is not None else alloy.pour)
+    if pour <= alloy.liquidus:
+        raise ValueError(f"the pouring temperature {fmt(pour)} C is below {alloy.name}'s liquidus "
+                         f"({fmt(alloy.liquidus)} C); pour it hotter")
+    say("geometry", f"reading {Path(study.part).name}")
+    prep, feats = describe_part(study.part, out / "work", study.scale, None, study.params)
+    foot = sum(math.pi * r.diameter ** 2 / 4 for r in study.risers)
+    modulus = feats.volume / max(feats.surface_area - foot, 1e-9)            # mm, of the casting alone
+    B = chvorinov_constant(alloy, mold, pour, study.mold_temp)
+    t_chv = B * modulus ** 2
+    t_est = B * max([modulus] + [r.modulus for r in study.risers]) ** 2
+    alpha = mold.conductivity / (mold.density * mold.specific_heat) * 1e6      # mm2/s
+    margin = float(np.clip(3.0 * math.sqrt(alpha * 1.5 * t_est), 15.0, 80.0))
+    duration = max(10.0 * t_est, 60.0)
+    h, h_mold = mesh_sizes(feats, study.quality)
+    factors = [1.0] if study.quality == "fast" else [1.0, 0.72, 0.52]
+    runs = []
+    for k, f in enumerate(factors):
+        say("mesh", f"level {k}: metal elements {h * f:.3g} mm, sand up to {h_mold:.3g} mm")
+        rm = build(prep, study.risers, study.chills, margin, h * f, h_mold, 0.6 * math.sqrt(alpha * t_est))
+        say("solve", f"level {k}: {len(rm.X):,} nodes, freezing")
+        sv = solidify(study, rm, alloy, mold, pour, duration, progress=say)
+        runs.append((sv, feeding(sv)))
+        if k >= 1 and abs(runs[-1][1]["t99_s"] / runs[-2][1]["t99_s"] - 1) < CONVERGED:
+            break
+    sv, fd = runs[-1]
+    say("check", "time step: level 0 again at half the step")
+    half = solidify(study, runs[0][0].base, alloy, mold, pour, duration, finer_steps=2.0)
+    fd_half = feeding(half)
+    res, rm = sv.result, sv.rm
+    t_sol = res.events["solidus"]
+    cn = sv.casting_nodes
+    t_cast = fd["t_casting_s"]
+    checks: list[Check] = []
+    solid = bool(np.isfinite(t_sol[cn]).all())
+    if solid:
+        checks.append(convergence_check([r[1]["t99_s"] for r in runs], 0.05,
+                                        "time for 99% of the casting to freeze", "s",
+                                        "the last level" if len(runs) == len(factors) else "", min_levels=2))
+        t_a, t_b = runs[0][1]["t99_s"], fd_half["t99_s"]
+        dt_ch = abs(t_b - t_a) / t_a
+        st = "pass" if dt_ch < 0.03 else ("warn" if dt_ch < 0.08 else "fail")
+        checks.append(Check("time step", st, f"half the time step moves the freezing time from {fmt(t_a)} to "
+                                             f"{fmt(t_b)} s ({100 * dt_ch:.2g}%)", {"change": dt_ch}))
+    e = res.energy
+    st = "pass" if e["error"] < 1e-4 else ("warn" if e["error"] < 1e-2 else "fail")
+    checks.append(Check("energy balance", st, f"the cooling metal and sand give up {fmt(e['moved_J'] / 1000)} kJ, "
+                                              f"the rest of the mold takes it in and {fmt(e['lost_J'] / 1000)} kJ "
+                                              f"leaves its outside, closing to {100 * e['error']:.2g}%", e))
+    # Chvorinov's rule for the casting alone: a riser keeps the casting hot where it joins, and chills cool it
+    ratio = t_cast / t_chv if solid else float("nan")
+    s = (f"Chvorinov's rule with modulus V/A = {fmt(modulus)} mm and mold constant {fmt(B * 100)} s/cm2 gives "
+         f"{fmt(t_chv / 60)} min, and the casting freezes in {fmt(t_cast / 60)} min here ({ratio:.2f}x)")
+    if study.chills:
+        checks.append(Check("hand calculation", "info", s + ", with chills that Chvorinov leaves out cooling it "
+                                                            "faster", {"chvorinov_s": t_chv, "ratio": ratio}))
+    else:
+        st = "pass" if 0.6 <= ratio <= 1.6 else "info"
+        checks.append(Check("hand calculation", st, s + ("" if st == "pass" else ", a spread that comes from a "
+                            "shape far from compact, which a single modulus cannot capture"),
+                            {"chvorinov_s": t_chv, "ratio": ratio}))
+    ny, gp = niyama(alloy, res.gradient, res.cooling)
+    pockets = fd["pockets"]
+    in_pocket = np.zeros(len(rm.X), bool)
+    for p in pockets:
+        in_pocket[p["nodes"]] = True
+    if gp is not None:
+        gp = np.where(in_pocket, 100.0 * alloy.shrinkage, gp)
+    vol_c = float(sv.node_volume[cn].sum())
+    shrink = alloy.shrinkage * vol_c
+    if not study.risers:
+        checks.append(Check("feeding", "fail", f"there is no riser, so the casting's whole shrinkage, about "
+                                               f"{fmt(shrink / 1000)} cm3, collects where it freezes last, at "
+                                               f"({_xyz(fd['last_xyz'])}) mm after {fmt(t_cast / 60)} min"))
+    elif pockets:
+        p = pockets[0]
+        many = len(pockets) > 1
+        checks.append(Check("feeding", "fail", f"{len(pockets)} region{'s' if many else ''} freeze{'' if many else 's'} "
+                            f"cut off from the risers; the largest, {fmt(p['volume_mm3'] / 1000)} cm3 around "
+                            f"({_xyz(p['hot_xyz'])}) mm, freezes last at {fmt(p['t_s'] / 60)} min and leaves about "
+                            f"{fmt(alloy.shrinkage * p['volume_mm3'] / 1000)} cm3 of shrinkage",
+                            {"pockets": [{k: v for k, v in q.items() if k != "nodes"} for q in pockets]}))
+    else:
+        checks.append(Check("feeding", "pass", "every part of the casting freezes before the metal on its path back "
+                                               "to a riser does, so liquid can reach it as it shrinks"))
+    t_ratio = None
+    if study.risers and fd["t_riser_s"] is not None and solid:
+        t_ratio = fd["t_riser_s"] / t_cast
+        m_ratio = max(r.modulus for r in study.risers) / modulus
+        st = "pass" if t_ratio >= 1.2 else ("warn" if t_ratio >= 1.0 else "fail")
+        checks.append(Check("riser", st, f"the risers freeze at {fmt(fd['t_riser_s'] / 60)} min, {t_ratio:.2f}x the "
+                                         f"casting, and by hand the riser's modulus is {m_ratio:.2f}x the casting's "
+                                         "against the rule of thumb of 1.2x",
+                            {"time_ratio": t_ratio, "modulus_ratio": m_ratio}))
+    cast_mask = np.zeros(len(rm.X), bool)
+    cast_mask[cn] = True
+    por_max, por_xyz, por_share = None, None, None
+    if gp is not None:
+        inner = cast_mask & ~in_pocket
+        inner[sv.surface] = False     # porosity forms inside; the skin against the mold is not a Niyama site
+        g_c = np.where(inner, gp, np.nan)
+        if np.isfinite(g_c).any():
+            i = int(np.nanargmax(g_c))
+            por_max, por_xyz = float(g_c[i]), rm.X[i].tolist()
+            por_share = float(sv.node_volume[np.nan_to_num(g_c) > 0.1].sum()) / vol_c
+            st = "pass" if por_max < 0.1 else ("warn" if por_max < 1.0 or por_share < 0.01 else "fail")
+            checks.append(Check("porosity", st, f"the dimensionless Niyama criterion gives at most "
+                                                f"{fmt(por_max)}% shrinkage porosity, at ({_xyz(por_xyz)}) mm, with "
+                                                f"{100 * por_share:.2g}% of the casting over 0.1%",
+                                {"max_pct": por_max, "share_over_0.1pct": por_share}))
+    else:
+        nyc = ny[cn]
+        if np.isfinite(nyc).any():
+            checks.append(Check("porosity", "info", f"lowest Niyama value {fmt(float(np.nanmin(nyc)))} (K s)^0.5/mm, "
+                                                    f"and there is no porosity curve for {alloy.name}"))
+    if not solid:
+        checks.append(Check("units and sanity", "fail", f"part of the casting was still liquid after "
+                                                        f"{fmt(duration / 60)} min"))
+    else:
+        checks.append(Check("units and sanity", "pass", f"poured at {fmt(pour)} C into {mold.name.lower()} at "
+                                                        f"{fmt(study.mold_temp)} C, a {fmt(vol_c / 1000)} cm3 casting "
+                                                        f"frozen after {fmt(t_cast / 60)} min"))
+    lo_h, hi_h = alloy.latent_range
+    spread = 0.0
+    if hi_h > lo_h:
+        spread = max(abs(chvorinov_constant(alloy, mold, pour, study.mold_temp, x) / B - 1) for x in (lo_h, hi_h))
+    extra = [("medium", f"process estimate: freezing times follow the latent heat ({fmt(lo_h / 1000)} to "
+                        f"{fmt(hi_h / 1000)} kJ/kg between sources, up to {100 * spread:.0f}% on time) and the "
+                        f"mold's heat uptake, which varies about {100 * SPREAD:.0f}% with sand and compaction")]
+    # feeding, riser and porosity are the answer itself, so only the checks on the solve set the confidence
+    level, reasons = confidence([c for c in checks if c.name in VERIFY], extra)
+    fails = (not solid) or (not study.risers) or bool(pockets) or (t_ratio is not None and t_ratio < 1.0) or \
+        (por_max is not None and por_max >= 1.0 and por_share is not None and por_share >= 0.01)
+    weak = (t_ratio is not None and t_ratio < 1.2) or (por_max is not None and por_max >= 0.1)
+    verdict = "fails" if fails else ("marginal" if weak else "ok")
+    if not solid:
+        head = f"The casting did not finish freezing within {fmt(duration / 60)} min."
+    elif not study.risers:
+        head = (f"Freezes last at ({_xyz(fd['last_xyz'])}) mm after {fmt(t_cast / 60)} min, and with no riser about "
+                f"{fmt(shrink / 1000)} cm3 of shrinkage collects there.")
+    elif pockets:
+        p = pockets[0]
+        head = (f"Shrinkage pocket of about {fmt(alloy.shrinkage * p['volume_mm3'] / 1000)} cm3 near "
+                f"({_xyz(p['hot_xyz'])}) mm, which freezes last at {fmt(p['t_s'] / 60)} min cut off from the risers.")
+    else:
+        head = (f"Freezes sound in {fmt(t_cast / 60)} min, fed throughout by the risers, which freeze at "
+                f"{fmt(fd['t_riser_s'] / 60)} min" + (f", with at most {fmt(por_max)}% Niyama porosity."
+                                                      if por_max is not None else "."))
+    fixes = casting_fixes(study, fd, ratio, B, por_max, por_xyz, t_ratio, rm, cn)
+    assumptions = [
+        f"{alloy.name}: liquidus {fmt(alloy.liquidus)} C, solidus {fmt(alloy.solidus)} C, latent heat "
+        f"{fmt(alloy.latent / 1000)} kJ/kg, {fmt(alloy.conductivity)} W/(m K), {fmt(alloy.specific_heat)} J/(kg K), "
+        f"{fmt(alloy.density)} kg/m3, shrinkage on freezing {100 * alloy.shrinkage:.3g}%. Sources: {alloy.source}.",
+        f"{mold.name}: {fmt(mold.conductivity)} W/(m K), {fmt(mold.density)} kg/m3, {fmt(mold.specific_heat)} J/(kg K), "
+        f"{fmt(margin)} mm thick around the part, its outside cooled at {fmt(study.film)} W/(m2 K) to "
+        f"{fmt(study.ambient)} C. Sources: {mold.source}.",
+        f"The cavity fills at once with metal at {fmt(pour)} C, so the gating and the cooling while it fills are "
+        "not modeled.",
+        "Metal and mold touch perfectly throughout. The air gap that opens as the casting shrinks slows cooling "
+        "late in freezing, so real freezing times run somewhat longer.",
+        "Shrinkage is fed only along paths of metal that freezes later. Gas porosity from hydrogen is not modeled, "
+        "which assumes well degassed metal.",
+        "Risers are blind cylinders sitting on the casting and poured at the same temperature.",
+    ]
+    if gp is not None:
+        assumptions.append("Porosity comes from the dimensionless Niyama criterion of Carlson and Beckermann (2009), "
+                           "with the thermal gradient and cooling rate taken 10% of the freezing range above the "
+                           "solidus.")
+    imgs = casting_images(out, sv, t_sol, gp if gp is not None else ny, gp is not None, fd, por_xyz)
+    notes = list(prep.notes)
+    try:
+        casting_playback(out, sv, fd)
+    except Exception as e:  # noqa: BLE001  the answer stands without its animation
+        notes.append(f"playback.json was not written: {e}")
+    metrics = [("freezes in", f"{fmt(t_cast / 60)} min" if solid else "not frozen"),
+               ("shrinkage pockets", str(len(pockets)) if study.risers else "no riser"),
+               ("worst porosity", f"{fmt(por_max)}%" if por_max is not None else "n/a"),
+               ("riser time ratio", f"{t_ratio:.2f}" if t_ratio is not None else "n/a")]
+    values = {"process": "casting", "t_casting_s": t_cast, "t_riser_s": fd["t_riser_s"], "chvorinov_s": t_chv,
+              "modulus_mm": modulus, "pour_C": pour, "alloy": alloy.key, "mold": mold.key,
+              "pockets": [{k: v for k, v in q.items() if k != "nodes"} for q in pockets],
+              "porosity_max_pct": por_max, "porosity_xyz": por_xyz, "last_xyz": fd["last_xyz"],
+              "levels": [{"nodes": len(r[0].rm.X), "t_casting_s": r[1]["t_casting_s"], "t99_s": r[1]["t99_s"],
+                          "steps": r[0].result.steps} for r in runs],
+              "_figures": [["freezing", "Time to freeze, cut through the last spot to freeze"],
+                           ["porosity", "Shrinkage porosity from the Niyama criterion, cut through its worst spot"],
+                           ["curves", "Solid fraction of the casting and risers over time"]]}
+    metal = np.isin(np.array(rm.kinds)[rm.region], ["casting", "riser"])
+    used = np.unique(rm.tets[metal])
+    field_ = gp if gp is not None else ny
+    np.savez_compressed(out / "fields.npz", X=rm.X[used].astype(np.float32), t_solidus=t_sol[used].astype(np.float32),
+                        porosity=field_[used].astype(np.float32))
+    o = GenericOutcome("manufacturing", str(study.part), study.question, verdict, head, metrics, level, reasons,
+                       checks, assumptions, values, imgs, fixes, notes,
+                       solver=f"Wobbl enthalpy solver (scipy), {len(rm.X):,} nodes", t_total=time.time() - t0)
+    o.write(out)
+    if not keep:
+        shutil.rmtree(out / "work", ignore_errors=True)
+    return o
+
+
+def _xyz(p) -> str:
+    return ", ".join(fmt(float(v)) for v in p)
+
+
+def casting_fixes(study, fd, ratio, B, por_max, por_xyz, t_ratio, rm, cn) -> list[dict]:
+    """Riser size and place from the modulus rule, with the mold constant scaled to agree with the solve."""
+    fixes = []
+    b_eff = B * (ratio if np.isfinite(ratio) and ratio > 0 else 1.0)
+    targets = []
+    if not study.risers:
+        targets.append((fd["last_xyz"], fd["t_casting_s"], "the last spot to freeze"))
+    for p in fd["pockets"][:2]:
+        targets.append((p["hot_xyz"], p["t_s"], "the cut off region"))
+    for xyz, t_hot, what in targets:
+        m_hot = math.sqrt(t_hot / b_eff)
+        d = 5.0 * math.ceil(1.2 * m_hot / 0.2143 / 5.0)              # height 1.5 d gives modulus 0.2143 d
+        near = np.linalg.norm(rm.X[cn, :2] - np.asarray(xyz[:2]), axis=1) < max(d / 2, 1e-6)
+        top = float(rm.X[cn][near][:, 2].max()) if near.any() else float(xyz[2])
+        fixes.append({"kind": "riser", "title": f"Add a riser d={fmt(d)} h={fmt(1.5 * d)} mm over {what}",
+                      "summary": f"{what.capitalize()} has a modulus of about {fmt(m_hot)} mm, from its freezing time "
+                                 f"through Chvorinov's rule scaled to this solve. A blind riser needs 1.2x that, so "
+                                 f"d={fmt(d)} mm and h={fmt(1.5 * d)} mm on top at ({fmt(xyz[0])}, {fmt(xyz[1])}, "
+                                 f"{fmt(top)}). Check it with --riser \"d={fmt(d)} h={fmt(1.5 * d)} at "
+                                 f"{fmt(xyz[0])},{fmt(xyz[1])},{fmt(top)}\".", "auto": False})
+    for p in fd["pockets"][:1]:
+        w = max(10.0, float(np.sort(np.ptp(rm.X[p["nodes"]], axis=0))[-2]))
+        fixes.append({"kind": "chill", "title": "Or chill the cut off region",
+                      "summary": f"A steel or copper chill against the face nearest ({_xyz(p['hot_xyz'])}) mm, about "
+                                 f"{fmt(w)} mm across, makes that region freeze early while the metal behind it can "
+                                 "still feed it. Try it with --chill \"steel WxDxH at X,Y,Z\" overlapping that face.",
+                      "auto": False})
+    if t_ratio is not None and t_ratio < 1.2:
+        k = math.sqrt(1.2 / t_ratio)
+        fixes.append({"kind": "riser", "title": f"Make the riser about {k:.2g}x wider",
+                      "summary": f"The risers freeze at {t_ratio:.2f}x the casting's time and should outlast it by "
+                                 f"1.2x. Freezing time grows with the square of the modulus, so a riser about {k:.2g}x "
+                                 "the diameter, or an insulating sleeve, gives that margin.", "auto": False})
+    if por_max is not None and por_max >= 0.1:
+        fixes.append({"kind": "gradient", "title": "Steepen the freezing toward the riser",
+                      "summary": f"Porosity of {fmt(por_max)}% at ({_xyz(por_xyz)}) mm comes from a shallow thermal "
+                                 "gradient late in freezing. Taper the section so it thickens toward the riser, or "
+                                 "chill the far end, so that region freezes in a clear order.", "auto": False})
+    return fixes
+
+
+def casting_playback(out: Path, sv: Solved, fd: dict) -> str:
+    """The metal cut open through its last spot to freeze, with the time each vertex started and finished
+    freezing, so a page can show the solid growing in from the mold walls."""
+    from . import playback
+    from .render import plane_through
+
+    rm, ev = sv.rm, sv.result.events
+    metal = np.isin(np.array(rm.kinds)[rm.region], ["casting", "riser"])
+    used = np.unique(rm.tets[metal])
+    lut = np.full(len(rm.X), -1)
+    lut[used] = np.arange(len(used))
+    X, tets = rm.X[used], lut[rm.tets[metal]]
+    riser = np.zeros(len(rm.X))
+    riser[sv.riser_nodes] = 1.0
+    riser[sv.casting_nodes] = 0.0
+    hot = fd["pockets"][0]["hot_xyz"] if fd["pockets"] else fd["last_xyz"]
+    cut = plane_through(X, hot)
+    surf = playback.surface(X, tets, {"t_liquidus": ev["liquidus"][used], "t_solidus": ev["solidus"][used],
+                                      "riser": riser[used]}, cut)
+    V, F, vals = playback.decimate(surf)
+    t_end = float(np.nanmax(ev["solidus"][used]))
+    return playback.write(
+        out / "playback.json", "casting", "Casting freezing from the mold walls inward", V, F,
+        {"t_liquidus": (vals["t_liquidus"], "s", "time the metal at the vertex starts to freeze, -1 if it was "
+                        "already below the liquidus", 1),
+         "t_solidus": (vals["t_solidus"], "s", "time the metal at the vertex is fully solid", 1),
+         "riser": (vals["riser"], "", "1 on a riser, 0 on the casting", 0)},
+        {"view": "the metal cut open by a plane through the last spot to freeze",
+         "cut_plane": {"origin": [round(float(v), 2) for v in cut[0]], "normal": [float(v) for v in cut[1]]}},
+        {"time_s": [round(float(t), 1) for t in np.linspace(0.0, 1.05 * t_end, 90)],
+         "rule": "at time t a vertex is liquid while t < t_liquidus, freezing while t_liquidus <= t < t_solidus, "
+                 "and solid once t >= t_solidus; its solid fraction can be drawn as (t - t_liquidus) / "
+                 "(t_solidus - t_liquidus)"},
+        {"events": {"last_to_freeze": {"xyz": [round(float(v), 2) for v in hot],
+                                       "t_s": round(float(fd["pockets"][0]["t_s"] if fd["pockets"]
+                                                          else fd["t_casting_s"]), 1)},
+                    "pockets": [{"xyz": [round(float(v), 2) for v in p["hot_xyz"]],
+                                 "volume_mm3": round(p["volume_mm3"], 1), "t_s": round(p["t_s"], 1)}
+                                for p in fd["pockets"]]}})
+
+
+def casting_images(out: Path, sv: Solved, t_sol, field_, is_pct: bool, fd: dict, por_xyz) -> dict:
+    from ..report.render import line_plot
+    from .render import plane_through, section
+
+    rm = sv.rm
+    imgs = {}
+    metal = np.isin(np.array(rm.kinds)[rm.region], ["casting", "riser"])
+    used = np.unique(rm.tets[metal])
+    lut = np.full(len(rm.X), -1)
+    lut[used] = np.arange(len(used))
+    X, tets = rm.X[used], lut[rm.tets[metal]]
+    try:
+        hot = fd["pockets"][0]["hot_xyz"] if fd["pockets"] else fd["last_xyz"]
+        o, n = plane_through(X, hot)
+        imgs["freezing"] = section(out / "images" / "freezing.png", X, tets, t_sol[used] / 60.0, "freezes after",
+                                   "min", o, n, hot, f"{fmt(float(np.nanmax(t_sol[sv.casting_nodes])) / 60)} min",
+                                   "magma")
+        v = field_[used]
+        if np.isfinite(v).any():
+            mark = por_xyz if por_xyz is not None else hot
+            o2, n2 = plane_through(X, mark)
+            if is_pct:
+                imgs["porosity"] = section(out / "images" / "porosity.png", X, tets, v, "shrinkage porosity", "%",
+                                           o2, n2, mark, f"{fmt(float(np.nanmax(v)))}%", "viridis",
+                                           (0.0, max(float(np.nanmax(v)), 0.2)))
+            else:
+                imgs["porosity"] = section(out / "images" / "porosity.png", X, tets, v, "Niyama", "(K s)^0.5/mm",
+                                           o2, n2, mark, "", "viridis_r")
+        grid = np.linspace(0, float(np.nanmax(t_sol[used])) * 1.05, 120)
+        curves = {}
+        for name, nodes in (("casting", sv.casting_nodes), ("risers", sv.riser_nodes)):
+            if len(nodes):
+                w = sv.node_volume[nodes]
+                ts = np.nan_to_num(t_sol[nodes], nan=np.inf)
+                curves[name] = [float(w[ts <= g].sum() / w.sum()) for g in grid]
+        imgs["curves"] = line_plot(out / "images" / "curves.png", grid / 60.0, curves, "minutes", "solid fraction")
+    except Exception as e:  # noqa: BLE001
+        imgs["error"] = str(e)
+    return imgs

@@ -30,7 +30,7 @@ from typing import Callable
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import cg, spsolve
+from scipy.sparse.linalg import spsolve
 
 
 @dataclass
@@ -160,6 +160,27 @@ def assemble(model: Model):
     return K, C, Lam, metal_mass, B, V, hdiag, src
 
 
+def _pcg(A, b, x, dinv, rtol: float = 1e-10, maxiter: int = 3000) -> tuple[np.ndarray, bool]:
+    """Conjugate gradients with a diagonal preconditioner, lean enough that the matrix products dominate."""
+    r = b - A @ x
+    z = dinv * r
+    p = z.copy()
+    rz = float(r @ z)
+    stop = rtol * max(float(np.linalg.norm(b)), 1e-300)
+    for _ in range(maxiter):
+        if float(np.linalg.norm(r)) <= stop:
+            return x, True
+        Ap = A @ p
+        alpha = rz / float(p @ Ap)
+        x += alpha * p
+        r -= alpha * Ap
+        z = dinv * r
+        rz_new = float(r @ z)
+        p = z + (rz_new / rz) * p
+        rz = rz_new
+    return x, False
+
+
 def solve(model: Model, progress=None) -> Result:
     t_wall = time.time()
     say = progress or (lambda a, b: None)
@@ -176,6 +197,11 @@ def solve(model: Model, progress=None) -> Result:
     free = np.nonzero(~fixed)[0]
     fx = np.nonzero(fixed)[0]
     Aff = A[free][:, free].tocsr()
+    Aff.sum_duplicates()
+    Aff.sort_indices()
+    rows = np.repeat(np.arange(Aff.shape[0]), np.diff(Aff.indptr))
+    on_diag = np.nonzero(Aff.indices == rows)[0]                   # where each row keeps its diagonal
+    Mff = Aff.copy()
     rhs_fix = A[free][:, fixed] @ T[fixed] if fixed.any() else np.zeros(len(free))
     latent = Lam > 0
     g = curve.of(T) if curve is not None else np.zeros(n)
@@ -226,11 +252,10 @@ def solve(model: Model, progress=None) -> Result:
                 s[active] = curve.dgdT(gk[active], gk[active] >= 1)
                 Tstar[active] = curve.temperature(gk[active])
             diag = (C + Lam * s) / dt
-            Mff = (Aff + sp.diags(diag[free])).tocsr()
+            Mff.data[on_diag] = Aff.data[on_diag] + diag[free]
             rhs = (src + (C * Tn - Lam * (gk - gn) + Lam * s * Tstar) / dt)[free] - rhs_fix
-            sol, info = cg(Mff, rhs, x0=Tk[free], rtol=1e-12, atol=0.0, maxiter=3000,
-                           M=sp.diags(1.0 / Mff.diagonal()))
-            if info != 0:
+            sol, ok_cg = _pcg(Mff, rhs, Tk[free].copy(), 1.0 / Mff.data[on_diag])
+            if not ok_cg:
                 stats["direct"] += 1
                 sol = spsolve(Mff.tocsc(), rhs)
             Tnew = Tk.copy()
@@ -241,7 +266,7 @@ def solve(model: Model, progress=None) -> Result:
             dT_it = float(np.abs(Tnew - Tk).max())
             dg_it = float(np.abs(gnew - gk).max()) if curve is not None else 0.0
             Tk, gk = Tnew, gnew
-            if dT_it < 1e-5 and dg_it < 1e-7:
+            if dT_it < 1e-4 and dg_it < 1e-6:
                 ok = True
                 break
         dT = float(np.abs(Tk - Tn).max())
