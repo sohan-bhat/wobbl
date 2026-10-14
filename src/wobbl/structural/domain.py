@@ -112,6 +112,40 @@ register(Analysis(
     example='wobbl simulate bracket.step "will it hold 200 N?"'))
 
 
+def review(job):
+    """A finished result asked a yes or no question: its verdict as it stands, or the same study run again with
+    the options given, as a new load or material."""
+    import json
+
+    src = job.path
+    if src is None or not (src / "outcome.json").exists():
+        raise ValueError(f"no finished result in {job.thing}")
+    if job.options and (src / "request.json").exists():
+        from ..simulate import rerun
+        job.ready()
+        job.log("rerun", f"{src.name} with {', '.join(job.options)} changed")
+        return rerun(src, job.out, job.options, job.quick)
+    job.ready()
+    d = json.loads((src / "outcome.json").read_text())
+    job.out.mkdir(parents=True, exist_ok=True)
+    d.setdefault("assumptions", []).insert(0, f"Wobbl read this verdict from the finished result in {src}.")
+    d["workdir"] = str(job.out)
+    for k in ("report",):
+        if d.get(k) and not Path(d[k]).is_absolute():
+            d[k] = str(src / d[k])
+    (job.out / "outcome.json").write_text(json.dumps(d, indent=1))
+    return d
+
+
+register(Analysis(
+    "part", "review", "A finished result's verdict, or the same study run again with what the question changes",
+    review, dry=True, kinds=("result",), default=True,
+    keywords=(r"\bhold", r"\bsurviv", r"\bfail", r"\bbreak", r"\bpass", r"\bsafe", r"\bok\b", r"\bverdict",
+              r"safety factor", r"\bstrong", r"what if", r"\binstead\b"),
+    aliases=("verdict", "result", "again"),
+    example='wobbl simulate wobbl-out/bracket "does it still hold with 250 N?" --load "250 N down @ top"'))
+
+
 register(Analysis(
     "part", "submodel", "Submodel: a fine local model of the peak, driven by the coarse result's displacements",
     "wobbl.structural.submodel:simulate_entry", kinds=PART_KINDS + ("result",), needs=("stress",),

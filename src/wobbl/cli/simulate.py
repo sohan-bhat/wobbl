@@ -227,14 +227,14 @@ def show_estimate(plan, opts, as_json: bool) -> None:
         ui.console.print(f"  {d.get('verdict', '')}  {d.get('headline', '')}")
 
 
-def start_job(plan, opts, remote: str, as_json: bool) -> None:
+def start_job(plan, opts, remote: str, as_json: bool, out: str | None = None) -> None:
     """Start the plan as a background job, here or on a remote, and say how to follow it."""
     try:
         from ..jobs.manage import start_plan
     except ImportError:
         ui.fail("this version of Wobbl cannot run a simulate plan as a job yet")
     try:
-        d = _plain(start_plan(plan, opts, on=remote))
+        d = _plain(start_plan(plan, opts, on=remote, out=out))
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e), getattr(e, "hint", ""))
     if as_json:
@@ -319,7 +319,7 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
     if estimate_only:
         return show_estimate(plan, opts, as_json)
     if background or remote:
-        return start_job(plan, opts, remote, as_json)
+        return start_job(plan, opts, remote, as_json, out)
     from .main import _out_dir
     out_dir = _out_dir(out_name(plan), out)
     try:

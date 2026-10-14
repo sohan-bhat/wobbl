@@ -101,6 +101,10 @@ CASES = [
     Case(str(PARTS / "enclosure_shell.step"), "will it survive a 1.2 m drop onto tile?", "part", "step", ("drop",)),
     Case(str(EX / "drone-arm" / "arm.py"), "it is bolted at the base, will it hold 20 N and survive a 1 m drop?",
          "part", "parametric", ("stress", "drop")),
+    # a finished result: a yes or no question reads its verdict, and only a question about the peak refines it
+    Case(str(EX / "shelf-bracket" / "output"), "will it hold?", "part", "result", ("review",)),
+    Case(str(EX / "shelf-bracket" / "output"), "refine the stress around the peak", "part", "result",
+         ("submodel",)),
     # a pressure drop is a flow question, not a drop test
     Case(str(PARTS / "cast_motor_mount.step"), "what is the pressure drop through it at 20 L/min of water?", "part",
          "step", ("cfd",)),
