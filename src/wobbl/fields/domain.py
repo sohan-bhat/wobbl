@@ -128,6 +128,7 @@ def magnetic_part(job):
     _situate(job, sc, {n: b.kind for n, b in bodies.items()})
     job.ready()
     o = ms3d.run(sc, s, job.out, job.question, _quality(job), log=job.log, title=Path(job.thing).name)
+    _tidy(job)
     if s.need:
         job.criterion("force", "force_target_N", s.need, "min")
     return o
@@ -143,6 +144,7 @@ def electric_part(job):
     _situate(job, sc, {**{n: "conductor" for n in conds}, **{n: "dielectric" for n in diel}})
     job.ready()
     o = es3d.run(sc, s, job.out, job.question, _quality(job), log=job.log, title=Path(job.thing).name)
+    _tidy(job)
     o.assumptions += [n for n in notes if n not in o.assumptions]
     return o
 
@@ -158,9 +160,17 @@ def acoustic_part(job):
     _situate(job, sc, {**{n: "air" for n in roles.air}, **{n: "wall" for n in roles.walls},
                        **{n: "source" for n in roles.sources}})
     job.ready()
-    return ac3d.run(sc, roles, job.out, job.question, _quality(job),
-                    fmax=value({"f": fmax}, "f", 0, "frequency") if fmax else 0.0, log=job.log,
-                    title=Path(job.thing).name, listen=job.values("listen"))
+    o = ac3d.run(sc, roles, job.out, job.question, _quality(job),
+                 fmax=value({"f": fmax}, "f", 0, "frequency") if fmax else 0.0, log=job.log,
+                 title=Path(job.thing).name, listen=job.values("listen"))
+    _tidy(job)
+    return o
+
+
+def _tidy(job) -> None:
+    """The scene copy of the CAD in meters is only needed while solving."""
+    import shutil
+    shutil.rmtree(job.out / "work", ignore_errors=True)
 
 
 def _situate(job, sc, roles: dict) -> None:

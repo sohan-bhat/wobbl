@@ -140,7 +140,7 @@ def run(scene: Scene, s: ElecSetup, out_dir: str | Path, question: str = "", qua
     t0 = time.time()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    work = out / "work"
+    work = out / "work" / "solve"      # the scene the caller loaded may sit beside it in out/work
     shutil.rmtree(work, ignore_errors=True)
     conds = list(s.conductors)
     if not conds:

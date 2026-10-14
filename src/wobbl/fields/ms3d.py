@@ -346,7 +346,7 @@ def run(scene: Scene, s: MagSetup, out_dir: str | Path, question: str = "", qual
     t0 = time.time()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    work = out / "work"
+    work = out / "work" / "solve"      # the scene the caller loaded may sit beside it in out/work
     shutil.rmtree(work, ignore_errors=True)
     if not s.bodies:
         raise ValueError("a magnetic study needs at least one magnet, coil or piece of steel, for example "

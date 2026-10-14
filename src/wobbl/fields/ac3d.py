@@ -185,7 +185,7 @@ def run_modes(scene: Scene, roles: SoundRoles, out_dir, question="", quality="no
     t0 = time.time()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    work = out / "work"
+    work = out / "work" / "solve"      # the scene the caller loaded may sit beside it in out/work
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir(parents=True)
     if roles.walls and not roles.air:
@@ -316,7 +316,7 @@ def run_radiation(scene: Scene, roles: SoundRoles, out_dir, question="", quality
     t0 = time.time()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    work = out / "work"
+    work = out / "work" / "solve"      # the scene the caller loaded may sit beside it in out/work
     shutil.rmtree(work, ignore_errors=True)
     fmax = fmax or 1000.0
     fmin = fmax / 10
