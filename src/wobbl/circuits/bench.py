@@ -426,6 +426,50 @@ def jumper(s: Svg, pts, color: str):
         s.add("circle", cx=x, cy=y, r=2.2, fill="#b8bdc3", stroke="#5b574d", stroke_width=0.8)
 
 
+def probe(s: Svg, cable: str, tip, ang: float, ring: str = YEL):
+    """A scope probe: its cable, a slim body pointing at the tip and a colored channel ring."""
+    lead(s, cable, "#4b5057", 3)
+    s.open(transform=f"translate({num(tip[0])} {num(tip[1])}) rotate({num(ang)})")
+    s.add("path", d="M0 0L-8 0", stroke="#c3c8cd", stroke_width=1.6, stroke_linecap="round")
+    s.add("rect", x=-44, y=-4.5, width=36, height=9, rx=4.5, fill="#2a2d31", stroke="#4a4f57", stroke_width=0.8)
+    s.add("rect", x=-36, y=-4.5, width=4, height=9, fill=ring)
+    s.close()
+
+
+def scope(s: Svg, x, y, w, h, traces, sweep, marks=(), inputs=("1", "2")) -> dict:
+    """An oscilloscope with its traces (x and y from 0 to 1) on the graticule; the site draws them in."""
+    s.add("rect", x=x + 3, y=y + 5, width=w, height=h, rx=7, fill="#000", opacity=0.5)
+    s.add("rect", x=x, y=y, width=w, height=h, rx=7, fill="#1b1e22", stroke="#3b4047")
+    s.add("rect", x=x + 1, y=y + 1, width=w - 2, height=7, rx=6, fill="#24282d")
+    s.text(x + 12, y + 21, "OSCILLOSCOPE", size=8.5, fill=MUTED, ls=1.2)
+    sx, sy, sw, sh = x + 12, y + 28, w - 62, h - 44
+    s.add("rect", x=sx, y=sy, width=sw, height=sh, rx=3, fill="#070a0a", stroke="#30353b")
+    grid = "".join(f"M{num(sx + sw * i / 10)} {num(sy)}v{num(sh)}" for i in range(1, 10))
+    grid += "".join(f"M{num(sx)} {num(sy + sh * j / 8)}h{num(sw)}" for j in range(1, 8))
+    s.add("path", d=grid, stroke="#172021", stroke_width=0.8)
+    s.add("path", d=f"M{num(sx + sw / 2)} {num(sy)}v{num(sh)}M{num(sx)} {num(sy + sh / 2)}h{num(sw)}", stroke="#27302f",
+          stroke_width=0.8)
+    for mx in marks:
+        s.add("path", d=f"M{num(sx + 3 + mx * (sw - 6))} {num(sy + 2)}v{num(sh - 4)}", stroke=MUTED, stroke_width=1,
+              stroke_dasharray="2 3")
+    for xs, ys, color in traces:
+        d = poly([(sx + 3 + a * (sw - 6), sy + sh - 3 - b * (sh - 6)) for a, b in zip(xs, ys)])
+        s.open(fill="none", stroke=color, stroke_linejoin="round", data_sweep=sweep)
+        s.add("path", d=d, stroke_width=4, stroke_opacity=0.22, pathLength=1)
+        s.add("path", d=d, stroke_width=1.6, pathLength=1)
+        s.close()
+    knob(s, x + w - 29, y + 40, 200)
+    knob(s, x + w - 29, y + 70, 60)
+    at = {}
+    for i, ch in enumerate(inputs):
+        bx, by = x + w - 42 + 22 * i, y + h - 14
+        s.add("circle", cx=bx, cy=by, r=7, fill="#aab0b6", stroke="#5d636b")
+        s.add("circle", cx=bx, cy=by, r=3.4, fill="#16181b")
+        s.add("circle", cx=bx, cy=by - 10.5, r=1.6, fill=YEL if ch == "1" else "#5aa9ff")
+        at[ch] = (bx, by)
+    return at
+
+
 def eng(x: float, unit: str) -> str:
     """A value with an SI prefix and three significant digits: 10 µF, 500 kHz, 100 ms."""
     for scale, pre in ((1e9, "G"), (1e6, "M"), (1e3, "k"), (1, ""), (1e-3, "m"), (1e-6, "µ"), (1e-9, "n")):
