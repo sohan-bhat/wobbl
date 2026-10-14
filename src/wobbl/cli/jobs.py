@@ -285,6 +285,35 @@ def _cloud_start(target, threads, max_hours, instance, region, key_name, securit
                         cloud={**launched, "job": job, "cores": p.cores, "ram": p.ram_gb * 1e9})
 
 
+@jobs.command(name="run-plan", hidden=True)
+@click.argument("thing")
+@click.option("--question", default="")
+@click.option("--domain", default="")
+@click.option("--kind", default="")
+@click.option("--physics", multiple=True)
+@click.option("--opt", "opts", nargs=2, multiple=True)
+@click.option("--quick", is_flag=True)
+@click.option("--out", "-o", default="result")
+def run_plan_cmd(thing, question, domain, kind, physics, opts, quick, out):
+    """Run a wobbl simulate plan exactly as planned. Background and remote jobs run plans through it."""
+    from ..simulate import route, run_plan
+    from ..simulate.runner import overall
+
+    try:
+        plan = route("" if thing == "-" else thing, question, list(physics) or None, domain or None, kind or None)
+    except Exception as e:  # noqa: BLE001
+        ui.fail(str(e), getattr(e, "hint", ""))
+    options: dict[str, list[str]] = {}
+    for k, v in opts:
+        options.setdefault(k, []).append(v)
+    steps = run_plan(plan, options, Path(out), lambda stage, msg: click.echo(f"{stage}: {msg}"), quick)
+    for s in steps:
+        click.echo(f"{s.analysis.key}: {s.error or s.get('headline', '')}")
+    if all(s.error for s in steps):
+        raise SystemExit(1)
+    click.echo(f"overall {overall(steps)}")
+
+
 @jobs.command(name="list")
 @click.option("--json", "as_json", is_flag=True)
 def list_cmd(as_json):

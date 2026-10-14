@@ -249,10 +249,32 @@ def finish(job: Job, st: dict, code, ru, cancelled: bool = False):
     if job.kind == "wobbl":
         from .drivers import result_folder
 
-        out = result_folder(job) / "outcome.json"
-        if out.exists():
-            d = json.loads(out.read_text())
-            st["results"] = {"verdict": d.get("verdict"), "headline": d.get("headline"), "report": d.get("report")}
+        st["results"] = result_summary(result_folder(job)) or st.get("results", {})
+
+
+def result_summary(folder: Path) -> dict:
+    """The answer in a finished result folder: one analysis's outcome.json, or a plan's simulation.json."""
+    out, plan = folder / "outcome.json", folder / "simulation.json"
+    if out.exists():
+        d = json.loads(out.read_text())
+        rep = folder / "report.html"
+        return {"verdict": d.get("verdict"), "headline": d.get("headline"),
+                "report": str(rep) if rep.exists() else d.get("report", "")}
+    if plan.exists():
+        d = json.loads(plan.read_text())
+        steps = d.get("steps", [])
+        return {"verdict": d.get("verdict"), "headline": " ".join(s.get("headline") or s.get("error", "")
+                                                                   for s in steps).strip(),
+                "steps": [{k: s.get(k) for k in ("analysis", "verdict", "headline", "error", "report")} for s in steps]}
+    return {}
+
+
+def start_plan(plan, options: dict | None = None, on: str = "", threads: int = 0, force: bool = False,
+               max_hours: float | None = None, quick: bool = False, out: str | None = None) -> dict:
+    """Start a wobbl simulate plan as a background job, here or on a remote, exactly as it was planned."""
+    from . import workload as WL
+
+    return start("", WL.plan_argv(plan, options or {}, out, quick), on, threads, True, force, max_hours)
 
 
 # ------------------------------------------------------------------------------------------------- remote
@@ -498,12 +520,8 @@ def _pull_wobbl(job: Job, t: R.Transport, dest: Path, full: bool, st: dict | Non
     """A remote Wobbl job's result folder, without its work files unless ``full``, and its log."""
     t.get_dir(f"{job.remote_dir}/result", dest / "result", () if full else ("work",))
     t.get(f"{job.remote_dir}/solver.log", dest / "solver.log")
-    o = dest / "result" / "outcome.json"
-    if st is not None and o.exists():
-        d = json.loads(o.read_text())
-        rep = dest / "result" / "report.html"
-        st["results"] = {"verdict": d.get("verdict"), "headline": d.get("headline"),
-                         "report": str(rep) if rep.exists() else ""}
+    if st is not None:
+        st["results"] = result_summary(dest / "result") or st.get("results", {})
     job.pulled = True
     job.save()
     return {"job_id": job.id, "results": str(dest / "result"),
