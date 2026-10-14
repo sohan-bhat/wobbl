@@ -48,3 +48,19 @@ def test_heated_gap_between_fins_matches_stephan_and_shah(tmp_path):
     r = channel_run(1000.0, 0.71, 5.16, (90, 27), tmp_path)
     assert r["dp"] == pytest.approx(shah_london_dp(1000.0, 5.16), rel=0.05)
     assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.slow
+def test_time_accurate_runs_reproduce_vortex_shedding_at_re_100(tmp_path):
+    """The time accurate solver settings, against the cylinder's vortex street at Re 100: Williamson's (1996)
+    Strouhal number 0.164, and the mean drag coefficient of 1.33 and lift amplitude of about 0.33 that Park, Kwon
+    and Choi (1998) and Henderson (1995) computed. Measured here: St 0.161, Cd 1.333, lift amplitude 0.35."""
+    from wobbl.flow import correlations as C
+    from wobbl.flow.external import shedding
+
+    r = shedding(100.0, tmp_path, "laminar", periods=10, st_guess=0.165, grid=(24, 60), settle_periods=15,
+                 max_co=0.9)
+    assert r["st"] == pytest.approx(C.strouhal_williamson(100.0), rel=0.03)
+    assert r["cd"] == pytest.approx(1.33, rel=0.03)
+    assert r["cl_amp"] == pytest.approx(0.33, rel=0.12)
+    assert abs(r["st_halves"][0] - r["st_halves"][1]) < 0.01 * r["st"]       # the street had settled
