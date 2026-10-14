@@ -125,6 +125,7 @@ def load() -> None:
                 errors[ep.value] = f"{type(e).__name__}: {e}"
     except Exception:  # noqa: BLE001
         pass
+    importlib.import_module("wobbl.simulate.legacy").fill()   # bridges for domains nobody has registered yet
 
 
 def domains() -> list[Domain]:
