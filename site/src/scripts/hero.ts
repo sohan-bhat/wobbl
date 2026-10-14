@@ -85,12 +85,12 @@ export function initHero(viewer: HTMLElement): () => void {
     schedule();
   }).catch(() => {});
 
-  // Only a real click, tap, drag or key stops the idle animation: hovering, a wheel or a swipe that
-  // scrolls the page does not. It plays again after a quiet spell.
+  // Only a real click, tap, drag or key on the part or the load stops the idle animation: hovering,
+  // a wheel or a swipe that scrolls the page does not, and neither does the bending toggle, which only
+  // changes how the part is drawn. It plays again after a quiet spell.
   const touched = () => auto?.hold();
   const onBend = () => {
     bend.setAttribute('aria-pressed', String(bend.getAttribute('aria-pressed') !== 'true'));
-    touched();
     schedule();
   };
   const onInput = () => { touched(); schedule(); };
