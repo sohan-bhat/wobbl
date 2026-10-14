@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 os.environ.setdefault("PYVISTA_OFF_SCREEN", "true")
+# a test without a solver should skip or fail, never download one
+os.environ.setdefault("WOBBL_AUTO_INSTALL", "0")
 
 
 def _write(path: Path, build):

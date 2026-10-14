@@ -58,7 +58,16 @@ class SolverAdapter(ABC):
         return SolverInfo(self.name, self.domains, p, self.version() if p else "", "" if p else self.install_hint)
 
     def require(self) -> Path:
+        """The solver's path, installing it first when this is the first study of its domain on this machine."""
         p = self.locate()
+        if p is None and self.domains:
+            from ..setup.installer import SetupError, install_on_demand
+            try:
+                if install_on_demand(self.domains):
+                    p = self.locate()
+            except SetupError as e:
+                raise SolverNotFound(f"{self.name} is not installed and installing it failed ({e})",
+                                     self.install_hint) from None
         if p is None:
             raise SolverNotFound(f"{self.name} is not installed", self.install_hint)
         return p

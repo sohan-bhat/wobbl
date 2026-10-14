@@ -119,13 +119,15 @@ def doctor(as_json):
     mm = installer.micromamba_path()
     add("micromamba", mm.exists(), str(mm) if mm.exists() else "not installed (run wobbl setup)")
     st = installer.verify(lambda m: None)
-    for name in ("calculix", "ngspice"):
+    for name, recipe in installer.RECIPES.items():
         info = st["solvers"].get(name)
         if info:
             add(name, info["works"], f"{info['version']} at {info['path']}" + (f" ({info['error']})" if
                                                                              info["error"] else ""))
-        else:
+        elif recipe.core:
             add(name, False, st["unavailable"].get(name, "not installed; run 'wobbl setup'"))
+        else:
+            add(name, None, f"installs the first time you run a {recipe.domains[0]} study")
     for a in base.adapters():
         if a.name in ("OpenFOAM", "MuJoCo", "Elmer"):
             add(a.name, None, a.install_hint)
@@ -149,7 +151,8 @@ def doctor(as_json):
         if ok:
             mark = Text("ok", style="bold green")
         elif ok is None:
-            mark = Text("off" if name.startswith("agent") else "planned", style="dim")
+            mark = Text("off" if name.startswith("agent") else "on demand" if name in installer.RECIPES else
+                        "planned", style="dim")
         else:
             mark = Text("missing", style="bold red")
         tb.add_row(mark, name, Text(detail, style="dim"))
