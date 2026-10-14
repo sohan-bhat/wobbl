@@ -224,6 +224,7 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
     T = res.T
     np.savez_compressed(out / "fields.npz", X=mesh.X, T=T, tets=mesh.tets, tris=mesh.tris,
                         hist_t=res.history_t, hist_T=res.history_T)
+    _save_study(study, out)
     tmax = float(T.max())
     hot = mesh.X[int(np.argmax(T))]
     limit = study.limit if study.limit is not None else mat.max_service_temp
@@ -392,6 +393,18 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
                                      ["history", "Temperature over time"]]},
                        img, fixes, prep.notes, solver=res.solver, t_total=time.time() - t0)
     return o.write(out)
+
+
+def _save_study(study: ThermalStudy, out: Path):
+    """study.json, so the run can be solved again with other inputs ('wobbl uncertainty', 'wobbl validate-against').
+    The part path is relative to the result folder, as a strength study's is."""
+    import json
+
+    from ..verify.checks import rel_up
+
+    d = study.to_dict()
+    d["part"] = rel_up(d["part"], out)
+    (out / "study.json").write_text(json.dumps(d, indent=1))
 
 
 SIGMA = 5.670374e-11   # Stefan Boltzmann constant, mW/(mm2 K4)

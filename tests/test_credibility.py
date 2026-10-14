@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 from scipy import integrate, stats
 
+from conftest import needs_ccx, needs_spice
 from wobbl.credibility import uq
 from wobbl.credibility.models import StrengthModel, for_result
 from wobbl.credibility.uncertainty import run_uncertainty
@@ -187,12 +188,9 @@ def test_credibility_assessment_and_test_plan(tmp_path):
 
 
 @pytest.mark.solver
+@needs_ccx
 def test_twin_experiment_recovers_the_modulus(parts, tmp_path):
     """Readings made from a cantilever's own solution at a known modulus, with noise, are calibrated back."""
-    from conftest import _have
-
-    if not _have("structural"):
-        pytest.skip("CalculiX not installed (run wobbl setup)")
     from wobbl.credibility.against import run_validation
     from wobbl.credibility.probes import gauge, load_fields, surface
     from wobbl.structural.pipeline import analyze_strength
@@ -217,3 +215,39 @@ def test_twin_experiment_recovers_the_modulus(parts, tmp_path):
     assert c["input"] == "E" and c["ci95"][0] < 66000 < c["ci95"][1]
     assert r["tests"]["synthetic"] and "synthetic" in r["headline"]
     assert "Comparison with tests" in (out / "report.html").read_text()
+
+
+@pytest.mark.solver
+@needs_ccx
+def test_heat_uncertainty_through_new_solves(tmp_path):
+    """A small aluminum cube making 2 W in still air is nearly isothermal, so its rise is P / (h A), and a lognormal
+    film coefficient gives a mean rise of rise0 (1 + cov^2) in closed form. The surrogate of new heat solves has to
+    find that, and say how well it fits."""
+    from wobbl.thermal.study import run_thermal
+    from wobbl.thermal.tools import study_from
+    from wobbl.validation import geometry as G
+
+    part = G.box(tmp_path / "cube.step", 20, 20, 20)
+    st = study_from(part, "6061-t6", power="2 W", films=["10 W/m2K @ all"], ambient="25 C", quality="fast")
+    run_thermal(st, tmp_path / "run")
+    assert json.loads((tmp_path / "run" / "study.json").read_text())["part"] == "../cube.step"
+    r = run_uncertainty(tmp_path / "run", ["film lognormal 20%"], samples=20000, numerical=False, solves=6)
+    rise0 = json.loads((tmp_path / "run" / "outcome.json").read_text())["values"]["t_max_C"] - 25.0
+    mean = r["outputs"]["t_max_C"]["mean"] - 25.0
+    assert mean == pytest.approx(rise0 * 1.04, rel=0.01)
+    assert r["model"]["kind"] == "polynomial chaos" and r["model"]["surrogate"]["solves"] == 6
+    assert r["model"]["surrogate"]["loo_error"]["t_max_C"] < 0.01
+    assert r["sensitivity"]["indices"][0]["input"] == "film"
+
+
+@pytest.mark.solver
+@needs_spice
+def test_circuit_uncertainty_through_ngspice(tmp_path):
+    from wobbl.circuits.run import run_circuit
+
+    run_circuit("led", {"supply": "5", "resistor": "150", "led": "red"}, tmp_path / "led")
+    r = run_uncertainty(tmp_path / "led", ["resistor 5%", "supply 2%", "vf sd 0.05"], samples=20000, solves=24)
+    i0 = json.loads((tmp_path / "led" / "outcome.json").read_text())["values"]["i_led_A"]
+    assert r["outputs"]["i_led_A"]["mean"] == pytest.approx(i0, rel=0.02)
+    assert r["probability"]["failure"]["value"] < 0.01         # 20 mA nominal against a 30 mA rating
+    assert {x["input"] for x in r["sensitivity"]["indices"]} >= {"resistor", "supply", "vf"}
