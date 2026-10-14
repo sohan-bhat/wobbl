@@ -98,13 +98,28 @@ def energy_check(run: Run, passive: bool = False) -> Check:
                                        "largest energy flow", {**info, "worst": worst, "end": end})
 
 
-def contact_check(run: Run, size: float, support_only: bool = False) -> Check | None:
+def contact_check(run: Run, size: float, support_only: bool = False, settled: bool = False) -> Check | None:
     """MuJoCo's contacts are springs, so a deep sink means the contact is too soft for the numbers to hold.
-    ``support_only`` judges only what rests on the floor, for a run where a part that fell is already the answer."""
-    contacts = [c for c in run.contacts.values() if c["support"] or not support_only]
-    if not contacts:
-        return None
-    depth = max(c["depth_m"] for c in contacts)
+    ``support_only`` judges only what rests on the floor, for a run where a part that fell is already the answer,
+    and ``settled`` only the contacts at the end, for forces read once it has come to rest. A sink within the
+    width a model's own contact settings give it is the soft pad or foot the model means."""
+    if settled:
+        last = run.model_info.get("final_contacts", [])
+        if not last:
+            return None
+        deep = max(last, key=lambda c: c["depth"])
+        depth, width = deep["depth"], deep.get("width", 0.0)
+    else:
+        contacts = [c for c in run.contacts.values() if c["support"] or not support_only]
+        if not contacts:
+            return None
+        deep = max(contacts, key=lambda c: c["depth_m"])
+        depth, width = deep["depth_m"], deep.get("width_m", 0.0)
+    if width > 0.002 and depth <= 1.2 * width:
+        return Check("contact settings", "pass", f"the deepest contact sinks {fmt(depth * 1000)} mm, within the "
+                                                 f"{fmt(width * 1000)} mm the model's own contact settings let it "
+                                                 "sink, as a soft pad or foot does",
+                     {"depth_m": depth, "width_m": width})
     rel = depth / max(size, 1e-9)
     st = "pass" if rel < 0.01 or depth < 2e-4 else ("warn" if rel < 0.05 else "fail")
     return Check("contact settings", st, f"the deepest contact sinks {fmt(depth * 1000)} mm, {100 * rel:.2g}% of the "
@@ -213,11 +228,13 @@ def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome")
         bodies = []
         for g, info in enumerate(geoms):
             pos, quat = P["pos"][keep, g], P["quat"][keep, g]
+            if any(info.get("offset", (0, 0, 0))):
+                pos = pos + _rotate(quat, np.asarray(info["offset"]))
             fixed = bool(np.ptp(pos, axis=0).max() < 1e-7 and np.ptp(quat, axis=0).max() < 1e-7)
             rgba = info["rgba"]
             bodies.append({"name": info["name"], "shape": info["type"], "size": r(info["size"], 5),
                            "color": "#" + "".join(f"{int(round(255 * c)):02x}" for c in rgba[:3]),
-                           "static": fixed,
+                           "static": fixed, **({"bounds": True} if info.get("bounds") else {}),
                            "pos": r(pos[0], 5) if fixed else [r(p, 5) for p in pos],
                            "quat": r(quat[0], 4) if fixed else [r(q, 4) for q in quat]})
         series = {}
@@ -249,7 +266,8 @@ def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome")
                 "units": {"length": "m", "time": "s", "angle": "rad", "torque": "N m", "force": "N"},
                 "axes": "z is up; quaternions are w, x, y, z and turn each shape from its own frame into the world",
                 "shapes": "sizes follow MuJoCo: sphere [radius], capsule and cylinder [radius, half length] along "
-                          "their own z axis, box [half x, half y, half z], plane [half x, half y] at z = pos",
+                          "their own z axis, box [half x, half y, half z], plane [half x, half y] at z = pos; a "
+                          "body marked bounds is a mesh drawn as the box that bounds it",
                 "source": "recorded by the MuJoCo run itself at evenly spaced steps; series are interpolated "
                           "from the run's samples at the same instants",
             },
@@ -267,8 +285,20 @@ def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome")
     return len(text)
 
 
+GENERAL = {"payload", "payload_at", "servo", "motor", "base", "passive", "analyses", "quick"}
+
+
+def _rotate(q: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Vector ``v`` turned by each unit quaternion (w, x, y, z) in ``q``."""
+    w, u = q[:, :1], q[:, 1:]
+    t = 2 * np.cross(u, v)
+    return v + w * t + np.cross(u, t)
+
+
 def load_target(target: str, params: dict) -> Mechanism:
-    """A spec file, or an MJCF or URDF model run as it is (its own gravity and contacts, nothing driven)."""
+    """A spec file, or an MJCF or URDF model as it is (its own gravity, contacts and time step). Either takes the
+    general values: a payload and where it sits, a servo for every driven joint, a free base, passive and the
+    analyses to run."""
     from . import quantities as Q
     from .spec import read_spec
 
@@ -278,16 +308,20 @@ def load_target(target: str, params: dict) -> Mechanism:
                         "gears, impact and tip)")
     suffix = p.suffix.lower()
     if suffix in (".toml", ".json"):
-        if params:
-            raise SpecError("a spec file carries its own values, so edit the file rather than passing --set")
+        extra = set(params) - GENERAL
+        if extra:
+            raise SpecError(f"a spec file carries its own values, so edit the file rather than setting "
+                            f"{', '.join(sorted(extra))}")
         return read_spec(str(p))
     if suffix in (".xml", ".mjcf", ".urdf"):
-        extra = set(params) - {"duration", "timestep"}
+        extra = set(params) - GENERAL - {"duration", "timestep"}
         if extra:
-            raise SpecError(f"a model file takes only duration and timestep, not {', '.join(sorted(extra))}. To drive "
-                            "its joints, write a spec with model = \"" + p.name + "\" and a move")
-        return Mechanism(name=p.stem, model_file=str(p.resolve()), duration=Q.time(params.get("duration", "2 s")),
-                         timestep=Q.time(params.get("timestep", "1 ms"), "ms"))
+            raise SpecError(f"a model file takes duration, timestep, {', '.join(sorted(GENERAL))}, not "
+                            f"{', '.join(sorted(extra))}. To drive its joints along a move, write a spec with model = "
+                            f'"{p.name}" and a move')
+        return Mechanism(name=p.stem, model_file=str(p.resolve()),
+                         duration=Q.time(params["duration"]) if params.get("duration") else 0.0,
+                         timestep=Q.time(params["timestep"], "ms") if params.get("timestep") else 0.0)
     raise SpecError(f"'{p.name}' is not a mechanism spec (.toml, .json) or model (.xml, .urdf)")
 
 
@@ -295,7 +329,8 @@ def run_mechanism(target: str, params: dict | None, out_dir: str | Path, questio
                   progress=None) -> MechanismOutcome:
     """Build, run, check and write a mechanism study: outcome.json, summary.txt, report.html, trajectory.csv,
     model.xml and the pictures."""
-    from .analyses import ANALYSES, generic
+    from . import general
+    from .analyses import ANALYSES
     from .install import require
     from .mjcf import to_mjcf
     from .templates import is_template, template
@@ -315,7 +350,9 @@ def run_mechanism(target: str, params: dict | None, out_dir: str | Path, questio
         mech = load_target(target, params)
         part = str(Path(target).resolve())
         say("solve", f"MuJoCo {mj.__version__}, {Path(target).name}")
-        a = generic(mech, out / "images", say)
+        names = [x.strip() for x in str(params.get("analyses", "")).split(",") if x.strip()] or None
+        a = general.answer(mech, question or mech.question, {k: v for k, v in params.items() if k != "analyses"},
+                           out / "images", say, names)
     say("outputs", "trajectory table, pictures and report")
     values = {**a.values, "_figures": a.figures}
     if a.run is not None:

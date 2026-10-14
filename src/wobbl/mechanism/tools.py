@@ -29,20 +29,42 @@ def _unit(m) -> str:
     return f"{m.group(1)} {u}"
 
 
+KINDS = (("pendulum", r"\bpendulum\b"), ("fourbar", r"four.?bar|linkage|wiper|\bcrank\b|\brocker\b"),
+         ("gears", r"\bgears?\b|gearbox|gear train|\bteeth\b|gear ratio"),
+         ("tip", r"tip(?:s|ping)? over|topple|fall over|knock(?:ed)? over|\bstable\b"),
+         ("impact", r"\bimpact\b|collid|collision|\bhits?\b|dropped onto|drop onto|peak force"),
+         ("arm", r"\bservos?\b|robot arm|\barm\b|pick and place|\blift\b"))
+
+
+def template_of(q: str) -> str | None:
+    """Which ready made mechanism a description or question is about, if any."""
+    low = (q or "").lower()
+    return next((k for k, rx in KINDS if re.search(rx, low)), None)
+
+
 def read_mechanism_question(q: str) -> tuple[str, dict, list[str]]:
     """Which template a question is about, the values it gives and the guesses for the ones it leaves out."""
-    low = q.lower()
+    kind = template_of(q)
+    if kind is None:
+        raise ValueError("could not tell which mechanism this is, so give a URDF, MJCF or spec file, or say which "
+                         "it is: an arm, a linkage, gears, an impact, something that tips or a pendulum")
+    p, guesses = read_for(kind, q)
+    return kind, p, guesses
+
+
+def read_for(kind: str, q: str) -> tuple[dict, list[str]]:
+    """The values a description gives for one template, and the guesses for the ones it leaves out."""
+    low = (q or "").lower()
     p, guesses = {}, []
     mass = re.search(_MASS, low)
-    if re.search(r"\bpendulum\b", low):
+    if kind == "pendulum":
         m = re.search(_LEN, low)
         if m:
             p["length"] = _unit(m)
         a = re.search(r"(\d+(?:\.\d+)?)\s*(?:deg|degrees?|°)", low)
         if a:
             p["angle"] = f"{a.group(1)} deg"
-        return "pendulum", p, guesses
-    if re.search(r"four.?bar|linkage|wiper|\bcrank\b|\brocker\b", low):
+    elif kind == "fourbar":
         m = re.search(r"(\d+(?:\.\d+)?)\s*rpm", low)
         if m:
             p["speed"] = f"{m.group(1)} rpm"
@@ -55,8 +77,7 @@ def read_mechanism_question(q: str) -> tuple[str, dict, list[str]]:
         t = re.search(r"(\d+(?:\.\d+)?)\s*n\s*\*?\s*m\b", low)
         if t:
             p["load"] = f"{t.group(1)} N*m"
-        return "fourbar", p, guesses
-    if re.search(r"\bgears?\b|gearbox|gear train|\bteeth\b|gear ratio", low):
+    elif kind == "gears":
         stages = re.findall(r"(\d+)\s*[:/]\s*(\d+)", low)
         if stages:
             p["teeth"] = ",".join(f"{a}:{b}" for a, b in stages)
@@ -72,8 +93,7 @@ def read_mechanism_question(q: str) -> tuple[str, dict, list[str]]:
         names = _servo_names(low)
         if names:
             p["motor"] = names[0]
-        return "gears", p, guesses
-    if re.search(r"tip(?:s|ping)? over|topple|fall over|knock(?:ed)? over|\bstable\b", low):
+    elif kind == "tip":
         if mass:
             p["payload"] = _unit(mass)
         m = re.search(rf"{_LEN}\s*(?:out|reach|from the (?:center|centre|base))", low)
@@ -84,8 +104,7 @@ def read_mechanism_question(q: str) -> tuple[str, dict, list[str]]:
             p["force"] = f"{f.group(1)} N"
         guesses.append("base not given, so Wobbl assumed 160 x 160 mm weighing 1200 g (override with --set base=... "
                        "base_mass=...)")
-        return "tip", p, guesses
-    if re.search(r"\bimpact\b|collid|collision|\bhits?\b|dropped onto|drop onto|peak force", low):
+    elif kind == "impact":
         if mass:
             p["mass"] = _unit(mass)
         h = re.search(rf"(?:from|drop(?:ped)?)\s+{_LEN}", low)
@@ -97,8 +116,7 @@ def read_mechanism_question(q: str) -> tuple[str, dict, list[str]]:
         if not h and not v:
             guesses.append("speed not given, so Wobbl assumed 2 m/s (override with --set speed=... or drop=...)")
         guesses.append("contact assumed round with a 10 mm radius, steel on steel unless materials are given")
-        return "impact", p, guesses
-    if re.search(r"\bservos?\b|robot arm|\barm\b|pick and place|\blift\b", low):
+    elif kind == "arm":
         names = _servo_names(low)
         if names:
             p["servo"] = names[0]
@@ -117,9 +135,7 @@ def read_mechanism_question(q: str) -> tuple[str, dict, list[str]]:
             p["pick"], p["place"] = f"{r:g},0,40", f"0,{r:g},40"
         guesses.append("the move is assumed to be a pick and place that lifts 80 mm, swings a quarter turn and "
                        "lowers, 1.2 s a step (override with --set pick=... place=... move_time=...)")
-        return "arm", p, guesses
-    raise ValueError("could not tell which mechanism this is, so use 'wobbl mechanism arm|fourbar|gears|impact|tip|"
-                     "pendulum' or a spec file")
+    return p, guesses
 
 
 def solve_mechanism_tool(template: str = "", spec: str = "", params: dict | None = None, question: str = "") -> dict:

@@ -2,6 +2,7 @@
 MuJoCo is not installed."""
 import csv
 import json
+from pathlib import Path
 
 import pytest
 
@@ -62,7 +63,8 @@ def test_a_pendulum_writes_every_output_and_passes_its_checks(tmp_path):
         assert (tmp_path / f).exists(), f
     d = json.loads((tmp_path / "outcome.json").read_text())
     assert d["domain"] == "mechanism" and d["events"][0]["name"] == "release" and d["model"]["degrees_of_freedom"] == 1
-    assert d["values"]["trajectory"] == "trajectory.csv" and d["images"]["swing"] == "images/swing.png"
+    assert d["values"]["trajectory"] == "trajectory.csv"
+    assert Path(d["images"]["swing"]).as_posix() == "images/swing.png"
     rows = _rows(tmp_path / "trajectory.csv")
     assert 100 < len(rows) <= 500 and set(rows[0]) >= {"t_s", "pivot_deg", "pivot_rpm", "pivot_Nm", "bob_z_m"}
     pb = json.loads((tmp_path / "playback.json").read_text())
@@ -101,8 +103,8 @@ def test_a_model_file_runs_as_written(tmp_path):
     o = run_mechanism(str(xml), {"duration": "0.5 s"}, tmp_path / "out")
     assert o.model["degrees_of_freedom"] == 6 and o.values["contacts"]       # the box lands on the plane
     assert not (tmp_path / "out" / "model.xml").exists()
-    with pytest.raises(ValueError, match="duration and timestep"):
-        run_mechanism(str(xml), {"servo": "sg90"}, tmp_path / "bad")
+    with pytest.raises(ValueError, match="a model file takes duration, timestep"):
+        run_mechanism(str(xml), {"crank": "30 mm"}, tmp_path / "bad")
 
 
 URDF = """<robot name="two_link">

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import math
 import xml.etree.ElementTree as ET
-from pathlib import Path
 
 from .install import require as _mj
 from .spec import Mechanism, SpecError
@@ -144,46 +143,3 @@ def build(m: Mechanism, timestep: float | None = None):
         raise SpecError(f"MuJoCo could not build the model: {e}") from e
     model.opt.timestep = timestep or m.timestep
     return model
-
-
-def load_file(path: str):
-    """An MJCF or URDF model, with energy bookkeeping on and its own actuators off (Wobbl drives the joints)."""
-    mujoco = _mj()
-
-    p = Path(path)
-    if not p.exists():
-        raise SpecError(f"model file not found: {path}")
-    try:
-        model = mujoco.MjModel.from_xml_path(str(p))
-    except ValueError as e:
-        raise SpecError(f"MuJoCo could not read {p.name}: {e}") from e
-    model.opt.enableflags |= int(mujoco.mjtEnableBit.mjENBL_ENERGY)
-    model.opt.disableflags |= int(mujoco.mjtDisableBit.mjDSBL_ACTUATION)
-    return model
-
-
-def file_limits(path: str, model=None) -> dict[str, tuple[float, float]]:
-    """Torque and speed limits a model file states for its joints: URDF ``<limit effort velocity>``, or the force
-    range of an MJCF actuator that drives one joint. Joint name to (N m, rad/s), with inf for no speed limit."""
-    out = {}
-    p = Path(path)
-    if p.suffix.lower() == ".urdf":
-        for j in ET.parse(p).getroot().iter("joint"):
-            lim = j.find("limit")
-            if lim is not None and float(lim.get("effort", 0) or 0) > 0:
-                out[j.get("name")] = (float(lim.get("effort")), float(lim.get("velocity", 0) or 0) or math.inf)
-        return out
-    if model is None:
-        return out
-    mujoco = _mj()
-
-    for a in range(model.nu):
-        if model.actuator_trntype[a] != mujoco.mjtTrn.mjTRN_JOINT:
-            continue
-        jname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, int(model.actuator_trnid[a, 0]))
-        gear = abs(float(model.actuator_gear[a, 0])) or 1.0
-        if model.actuator_forcelimited[a]:
-            out[jname] = (float(max(abs(model.actuator_forcerange[a]))) * gear, math.inf)
-        elif model.actuator_ctrllimited[a] and model.actuator_gaintype[a] == 0 and model.actuator_biastype[a] == 0:
-            out[jname] = (float(max(abs(model.actuator_ctrlrange[a]))) * gear, math.inf)
-    return out
