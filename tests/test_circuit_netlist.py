@@ -71,3 +71,16 @@ def test_unknown_names_and_net_names():
     assert lookup("vcc") is None and lookup("XYZ123") is None
     assert safe_node("GND") == "0" and safe_node("+5V") == "p5v" and safe_node("3V3") == "n3v3"
     assert e_series(330.5) == 360 and e_series(1234) == 1300 and e_series(98, up=False) == 91
+
+
+def test_a_makers_model_saved_in_the_parts_folder_is_used(tmp_path, monkeypatch):
+    from wobbl.circuits import bind as b
+
+    (tmp_path / "parts").mkdir()
+    (tmp_path / "parts" / "vendor.lib").write_text("* maker model\n.model D1N4148X D(IS=2.5n N=1.75 RS=0.6)\n")
+    monkeypatch.setenv("WOBBL_HOME", str(tmp_path))
+    monkeypatch.setattr(b, "_USER", None)
+    c = parse_spice("* t\nV1 a 0 5\nR1 a k 1k\nD1 k 0 D1N4148X\n")
+    b.bind(c)
+    assert "d1n4148x" in c.models and "~/.wobbl/parts" in c.element("D1").part["source"]
+    monkeypatch.setattr(b, "_USER", None)

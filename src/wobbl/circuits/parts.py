@@ -9,8 +9,9 @@ the stress check reads them. Where a datasheet gives a maximum and a typical val
 that runs the part harder (the higher on resistance or forward drop), so heating is not understated.
 
 A part that is not here gets a generic model of its kind with stated parameters, and the report says so.
-Vendor models can be added by dropping .lib files in ~/.wobbl/parts or by .include in a netlist; a model a
-netlist defines always wins over the library.
+A maker's own SPICE model can be used instead by saving its file in ~/.wobbl/parts (read by bind.py) or by
+.include in a netlist; a model the netlist or that folder defines wins over the built in one, and the
+library's ratings still apply to it.
 """
 from __future__ import annotations
 

@@ -114,7 +114,8 @@ def provenance(c: Circuit, stress: list[Stress]) -> tuple[Check, list[tuple[str,
     """Where each model came from, and what that does to the confidence."""
     lib = [e.ref for e in c.elements if e.part and not e.part.get("generic") and "netlist" not in
            e.part.get("source", "")]
-    net = [e.ref for e in c.elements if "as the netlist defines" in e.part.get("source", "")]
+    net = [e.ref for e in c.elements if "as the netlist defines" in e.part.get("source", "") or
+           "~/.wobbl/parts" in e.part.get("source", "")]
     gen = [e.ref for e in c.elements if e.part.get("generic") and e.kind not in ("resistor", "capacitor",
                                                                                   "inductor")]
     passive = [e.ref for e in c.elements if e.part.get("generic") and e.kind in ("resistor", "capacitor",

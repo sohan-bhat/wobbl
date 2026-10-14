@@ -221,6 +221,7 @@ def _bind_one(c: Circuit, e: Element, n: dict, part_name: str) -> None:
         e.kind = {"k": "coupling", "t": "line", "a": "xspice"}[L]
         return
     name = e.model
+    where = "from ~/.wobbl/parts" if _from_user_library(c, name) else "as the netlist defines it"
     defined = name.lower() in c.models or name.lower() in c.subckts
     lib = lookup(part_name) or lookup(name) or (lookup(str(e.meta.get("value", ""))) if e.meta.get("value") else None)
     if defined:
@@ -228,11 +229,11 @@ def _bind_one(c: Circuit, e: Element, n: dict, part_name: str) -> None:
         e.kind = lib.kind if lib and (kind in ("part", "subcircuit") or lib.kind.endswith(kind[-3:])) else kind
         if lib:
             d = _as_dict(lib)
-            d["source"] = f"model {name} as the netlist defines it, ratings from the library ({lib.source})"
+            d["source"] = f"model {name} {where}, ratings from the library ({lib.source})"
             e.part = d
         else:
-            e.part = {"key": name, "kind": e.kind, "ratings": {}, "source": f"model {name} as the netlist defines it, "
-                      "no ratings known", "generic": True, "params": {}}
+            e.part = {"key": name, "kind": e.kind, "ratings": {}, "source": f"model {name} {where}, no ratings known",
+                      "generic": True, "params": {}}
         return
     if lib is not None and lib.kind == "mcu":
         e.part, e.kind = _as_dict(lib), "mcu"
@@ -273,6 +274,43 @@ def _generic_ic(c: Circuit, e: Element, name: str) -> None:
                         "high impedance"}
     c.assumptions.append(f"{e.ref} ({name or 'no part number'}) is not in the parts library, so it is modeled as a "
                          "5 mA load on its supply with its other pins left high impedance.")
+
+
+_USER: dict | None = None
+
+
+def user_library() -> tuple[dict, dict]:
+    """Models and subcircuits from the files in ~/.wobbl/parts (a maker's SPICE models the user saved there),
+    read once. A model there wins over the built in one of the same name, and the library's ratings still apply."""
+    global _USER
+    if _USER is None:
+        from ..solvers.locate import wobbl_home
+        from .netlist import parse_spice
+        models, subs = {}, {}
+        d = wobbl_home() / "parts"
+        for f in sorted(d.glob("*")) if d.is_dir() else []:
+            if f.suffix.lower() in (".lib", ".mod", ".cir", ".sp", ".spi", ".spice", ".txt", ".inc"):
+                try:
+                    lib = parse_spice("* user parts\n" + f.read_text(encoding="utf-8", errors="replace"), f.parent)
+                except Exception:  # noqa: BLE001  one unreadable file must not stop the rest
+                    continue
+                models.update(lib.models)
+                subs.update(lib.subckts)
+        _USER = (models, subs)
+    return _USER
+
+
+def _from_user_library(c: Circuit, name: str) -> bool:
+    if not name or name.lower() in c.models or name.lower() in c.subckts:
+        return False
+    models, subs = user_library()
+    if name.lower() in models:
+        c.models[name.lower()] = models[name.lower()]
+    elif name.lower() in subs:
+        c.subckts[name.lower()] = subs[name.lower()]
+    else:
+        return False
+    return True
 
 
 def _generic(c: Circuit, e: Element, n: dict, name: str) -> None:
