@@ -26,6 +26,15 @@ CHEAP_S = 0.5            # a rerun this quick gets a design three times the usua
 MAX_SOLVES = 150
 
 
+def _signed(name: str, unit: str) -> bool:
+    """An input that may go below zero: a temperature on a scale with an arbitrary zero, an angle, a wind or a
+    height above some datum."""
+    import re
+
+    return unit.strip().lower() in ("c", "f", "°c", "°f", "degc", "degf", "deg", "°") or bool(
+        re.search(r"temp|ambient|angle|wind|altitude|offset|rise", name.split(".")[-1].lower()))
+
+
 class GenericModel(Model):
     def __init__(self, result_dir, outcome):
         super().__init__(result_dir, outcome)
@@ -38,25 +47,27 @@ class GenericModel(Model):
         for name, lf in self.found.items():
             words = " ".join(str(p) for p in lf.path).replace("_", " ")
             self.known[name] = Known(lf.value, lf.unit, D.role_of(name, self.req.roles), f"the {words}",
-                                     positive=lf.value > 0)
+                                     positive=lf.value > 0 and not _signed(name, lf.unit))
             tail = str(lf.path[-1]).lower()
             if "." in name and tail not in self.known:
                 self.aliases.setdefault(tail, name)
-        self.vals = D.scalar_values(outcome)
+        self.vals = D.scalar_values(outcome, top=True)
         self.crit = D.criteria(outcome)
         gov = D.governing(self.crit, self.vals)
         names = [c["value"] for c in self.crit]
+        own = list(D.scalar_values(outcome))
         if gov:
             self.decision = gov["value"]
-        elif self.vals:
-            self.decision = next(iter(self.vals))
+        elif own:
+            self.decision = own[0]
         else:
             raise ModelError(f"this {self.domain} result has no numeric values to carry scatter to")
         if names:
             self.outputs = list(dict.fromkeys([self.decision] + names))
         else:
-            self.outputs = list(dict.fromkeys([self.decision] + list(self.vals)[:5]))
-        self.limit_keys = list(dict.fromkeys(c["limit_key"] for c in self.crit if c.get("limit_key")))
+            self.outputs = list(dict.fromkeys([self.decision] + own[:5]))
+        # each criterion's limit as each rerun states it, so a limit that is itself an input scatters too
+        self.limit_keys = [f"limit:{c['name']}" for c in self.crit]
         self.units = {k: D.unit_of(k) for k in self.outputs}
         self.reproduced: float | None = None
         self._limits = None
@@ -72,7 +83,7 @@ class GenericModel(Model):
     def design(self, solved: list[Input], keys: list[str], extract, progress=None, solves=None, series=False):
         """Rerun the request at a Latin hypercube of the solved inputs and fit polynomial chaos to extract(outcome,
         series) for each design point. Returns the surrogate (None with nothing to solve) and the nominal answer."""
-        if not D.can_rerun(self.req.domain):
+        if not D.can_rerun(self.req):
             raise ModelError(f"Wobbl does not know how to run a {self.req.domain} study again yet")
         runs = D.Reruns(self.req, self.found, keep_series=series)
         try:
@@ -80,7 +91,7 @@ class GenericModel(Model):
                 progress("solve", f"the {self.domain} study again as it was, to check it reproduces")
             o0, s0 = runs({})
             nominal = np.asarray(extract(o0, s0), float)
-            v0 = D.scalar_values(o0)
+            v0 = D.scalar_values(o0, top=True)
             if self.decision in v0 and self.decision in self.vals:
                 ref = self.vals[self.decision]
                 self.reproduced = abs(v0[self.decision] - ref) / max(abs(ref), 1e-12)
@@ -101,12 +112,21 @@ class GenericModel(Model):
             runs.cleanup()
 
     def _values(self, keys):
+        given = {f"limit:{c['name']}": D.limit_of(c, self.vals) for c in self.crit}
+
         def extract(o, _s):
-            v = D.scalar_values(o)
-            missing = [k for k in keys if k not in v]
-            if missing:
-                raise ModelError(f"a rerun of this {self.domain} study gave no {missing[0]}")
-            return [v[k] for k in keys]
+            v = D.scalar_values(o, top=True)
+            lims = {f"limit:{c['name']}": D.limit_of(c, v) for c in D.criteria(o)
+                    if c.get("limit_key") in v or "limit" in c}
+            row = []
+            for k in keys:
+                if k in given:
+                    row.append(lims.get(k, given[k]))
+                elif k in v:
+                    row.append(v[k])
+                else:
+                    raise ModelError(f"a rerun of this {self.domain} study gave no {k}")
+            return row
         return extract
 
     def evaluator(self, inputs, progress=None, solves=None):
@@ -154,7 +174,7 @@ class GenericModel(Model):
             if c["value"] not in self.outputs:
                 continue
             v = Y[:, self.outputs.index(c["value"])]
-            lim = lims.get(c.get("limit_key"), np.full(len(Y), D.limit_of(c, self.vals)))
+            lim = lims.get(f"limit:{c['name']}", np.full(len(Y), D.limit_of(c, self.vals)))
             bad |= (v > lim) if c["sense"] == "max" else (v < lim)
             u = D.unit_of(c["value"])
             lim0 = D.limit_of(c, self.vals)
@@ -199,7 +219,7 @@ class GenericPredictor:
         solved, found = self.inputs, model.found
 
         def predict(row: dict, o: dict, series: dict, ks: list[int], out: list):
-            vals = D.scalar_values(o)
+            vals = D.scalar_values(o, top=True)
             for k in ks:
                 r = readings[k]
                 q = keys[k]

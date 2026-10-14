@@ -117,3 +117,44 @@ def test_generic_model_on_a_toy_domain(tmp_path):
     want = np.mean(rng.normal(5, 0.5, 400000) * rng.normal(10, 2, 400000) > 65)
     assert r["probability"]["failure"]["value"] == pytest.approx(want, abs=0.01)
     assert {x["input"] for x in r["sensitivity"]["indices"]} >= {"a", "b"}
+
+
+def test_registry_spec_leaves():
+    spec = {"thing": "/x/bar.step", "kind": "step", "question": "q",
+            "options": {"material": ["6061-t6"], "load": ["220 N down @ top", "60 N +y @ x=max"], "fix": ["x=min"],
+                        "param": ["thickness=6"], "target-sf": ["2"], "film": ["10 W/m2K @ all"]}}
+    found = D.leaves(spec)
+    assert set(found) == {"load1", "load2", "thickness", "target-sf", "film"}
+    out = D.with_values(spec, {"load1": 250.0, "thickness": 6.5, "film": 12.0}, found)["options"]
+    assert out["load"] == ["250 N down @ top", "60 N +y @ x=max"]
+    assert out["param"] == ["thickness=6.5"] and out["film"] == ["12 W/m2K @ all"] and out["fix"] == ["x=min"]
+
+
+def test_a_registry_run_scatters_through_the_registry(tmp_path):
+    """A run 'wobbl simulate' made is run again by its own analysis, and its criteria come from job.criterion."""
+    from wobbl.credibility.uncertainty import run_uncertainty
+    from wobbl.simulate import Analysis, Option, get, register
+
+    def entry(job):
+        a = float(job.value("a", "5"))
+        b = float(job.value("b", "10 W").split()[0])
+        o = {"domain": "toy3", "part": "toy", "question": job.question, "verdict": "ok", "headline": "ok",
+             "metrics": [], "confidence": "high", "confidence_reasons": [], "assumptions": [], "checks": [],
+             "values": {"peak_C": 20 + a * b}}
+        job.out.mkdir(parents=True, exist_ok=True)
+        (job.out / "outcome.json").write_text(json.dumps(o))
+        job.criterion("temperature", "peak_C", 85.0, "max")
+        return o
+
+    register(Analysis("toydomain", "warmth", "a toy", entry, options=(Option("a"), Option("b"))))
+    out = tmp_path / "run"
+    get("toydomain", "warmth").run({"thing": "", "kind": "words", "question": "warm?",
+                                    "options": {"a": ["5"], "b": ["10 W"]}}, out)
+    req = D.load_request(out)
+    assert req.registry and req.domain == "toydomain" and req.kind == "warmth"
+    assert json.loads((out / "outcome.json").read_text())["criteria"][0]["limit"] == 85.0
+    r = run_uncertainty(out, ["a 10%", "b 20%"], samples=50000)
+    assert r["decision"] == "peak_C" and "reruns of the toy3 study" in r["model"]["method"]
+    rng = np.random.default_rng(0)
+    want = np.mean(rng.normal(5, 0.5, 400000) * rng.normal(10, 2, 400000) > 65)
+    assert r["probability"]["failure"]["value"] == pytest.approx(want, abs=0.01)

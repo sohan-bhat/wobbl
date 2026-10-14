@@ -3,16 +3,20 @@
 Uncertainty, the comparison with tests, the credibility assessment and the test plan all need the same three things
 from a run, whatever it simulates.
 
-1. What it was run from. Every run writes request.json next to its outcome, {"domain": ..., "spec": {...}}, the
-   plain JSON the domain was run from. Its numeric leaves, plain numbers or quantities such as "9 cm", are the
-   inputs that can scatter, each in the unit it was written in.
-2. How to run it again. The domain registry runs a spec into a folder and returns its outcome. Domains register a
-   runner here (register), and a router that knows every domain can stand in for them all (set_router).
-3. What decides it. outcome.json lists its pass or fail criteria, each a value judged against a limit, from above
-   or below. A run that lists none has them inferred from value and limit pairs such as t_max_C and limit_C.
+1. What it was run from. 'wobbl simulate' writes request.json next to every outcome.json, {"domain": "part",
+   "analysis": "stress", "spec": {"thing", "kind", "question", "options": {name: [values]}}}, with every value the
+   run used. Its numbers are the inputs that can scatter, each in the unit it was written in: a plain number, a
+   quantity such as "9 cm", a load such as "220 N down @ top" (its number scatters, the rest stays) or a parameter
+   such as "thickness=6". A repeatable option with several values names them load1, load2 and so on.
+2. How to run it again. wobbl.simulate.get(domain, analysis).run(spec, out, quick) runs a spec into a folder and
+   returns its outcome. A domain the registry does not have yet registers a runner here (register).
+3. What decides it. outcome.json lists its criteria, [{"name", "value", "limit", "sense"}], each a value (a key of
+   its values, or of the outcome itself) that must stay at most (max) or at least (min) its limit. A run that lists
+   none has them inferred from value and limit pairs such as t_max_C and limit_C.
 
 Runs from before request.json existed are read through legacy loaders where their folder kept enough (a strength or
-heat study's study.json, a circuit template's parameters).
+heat study's study.json, a circuit template's parameters), and runs of a domain the registry does not have yet keep
+a request.json of their own, {"domain", "kind", "spec"}, written by save_request.
 """
 from __future__ import annotations
 
@@ -30,7 +34,6 @@ import numpy as np
 
 REQUEST = "request.json"
 _NUM = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-_QTY = re.compile(rf"^\s*({_NUM})\s*([^\d\s].*)?$")
 
 
 class DomainError(ValueError):
@@ -41,8 +44,9 @@ class DomainError(ValueError):
 class Request:
     domain: str
     spec: dict
-    kind: str = ""                      # the entry point within a domain, such as pipe or drag for flow
+    kind: str = ""                      # the analysis, or the entry point within a domain such as pipe for flow
     roles: dict = field(default_factory=dict)   # optional input name -> role, from the domain
+    registry: bool = False              # written by 'wobbl simulate', so its registry runs it again
 
 
 PATH_KEYS = {"part", "file", "path", "netlist", "model", "design", "spec_file"}
@@ -114,6 +118,8 @@ def load_request(result_dir, outcome: dict | None = None) -> Request:
     p = d / REQUEST
     if p.exists():
         r = json.loads(p.read_text())
+        if "analysis" in r:
+            return Request(r["domain"], r.get("spec", {}), r["analysis"], r.get("roles", {}), registry=True)
 
         def absolute(v: str) -> str:
             q = Path(v)
@@ -158,28 +164,29 @@ def set_router(fn: Callable[[Request, Path], dict | None]):
     _ROUTER[:] = [fn]
 
 
-def _router_run(req: Request, out: Path) -> dict | None:
-    if _ROUTER:
-        return _ROUTER[0](req, out)
-    try:   # the shared domain registry, once it exists
-        from .. import simulate as sim   # type: ignore[attr-defined]
+def _analysis(req: Request):
+    """The registry's analysis for a request, or None when the registry does not have it."""
+    try:
+        from ..simulate import get
     except ImportError:
         return None
-    get = getattr(sim, "get", None) or getattr(getattr(sim, "registry", None), "get", None)
-    if get is None:
-        return None
     try:
-        dom = get(req.domain)
+        return get(req.domain, req.kind) if req.kind else get(req.domain)
     except (KeyError, LookupError, ValueError):
         return None
-    if dom is None or not hasattr(dom, "run"):
+
+
+def _router_run(req: Request, out: Path) -> dict | None:
+    if _ROUTER:
+        res = _ROUTER[0](req, out)
+        if res is not None:
+            return res
+    if not req.registry:
         return None
-    spec = dict(req.spec, **({"kind": req.kind} if req.kind and "kind" not in req.spec else {}))
-    try:
-        res = dom.run(spec, out, quick=True)
-    except TypeError:
-        res = dom.run(spec, out)
-    return _as_outcome(res, out)
+    a = _analysis(req)
+    if a is None:
+        raise DomainError(f"this run came from the {req.domain} {req.kind} analysis, which this Wobbl does not have")
+    return _as_outcome(a.run(req.spec, out, quick=True), out)
 
 
 def _as_outcome(res, out: Path) -> dict:
@@ -207,14 +214,18 @@ def rerun(req: Request, out: Path) -> dict:
     return _as_outcome(fn(req, out), out)
 
 
-def can_rerun(domain: str) -> bool:
+def can_rerun(req: Request) -> bool:
+    if req.registry:
+        return _analysis(req) is not None
     from . import runners   # noqa: F401
-    return domain in _RUNNERS or bool(_ROUTER)
+    return req.domain in _RUNNERS or bool(_ROUTER)
 
 
 # --- the numbers a spec is made of ---------------------------------------------------
 SKIP_KEYS = {"question", "name", "part", "material", "template", "kind", "quality", "seed", "version", "solver",
-             "label", "source", "file", "path", "out", "output", "budget", "timeout", "threads", "id", "units"}
+             "label", "source", "file", "path", "out", "output", "budget", "timeout", "threads", "id", "units",
+             "base", "cell", "prop", "shape", "fluid", "fuel", "oxidizer", "led", "eng", "design", "keep", "cfd",
+             "thing", "body", "scale", "modes", "wobbl"}
 
 
 @dataclass
@@ -222,40 +233,88 @@ class Leaf:
     path: tuple
     value: float
     unit: str
-    text: bool            # written as a quantity string, so it is written back the same way
+    text: bool            # written as a string, so it is written back the same way
+    label: str = ""       # the short name it goes by
+    prefix: str = ""      # what comes before the number, as "thickness=" in "thickness=6"
+    suffix: str = ""      # what comes after the number and its unit, as " down @ top" in "220 N down @ top"
+
+    def write(self, v: float):
+        if not self.text:
+            return float(v)
+        return f"{self.prefix}{float(v):.10g}{' ' + self.unit if self.unit else ''}{self.suffix}"
+
+
+_UNIT = r"[A-Za-z\u00b5\u00b0%][\w/^\u00b7*.%\u00b5\u00b0-]*"
+_STR = re.compile(rf"^\s*(?P<num>{_NUM})\s*(?P<unit>{_UNIT})?(?P<rest>\s+\S.*)?\s*$")
+_PARAM = re.compile(rf"^\s*(?P<key>[A-Za-z_][\w-]*)\s*=\s*(?P<num>{_NUM})\s*(?P<unit>{_UNIT})?\s*$")
+
+
+def _parse(x: str) -> tuple[float, str, str, str, str] | None:
+    """(value, unit, prefix, suffix, own name) of a string that holds one number to vary, or None."""
+    m = _PARAM.match(x)
+    if m:
+        return float(m["num"]), m["unit"] or "", f"{m['key']}=", "", m["key"]
+    m = _STR.match(x)
+    if m and (m["unit"] or not m["rest"]):
+        return float(m["num"]), m["unit"] or "", "", m["rest"] or "", ""
+    return None
 
 
 def leaves(spec: dict, skip: set[str] = SKIP_KEYS) -> dict[str, Leaf]:
-    """Every numeric leaf of a spec, by a short name: its own key when that is unique, else its dotted path."""
+    """Every number of a spec that can scatter, by a short name: its key, its key and place for a repeated option
+    (load1, load2), the name a parameter gives itself (thickness in "thickness=6"), or, when two share a name, the
+    shortest tail of its path that tells them apart (rocket.length and nose.length)."""
     found: list[Leaf] = []
 
-    def walk(x, path):
+    def add(x, path, label):
+        if isinstance(x, bool) or x is None:
+            return
+        if isinstance(x, (int, float)):
+            if np.isfinite(x):
+                found.append(Leaf(path, float(x), "", False, label))
+        elif isinstance(x, str):
+            got = _parse(x)
+            if got:
+                v, unit, pre, suf, own = got
+                found.append(Leaf(path, v, unit, True, own or label, pre, suf))
+
+    def walk(x, path, label):
         if isinstance(x, dict):
             for k, v in x.items():
                 if str(k).lower() not in skip and not str(k).startswith("_"):
-                    walk(v, path + (k,))
-        elif isinstance(x, list) and 0 < len(x) <= 6 and all(isinstance(v, (int, float, str)) for v in x):
-            for j, v in enumerate(x):
-                walk(v, path + (j,))
-        elif isinstance(x, bool) or x is None:
-            return
-        elif isinstance(x, (int, float)):
-            if np.isfinite(x):
-                found.append(Leaf(path, float(x), "", False))
-        elif isinstance(x, str):
-            m = _QTY.match(x)
-            if m and (m.group(2) is None or re.fullmatch(r"[A-Za-z°µ%/^·*\d. ]+", m.group(2).strip())):
-                found.append(Leaf(path, float(m.group(1)), (m.group(2) or "").strip(), True))
-    walk(spec, ())
-    out: dict[str, Leaf] = {}
-    tails = [str(lf.path[-1]) for lf in found if not isinstance(lf.path[-1], int)]
-    for lf in found:
-        tail = lf.path[-1]
-        if isinstance(tail, int) or tails.count(str(tail)) > 1:
-            name = ".".join(str(p) for p in lf.path)
+                    walk(v, path + (k,), str(k))
+        elif isinstance(x, list):
+            if x and all(isinstance(v, dict) for v in x):
+                for j, v in enumerate(x):
+                    walk(v, path + (j,), label)
+            elif 0 < len(x) <= 8 and all(isinstance(v, (int, float, str)) for v in x):
+                for j, v in enumerate(x):
+                    add(v, path + (j,), label if len(x) == 1 else f"{label}{j + 1}")
         else:
-            name = str(tail)
-        out[name.lower()] = lf
+            add(x, path, label)
+    walk(spec, (), "")
+
+    def name(lf: Leaf, k: int) -> str:
+        comps = [str(c) for c in lf.path[:-1] if not isinstance(c, int) and str(c) not in ("options", "spec")]
+        if not isinstance(lf.path[-1], int) and comps and comps[-1] == lf.path[-1]:
+            comps = comps[:-1]
+        parts = comps[max(0, len(comps) - (k - 1)):] if k > 1 else []
+        return ".".join(parts + [lf.label]).lower()
+    depth = {id(lf): 1 for lf in found}
+    for _ in range(8):
+        names = [name(lf, depth[id(lf)]) for lf in found]
+        dup = {n for n in names if names.count(n) > 1}
+        if not dup:
+            break
+        for lf, n in zip(found, names):
+            if n in dup:
+                depth[id(lf)] += 1
+    out = {}
+    for lf in found:
+        n = name(lf, depth[id(lf)])
+        while n in out:           # a clash no path can settle keeps its place in the list
+            n = f"{n}.{len(out)}"
+        out[n] = lf
     return out
 
 
@@ -267,7 +326,7 @@ def with_values(spec: dict, values: dict[str, float], found: dict[str, Leaf]) ->
         node = s
         for p in lf.path[:-1]:
             node = node[p]
-        node[lf.path[-1]] = (f"{float(v):.10g} {lf.unit}".strip() if lf.text else float(v))
+        node[lf.path[-1]] = lf.write(v)
     return s
 
 
@@ -309,9 +368,15 @@ def unit_of(key: str) -> str:
     return ""
 
 
-def scalar_values(o: dict) -> dict[str, float]:
-    v = o.get("values") or {}
+def scalar_values(o: dict, top: bool = False) -> dict[str, float]:
+    """The numbers in an outcome's values, and with top its own numeric fields too (a strength outcome keeps
+    governing_MPa and safety_factor at the top), with values winning a clash."""
     out = {}
+    if top:
+        for k, x in o.items():
+            if isinstance(x, (int, float)) and not isinstance(x, bool) and np.isfinite(x) and k not in ("t_total",):
+                out[k] = float(x)
+    v = o.get("values") or {}
     for k, x in v.items():
         if k.startswith("_") or isinstance(x, bool):
             continue
@@ -323,7 +388,7 @@ def scalar_values(o: dict) -> dict[str, float]:
 def criteria(o: dict) -> list[dict]:
     """The run's pass or fail criteria: each {"name", "value", "limit" (a number) or "limit_key", "sense"}, with
     "max" for a value that must stay at or under its limit and "min" for one that must stay at or over it."""
-    vals = scalar_values(o)
+    vals = scalar_values(o, top=True)
     given = o.get("criteria") or (o.get("values") or {}).get("_criteria") or []
     out = []
     for c in given:
@@ -428,7 +493,7 @@ class Reruns:
         out = self.work / f"r{self.count}"
         spec = with_values(self.req.spec, values, self.found)
         t = time.perf_counter()
-        o = rerun(Request(self.req.domain, spec, self.req.kind, self.req.roles), out)
+        o = rerun(Request(self.req.domain, spec, self.req.kind, self.req.roles, self.req.registry), out)
         self.seconds.append(time.perf_counter() - t)
         series = read_series(out) if self.keep else {}
         shutil.rmtree(out, ignore_errors=True)
