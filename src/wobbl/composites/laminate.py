@@ -79,7 +79,7 @@ class Laminate:
     def balanced(self) -> bool:
         """Every off axis ply has a partner at the opposite angle, so pulling it does not shear it."""
         A, _, _ = self.abd()
-        return abs(A[0, 2]) + abs(A[1, 2]) <= 1e-6 * (abs(A[0, 0]) + abs(A[1, 1]))
+        return bool(abs(A[0, 2]) + abs(A[1, 2]) <= 1e-6 * (abs(A[0, 0]) + abs(A[1, 1])))
 
     def share(self, angle: float) -> float:
         """Fraction of the thickness in plies at this angle (either sign for off axis angles)."""

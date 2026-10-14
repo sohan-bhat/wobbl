@@ -198,9 +198,8 @@ def write_shell_inp(path: Path, model: ShellModel) -> dict[str, tuple[int, int]]
             if model.posts:
                 # thin spokes a thousand times stiffer than the part: a rigid boss top that adds no weight
                 f.write(f"*MATERIAL, NAME=STIFF\n*ELASTIC\n{1000 * model.E:.10g},{model.nu:.10g}\n*DENSITY\n1e-30\n")
-        for k, r in enumerate(model.rigid):
-            ref, rot = extra[r.name]
-            f.write(f"*RIGID BODY, NSET=RB{k + 1}, REF NODE={ref + 1}, ROT NODE={rot + 1}\n")
+        for r in model.rigid:
+            _rigid_equations(f, r, extra[r.name], mesh.X)
         f.write("*STEP\n*STATIC\n*BOUNDARY\n")
         for name, _, dofs in model.constraints:
             for d in dofs:
@@ -229,6 +228,24 @@ def write_shell_inp(path: Path, model: ShellModel) -> dict[str, tuple[int, int]]
             f.write(f"*NODE PRINT, NSET={_set(name)}, TOTALS=ONLY\nRF\n")
         f.write("*NODE FILE, OUTPUT=3D\nU\n*EL FILE, OUTPUT=3D\nS,E\n*END STEP\n")
     return extra
+
+
+def _rigid_equations(f, r: RigidCoupling, refrot: tuple[int, int], X: np.ndarray):
+    """A rigid attachment as linear equations: every node moves with the reference node plus the small turn the
+    rotation node's translations stand for, u = u_ref + theta x (x - x_ref).
+
+    CalculiX refuses a rigid body on shell nodes, whose copies through the thickness it ties together itself;
+    linear equations go through, and for the small deflections of a linear study they are the same joint.
+    """
+    ref, rot = refrot
+    f.write("*EQUATION\n")
+    c = np.asarray(r.ref_point, float)
+    for i in r.nodes:
+        x, y, z = X[i] - c
+        # (theta x r)_x = ty z - tz y, (theta x r)_y = tz x - tx z, (theta x r)_z = tx y - ty x
+        for d, terms in ((1, ((2, z), (3, -y))), (2, ((3, x), (1, -z))), (3, ((1, y), (2, -x)))):
+            row = [(i, d, 1.0), (ref, d, -1.0)] + [(rot, a, -v) for a, v in terms if abs(v) > 1e-12]
+            f.write(f"{len(row)}\n" + ",".join(f"{n + 1},{dd},{v:.10g}" for n, dd, v in row) + "\n")
 
 
 FOLD_COS = 0.94   # an element more than about 20 degrees off the mean normal at a node keeps its own there
