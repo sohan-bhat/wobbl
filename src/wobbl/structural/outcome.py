@@ -58,8 +58,11 @@ class Outcome:
         return _jsonable(d)
 
     def save(self, path: str | Path):
+        from ..jobs.workload import record_outcome
         from ..verify.checks import relative_paths
-        Path(path).write_text(json.dumps(relative_paths(self.to_dict(), Path(path).parent), indent=1))
+        d = self.to_dict()
+        Path(path).write_text(json.dumps(relative_paths(d, Path(path).parent), indent=1))
+        record_outcome(d, Path(path).parent)
 
     @classmethod
     def load(cls, path: str | Path) -> "Outcome":

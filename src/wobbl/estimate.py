@@ -233,9 +233,13 @@ def record(solver: str, predicted_time: float, measured_time: float, predicted_m
                                        "measured_memory": measured_memory, "size": size or {},
                                        "source": source, "when": time.time()})
     cal["runs"] = cal["runs"][-200:]
+    save_calibration(cal)
+
+
+def save_calibration(cal: dict):
     p = calibration_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_suffix(".tmp")
+    tmp = p.with_name(f"calibration.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(cal, indent=1))
     tmp.replace(p)
 
@@ -323,6 +327,8 @@ class Cost:
     size: dict = field(default_factory=dict)
     basis: list[str] = field(default_factory=list)
     sums: tuple = ()              # CalculiX: the dissection sums, so a coarser mesh can be priced
+    known: bool = True            # False when nothing has measured this kind of run yet
+    measured: bool = False        # True when the numbers are this machine's own measured runs
 
 
 def compact_sums(n: float) -> tuple[float, float]:
@@ -481,6 +487,10 @@ class Estimate:
     def fits(self) -> bool:
         return self.verdict != "does not fit"
 
+    @property
+    def known(self) -> bool:
+        return self.verdict != "unknown"
+
     def to_dict(self) -> dict:
         return {"target": self.target, "solver": self.cost.solver, "procedure": self.cost.procedure,
                 "size": self.cost.size, "machine": self.machine.to_dict(), "time_s": round(self.seconds, 1),
@@ -490,6 +500,8 @@ class Estimate:
 
     def headline(self) -> str:
         m = self.machine
+        if not self.known:
+            return "Its time is not known yet."
         where = f"{m.threads} cores of {m.name}" if m.threads > 1 else f"one core of {m.name}"
         return (f"About {duration(self.seconds)} on {where}, {nbytes(self.peak_bytes)} of memory at the peak and "
                 f"{nbytes(self.disk_bytes)} on disk.")
@@ -501,11 +513,18 @@ def predict(cost: Cost, machine: Machine | None = None, max_hours: float | None 
     m = machine or this_machine()
     basis = list(cost.basis)
     tf = mf = 1.0
-    if m.name == "this machine":
+    if not cost.known:
+        est = Estimate(cost, m, 0.0, 0.0, 0.0, "unknown", [], [], basis, target)
+        if advise_options and m.name == "this machine":
+            est.options = [{"kind": "background", "command": f"wobbl jobs start {target}",
+                            "summary": f"Run it in the background with wobbl jobs start {target}, and its time "
+                                       "becomes known for the next estimate."}]
+        return est
+    if m.name == "this machine" and not cost.measured:
         tf, nt = factor(cost.solver, "time")
         mf, _ = factor(cost.solver, "memory")
         how = ("Run wobbl estimate --calibrate to measure it." if cost.solver == "calculix" else
-               "A finished job here measures it.")
+               "Its first run here measures it.")
         basis.append(f"Calibrated on this machine from {nt} measured run{'s' if nt != 1 else ''}." if nt else
                      f"Not calibrated on this machine yet, so the reference machine's speed is used. {how}")
     seconds = cost.core_seconds * tf * m.speed / amdahl(m.threads, cost.parallel)
@@ -705,6 +724,17 @@ def estimate_part(part: str | Path, domain: str = "strength", quality: str = "no
         prep, features = describe_part(str(part), tmp, scale)
         mesh = first_mesh(prep, features, domain, quality, mesh_size, transient)
     return predict(study_cost(mesh, domain, quality, transient), machine or this_machine(), max_hours, str(part))
+
+
+def estimate_command(argv: list[str], machine: Machine | None = None, max_hours: float | None = None) -> Estimate:
+    """Predict any Wobbl command line, of any domain, before it runs."""
+    from .jobs import workload as WL
+
+    w = WL.parse(argv)
+    est = predict(WL.cost(w), machine or this_machine(), max_hours, " ".join(argv))
+    if est.known and not est.cost.measured and (machine is None or machine.name == "this machine"):
+        WL.remember_prediction(w, est.cost.core_seconds, est.cost.peak_bytes)
+    return est
 
 
 def estimate_size(solver: str, nodes: int = 0, elements: int = 0, end_time: float = 0.0, time_step: float = 0.0,
