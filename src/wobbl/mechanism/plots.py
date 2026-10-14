@@ -76,6 +76,35 @@ def torque_speed(path, panels: list[dict]) -> str:
     return _save(fig, path)
 
 
+def cloud(path, pts, title: str) -> str:
+    """Points a tip can reach, from above and from the side, relative to the base, in mm."""
+    pts = np.asarray(pts) * 1000
+    fig, axes = _fig(8.0, 3.8, 2, 1)
+    for ax, (a, b, la, lb) in zip(axes.ravel(), ((0, 1, "x", "y"), (0, 2, "x", "z"))):
+        ax.scatter(pts[:, a], pts[:, b], s=2, color=MARK, alpha=0.35, linewidths=0)
+        ax.scatter([0], [0], s=30, color=SOFT, marker="s", label="base")
+        ax.set_xlabel(f"{la} (mm)", color=FG, fontsize=8)
+        ax.set_ylabel(f"{lb} (mm)", color=FG, fontsize=8)
+        ax.set_aspect("equal", adjustable="datalim")
+    axes[0, 0].legend(fontsize=7, facecolor=BG, labelcolor=FG, edgecolor="#3a3d42", loc="upper right")
+    fig.suptitle(title, color=FG, fontsize=9)
+    return _save(fig, path)
+
+
+def bars(path, labels: list[str], values, ylabel: str, lines: dict | None = None) -> str:
+    """One bar per item, with optional reference lines."""
+    fig, axes = _fig(8.0, 3.6)
+    ax = axes[0, 0]
+    ax.bar(range(len(values)), values, color=MARK, width=0.6)
+    ax.set_xticks(range(len(values)), labels, rotation=30, ha="right", fontsize=7, color=FG)
+    ax.set_ylabel(ylabel, color=FG, fontsize=8)
+    for name, v in (lines or {}).items():
+        ax.axhline(v, color=FAIL, lw=1, ls="--", label=name)
+    if lines:
+        ax.legend(fontsize=7, facecolor=BG, labelcolor=FG, edgecolor="#3a3d42")
+    return _save(fig, path)
+
+
 def series(path, t, ys: dict, ylabel: str, hlines: dict | None = None, xlabel: str = "s") -> str:
     """Lines over time, with optional labeled limits."""
     fig, axes = _fig()
@@ -130,7 +159,11 @@ def strobe(path, run, views=(("x", "z"),), caption_times: bool = True, highlight
             last = k == len(frames) - 1
             alpha = 0.95 if last else 0.12 + 0.35 * k / max(len(frames) - 1, 1)
             for g, info in enumerate(geoms):
-                pts = _outline(info["type"], np.asarray(info["size"]), xpos[g], xmat[g])
+                R = np.asarray(xmat[g]).reshape(3, 3)
+                if info.get("rgba", [1, 1, 1, 1])[3] == 0:
+                    continue
+                at = xpos[g] + R @ np.asarray(info.get("offset", (0.0, 0.0, 0.0)))
+                pts = _outline(info["type"], np.asarray(info["size"]), at, xmat[g])
                 if pts is None:
                     continue
                 p2 = pts[:, [i, j]]
