@@ -202,23 +202,14 @@ def pot_estimate(s: Spec, gap: float) -> float:
 
 # --- permanent magnet holding a steel plate --------------------------------------------------
 MAGNET_KEYS = {"diameter", "height", "grade", "cup", "cup_gap", "plate", "plate_d", "stroke", "min_gap", "points",
-               "material", "need", "shape", "width", "depth"}
+               "material", "need"}
 
 
 def magnet_spec(p: dict) -> Spec:
     check_known(p, MAGNET_KEYS, "magnet")
     rm = value(p, "diameter", 20, "length") / 2
     d = {"rm": rm, "hm": value(p, "height", 10, "length"), "tc": value(p, "cup", 0, "length"),
-         "gc": value(p, "cup_gap", 1, "length"), "ta": value(p, "plate", 5, "length"),
-         "shape": text(p, "shape", "cylinder")}
-    if d["shape"] not in ("cylinder", "block"):
-        raise ParamError("shape is cylinder (axisymmetric) or block (3D)")
-    if d["shape"] == "block":
-        if d["tc"]:
-            raise ParamError("a steel cup is only modeled around a cylinder magnet")
-        d["a"] = value(p, "width", 20, "length")
-        d["b"] = value(p, "depth", d["a"] * 1e3, "length")
-        d["pa"] = value(p, "plate_d", 2 * max(d["a"], d["b"]) * 1e3 + 10, "length")
+         "gc": value(p, "cup_gap", 1, "length"), "ta": value(p, "plate", 5, "length")}
     d["rpl"] = value(p, "plate_d", 2 * (rm + (d["tc"] + d["gc"] if d["tc"] else 0)) * 1e3 + 20, "length") / 2
     stroke = value(p, "stroke", 5, "length")
     grade = text(p, "grade", "n42")
@@ -317,9 +308,6 @@ def run_magnetic(template: str, params: dict, out_dir: str | Path, question: str
     shutil.rmtree(work, ignore_errors=True)
     if s.air_core:
         return _air_core(s, out, work, question, keep, t_start, log)
-    if s.dims.get("shape") == "block":
-        from .magnet3d import run_block
-        return run_block(s, out, work, question, keep, t_start, log)
     sweep = []
     for i, g in enumerate(s.gaps):
         log("solve", f"gap {g * 1e3:.3g} mm ({i + 1} of {len(s.gaps)})")
