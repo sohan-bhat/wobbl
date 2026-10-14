@@ -143,12 +143,17 @@ stability, or the spread across part tolerances and the supply range in the ques
 the netlist yourself and pass it. A board's trace parasitics come from the field physics below and feed
 back into a converter run.
 
-**Mechanisms.** A spec, a URDF or MJCF model, or words, as in
-`wobbl simulate "can two mg996r servos lift 500 g with a robot arm?"` or
-`wobbl simulate robot.urdf "can the shoulder hold the arm out level?"`, run in MuJoCo with each motor's
-torque speed line, checked against a closed form wherever one exists, again at half the time step and with an
-energy account. Read the stall and heat numbers joint by joint, since a servo that clears a single move can
-still cook when the move repeats.
+**Mechanisms.** Any URDF or MJCF model, a spec of bodies, joints, drives and a move, or words, as in
+`wobbl simulate arm.urdf "can it hold 2 kg at full reach?"`, `wobbl simulate go1.xml "what does each foot carry, and is it stable?"`
+or `wobbl simulate "can two mg996r servos lift 500 g with a robot arm?"`. It runs in MuJoCo with each drive
+held to its torque and speed limit, and the question picks the physics: torque, kinematics (reach and range),
+collision, stability, contact or dynamics. Each searches the whole range for its worst pose and checks itself
+against a hand calculation. A model that names no motors takes a catalog servo on every driven joint, as in
+`wobbl simulate arm.urdf "can it lift 500 g?" --servo mg996r`, a fixed base arm stands loose on a floor with
+`wobbl simulate arm.urdf "will it tip over?" --base free`, and a model left to itself runs as
+`wobbl simulate pendulum.xml "does it fall over?" --passive`. Read the loader's notes on meshes it could not
+read or masses it took from shapes, and read stall and heat joint by joint, since a servo that clears a
+single move can still cook when the move repeats.
 
 **Flights.** A body in words, a rocket spec or a solid motor spec, as in
 `wobbl simulate "a 9 cm rock dropped from 300 m"`, `wobbl simulate rocket.toml "what is the apogee?"` and

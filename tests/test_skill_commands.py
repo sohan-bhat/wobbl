@@ -64,7 +64,8 @@ def stand_in(thing: str, tmp: Path) -> str:
     if p.suffix in STAND_IN:
         return str(STAND_IN[p.suffix])
     texts = {".cir": "* divider\nV1 in 0 12\nR1 in out 1k\nR2 out 0 1k\n.op\n.end\n",
-             ".urdf": '<?xml version="1.0"?>\n<robot name="arm"><link name="base"/></robot>\n'}
+             ".urdf": '<?xml version="1.0"?>\n<robot name="arm"><link name="base"/></robot>\n',
+             ".xml": "<mujoco model='robot'><worldbody/></mujoco>\n"}
     if p.suffix in texts:
         (tmp / p.name).write_text(texts[p.suffix])
         return str(tmp / p.name)
