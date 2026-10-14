@@ -163,7 +163,7 @@ class Circuit:
               save: bool = True) -> str:
         """The netlist as ngspice reads it. Instrumented, each probed pin moves to its own node behind a 0 V
         source, and only node voltages and those currents are saved."""
-        lines = [f"* {self.title or 'circuit'}"]
+        lines = ["* " + (self.title or "circuit").encode("ascii", "replace").decode()]     # Windows code pages
         lines += self.directives
         moved: dict[tuple[str, int], str] = {}
         amm = []
@@ -240,7 +240,7 @@ def _expand_includes(text: str, base: Path | None, depth: int = 0) -> str:
             p = base / p
         if not p.exists():
             return f"* (missing {kind} {fname})"
-        body = p.read_text(errors="replace")
+        body = p.read_text(encoding="utf-8", errors="replace")
         if kind == ".lib" and len(toks) > 1:
             sec = re.search(rf"(?ims)^\.lib\s+{re.escape(toks[1])}\s*$(.*?)^\.endl", body)
             body = sec.group(1) if sec else body

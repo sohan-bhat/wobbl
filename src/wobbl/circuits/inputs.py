@@ -15,7 +15,7 @@ def kind_of(source: str) -> str:
     s = str(source).strip()
     p = _path(s)
     if p is not None:
-        head = p.read_text(errors="replace")[:400].lstrip()
+        head = p.read_text(encoding="utf-8", errors="replace")[:400].lstrip()
         if p.suffix.lower() == ".kicad_sch" or head.startswith("(kicad_sch"):
             return "kicad"
         if head.startswith("(export"):
@@ -46,7 +46,7 @@ def load(source: str, params: dict, assume=None) -> Circuit:
     kind = kind_of(source)
     p = _path(str(source).strip())
     if kind == "netlist":
-        text = p.read_text(errors="replace") if p else str(source)
+        text = p.read_text(encoding="utf-8", errors="replace") if p else str(source)
         c = parse_spice(text, p.parent if p else None)
         c.source = "netlist"
         if not c.elements:
@@ -54,7 +54,7 @@ def load(source: str, params: dict, assume=None) -> Circuit:
         return c
     if kind in ("kicad", "kicad-netlist"):
         from . import kicad
-        text = p.read_text(errors="replace") if p else str(source)
+        text = p.read_text(encoding="utf-8", errors="replace") if p else str(source)
         c = kicad.parse_schematic(text, p, params) if kind == "kicad" else kicad.parse_netlist_export(text, params)
         c.source = "kicad"
         return c

@@ -143,7 +143,7 @@ def simulate_circuit(source: str, question: str = "", params: dict | None = None
         write_playback(out, c, main, stress, o.verdict)
     except Exception as e:  # noqa: BLE001  the drawing data must not lose the result
         o.notes.append(f"playback.json not written: {e}")
-    (out / "netlist.cir").write_text(c.spice())
+    (out / "netlist.cir").write_text(c.spice(), encoding="utf-8")
     return o.write(out, sections)
 
 

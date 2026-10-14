@@ -238,7 +238,7 @@ def _sheet(root: list, path: Path | None, uf: _Union, prefix: str, syms: list[Sy
             continue
         sname = pr.get("Sheetname") or pr.get("Sheet name") or sub.stem
         uid = _one(sh, "uuid")
-        child = _sheet(sexp(sub.read_text(errors="replace")), sub, uf, f"{prefix}/{sname}", syms, names, depth + 1,
+        child = _sheet(sexp(sub.read_text(encoding="utf-8", errors="replace")), sub, uf, f"{prefix}/{sname}", syms, names, depth + 1,
                        str(uid[1]) if uid else "")
         for p in _items(sh, "pin"):
             name = str(p[1])

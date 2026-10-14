@@ -80,7 +80,7 @@ class NgSpice(SolverAdapter):
         if body.lower().endswith(".end"):
             body = body[:-4].rstrip()
         cir = work / f"{name}.cir"
-        cir.write_text(body + "\n" + "\n".join(ctrl) + "\n.end\n")
+        cir.write_text(body + "\n" + "\n".join(ctrl) + "\n.end\n", encoding="utf-8")
         try:
             r = subprocess.run([str(exe), "-b", cir.name], cwd=work, capture_output=True, text=True,
                                timeout=timeout, env=tool_env(exe), stdin=subprocess.DEVNULL)
