@@ -173,7 +173,7 @@ export function sim(run: Run): Sim {
     phases: phaseNames.map((p) => `${p}=${PHASE[p] ?? cap(p)}`).join(';'), scale: s, ground: GROUND,
     events: flagEvents.join(';'),
     speedup: speedup(tEnd), decimals, bar, answer, readouts, widths,
-    said: `${answer}. The run marks ${events.map((e) => `${e.name} at ${secs(e.t_s)}, ${meters(e.alt_m)} up`).join(', then ')}.`
+    said: `${answer}. The run marks ${events.map((e) => `${e.name} at ${secs(e.t_s)}, ${meters(e.alt_m ?? 0)} up`).join(', then ')}.`
       + (ghost ? ` The same drop without air lands after ${secs(ghost.t)}.` : ''),
   };
 }

@@ -41,6 +41,17 @@ IMAGES = {
     "rocket-path": (EX / "rocket-launch/output/images/path.png", False, (1200, 800)),
     "propane-sweep": (EX / "propane-flame/output/images/sweep.png", False, (1200, 800)),
     "knsb-burn": (EX / "knsb-motor/output/images/burn.png", False, (1200, 800)),
+    "wiper-frames": (EX / "wiper-linkage/output/images/frames.png", False, (1200, 800)),
+    "wiper-angles": (EX / "wiper-linkage/output/images/angles.png", False, (1200, 800)),
+    "arm-frames": (EX / "desktop-arm/output/images/frames.png", False, (1200, 800)),
+    "arm-torque-speed": (EX / "desktop-arm/output/images/torque_speed.png", False, (1200, 800)),
+    "arm-usage": (EX / "desktop-arm/output/images/usage.png", False, (1200, 800)),
+    "cell-onset": (EX / "cell-runaway/output/images/onset.png", False, (1200, 800)),
+    "drone-arm-modes": (EX / "drone-arm-resonance/output/images/modes.jpg", True, (1200, 800)),
+    "strut-mode1": (EX / "strut-buckling/output/images/mode1.jpg", True, (1200, 800)),
+    "mount-fatigue-sn": (EX / "motor-mount-fatigue/output/images/sn.png", False, (1200, 800)),
+    "credibility-validation": (EX / "cast-mount-credibility/output/images/validation.png", False, (1200, 800)),
+    "credibility-uncertainty": (EX / "cast-mount-credibility/output/images/uncertainty.png", False, (1200, 800)),
 }
 
 
@@ -61,8 +72,12 @@ def main(only: list[str]) -> None:
         img = Image.open(src).convert("RGB")
         if do_trim:
             img = trim(img)
+        done: set[int] = set()
         for i, w in enumerate(widths):
             w = min(w, img.width)
+            if w in done:  # a picture narrower than the smaller width needs no second copy
+                continue
+            done.add(w)
             h = round(img.height * w / img.width)
             out = OUT / (f"{name}.webp" if i == 0 else f"{name}-{w}.webp")
             img.resize((w, h), Image.LANCZOS).save(out, "WEBP", quality=82, method=6)

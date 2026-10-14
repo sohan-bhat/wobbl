@@ -10,6 +10,8 @@ import { ROOT } from './site';
 // The newer kinds of study come first, since the landing page's hero already shows a stress result:
 // motion, then circuits, then chemistry and the rest as they land, with strength and heat after them.
 export const ORDER = ['rocket-launch', 'falling-rock', 'circuits', 'propane-flame', 'knsb-motor',
+  'wiper-linkage', 'desktop-arm', 'cell-runaway', 'drone-arm-resonance', 'strut-buckling', 'motor-mount-fatigue',
+  'cast-mount-credibility',
   'cast-motor-mount', 'shelf-bracket', 'motor-mount', 'enclosure', 'drone-arm', 'heat-sink', 'battery-pack'];
 
 const EX = resolve(ROOT, 'examples');
@@ -32,15 +34,23 @@ export const RUN_IMAGES: Record<string, Record<string, string>> = {
   'rocket-launch/output': { flight: 'rocket-flight', path: 'rocket-path' },
   'propane-flame/output': { sweep: 'propane-sweep' },
   'knsb-motor/output': { burn: 'knsb-burn' },
+  'wiper-linkage/output': { frames: 'wiper-frames', angles: 'wiper-angles' },
+  'desktop-arm/output': { frames: 'arm-frames', torque_speed: 'arm-torque-speed', usage: 'arm-usage' },
+  'cell-runaway/output': { onset: 'cell-onset' },
+  'drone-arm-resonance/output': { modes: 'drone-arm-modes' },
+  'strut-buckling/output': { mode1: 'strut-mode1' },
+  'motor-mount-fatigue/output': { sn: 'mount-fatigue-sn' },
+  'cast-mount-credibility/output': { validation: 'credibility-validation', uncertainty: 'credibility-uncertainty' },
 };
 
 const DOMAIN: Record<string, string> = {
   strength: 'Strength', thermal: 'Heat', circuit: 'Circuits', motion: 'Motion', combustion: 'Chemistry', motor: 'Motors',
+  mechanism: 'Mechanisms', battery: 'Batteries', vibration: 'Vibration', buckling: 'Buckling', fatigue: 'Fatigue',
 };
 export const COLOR: Record<string, string> = { holds: 'holds', ok: 'holds', marginal: 'marginal', fails: 'fails', hot: 'fails' };
 
 /** An event a motion run marks, such as burnout or impact, with where and how fast. */
-export interface FlightEvent { name: string; t_s: number; alt_m: number; x_m?: number; speed_mps?: number }
+export interface FlightEvent { name: string; t_s: number; alt_m?: number; x_m?: number; speed_mps?: number; detail?: string }
 export interface Check { name: string; status: string; summary: string; detail?: Record<string, unknown> }
 export interface Fix { kind: string; title: string; after?: { governing_MPa: number; safety_factor: number; verdict: string; report: string; params?: Record<string, number> } }
 export interface Outcome {
@@ -48,7 +58,9 @@ export interface Outcome {
   governing_MPa?: number; safety_factor?: number; target_sf?: number;
   metrics?: [string, string][]; checks?: Check[]; fixes?: Fix[]; images?: Record<string, string>;
   // motion runs: what happened when, how long the run took and what the model included
-  events?: FlightEvent[]; runtime_s?: number; model?: { states: number; effects: string[] };
+  // mechanism runs carry events with a detail line, and a model of bodies and joints in place of effects
+  events?: FlightEvent[]; runtime_s?: number;
+  model?: { states?: number; effects?: string[]; bodies?: number; joints?: number; degrees_of_freedom?: number };
 }
 
 export interface Run {
@@ -145,6 +157,9 @@ function load(name: string): Example {
       continue;
     }
     const rel = `${name}/${opt(a, '-o', '--out') ?? 'output'}`;
+    // a later command that works on a run's own folder, such as wobbl uncertainty output, belongs to that run
+    const on = runs.find((r) => r.rel === `${name}/${a[2]}` || r.rel === rel);
+    if (on) { on.command += `\n${shown}`; continue; }
     const outcome = JSON.parse(readFileSync(resolve(EX, rel, 'outcome.json'), 'utf-8')) as Outcome;
     const reportRel = `examples/${rel}/report.html`;
     const has = existsSync(resolve(EX, rel, 'report.html')) && (tracked === null || tracked.has(reportRel));
@@ -155,7 +170,8 @@ function load(name: string): Example {
   }
   return {
     name, title, subtitle: sub ? sub[0].toUpperCase() + sub.slice(1) : '', subtitleFromBody, readme, runs,
-    domain: DOMAIN[runs[0].outcome.domain] ?? '',
+    // an example that ends in wobbl credibility is about how far the run can be trusted
+    domain: runs[0].command.includes('wobbl credibility') ? 'Credibility' : DOMAIN[runs[0].outcome.domain] ?? '',
   };
 }
 

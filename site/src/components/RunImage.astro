@@ -12,6 +12,9 @@ const img = runImages(run)[0];
 const kinds: Record<string, string> = {
   stress: 'Stress heatmap', temperature: 'Temperature map', waveform: 'Simulated waveform',
   sweep: 'Flame temperature across mixtures', burn: 'Thrust and chamber pressure over the burn',
+  frames: 'The mechanism at moments through its move', onset: 'Cell temperature just under and just over the onset',
+  modes: 'Mode shapes', mode1: 'First buckling mode', sn: 'Stress cycles against the S-N curve',
+  validation: 'Prediction against the test readings',
 };
 const pic = img && !flight ? picture(img.name) : null;
 const [k, v] = metrics(run)[0];
