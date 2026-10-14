@@ -526,3 +526,54 @@ def _lookup(name: str, table: dict, what: str):
     hint = f" Did you mean {', '.join(close)}?" if close else ""
     raise KeyError(f"unknown {what} '{name}'.{hint} Known: {', '.join(table)}")
 
+
+@dataclass(frozen=True)
+class CrackGrowth:
+    """How fast a fatigue crack grows in one material, in the units growth data is published in: da/dN in mm per
+    cycle and K in MPa sqrt(m). ``C`` and ``n`` are the Paris fit at R = 0, da/dN = C dK^n, and the NASGRO
+    equation is matched to that fit away from threshold and fracture (see wobbl.fracture.growth). A zero
+    toughness means no value is built in, because it moves too much with temperature, plate and heat, and the
+    crack is then judged by net section yield unless one is given."""
+    C: float
+    n: float
+    dk_th: float              # threshold of the stress intensity range at R = 0, MPa sqrt(m)
+    k_ic: float               # plane strain fracture toughness, MPa sqrt(m), or 0
+    source: str
+    scatter: float = 0.25     # standard deviation of ln C from one heat to another
+    p: float = 0.5            # NASGRO threshold and toughness exponents, the usual values for these alloys
+    q: float = 1.0
+
+
+_IIW_AL = ("growth from the IIW mean plus two standard deviations curve for aluminium alloys, C 1.41e-11 mm/cycle "
+           "per (N mm^-1.5)^3 with m = 3 (Hobbacher, Recommendations for Fatigue Design of Welded Joints and "
+           "Components, IIW, 2nd ed. 2016), which lies above most data so lives come out short; threshold 1.8 "
+           "MPa sqrt(m), the same document's lower bound for aluminium at R = 0")
+_STEEL_TH = "threshold 5.4 MPa sqrt(m), the BS 7910:2019 value for steels at R = 0 (170 N mm^-1.5)"
+_BARSOM = "Barsom and Rolfe, Fracture and Fatigue Control in Structures, 3rd ed. (1999), upper bound of data for "
+
+# keyed by material key. IIW's 1.41e-11 in N mm^-1.5 is 4.46e-7 in MPa sqrt(m), since 1 MPa sqrt(m) = 31.62 N mm^-1.5
+CRACK_GROWTH: dict[str, CrackGrowth] = {
+    "7075-t6": CrackGrowth(2.71e-8, 3.70, 1.8, 29.0,
+                           "Paris fit and K_Ic from Dowling, Mechanical Behavior of Materials, 4th ed. (2013), Table "
+                           "11.2 (Walker C0 and m); threshold 1.8 MPa sqrt(m), the IIW lower bound for aluminium at "
+                           "R = 0 (Hobbacher 2016)"),
+    "6061-t6": CrackGrowth(4.46e-7, 3.0, 1.8, 29.0,
+                           _IIW_AL + "; K_Ic 29 MPa sqrt(m) from ASM Aerospace Specification Metals, Aluminum 6061-T6"),
+    "6063-t5": CrackGrowth(4.46e-7, 3.0, 1.8, 0.0, _IIW_AL),
+    "5052-h32": CrackGrowth(4.46e-7, 3.0, 1.8, 0.0, _IIW_AL),
+    "a356-t6": CrackGrowth(4.46e-7, 3.0, 1.8, 0.0, _IIW_AL),
+    "mild-steel": CrackGrowth(6.9e-9, 3.0, 5.4, 0.0, _BARSOM + "ferrite pearlite steels; " + _STEEL_TH),
+    "ss304": CrackGrowth(5.6e-9, 3.25, 5.4, 0.0, _BARSOM + "austenitic stainless steels; " + _STEEL_TH),
+    "4140": CrackGrowth(1.35e-7, 2.25, 5.4, 0.0, _BARSOM + "martensitic steels; " + _STEEL_TH),
+}
+
+
+def crack_growth(key: str) -> CrackGrowth:
+    """The crack growth constants of a library material. Raises KeyError naming the materials that have them."""
+    base = key.rstrip("*")
+    if base in CRACK_GROWTH:
+        return CRACK_GROWTH[base]
+    raise KeyError(f"no crack growth data is built in for '{key}'. Materials with data: "
+                   f"{', '.join(CRACK_GROWTH)}. Give your own with --growth 'C=2.7e-8,n=3.7,dkth=1.8,kic=29' "
+                   "(mm/cycle and MPa sqrt(m)).")
+
