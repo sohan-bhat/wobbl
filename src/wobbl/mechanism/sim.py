@@ -108,6 +108,10 @@ class Trajectory:
         return pts[-1][1], 0.0, 0.0
 
 
+def _clip(x: float, lohi: tuple[float, float]) -> float:
+    return min(max(x, lohi[0]), lohi[1])
+
+
 def _names(model, kind) -> list[str]:
     mujoco = _mj()
 
@@ -246,7 +250,7 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
             need = motor.stall_torque * dr.voltage if motor is not None else 0.0
             if motor is not None and math.isfinite(motor.no_load_speed):
                 need -= motor.stall_torque * w / motor.no_load_speed
-            tau = min(max(need, motor.limit(w)[0]), motor.limit(w)[1]) if motor is not None else need
+            tau = _clip(need, motor.limit(w)) if motor is not None else need
             f_drive[dof] += tau
             tau_cur[dof], need_cur[dof] = tau, need
         if len(servo_dofs):
@@ -269,7 +273,7 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
             needs = a_cmd / A[0, 0] if len(a_cmd) == 1 else np.linalg.solve(A, a_cmd)
             for k, (dr, dof, qa, motor, follows) in enumerate(servo_plan):
                 need = float(needs[k])
-                tau = min(max(need, motor.limit(qvel[dof])[0]), motor.limit(qvel[dof])[1]) if motor else need
+                tau = _clip(need, motor.limit(float(qvel[dof]))) if motor else need
                 f_drive[dof] += tau
                 tau_cur[dof], need_cur[dof] = tau, need
         np.add(f_drive, f_load, out=applied)
