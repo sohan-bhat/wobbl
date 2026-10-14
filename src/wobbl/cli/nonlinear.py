@@ -61,10 +61,13 @@ def _part_options(f):
 @_part_options
 @click.option("--target", type=float, default=None,
               help="Margin wanted on the collapse load (default the material's safety factor, 1.5 for most metals).")
-@click.option("--curve", type=click.Choice(["auto", "perfect"]), default="auto",
-              help="Past yield, the metal's true stress strain curve (auto) or a flat line at yield (perfect).")
+@click.option("--curve", default="auto",
+              help="Past yield: auto (the material's true curve), perfect (flat at yield), 'true 250@0, 300@0.02' "
+                   "(true stress MPa at plastic strain), 'engineering 250@0.00125, 400@0.2' or a CSV file.")
 @click.option("--body", type=int, default=None, help="Pick one body from a multi body file.")
-def plastic(part, material, loads, fixes, quality, scale, params, out, question, keep, as_json, target, curve, body):
+@click.option("--playback", is_flag=True, help="Also write playback.json with the load going on and off.")
+def plastic(part, material, loads, fixes, quality, scale, params, out, question, keep, as_json, target, curve, body,
+            playback):
     """Past first yield: permanent set after unloading and the load that collapses a metal part.
 
     \b
@@ -80,7 +83,8 @@ def plastic(part, material, loads, fixes, quality, scale, params, out, question,
     out_dir = _out_dir(part, out)
     try:
         st = PlasticStudy(str(Path(part).resolve()), material, list(loads), list(fixes), target, curve, quality,
-                          question, scale, body, dict(p.split("=", 1) for p in params if "=" in p), keep)
+                          question, scale, body, dict(p.split("=", 1) for p in params if "=" in p), keep,
+                          playback)
         with ui.progress(not as_json) as cb:
             o = run_plastic(st, out_dir, cb)
     except Exception as e:  # noqa: BLE001
