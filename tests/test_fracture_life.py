@@ -98,3 +98,13 @@ def test_a_path_that_ends_by_cutting_through_counts_as_failure():
     path.end_fails = True
     n, ran = lives(path, inp, 1.0, 1.0, 1.0, 0.0)
     assert not ran[0] and np.isfinite(n[0])
+
+
+def test_counted_block_gives_the_same_life_as_the_block_written_out():
+    path, _ = _path(stress=150.0)
+    law = law_for("7075-t6")
+    counted = Spectrum(np.array([1.0, 0.6]), np.array([0.1, 0.06]), count=np.array([1.0, 49.0]))
+    written = counted.expanded()
+    a = lives(path, LifeInputs(law, counted, 400.0), 1.0, 1.0, 1.0, law.kc)[0][0]
+    b = lives(path, LifeInputs(law, written, 400.0), 1.0, 1.0, 1.0, law.kc)[0][0]
+    assert a == pytest.approx(b, rel=1e-9) and counted.cycles == 50

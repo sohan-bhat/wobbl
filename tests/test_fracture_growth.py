@@ -50,3 +50,28 @@ def test_custom_constants_and_spectra(tmp_path):
     with pytest.raises(ValueError):
         parse_spectrum(str(tmp_path / "none.csv"))
 
+
+
+def test_load_blocks_and_counted_cycles():
+    from wobbl.fracture.growth import parse_blocks
+
+    sp = parse_spectrum("100% x 3650 R=0; 70% x 1e8 R=0.714")
+    assert sp.cycles == pytest.approx(3650 + 1e8) and len(sp.smax) == 2
+    assert sp.smin[1] == pytest.approx(0.7 * 0.714) and sp.expanded() is None
+    sp = parse_blocks(["1,0.1 x 2", "0.5 x 3"], r_ratio=0.2)
+    assert sp.smin.tolist() == pytest.approx([0.1, 0.1]) and sp.cycles == 5
+    assert len(sp.expanded().smax) == 5
+    with pytest.raises(ValueError):
+        parse_blocks(["lots x 3"])
+
+
+def test_metals_without_data_are_estimated_from_their_stiffness():
+    from wobbl.materials import resolve_material
+
+    cast = law_for(resolve_material("custom:E=70000,nu=0.33,yield=165,process=cast"), "paris")
+    assert cast.estimated and cast.C == pytest.approx(1.65e-8 * 27, rel=1e-6)   # IIW's aluminium curve
+    steel = law_for(resolve_material("custom:E=205000,nu=0.3,yield=350"), "paris")
+    assert steel.C == pytest.approx(1.65e-8) and steel.dk1 == 0.0
+    assert not law_for("7075-t6").estimated
+    with pytest.raises(KeyError, match="only metals"):
+        law_for(resolve_material("pla"))

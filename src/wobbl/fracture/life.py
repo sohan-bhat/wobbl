@@ -75,8 +75,9 @@ def cycle_types(spectrum: Spectrum, wheeler: float) -> tuple[np.ndarray, np.ndar
     hi = np.round(spectrum.smax[keep] / step) * step
     lo = np.round(spectrum.smin[keep] / step) * step
     key = np.column_stack([hi, lo, np.round(phi[keep], 6)])
-    uniq, count = np.unique(key, axis=0, return_counts=True)
-    return uniq[:, 0], uniq[:, 1], uniq[:, 2], count.astype(float)
+    uniq, inv = np.unique(key, axis=0, return_inverse=True)
+    count = np.bincount(inv.ravel(), weights=spectrum.counts[keep], minlength=len(uniq))
+    return uniq[:, 0], uniq[:, 1], uniq[:, 2], count
 
 
 def block_rate(inp: LifeInputs, k: np.ndarray, s: np.ndarray, scale, cmult, kc, types=None) -> np.ndarray:
@@ -279,17 +280,19 @@ def wheeler_reference(path: CrackPath, inp: LifeInputs, a0: float, sigma_y: floa
     whole block grows the crack by under a hundredth of the zone, several blocks are taken at once, holding the
     size to within 1%.
     """
-    spec, law, m = inp.spectrum, inp.law, inp.wheeler
+    spec, law, m = inp.spectrum.expanded(), inp.law, inp.wheeler
+    if spec is None:
+        return math.nan                  # too long a block to follow one cycle at a time
     hi, lo = spec.smax, spec.smin
     r = np.where(hi > 0, lo / np.where(hi > 0, hi, 1.0), 0.0)
     a, edge, n = a0, a0, 0.0           # crack size, front edge of the overload zone (a_ol + r_ol), cycles
-    i, size = 0, spec.cycles           # position in the block and cycles per stretch
+    i, size = 0, len(spec.smax)        # position in the block and cycles per stretch
     for _ in range(max_steps):
         k = float(path.k_at(a))
         if (law.kc and k * spec.peak >= law.kc) or \
                 (path.section_area > 0 and spec.peak * path.net_stress(a) >= inp.flow_stress) or a >= path.s[-1]:
             return n
-        j = min(i + size, spec.cycles)
+        j = min(i + size, len(spec.smax))
         ry = np.maximum(k * hi[i:j], 0.0) ** 2 / (2 * math.pi * sigma_y ** 2) * 1e3     # mm, K in MPa sqrt(m)
         reach = np.maximum.accumulate(np.maximum(a + ry, edge))
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -302,7 +305,7 @@ def wheeler_reference(path: CrackPath, inp: LifeInputs, a0: float, sigma_y: floa
         if not np.isfinite(grow):
             return n
         reps = 1
-        if i == 0 and j == spec.cycles:
+        if i == 0 and j == len(spec.smax):
             if grow <= 0:
                 return math.inf
             if grow < 0.01 * zone:
@@ -311,7 +314,7 @@ def wheeler_reference(path: CrackPath, inp: LifeInputs, a0: float, sigma_y: floa
         n += reps * (j - i)
         # the zone renews with every block's peak, so after several blocks at once it has moved with the crack
         edge = float(reach[-1]) + (reps - 1) * grow
-        i = 0 if j >= spec.cycles else j
+        i = 0 if j >= len(spec.smax) else j
         if grow < 0.01 * zone:
-            size = min(spec.cycles, 2 * size)
+            size = min(len(spec.smax), 2 * size)
     return n

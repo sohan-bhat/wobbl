@@ -621,6 +621,7 @@ class CrackGrowth:
     scatter: float = 0.25     # standard deviation of ln C from one heat to another
     p: float = 0.5            # NASGRO threshold and toughness exponents, the usual values for these alloys
     q: float = 1.0
+    estimated: bool = False   # from the metal's stiffness rather than data on the alloy itself
 
 
 _IIW_AL = ("growth from the IIW mean plus two standard deviations curve for aluminium alloys, C 1.41e-11 mm/cycle "
@@ -647,12 +648,29 @@ CRACK_GROWTH: dict[str, CrackGrowth] = {
 }
 
 
-def crack_growth(key: str) -> CrackGrowth:
-    """The crack growth constants of a library material. Raises KeyError naming the materials that have them."""
+# BS 7910's simplified law for steels in air, 5.21e-13 mm/cycle per (N mm^-1.5)^3, is 1.65e-8 in MPa sqrt(m). IIW's
+# aluminium curve is this one times (E_steel / E_aluminium)^3, the same modulus scaling used below for other metals.
+_BS7910_C, _E_STEEL = 1.65e-8, 210000.0
+_BS7910 = ("BS 7910:2019 simplified crack growth law for steels in air, C 5.21e-13 mm/cycle per (N mm^-1.5)^3 with "
+           "m = 3, an upper bound of the data; " + _STEEL_TH)
+
+
+def crack_growth(key: str, material: "Material | None" = None) -> CrackGrowth:
+    """The crack growth constants of a library material. A metal without its own data gets the BS 7910 steel law
+    scaled by (E_steel / E)^3, the modulus normalization that turns IIW's steel curve into its aluminium one,
+    marked as estimated. Raises KeyError for other materials, naming the ones with data."""
     base = key.rstrip("*")
     if base in CRACK_GROWTH:
         return CRACK_GROWTH[base]
-    raise KeyError(f"no crack growth data is built in for '{key}'. Materials with data: "
-                   f"{', '.join(CRACK_GROWTH)}. Give your own with --growth 'C=2.7e-8,n=3.7,dkth=1.8,kic=29' "
-                   "(mm/cycle and MPa sqrt(m)).")
+    if material is not None and material.category == "metal" and material.E > 0:
+        ratio = _E_STEEL / material.E
+        if 0.85 <= ratio <= 1.2:
+            return CrackGrowth(_BS7910_C, 3.0, 5.4, 0.0, _BS7910, estimated=True)
+        return CrackGrowth(_BS7910_C * ratio ** 3, 3.0, 5.4 / ratio, 0.0,
+                           f"estimated from E = {material.E / 1000:.3g} GPa: {_BS7910} scaled by (E_steel / E)^3 "
+                           f"and the threshold by E / E_steel, as IIW scales its steel curve to aluminium",
+                           estimated=True)
+    raise KeyError(f"no crack growth data is built in for '{key}', and only metals can be estimated from their "
+                   f"stiffness. Materials with data: {', '.join(CRACK_GROWTH)}. Give measured constants with "
+                   "--growth 'C=2.7e-8,n=3.7,dkth=1.8,kic=29' (mm/cycle and MPa sqrt(m)).")
 
