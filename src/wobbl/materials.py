@@ -245,6 +245,80 @@ def resolve_material(spec: str) -> Material:
     return get_material(spec)
 
 
+@dataclass(frozen=True)
+class PlyMaterial:
+    """A unidirectional ply: stiff along its fibers (1), soft across them (2), with five strengths.
+
+    Through the thickness the ply is taken as transversely isotropic (E3 = E2, nu13 = nu12, G13 = G12), and
+    nu23 sets G23 = E2 / (2 (1 + nu23)). Strengths are positive numbers in MPa: along the fibers in tension
+    and compression (Xt, Xc), across them (Yt, Yc) and in plane shear (S12).
+    """
+    key: str
+    name: str
+    E1: float
+    E2: float
+    G12: float
+    nu12: float
+    nu23: float
+    Xt: float
+    Xc: float
+    Yt: float
+    Yc: float
+    S12: float
+    density: float                # kg/m3
+    thickness: float              # cured ply thickness, mm
+    aliases: tuple[str, ...] = ()
+    source: str = ""
+    notes: str = ""
+
+    @property
+    def G23(self) -> float:
+        return self.E2 / (2.0 * (1.0 + self.nu23))
+
+    def engineering_constants(self) -> tuple[float, ...]:
+        """E1 E2 E3 nu12 nu13 nu23 G12 G13 G23, the order CalculiX reads them in."""
+        return (self.E1, self.E2, self.E2, self.nu12, self.nu12, self.nu23, self.G12, self.G12, self.G23)
+
+    def summary(self) -> str:
+        return (f"{self.name}: E1 {self.E1:g}, E2 {self.E2:g}, G12 {self.G12:g} MPa, nu12 {self.nu12:g}; "
+                f"Xt {self.Xt:g}, Xc {self.Xc:g}, Yt {self.Yt:g}, Yc {self.Yc:g}, S12 {self.S12:g} MPa; "
+                f"{self.thickness:g} mm plies")
+
+
+PLIES: dict[str, PlyMaterial] = {p.key: p for p in [
+    PlyMaterial("t300-5208", "Carbon/epoxy T300/5208", 181000, 10300, 7170, 0.28, 0.49, 1500, 1500, 40, 246, 68,
+                1600, 0.125, aliases=("carbon", "carbon fiber", "carbon epoxy", "cfrp", "graphite epoxy", "t300"),
+                source="Tsai and Hahn (1980), Introduction to Composite Materials, as tabulated in Kaw, Mechanics "
+                       "of Composite Materials, 2nd ed.",
+                notes="nu23 0.49, the density and the 0.125 mm ply are typical carbon/epoxy values, not from the "
+                      "source."),
+    PlyMaterial("im7-8552", "Carbon/epoxy IM7/8552", 171420, 9080, 5290, 0.32, 0.487, 2323.5, 1200.1, 62.3, 199.8,
+                92.3, 1570, 0.131, aliases=("im7", "8552", "aerospace carbon"),
+                source="Camanho, Maimi and Davila (2007), Composites Science and Technology 67, 2715",
+                notes="nu23 0.487 and the 1570 kg/m3 density are typical IM7/8552 values, not from the source."),
+    PlyMaterial("as4-3501-6", "Carbon/epoxy AS4/3501-6", 126000, 11000, 6600, 0.28, 0.4, 1950, 1480, 48, 200, 79,
+                1580, 0.125, aliases=("as4", "3501-6"),
+                source="Soden, Hinton and Kaddour (1998), World Wide Failure Exercise lamina data, Composites "
+                       "Science and Technology 58, 1011",
+                notes="Density and ply thickness are typical values, not from the source."),
+    PlyMaterial("e-glass-epoxy", "E-glass/epoxy (Scotchply 1002)", 38600, 8270, 4140, 0.26, 0.4, 1062, 610, 31, 118,
+                72, 1800, 0.125, aliases=("glass", "fiberglass", "glass epoxy", "gfrp", "e-glass", "scotchply"),
+                source="Tsai and Hahn (1980), Introduction to Composite Materials, as tabulated in Kaw, Mechanics "
+                       "of Composite Materials, 2nd ed.",
+                notes="nu23 0.4, the density and the 0.125 mm ply are typical glass/epoxy values, not from the "
+                      "source."),
+]}
+
+
+def get_ply(name: str) -> PlyMaterial:
+    """Find a ply material by key or alias. Raises KeyError with the list."""
+    k = _clean(name)
+    for p in PLIES.values():
+        if k in {_clean(x) for x in (p.key, p.name, *p.aliases)}:
+            return p
+    raise KeyError(f"unknown ply material '{name}'. Ply materials: {', '.join(PLIES)}")
+
+
 SWAP_ORDER = ["pla", "petg", "abs", "asa", "pc", "nylon", "pa12", "6063-t5", "5052-h32", "6061-t6", "mild-steel",
               "ss304", "7075-t6", "4140", "ti-6al-4v"]
 PRINTABLE = {"pla", "petg", "abs", "asa", "nylon", "pa12", "pc"}
