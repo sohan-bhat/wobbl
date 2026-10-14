@@ -132,3 +132,107 @@ def resistance(h: Hull, speed: float, rho: float = RHO_SEA, nu: float = NU_SEA) 
 EXAMPLE = Hull(205.0, 32.0, 10.0, 37500.0, cm=0.98, cwp=0.75, lcb=-0.75, draft_fwd=10.0, bulb_area=20.0,
                bulb_height=4.0, transom_area=16.0, appendage_area=50.0, appendage_factor=1.5, stern=10.0)
 EXAMPLE_KN = 1793.26        # the paper's total at 25 knots
+
+
+# --- the study ---------------------------------------------------------------------------------------------------
+@dataclass
+class HullStudy:
+    hull: Hull
+    speed: float                  # m/s
+    power: float = 0.0            # installed power, W, 0 when not given
+    efficiency: float = 0.55      # propulsive efficiency from installed to tow rope power
+    fresh: bool = False
+    question: str = ""
+
+
+def run_hull(study: HullStudy, out_dir):
+    import time
+    from pathlib import Path
+
+    import numpy as np
+
+    from ..outcome_generic import GenericOutcome
+    from ..units import fmt
+    from ..verify.checks import Check, confidence
+    from .render import chart
+
+    t0 = time.time()
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    h = study.hull.fill()
+    rho, nu = (999.1, 1.139e-6) if study.fresh else (RHO_SEA, NU_SEA)
+    r = resistance(h, study.speed, rho, nu)
+    kn = study.speed / KNOT
+    checks = [Check("method range", "pass" if not r.out_of_range else "warn",
+                    "this hull and speed sit inside the forms the method was fitted to" if not r.out_of_range else
+                    ", ".join(r.out_of_range) + ", so the answer is an extrapolation")]
+    # Denny and Mumford's wetted area, an independent check on the hull's numbers
+    s_dm = 1.7 * h.length * h.draft + h.displacement / h.draft
+    err = abs(r.wetted - s_dm) / s_dm
+    checks.append(Check("hand calculation", "pass" if err < 0.1 else "warn",
+                        f"Denny and Mumford's formula gives a wetted area of {fmt(s_dm)} m2 against the method's "
+                        f"{fmt(r.wetted)} m2 ({100 * err:.2g}% apart)" + ("" if err < 0.1 else
+                                                                         ", so check the hull's coefficients")))
+    friction = r.parts["friction"] / r.total
+    checks.append(Check("speed regime", "pass" if r.froude <= 0.4 else "warn",
+                        f"Froude number {r.froude:.2f}, friction is {100 * friction:.0f}% of the resistance" +
+                        ("" if r.froude <= 0.4 else ", and past about 0.4 the hull climbs its own bow wave, where "
+                                                    "resistance rises steeply")))
+    level, reasons = confidence(checks, [("medium", "Holtrop and Mennen is a regression on model tests, typically "
+                                                    "within 5 to 10% of a towing tank test of the actual hull")])
+    need = r.power / study.efficiency
+    if study.power:
+        verdict = "ok" if need <= 0.9 * study.power else ("marginal" if need <= study.power else "fails")
+    else:
+        verdict = "ok"
+    head = (f"At {fmt(kn)} knots the hull takes {fmt(r.total / 1000)} kN, so {fmt(r.power / 1000)} kW at the tow "
+            f"rope and about {fmt(need / 1000)} kW from the engine at a propulsive efficiency of "
+            f"{study.efficiency:g}" + (f", against {fmt(study.power / 1000)} kW installed." if study.power else "."))
+    speeds = np.linspace(0.3, 1.25, 30) * study.speed
+    curves = [resistance(h, v, rho, nu) for v in speeds]
+    fixes = []
+    if verdict != "ok":
+        top = max((v for v, c in zip(speeds, curves) if c.power / study.efficiency <= 0.9 * study.power),
+                  default=None)
+        if top:
+            fixes.append({"kind": "speed", "title": f"Cruise at {fmt(top / KNOT)} knots",
+                          "summary": f"The installed {fmt(study.power / 1000)} kW holds that speed with a 10% "
+                                     "margin, since resistance grows faster than the square of speed.",
+                          "auto": False})
+        longer = Hull(**{**h.__dict__, "length": h.length * 1.15, "beam": h.beam / 1.15, "wetted": 0.0,
+                         "estimated": []})
+        rl = resistance(longer, study.speed, rho, nu)
+        fixes.append({"kind": "hull", "title": f"Lengthen the hull to {fmt(longer.length)} m",
+                      "summary": f"At the same displacement and draft, with the beam cut to {fmt(longer.beam)} m, "
+                                 f"the resistance becomes {fmt(rl.total / 1000)} kN against {fmt(r.total / 1000)} kN, "
+                                 "because a longer hull makes smaller waves at the same speed.", "auto": False})
+        fixes.append({"kind": "power", "title": f"Install about {fmt(1.1 * need / 1000)} kW",
+                      "summary": "That covers this speed with a 10% margin for a clean hull in calm water.",
+                      "auto": False})
+    imgs = {}
+    try:
+        imgs["resistance"] = chart(out / "images" / "resistance.png",
+                                   {"total": (speeds / KNOT, [c.total / 1000 for c in curves]),
+                                    "friction with form factor": (speeds / KNOT,
+                                                                  [c.parts["friction"] / 1000 for c in curves]),
+                                    "waves": (speeds / KNOT, [c.parts["waves"] / 1000 for c in curves])},
+                                   "speed, knots", "resistance, kN", {"this speed": ([kn], [r.total / 1000])},
+                                   "Calm water resistance (Holtrop and Mennen)")
+    except Exception as e:  # noqa: BLE001
+        imgs["error"] = str(e)
+    metrics = [("resistance", f"{fmt(r.total / 1000)} kN"), ("tow rope power", f"{fmt(r.power / 1000)} kW"),
+               ("engine power", f"{fmt(need / 1000)} kW"), ("Froude number", f"{r.froude:.2f}")]
+    assumptions = [f"{'Fresh water' if study.fresh else 'Seawater'} at 15 C, {fmt(rho)} kg/m3.",
+                   f"Waterline {fmt(h.length)} m, beam {fmt(h.beam)} m, draft {fmt(h.draft)} m, displacement "
+                   f"{fmt(h.displacement)} m3, block coefficient {r.cb:.3f}.",
+                   *[f"Estimated {e}." for e in h.estimated],
+                   "Calm water and a clean hull. Waves, wind and fouling add the sea margin, often 15 to 30%.",
+                   f"Propulsive efficiency {study.efficiency:g} from engine to tow rope, typical of a single screw.",
+                   "No free surface CFD was run. A RANS solve of the waves around a hull needs millions of cells and "
+                   "hours, which is beyond a quick check on a laptop."]
+    values = {"resistance_N": r.total, "parts_N": r.parts, "tow_power_W": r.power, "engine_power_W": need,
+              "froude": r.froude, "wetted_m2": r.wetted, "form_factor": r.form_factor,
+              "_figures": [["resistance", "Resistance against speed, with this speed marked"]]}
+    o = GenericOutcome("flow", "hull", study.question, verdict, head, metrics, level, reasons, checks, assumptions,
+                       values, imgs, fixes, solver="Holtrop and Mennen (1982)", t_total=time.time() - t0)
+    return o.write(out)

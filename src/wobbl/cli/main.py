@@ -422,10 +422,11 @@ def _register():
     from .admin import doctor, setup, uninstall
     from .circuits import circuit
     from .credibility import uncertainty
+    from .flow import flow
     from .motion import motion
     from .thermal import thermal
 
-    for c in (setup, doctor, uninstall, thermal, circuit, motion, uncertainty):
+    for c in (setup, doctor, uninstall, thermal, circuit, motion, uncertainty, flow):
         cli.add_command(c)
 
 
