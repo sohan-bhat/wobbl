@@ -229,6 +229,16 @@ def validation_section(r: dict, d: Path) -> str:
     parts.append("<h3>Area metric</h3>" + table(["gauge", "load", "readings", "area", "of the reading"], rows) +
                  f"<p class='muted'>Pooled over all readings the area is {p['area']:.3f} against "
                  f"{p['reference_95']:.3f} for a model whose spread is right, at 95%.</p>")
+    mf = r.get("model_form")
+    if mf:
+        rows = [[x["idealization"] + (" (assumed)" if x["idealization"] == mf["assumed"] else ""),
+                 f"{fmt(x['fitted_modulus'])} MPa" if x.get("fitted_modulus") else "", f"{x['rms_in_sigma']:.2f}",
+                 f"{100 * x['rms_relative_error']:.2g}%"] for x in mf["idealizations"]]
+        parts.append("<h3>Which idealization the readings favour</h3>" +
+                     table(["load attachment", "modulus fitted to the readings", "rms residual in reading "
+                            "uncertainties", "rms error"], rows) +
+                     f"<p class='muted'>The readings favour {esc(mf['favours'])}, log10 likelihood ratio "
+                     f"{mf['log10_likelihood_ratio']:.1f}.</p>")
     cal = r.get("calibration")
     if cal:
         rows = []

@@ -159,6 +159,27 @@ def test_calibration_matches_the_conjugate_posterior():
     assert 0.2 < r["acceptance"] < 0.8
 
 
+def test_readings_pick_the_idealization_they_came_from():
+    """Gauges read from the distributed field, at a modulus 3% low, favour it over the rigid one, and the modulus
+    fitted to it comes back."""
+    from types import SimpleNamespace
+
+    from wobbl.credibility.against import model_form
+
+    dist = np.array([800e-6, 300e-6, 120e-6, 0.26])
+    rigid = np.array([500e-6, 310e-6, 410e-6, 0.21])
+    ratio = np.array([1.0, 1.0, 1.0, 1.0])
+    pred = SimpleNamespace(unit=dist, alt_unit=rigid, ratio=ratio, E0=72400.0,
+                           alt={"assumed": "a distributed attachment", "label": "loads entering through a rigid "
+                                                                                  "attachment"})
+    data = dist * 72400.0 / 70300.0
+    sigma = np.array([10e-6, 6e-6, 5e-6, 0.005])
+    mf = model_form(pred, data, sigma)
+    assert mf["favours"] == "a distributed attachment" and mf["log10_likelihood_ratio"] > 10
+    assert mf["idealizations"][0]["fitted_modulus"] == pytest.approx(70300.0, rel=1e-6)
+    assert mf["idealizations"][1]["idealization"] == "a rigid attachment"
+
+
 def test_credibility_assessment_and_test_plan(tmp_path):
     from wobbl.credibility.assess import model_risk, run_credibility
 

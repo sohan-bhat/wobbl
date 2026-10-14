@@ -117,8 +117,17 @@ def assess(result_dir, influence: str = "medium", consequence: str = "medium", q
         lvl = "low"
     ev = ("no check found an idealization that moves the answer" if not flags else
           ". ".join(f"The {c['name']} check reports {_sentence(c['summary'])}" for c in flags))
-    if v and any("idealization" in n for n in v.get("notes", [])):
-        lvl = "medium" if lvl == "low" else lvl
+    mf = (v or {}).get("model_form")
+    if mf:
+        decided = mf["favours"] == mf["assumed"] and mf["log10_likelihood_ratio"] >= 2
+        ev += (f". The readings favour {mf['favours']} over the other idealization, by a log10 likelihood ratio of "
+               f"{mf['log10_likelihood_ratio']:.1f}")
+        if v["tests"].get("synthetic"):
+            ev += ", but the readings are synthetic, so this shows how a real test would settle it"
+        elif decided:
+            lvl = "high" if len(flags) == 1 else "medium"
+        elif mf["favours"] != mf["assumed"]:
+            ev += ", which is not the one the answer assumes, so run the study again with that attachment"
     F.append(_factor("model form", "validation", lvl, goal, ev,
                      "measure where the idealizations differ most, so a test decides between them"))
 

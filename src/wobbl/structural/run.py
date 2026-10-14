@@ -620,6 +620,9 @@ def _converge_variant(adapter, study, q, prep, sizing, mesh, loads, fixtures, ma
         spots = _update_spots(spots, lv, mesh, measure, zmap, features, prep)
         levels.append(_record_level(lv, mesh, sizing, res, built, measure, zmap.excluded_mask(mesh.X, r_ex)))
         budget.charge_level(mesh.n_nodes, meshed=lv > 0)
+        # the variant's field, so readings from a test can be compared with both idealizations
+        np.savez_compressed(work / "fields.npz", X=mesh.X, U=res.U, S=res.S, measure=measure, tris=mesh.tris,
+                            tri_surf=mesh.tri_surf)
         classify(spots, tol)
         if lv == 0:
             why = variant_needs_refinement(primary, levels[0], primary_spot, material.allowable, target)

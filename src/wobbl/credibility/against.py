@@ -53,24 +53,31 @@ class StrengthPredictor(Predictor):
         if f is None or "S" not in f:
             raise ModelError("this run kept no fields (work/fields.npz), so gauge readings cannot be predicted; run "
                              "the study again without deleting its work folder")
-        surf = surface(f)
         E0, nu = model.mat.E, model.mat.nu
-        self.unit = []
-        for r in readings:
-            if r.quantity == "strain":
-                g = gauge(f, r.xyz, E0, nu, r.direction, r.gauge_length or GAUGE_MM, surf)
-                if r.direction is None:
-                    r.direction = g["direction"]
-                self.unit.append(g["strain"])
-            elif r.quantity == "displacement":
-                i = int(np.argmin(np.linalg.norm(f["X"] - np.asarray(r.xyz), axis=1)))
-                u = f["U"][i]
-                if r.direction is None:
-                    r.direction = (u / max(np.linalg.norm(u), 1e-300)).tolist()
-                self.unit.append(float(u @ np.asarray(r.direction)))
-            else:
-                raise ReadingError(f"row {r.row}: a strength run predicts strain and displacement, not {r.quantity}")
-        self.unit = np.array(self.unit)
+
+        def read(f):
+            surf, out = surface(f), []
+            for r in readings:
+                if r.quantity == "strain":
+                    g = gauge(f, r.xyz, E0, nu, r.direction, r.gauge_length or GAUGE_MM, surf)
+                    if r.direction is None:
+                        r.direction = g["direction"]
+                    out.append(g["strain"])
+                elif r.quantity == "displacement":
+                    i = int(np.argmin(np.linalg.norm(f["X"] - np.asarray(r.xyz), axis=1)))
+                    u = f["U"][i]
+                    if r.direction is None:
+                        r.direction = (u / max(np.linalg.norm(u), 1e-300)).tolist()
+                    out.append(float(u @ np.asarray(r.direction)))
+                else:
+                    raise ReadingError(f"row {r.row}: a strength run predicts strain and displacement, not "
+                                       f"{r.quantity}")
+            return np.array(out)
+        self.unit = read(f)
+        # the other load attachment idealization the run solved, when its field was kept
+        alt = load_fields(Path(model.dir) / "work" / "load_path")
+        self.alt_unit = read(alt) if alt is not None and "S" in alt else None
+        self.alt = model.alternatives()[0] if self.alt_unit is not None and model.alternatives() else None
         p0 = model.load_nominal
         self.ratio = np.array([(r.load if r.load is not None else p0) / p0 for r in readings])
         self.e = [j for j, i in enumerate(inputs) if i.name == "E"]
@@ -235,14 +242,15 @@ def run_validation(result_dir, tests: str, vary: list[str] | None = None, load_u
                        "rms_relative_error": _rms([r["relative_error"] for r in rows]),
                        "largest_ratio": max((r["ratio"] or 0.0) for r in rows)},
            "notes": notes}
+    sigma = np.sqrt(u_d ** 2 + u_num ** 2 + (pred.load_unc * S) ** 2)
     if calibrate_inputs and ins:
         from .calibrate import calibrate
 
         if progress:
             progress("calibrate", ", ".join(i.name for i in ins))
-        sigma = np.sqrt(u_d ** 2 + u_num ** 2 + (pred.load_unc * S) ** 2)
-        cal = calibrate(pred, ins, data, sigma)
-        res["calibration"] = cal
+        res["calibration"] = calibrate(pred, ins, data, sigma)
+    if getattr(pred, "alt_unit", None) is not None and pred.alt:
+        res["model_form"] = model_form(pred, data, sigma)
     res["headline"] = headline(res)
     from .report import refresh
     from .uncertainty import _clean
@@ -250,6 +258,25 @@ def run_validation(result_dir, tests: str, vary: list[str] | None = None, load_u
     (d / "validation.json").write_text(json.dumps(_clean(res), indent=1))
     refresh(d)
     return res
+
+
+def model_form(pred: StrengthPredictor, data: np.ndarray, sigma: np.ndarray) -> dict:
+    """Which load attachment idealization the readings favour. The modulus is fitted to each one on its own (one
+    scale factor, since every reading goes as 1 / E), so neither wins by a stiffness it does not have, and the
+    ratio of their likelihoods says how strongly the readings prefer one."""
+    rows = []
+    for label, unit in ((pred.alt["assumed"], pred.unit), (pred.alt["label"].replace("loads entering through ", ""),
+                                                           pred.alt_unit)):
+        s = unit * pred.ratio
+        k = float(np.sum(s * data / sigma ** 2) / max(np.sum(s ** 2 / sigma ** 2), 1e-300))
+        r = (k * s - data) / sigma
+        rel = (k * s - data) / np.where(data != 0, np.abs(data), 1.0)
+        rows.append({"idealization": label, "fitted_modulus": pred.E0 / k if k > 0 else None,
+                     "chi2": float(r @ r), "rms_in_sigma": float(np.sqrt(np.mean(r ** 2))),
+                     "rms_relative_error": float(np.sqrt(np.mean(rel ** 2)))})
+    log10 = (rows[1]["chi2"] - rows[0]["chi2"]) / (2 * np.log(10))
+    return {"idealizations": rows, "favours": rows[0]["idealization"] if log10 >= 0 else rows[1]["idealization"],
+            "log10_likelihood_ratio": float(abs(log10)), "assumed": rows[0]["idealization"]}
 
 
 def _q(v: float, quantity: str) -> str:
@@ -281,6 +308,13 @@ def headline(r: dict) -> str:
         fit = "within" if p["area"] <= p["reference_95"] else "outside"
         out += (f" The pooled area metric is {p['area']:.3f}, {fit} the {p['reference_95']:.3f} a model with the "
                 "right spread would stay under 95% of the time.")
+    mf = r.get("model_form")
+    if mf:
+        other = next(x["idealization"] for x in mf["idealizations"] if x["idealization"] != mf["favours"])
+        x = mf["log10_likelihood_ratio"]
+        strength = ("barely" if x < 1 else f"by a likelihood ratio of about {round(10 ** x):,}" if x < 3 else
+                    "by a likelihood ratio of more than 1,000")
+        out += f" The readings favour {mf['favours']} over {other} {strength}, with the modulus fitted to each."
     for c in (r.get("calibration") or {}).get("inputs", []):
         u = f" {c['unit']}" if c["unit"] and c["unit"] != "x" else ""
         out += (f" Calibration puts {c['input']} at {fmt(c['mean'])}{u} (95% interval {fmt(c['ci95'][0])} to "
