@@ -285,7 +285,10 @@ left to itself. Every fix is solved again before it is suggested. Model files ar
 read the way people share them. Meshes behind `package://` paths are found, meshes
 MuJoCo cannot read are dropped with their mass kept, a link with no mass takes it
 from its shape, a home keyframe is the starting pose, and every such guess is written
-into the report.
+into the report. A CAD assembly runs from a short spec that names each part's solid in
+a STEP file (`cad = "arm.step"` and a `[[part]]` table per part) and where its joint
+sits in the assembly's own coordinates, with each part's mass worked out from its
+volume and material.
 
 To show this works on models nobody tuned for, 27 public ones run in
 `tests/test_mechanism_zoo.py` with `WOBBL_ZOO=1`, each asked a plain question: from

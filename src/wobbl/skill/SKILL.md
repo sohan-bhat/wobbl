@@ -151,7 +151,9 @@ collision, stability, contact or dynamics. Each searches the whole range for its
 against a hand calculation. A model that names no motors takes a catalog servo on every driven joint, as in
 `wobbl simulate arm.urdf "can it lift 500 g?" --servo mg996r`, a fixed base arm stands loose on a floor with
 `wobbl simulate arm.urdf "will it tip over?" --base free`, and a model left to itself runs as
-`wobbl simulate pendulum.xml "does it fall over?" --passive`. Read the loader's notes on meshes it could not
+`wobbl simulate pendulum.xml "does it fall over?" --passive`. A CAD assembly needs a short spec naming each
+part's solid in the STEP file (`cad = "arm.step"`, then `[[part]]` with `name`, `solid`, `parent`, `material`
+and a `joint` with its `axis` and the point `at` it sits, in mm in the assembly's coordinates). Read the loader's notes on meshes it could not
 read or masses it took from shapes, and read stall and heat joint by joint, since a servo that clears a
 single move can still cook when the move repeats.
 
