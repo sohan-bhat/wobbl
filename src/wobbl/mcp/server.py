@@ -26,7 +26,9 @@ Metal parts loaded past yield (permanent set, collapse load): solve_plastic.
 Robot arms and servos, linkages, gear trains, impacts and tipping: solve_mechanism.
 Solenoids, electromagnets and magnets: solve_magnetic. Capacitance and breakdown: solve_electric. Trace
 impedance, crosstalk and board parasitics: solve_board. Antennas and wireless range: solve_antenna. Room modes,
-mufflers and panel noise: solve_sound."""
+mufflers and panel noise: solve_sound.
+Big problems: estimate_cost before any long solve, then start_job, job_status, job_logs, cancel_job and resume_job to
+run a deck in the background or on a remote machine. A cloud run starts only after the user agrees to its plan."""
 
 
 def _protect_stdout():
@@ -356,6 +358,57 @@ def build_server():
         balance and the exact piston."""
         from ..fields.tools import solve_field_tool
         return solve_field_tool("sound", template, params)
+
+    @srv.tool()
+    def estimate_cost(path: str = "", solver: str = "", nodes: float = 0, elements: float = 0, end_time: float = 0.0,
+                      time_step: float = 0.0, iterations: int = 0, procedure: str = "static",
+                      domain: str = "strength", quality: str = "normal", remote: str = "", threads: int = 0,
+                      max_hours: float | None = None) -> dict:
+        """Predict run time, peak memory and disk before solving, for a CalculiX .inp deck, an LS-DYNA .k or
+        OpenRadioss .rad deck, an OpenFOAM case folder, a CAD part's strength or heat study, or a run given by
+        size (solver='openradioss', elements=1.5e6, end_time=0.2). Returns the verdict (fits, long, too long,
+        does not fit), the problems and options such as a coarser first pass, a submodel, a remote machine or a
+        priced cloud machine. Call it before any solve that might be big."""
+        from ..jobs.tools import estimate_cost as run
+        return run(path, solver, nodes, elements, end_time, time_step, iterations, procedure, domain, quality,
+                   remote, threads, max_hours)
+
+    @srv.tool()
+    def start_job(path: str = "", command: list[str] | None = None, remote: str = "", threads: int = 0,
+                  checkpoint: bool = True, cloud: str = "", instance: str = "", region: str = "us-east-1",
+                  key_name: str = "", security_group: str = "", confirm: str = "",
+                  max_hours: float | None = None) -> dict:
+        """Run a CalculiX deck (path) or a Wobbl command (command=['run', 'part.step', '-m', 'pla', ...]) in the
+        background, here or on a remote added with wobbl remote add. Checkpoints after every step, refuses a run
+        that will not fit and returns the job id. With cloud='aws' it returns a priced plan and confirm_token and
+        starts nothing; only after the user agrees, call again with confirm=<token>."""
+        from ..jobs.tools import start_job as run
+        return run(path, command, remote, threads, checkpoint, cloud, instance, region, key_name, security_group,
+                   confirm, max_hours)
+
+    @srv.tool()
+    def job_status(job_id: str = "") -> dict:
+        """State, progress, ETA, predicted time and the peaks found so far for a job (the newest by default)."""
+        from ..jobs.tools import job_status as run
+        return run(job_id)
+
+    @srv.tool()
+    def job_logs(job_id: str = "", lines: int = 40) -> dict:
+        """The newest lines a job's solver printed."""
+        from ..jobs.tools import job_logs as run
+        return run(job_id, lines)
+
+    @srv.tool()
+    def cancel_job(job_id: str = "") -> dict:
+        """Stop a job. Its checkpoint stays, so resume_job carries on from the last finished step."""
+        from ..jobs.tools import cancel_job as run
+        return run(job_id)
+
+    @srv.tool()
+    def resume_job(job_id: str = "") -> dict:
+        """Carry on a cancelled or interrupted job from its last checkpoint, or from the start when it has none."""
+        from ..jobs.tools import resume_job as run
+        return run(job_id)
 
     @srv.tool()
     def list_materials() -> dict:
