@@ -1,0 +1,23 @@
+{
+ "source": "../cast-motor-mount/output",
+ "material": "",
+ "amplitude": "",
+ "mean": "",
+ "kt": null,
+ "radius": "",
+ "ratio": 0.0,
+ "cycles": "1e7",
+ "blocks": [
+  "100% x 3650 R=0",
+  "70% x 1e8 R=0.714"
+ ],
+ "repeats": 10.0,
+ "duration": "",
+ "surface": "auto",
+ "size": "",
+ "loading": "auto",
+ "reliability": 0.9,
+ "mean_model": "goodman",
+ "target_sf": null,
+ "question": "Does the cast motor mount last ten years of starts and running without a fatigue crack?"
+}

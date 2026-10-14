@@ -1,0 +1,29 @@
+MARGINAL. 10 runs of the duty cycle use 62.7% of the fatigue life on the 3.99 mm inside fillet (face 65) at (43.9, 8.96, 79.6) (Miner's rule), so it can run about 16 times before cracks start; the stresses could rise 1.03 times before the required 10 runs would start a crack (target 2). Confidence is medium.
+
+Confidence: medium. strength result: the stresses come from a result Wobbl rated medium confidence (load introduction: the off part loads enter through a distributing coupling (the attached part adds no stiffness)); the S-N line comes from a rule of thumb for this material, not a fatigue test
+life: 16 repeats
+safety factor: 1.03
+required: 10 repeats
+target: 2
+
+Checks:
+  [warn] strength result: the stresses come from a result Wobbl rated medium confidence (load introduction: the off part loads enter through a distributing coupling (the attached part adds no stiffness))
+  [pass] first cycle yield: the highest stress in a cycle, 124 MPa, stays under the 165 MPa yield (factor 1.21), so the part stays elastic and the stress life method applies
+  [info] S-N range: a block lasts 1.66e11 cycles, past the 500 million the data reach, so that life extends the line
+  [pass] mean stress model: safety factor by mean stress model: Goodman 1.03, Gerber 1.29, Soderberg 1.03; the answer uses Goodman, and the verdict is the same with each
+  [pass] other peaks: 2 stress peaks were tracked away from supports and sharp corners, and under the same cycling none starts a crack sooner than the one judged
+
+Assumptions:
+  - Stress life method for crack initiation (Shigley's approach): an S-N line from f Sut at 1000 cycles to the corrected endurance strength. It does not cover crack growth after a crack starts, which is a separate damage tolerance question.
+  - S-N data for Custom material (cast): 42.7 MPa at 500 million cycles, smooth specimens, fully reversed (estimate: 0.26 Sut at 5e8 cycles, the ratio of sand cast A356-T6).
+  - Marin factors: surface as-cast (1.00), size 1.05, load 1.00, reliability 90% (0.897), room temperature.
+  - Mean stress by Goodman; a compressive mean gets no credit.
+  - Fatigue lives scatter by a factor of three to ten at the same stress, so the life is an estimate and the safety factor on stress is the steadier number.
+  - Each block scales the studied load and cycles it between R times its peak and the peak (or at the study's load ratio when the block gives none), and the stress field keeps its shape, as it does for a linear part.
+
+Suggested fixes:
+  - Cut the cyclic stress by 49%: A safety factor of 2 needs every stress 1.94 times lower. In bending the stress falls with the square of the wall, so about 1.39 times the thickness at the peak gets there.
+  - Switch to Aluminum 6061-T6: Its fatigue strength is 2.3 times that of Custom material (cast), which covers the 1.94 needed if the part is otherwise the same. It is a wrought alloy, so the part would be made that way instead.
+
+Images: sn: images/sn.png, haigh: images/haigh.png
+Report: report.html

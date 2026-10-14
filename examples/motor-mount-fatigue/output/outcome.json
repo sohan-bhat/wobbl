@@ -1,0 +1,249 @@
+{
+ "domain": "fatigue",
+ "part": "../../../src/wobbl/validation/parts/cast_motor_mount.step",
+ "question": "Does the cast motor mount last ten years of starts and running without a fatigue crack?",
+ "verdict": "marginal",
+ "headline": "10 runs of the duty cycle use 62.7% of the fatigue life on the 3.99 mm inside fillet (face 65) at (43.9, 8.96, 79.6) (Miner's rule), so it can run about 16 times before cracks start; the stresses could rise 1.03 times before the required 10 runs would start a crack (target 2). Confidence is medium.",
+ "metrics": [
+  [
+   "life",
+   "16 repeats"
+  ],
+  [
+   "safety factor",
+   "1.03"
+  ],
+  [
+   "required",
+   "10 repeats"
+  ],
+  [
+   "target",
+   "2"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "strength result: the stresses come from a result Wobbl rated medium confidence (load introduction: the off part loads enter through a distributing coupling (the attached part adds no stiffness))",
+  "the S-N line comes from a rule of thumb for this material, not a fatigue test"
+ ],
+ "checks": [
+  {
+   "name": "strength result",
+   "status": "warn",
+   "summary": "the stresses come from a result Wobbl rated medium confidence (load introduction: the off part loads enter through a distributing coupling (the attached part adds no stiffness))",
+   "detail": {}
+  },
+  {
+   "name": "first cycle yield",
+   "status": "pass",
+   "summary": "the highest stress in a cycle, 124 MPa, stays under the 165 MPa yield (factor 1.21), so the part stays elastic and the stress life method applies",
+   "detail": {}
+  },
+  {
+   "name": "S-N range",
+   "status": "info",
+   "summary": "a block lasts 1.66e11 cycles, past the 500 million the data reach, so that life extends the line",
+   "detail": {}
+  },
+  {
+   "name": "mean stress model",
+   "status": "pass",
+   "summary": "safety factor by mean stress model: Goodman 1.03, Gerber 1.29, Soderberg 1.03; the answer uses Goodman, and the verdict is the same with each",
+   "detail": {
+    "goodman": 1.029209,
+    "gerber": 1.286107,
+    "soderberg": 1.029209
+   }
+  },
+  {
+   "name": "other peaks",
+   "status": "pass",
+   "summary": "2 stress peaks were tracked away from supports and sharp corners, and under the same cycling none starts a crack sooner than the one judged",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Stress life method for crack initiation (Shigley's approach): an S-N line from f Sut at 1000 cycles to the corrected endurance strength. It does not cover crack growth after a crack starts, which is a separate damage tolerance question.",
+  "S-N data for Custom material (cast): 42.7 MPa at 500 million cycles, smooth specimens, fully reversed (estimate: 0.26 Sut at 5e8 cycles, the ratio of sand cast A356-T6).",
+  "Marin factors: surface as-cast (1.00), size 1.05, load 1.00, reliability 90% (0.897), room temperature.",
+  "Mean stress by Goodman; a compressive mean gets no credit.",
+  "Fatigue lives scatter by a factor of three to ten at the same stress, so the life is an estimate and the safety factor on stress is the steadier number.",
+  "Each block scales the studied load and cycles it between R times its peak and the peak (or at the study's load ratio when the block gives none), and the stress field keeps its shape, as it does for a linear part."
+ ],
+ "values": {
+  "analysis": "fatigue",
+  "source": "strength result",
+  "material": "Custom material (cast)",
+  "life": 15.945484,
+  "required": 10.0,
+  "sf": 1.029209,
+  "target_sf": 2.0,
+  "mean_model": "goodman",
+  "damage": 0.627137,
+  "blocks": [
+   {
+    "label": "100% x 3650 R=0",
+    "amplitude_MPa": 61.847724,
+    "mean_MPa": 61.847724,
+    "cycles": 3650.0,
+    "life": 58766.790813
+   },
+   {
+    "label": "70% x 1e8 R=0.714",
+    "amplitude_MPa": 12.381914,
+    "mean_MPa": 74.2049,
+    "cycles": 100000000.0,
+    "life": 165624768519.774
+   }
+  ],
+  "curve": {
+   "s1000_MPa": 148.5,
+   "se_MPa": 40.131961,
+   "ne": 500000000.0,
+   "knee": false,
+   "b": -0.099709,
+   "describe": "148 MPa at 1e3 cycles down to 40.1 MPa at 5e8 cycles, falling on past it"
+  },
+  "factors": {
+   "surface ka": {
+    "value": 1.0,
+    "why": "as-cast surface (Shigley Table 6-2, as cast taken as hot rolled)"
+   },
+   "size kb": {
+    "value": 1.047289,
+    "why": "equivalent diameter 4.85 mm, taken as 0.808 times the 6 mm wall"
+   },
+   "load kc": {
+    "value": 1.0,
+    "why": "bending load"
+   },
+   "temperature kd": {
+    "value": 1.0,
+    "why": "room temperature"
+   },
+   "reliability ke": {
+    "value": 0.897476,
+    "why": "90% of parts survive"
+   }
+  },
+  "kt": null,
+  "kf": null,
+  "q": 1.0,
+  "notch_radius_mm": 3.986,
+  "data_source": "estimate: 0.26 Sut at 5e8 cycles, the ratio of sand cast A356-T6",
+  "data_estimated": true,
+  "where": "on the 3.99 mm inside fillet (face 65) at (43.9, 8.96, 79.6)",
+  "xyz": [
+   43.857835,
+   8.964648,
+   79.648403
+  ],
+  "mean_model_spread": {
+   "goodman": 1.029209,
+   "gerber": 1.286107,
+   "soderberg": 1.029209
+  },
+  "_figures": [
+   [
+    "sn",
+    "The S-N line used, with each load block at its life"
+   ],
+   [
+    "haigh",
+    "Mean stress diagram for the required life"
+   ]
+  ],
+  "_tables": [
+   [
+    "Load blocks",
+    [
+     "block",
+     "amplitude MPa",
+     "mean MPa",
+     "cycles",
+     "life"
+    ],
+    [
+     [
+      "100% x 3650 R=0",
+      "61.8",
+      "61.8",
+      "3,650",
+      "58,800"
+     ],
+     [
+      "70% x 1e8 R=0.714",
+      "12.4",
+      "74.2",
+      "100 million",
+      "1.66e11"
+     ]
+    ],
+    "Stresses are at the notch, after the notch sensitivity, and the life is how many such cycles alone would start a crack."
+   ],
+   [
+    "Marin factors",
+    [
+     "factor",
+     "value",
+     "why"
+    ],
+    [
+     [
+      "surface ka",
+      "1.000",
+      "as-cast surface (Shigley Table 6-2, as cast taken as hot rolled)"
+     ],
+     [
+      "size kb",
+      "1.047",
+      "equivalent diameter 4.85 mm, taken as 0.808 times the 6 mm wall"
+     ],
+     [
+      "load kc",
+      "1.000",
+      "bending load"
+     ],
+     [
+      "temperature kd",
+      "1.000",
+      "room temperature"
+     ],
+     [
+      "reliability ke",
+      "0.897",
+      "90% of parts survive"
+     ]
+    ]
+   ]
+  ],
+  "playback": "playback.json"
+ },
+ "images": {
+  "sn": "images/sn.png",
+  "haigh": "images/haigh.png"
+ },
+ "fixes": [
+  {
+   "kind": "thicken",
+   "title": "Cut the cyclic stress by 49%",
+   "summary": "A safety factor of 2 needs every stress 1.94 times lower. In bending the stress falls with the square of the wall, so about 1.39 times the thickness at the peak gets there.",
+   "params": {
+    "factor": 1.94324
+   },
+   "auto": false
+  },
+  {
+   "kind": "material",
+   "title": "Switch to Aluminum 6061-T6",
+   "summary": "Its fatigue strength is 2.3 times that of Custom material (cast), which covers the 1.94 needed if the part is otherwise the same. It is a wrought alloy, so the part would be made that way instead.",
+   "auto": false
+  }
+ ],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 7.826592,
+ "solver": "Wobbl stress life"
+}
