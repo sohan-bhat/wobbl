@@ -1,0 +1,295 @@
+"""Vibration: natural frequencies against what shakes the part, and the stress a sine sweep or random input causes.
+
+CalculiX's *FREQUENCY step finds the modes on meshes that get finer until the frequencies that matter settle. With
+those modes Wobbl
+
+    - compares every natural frequency with the rotor speeds and tones the part has to live with,
+    - sums the response to a sine sweep of the base and finds its peak, then has CalculiX's *STEADY STATE DYNAMICS
+      step, reading the same modes from the .eig file, solve that peak again for the reported stress, and
+    - sums the response to a random base input from its PSD (CalculiX has no random step) as a 3 sigma stress,
+      with Steinberg's three band fatigue estimate for the test duration.
+
+Checks: frequencies and response stress on successive meshes, the modal mass against the part's mass, Rayleigh's
+quotient from the static sag under 1 g, a single mode estimate of the response (Miles' equation for random input),
+and the two harmonic solutions against each other.
+"""
+from __future__ import annotations
+
+import math
+import shutil
+import time
+from pathlib import Path
+
+import numpy as np
+
+from ..geometry.select import Selector
+from ..mesh.mesher import build_mesh
+from ..solvers import base as solvers
+from ..structural.build import build_static, tri_area_weights
+from ..structural.spec import SpecError
+from ..units import fmt
+from . import ccx, modal
+from .common import QUALITY, REFINE, change, excluded_nodes, governing, level_sizes, prepare
+from .outcome import LifeOutcome, clean_work
+from .vibspec import (VibrationStudy, default_damping, default_duration, parse_mass, parse_sine, seconds,
+                      unit_vector)
+
+MAX_MODES = 40
+
+
+def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre=None) -> LifeOutcome:
+    from . import vibchecks as vc
+
+    t0 = time.time()
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    work = out / "work"
+    base = study.base
+    say = progress or (lambda a, b: None)
+    adapter = solvers.for_domain("structural")
+    exe = adapter.require()
+    base.loads = []
+    p = prepare(base, work, progress, pre)
+    mat = p.material
+    zeta, zeta_why = (study.damping, "given") if study.damping else default_damping(mat)
+    if not 0 < zeta < 0.5:
+        raise SpecError("damping is a fraction of critical, for example 0.02 for 2%")
+    masses = [parse_mass(m) for m in study.masses]
+    excite = study.excitations()
+    sine = parse_sine(study.sine) if study.sine else None
+    psd = modal.parse_psd(study.psd) if study.psd else None
+    axis = unit_vector(study.axis)
+    top = max([e.hi for e in excite] + ([sine.hi] if sine else []) + ([float(psd.f[-1])] if psd else []) + [0.0])
+    n_modes = int(min(max(2, study.modes), MAX_MODES))
+    q = QUALITY.get(base.quality, QUALITY["normal"])
+    sizes = level_sizes(p, base.quality, base.mesh_size)
+    sel = Selector(p.features.faces, p.features.bbox)
+    levels, last, stopped_by = [], None, "level limit"
+    for k, sz in enumerate(sizes):
+        if levels and levels[-1]["n_nodes"] / REFINE ** 3 > q["nodes"]:
+            stopped_by = "node limit"
+            break
+        say("mesh", f"level {k}: element size {sz.h:.3g} mm")
+        mesh = build_mesh(p.prep, sz)
+        built = build_static(mesh, [], p.fixtures, mat, p.features.faces)
+        attached = _attach(masses, sel, mesh)
+        wl = work / f"level{k}"
+        deck = ccx.make_deck(built.model, wl / "static.inp", attached)
+        say("solve", f"level {k}: {n_modes} modes of {mesh.n_nodes:,} nodes with {adapter.name}")
+        ccx.run(exe, wl, "modes", ccx.frequency_inp(deck, n_modes))
+        modes = _read(wl, mesh.X, deck)
+        if modes.count == 0 or modes.freq[0] <= 1e-3 * max(modes.freq[-1], 1e-9):
+            raise SpecError("the supports leave the part free to move as a rigid body (a natural frequency of zero). "
+                            "Hold it the way it is mounted, for example --fix 'bolt holes d=3.2'")
+        (wl / "modes.frd").unlink(missing_ok=True)
+        resp = _response(modes, mesh, built, p, sz, zeta, sine, psd, axis)
+        watch = _watched(modes, excite, axis)
+        levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sz.h, "freq": modes.freq[:8].tolist(),
+                       "watch_mode": watch + 1, "watch_Hz": float(modes.freq[watch]),
+                       "stress": resp["stress"] if resp else None})
+        if last is not None:
+            shutil.rmtree(last[-1], ignore_errors=True)   # an earlier level's solver files are not needed again
+        last = (mesh, built, deck, modes, resp, sz, wl)
+        say("check", f"level {k}: mode {watch + 1} at {fmt(modes.freq[watch])} Hz"
+                     + (f", response {fmt(resp['stress'])} MPa" if resp else "")
+                     + (f" ({100 * change([L['watch_Hz'] for L in levels]):.1f}% change)" if k else ""))
+        if k >= 1 and change([L["watch_Hz"] for L in levels]) <= q["tol"] and (
+                resp is None or change([L["stress"] for L in levels]) <= 2.5 * q["tol"]):
+            stopped_by = "converged"
+            break
+    mesh, built, deck, modes, resp, sz, wl = last
+    if modes.freq[-1] < 1.5 * top and modes.count == n_modes and n_modes < MAX_MODES:
+        say("check", f"the {n_modes} modes found reach {fmt(modes.freq[-1])} Hz, short of 1.5 times the "
+                     f"{fmt(top)} Hz input; more modes would cover it (--modes)")
+
+    harmonic = None
+    if sine is not None and resp is not None:
+        say("solve", f"steady state dynamics at {fmt(resp['harmonic']['f_peak'])} Hz with {adapter.name}")
+        harmonic = _ccx_harmonic(exe, wl, deck, modes, resp, sine, zeta, mesh)
+    rayleigh = _rayleigh(exe, wl, deck, modes, mesh, built)
+    dur, dur_why = (seconds(study.duration), "given") if study.duration else default_duration(study.psd)
+    say("check", "checking mass, Rayleigh's quotient and the single mode estimates")
+    checks, extra, verdict, sf, headline, values = vc.evaluate(
+        study, mat, modes, mesh, built, levels, stopped_by, q["tol"], zeta, excite, sine, psd, axis, resp,
+        harmonic, rayleigh, dur, p)
+    say("render", "drawing the modes and the response")
+    images = vc.images(out / "images", mesh, modes, excite, sine, psd, axis, resp, harmonic, study.margin)
+    from ..verify.checks import confidence
+
+    level, reasons = confidence(checks, extra)
+    if level != "high":
+        headline += f" Confidence is {level}."
+    values.update({"damping": zeta, "damping_reason": zeta_why, "duration_s": dur, "duration_reason": dur_why,
+                   "levels": levels})
+    o = LifeOutcome("vibration", str(base.part), base.question, verdict, headline, vc.metrics(values), level,
+                    reasons, checks, vc.assumptions(mat, zeta_why, masses, deck, sine, psd, base), values, images,
+                    vc.fixes(values, mat, p.features), deck.notes + p.prep.notes,
+                    solver=f"CalculiX {adapter.version()}", t_total=time.time() - t0)
+    o.write(out)
+    clean_work(work, study.keep)
+    return o
+
+
+def _attach(masses, sel: Selector, mesh) -> list:
+    out = []
+    for k, m in enumerate(masses):
+        try:
+            mask = sel.select(m.faces).tri_mask(mesh)
+        except Exception as e:  # noqa: BLE001
+            raise SpecError(f"mass {k + 1} ({m.describe()}): {e}") from None
+        if not mask.any():
+            raise SpecError(f"mass {k + 1} ({m.describe()}) sits on no part of the mesh; widen the selection")
+        w, _ = tri_area_weights(mesh, mask)
+        nodes = np.nonzero(w > 0)[0]
+        point = np.asarray(m.point, float) if m.point is not None else (mesh.X[nodes] * w[nodes, None]).sum(0) / \
+            w[nodes].sum()
+        out.append(ccx.Attached(f"mass {k + 1}", nodes, point, m.mass, m.rigid, w[nodes]))
+    return out
+
+
+def _read(wl: Path, X: np.ndarray, deck: ccx.Deck) -> modal.Modes:
+    n = len(X)
+    e = ccx.read_eigen(wl / "modes.dat")
+    _, U, S = ccx.read_modes(wl / "modes.frd", n, 2 * len(deck.extra))
+    U = ccx.fill_rigid(U, X, deck).astype(np.float32) if deck.rigid_sets and len(U) else U
+    m = min(len(e["freq"]), len(U))
+    return modal.Modes(e["freq"][:m], U[:m], None if S is None else S[:m], e["participation"][:m],
+                       e["effective_mass"][:m], e["total_mass"], n, deck.mass_nodes, deck.mass_values)
+
+
+def _watched(modes: modal.Modes, excite, axis) -> int:
+    """The mode whose frequency the answer hangs on: the one nearest an excitation, else the first mode that moves a
+    tenth or more of the mass along the input axis, else the first."""
+    if excite:
+        mid = [math.sqrt(e.lo * e.hi) for e in excite]
+        return int(np.argmin([min(abs(math.log(f / x)) for x in mid) for f in modes.freq]))
+    frac = (modes.gamma(axis) ** 2) / max(float(modes.total_mass[:3].mean()), 1e-300)
+    big = np.nonzero(frac >= 0.1)[0]
+    return int(big[0]) if len(big) else 0
+
+
+def _response(modes, mesh, built, p, sz, zeta, sine, psd, axis) -> dict | None:
+    """Governing response stress on this mesh, from the modes: the sine sweep's peak and the random 3 sigma."""
+    if (sine is None and psd is None) or modes.stress is None:
+        return None
+    out = {}
+    if psd is not None:
+        R = modal.random_modal(modes, zeta, psd, axis)
+        rms = modal.vm_rms(modes, R.C0)
+        excluded, r_ex = excluded_nodes(mesh, built, p.features, sz, rms)
+        gi = governing(rms, excluded)
+        out["random"] = {"rms": rms, "excluded": excluded, "node": gi, "xyz": mesh.X[gi].tolist(),
+                         "sigma_rms": float(rms[gi]), "raw_max": float(rms.max()), "rate": modal.zero_crossing_rate(
+                             modes, R, gi), "R": R, "exclusion_radius": r_ex}
+        out["stress"] = 3 * float(rms[gi])
+    if sine is not None:
+        out["harmonic"] = _sweep(modes, mesh, built, p, sz, zeta, sine)
+        out["stress"] = max(out.get("stress", 0.0), out["harmonic"]["peak"])
+    return out
+
+
+def _sweep(modes, mesh, built, p, sz, zeta, sine) -> dict:
+    """The largest von Mises amplitude over a base sweep: at each mode in the band and around it, then the best
+    frequency refined, all from the modal sum."""
+    force = modal.base_force(modes, sine.accel, sine.direction)
+    near = [f * (1 + zeta * np.linspace(-4, 4, 17)) for f in modes.freq if sine.lo <= f <= sine.hi]
+    grid = np.unique(np.concatenate(near + [np.array([sine.lo, sine.hi])]))
+    grid = grid[(grid >= sine.lo) & (grid <= sine.hi)]
+    S = modes.stress.astype(float)
+
+    def field(f):
+        qf = modal.harmonic_coords(np.array([f]), modes, zeta, force)[0]
+        return modal.vm_amplitude(np.einsum("m,mnc->nc", qf, S))
+
+    first = field(grid[0])
+    excluded, r_ex = excluded_nodes(mesh, built, p.features, sz, first)
+    best = (-1.0, grid[0], first)
+    for f in grid:
+        vm = field(f)
+        v = float(vm[~excluded].max()) if (~excluded).any() else float(vm.max())
+        if v > best[0]:
+            best = (v, f, vm)
+    _, f_peak, vm = best
+    excluded, r_ex = excluded_nodes(mesh, built, p.features, sz, vm)
+    gi = governing(vm, excluded)
+    # refine the peak frequency at the governing node with a golden section search across the neighbouring points
+    lo, hi = f_peak * (1 - zeta), f_peak * (1 + zeta)
+    node = lambda f: float(modal.vm_amplitude(np.einsum(   # noqa: E731
+        "m,mc->c", modal.harmonic_coords(np.array([f]), modes, zeta, force)[0], S[:, gi])[None, :])[0])
+    g = (math.sqrt(5) - 1) / 2
+    a, b = max(lo, sine.lo), min(hi, sine.hi)
+    for _ in range(40):
+        c, d = b - g * (b - a), a + g * (b - a)
+        if node(c) > node(d):
+            b = d
+        else:
+            a = c
+    f_peak = 0.5 * (a + b)
+    vm = field(f_peak)
+    gi = governing(vm, excluded)
+    curve_f = np.unique(np.concatenate([np.geomspace(sine.lo, sine.hi, 300), grid]))
+    q = modal.harmonic_coords(curve_f, modes, zeta, force)
+    curve = modal.vm_amplitude(np.einsum("fm,mc->fc", q, S[:, gi]))
+    return {"f_peak": float(f_peak), "peak": float(vm[gi]), "node": gi, "xyz": mesh.X[gi].tolist(), "vm": vm,
+            "excluded": excluded, "raw_max": float(vm.max()), "curve_f": curve_f, "curve": curve,
+            "exclusion_radius": r_ex}
+
+
+def _ccx_harmonic(exe, wl: Path, deck, modes, resp, sine, zeta, mesh) -> dict | None:
+    """Solve the sweep again with CalculiX's steady state dynamics, reading the same modes from the .eig file: the
+    motion of the governing node across the band, and the whole field at Wobbl's peak frequency."""
+    h = resp["harmonic"]
+    gi = h["node"]
+    loads = ccx.body_load(deck, sine.accel, sine.direction)
+    fp = h["f_peak"]
+    try:
+        text = ccx.harmonic_inp(deck, loads, [(sine.lo, sine.hi, 6, 3.0), (fp, fp * (1 + 1e-6), 2, 1.0)], zeta,
+                                modes.count, np.array([gi]))
+        ccx.run(exe, wl, "harmonic", text, eig_from="modes")
+        printed = ccx.read_node_print(wl / "harmonic.dat")
+        fieldset = ccx.read_harmonic_field(wl / "harmonic.frd", mesh.n_nodes + 2 * len(deck.extra))
+        (wl / "harmonic.frd").unlink(missing_ok=True)
+    except Exception as e:  # noqa: BLE001  the cross check is a bonus, never a reason to fail
+        return {"error": str(e)[:200]}
+    if not fieldset:
+        return {"error": "CalculiX wrote no harmonic field"}
+    f_ccx = min(fieldset, key=lambda f: abs(f - fp))
+    U, S = fieldset[f_ccx]
+    vm = modal.vm_amplitude(S[:mesh.n_nodes])
+    excl = h["excluded"]
+    gj = governing(vm, excl)
+    force = modal.base_force(modes, sine.accel, sine.direction)
+    sweep_err = 0.0
+    fs = sorted(f for f in printed if sine.lo <= f <= sine.hi)
+    if fs:
+        q = modal.harmonic_coords(np.array(fs), modes, zeta, force)
+        mine = np.abs(np.einsum("fm,md->fd", q, modes.shapes[:, gi].astype(float)))
+        theirs = np.array([np.abs(printed[f][1][0] + 1j * printed[f][2][0]) for f in fs])
+        scale = max(float(theirs.max()), 1e-30)
+        sweep_err = float(np.max(np.abs(mine - theirs)) / scale)
+    return {"f": float(f_ccx), "peak": float(vm[gj]), "node": gj, "xyz": mesh.X[gj].tolist(), "vm": vm,
+            "at_wobbl_node": float(vm[gi]), "sweep_points": len(fs), "sweep_error": sweep_err}
+
+
+def _rayleigh(exe, wl: Path, deck, modes, mesh, built) -> dict | None:
+    """Rayleigh's quotient from the static sag under 1 g along the direction the first mode moves most mass."""
+    eff = modes.effective_mass[:, :3]
+    if not len(eff):
+        return None
+    i = 0 if eff[0].max() >= 0.05 * float(modes.total_mass[:3].mean()) else int(np.argmax(eff.max(1)))
+    d = np.eye(3)[int(np.argmax(eff[i]))]
+    text = deck.head + "*STEP\n*STATIC\n" + deck.supports + ccx.body_load(deck, modal.G0, d) + \
+        "*NODE FILE\nU\n*END STEP\n"
+    try:
+        ccx.run(exe, wl, "sag", text)
+        n_all = mesh.n_nodes + 2 * len(deck.extra)
+        u = ccx.read_blocks(wl / "sag.frd", n_all, ("DISP",))["DISP"][-1][1][:, :3].astype(float)
+        u = ccx.fill_rigid(u, mesh.X, deck)
+        (wl / "sag.frd").unlink(missing_ok=True)
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)[:200]}
+    density = built.model.density
+    f = modal.rayleigh_frequency(mesh, density, u, d, modal.G0, modes.mass_nodes, modes.mass_values)
+    return {"frequency": f, "direction": "xyz"[int(np.argmax(d))], "mode": i + 1,
+            "mode_frequency": float(modes.freq[i]), "first": float(modes.freq[0]),
+            "sag_mm": float(np.abs(u[:, int(np.argmax(d))]).max())}
