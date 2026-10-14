@@ -26,8 +26,8 @@ circuit solver or physics loop.
    own scenario playing out with the result on it, the wall and the shelf, the floor for a drop, the
    breadboard for a circuit. The CLI opens it in the browser and prints its path, and every MCP result says
    where it is as `view` (simulation.html for a simulate run). From an agent, open it at once with
-   `open <path>` on macOS, `xdg-open <path>` on Linux or `start "" <path>` on Windows, or run
-   `wobbl view wobbl-out/bracket` on a result folder. Then tell the user what they are seeing, which props
+   `open <path>` on macOS, `xdg-open <path>` on Linux or `start "" <path>` on Windows, or pass the result
+   folder to wobbl view. Then tell the user what they are seeing, which props
    stand for the supports and loads, what plays out (the load coming on, the flight, the heat building) and
    where the failure shows if there is one.
 3. **Check what Wobbl read and what it guessed.** The run prints the route it took, the values it read

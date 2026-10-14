@@ -18,8 +18,8 @@ def test_help_and_version():
     assert r.exit_code == 0
     listed = re.findall(r"^  (\S+)\s", r.output.split("Commands:")[1], re.M)
     assert listed[0] == "simulate"
-    assert set(listed) == {"simulate", "inspect", "check", "report", "fix", "uncertainty", "credibility", "test-plan",
-                           "estimate", "jobs", "materials", "validate", "setup", "doctor", "mcp"}
+    assert set(listed) == {"simulate", "view", "inspect", "check", "report", "fix", "uncertainty", "credibility",
+                           "test-plan", "estimate", "jobs", "materials", "validate", "setup", "doctor", "mcp"}
     for alias in ("run", "thermal", "circuit", "motion", "mechanism", "flow", "buckling", "plastic", "magnetic"):
         assert alias not in listed and cli.commands[alias].hidden
         assert CliRunner().invoke(cli, [alias, "--help"]).exit_code == 0, alias
