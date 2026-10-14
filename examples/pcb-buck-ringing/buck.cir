@@ -1,0 +1,15 @@
+* 12 V to 5 V buck power stage at 500 kHz, 2 A, the same parts and nets as the two board files
+V1 VIN 0 DC 12
+C1 VIN 0 22u
+VG G 0 PULSE(0 5 0 5n 5n 0.85u 2u)
+* the switch and its 300 pF output capacitance, a small 30 V MOSFET's Coss
+S1 VIN SW G 0 SWMOD
+CS1 VIN SW 300p
+.model SWMOD SW(VT=2.5 VH=0.1 RON=0.05 ROFF=1e6)
+D1 0 SW SCHOTTKY
+.model SCHOTTKY D(IS=5e-5 N=1.05 RS=0.02 CJO=100p)
+L1 SW VOUT 10u IC=2
+C2 VOUT 0 22u IC=5
+R1 VOUT 0 2.5
+.tran 2n 30u 26u uic
+.end
