@@ -301,9 +301,10 @@ def _rgb(color: str) -> np.ndarray:
 @dataclass
 class Look:
     """How a surface is colored by its field and lit."""
-    cmap: str = "turbo"
+    cmap: object = "turbo"                # a matplotlib colormap or its name
     clim: tuple[float, float] = (0.0, 1.0)
     above: str | None = None              # color for values over the top of the scale, else the top color
+    nan: str = "#4a4d52"                  # color where the field has no value
     ambient: float = 0.3
     diffuse: float = 0.8
     specular: float = 0.0
@@ -317,6 +318,7 @@ class Lines:
     color: str = EDGE
     alpha: float = 0.6
     width: float = 1.5                    # final pixels
+    depth_test: bool = True               # False draws the lines through the surface, for a see through part
 
 
 def _lighting(cam: Camera, P: np.ndarray, N: np.ndarray, look: Look) -> tuple[np.ndarray, np.ndarray]:
@@ -337,8 +339,9 @@ def _lighting(cam: Camera, P: np.ndarray, N: np.ndarray, look: Look) -> tuple[np
 
 
 def draw(size: tuple[int, int], cam: Camera, surf: Surface, values, look: Look, lines: Lines | None = None,
-         two_sided: bool = False):
-    """The picture of a surface colored by a field at its points, as an (H, W, 3) array of floats in 0..1.
+         two_sided: bool = False, coverage: bool = False):
+    """The picture of a surface colored by a field at its points, as an (H, W, 3) array of floats in 0..1, and with
+    coverage=True also the share of each pixel the surface or lines cover, for laying pictures over each other.
 
     A closed surface hides its back faces behind its front ones, so only faces toward the camera are drawn. A
     two sided surface, a shell's midsurface, draws both sides and lights each from the side the camera sees.
@@ -365,10 +368,13 @@ def draw(size: tuple[int, int], cam: Camera, surf: Surface, values, look: Look, 
         val = look.transform(val)
     lo, hi = look.clim
     hi = hi if hi > lo else lo + max(abs(lo), 1.0) * 1e-9
-    lut = colormaps[look.cmap](np.linspace(0, 1, 256))[:, :3].astype(np.float32)
-    rgb = lut[np.clip((val - lo) * (255.0 / (hi - lo)) + 0.5, 0, 255).astype(np.int64)]
+    cmap = colormaps[look.cmap] if isinstance(look.cmap, str) else look.cmap
+    lut = cmap(np.linspace(0, 1, 256))[:, :3].astype(np.float32)
+    missing = ~np.isfinite(val)
+    rgb = lut[np.clip((np.where(missing, lo, val) - lo) * (255.0 / (hi - lo)) + 0.5, 0, 255).astype(np.int64)]
     if look.above:
         rgb[val > hi + 1e-9 * abs(hi)] = _rgb(look.above)
+    rgb[missing] = _rgb(look.nan)
     rgb = np.clip(rgb * light[:, None] + spec[:, None], 0, 1)
     if lines is not None and len(lines.segments):
         pix, rgb = _draw_lines(pix, rgb, zbuf, cam, lines, W, H)
@@ -380,7 +386,8 @@ def draw(size: tuple[int, int], cam: Camera, surf: Surface, values, look: Look, 
     bg = _rgb(BG)
     out = np.column_stack([np.bincount(block, weights=rgb[:, c], minlength=n) + bg[c] * (SS * SS - cover)
                            for c in range(3)]) / (SS * SS)
-    return out.reshape(size[1], size[0], 3)
+    out = out.reshape(size[1], size[0], 3)
+    return (out, (cover / (SS * SS)).reshape(size[1], size[0])) if coverage else out
 
 
 def _draw_lines(pix, rgb, zbuf, cam: Camera, lines: Lines, W: int, H: int):
@@ -398,7 +405,7 @@ def _draw_lines(pix, rgb, zbuf, cam: Camera, lines: Lines, W: int, H: int):
             px, py = np.floor(x + dx).astype(np.int64), np.floor(y + dy).astype(np.int64)
             ok = (px >= 0) & (px < W) & (py >= 0) & (py < H)
             p = py[ok] * W + px[ok]
-            hits.append(p[z[ok] >= zbuf[p] * (1 - 1e-4)])
+            hits.append(p[z[ok] >= zbuf[p] * (1 - 1e-4)] if lines.depth_test else p)
     line = np.unique(np.concatenate(hits))
     color, alpha = _rgb(lines.color), lines.alpha
     at = np.minimum(np.searchsorted(pix, line), max(len(pix) - 1, 0))

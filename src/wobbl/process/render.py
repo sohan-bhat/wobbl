@@ -2,8 +2,8 @@
 
 A casting's hot spot and a molding's weld line sit inside the part or across a
 face, so the heatmap is a section: the part is cut by a plane through the
-marked point and the cut face is colored. Rendering uses VTK off screen like
-the other heatmaps and falls back to matplotlib without OpenGL.
+marked point and the cut face is colored, drawn with the renderer of the other
+heatmaps.
 """
 from __future__ import annotations
 
@@ -12,41 +12,31 @@ from pathlib import Path
 
 import numpy as np
 
-from ..report.render import BG, FG, MARK, _bar, _camera, _marker, _plotter, _surface
-
-
-def _tet_grid(X, tets, values):
-    import pyvista as pv
-
-    cells = np.hstack([np.full((len(tets), 1), 4), tets]).ravel()
-    grid = pv.UnstructuredGrid(cells, np.full(len(tets), pv.CellType.TETRA, dtype=np.uint8), X)
-    grid.point_data["v"] = values
-    return grid
+from ..report.render import BG, FG, MARK
 
 
 def section(path: str | Path, X: np.ndarray, tets: np.ndarray, values: np.ndarray, label: str, unit: str,
             origin, normal, mark_xyz=None, mark_label: str = "", cmap: str = "inferno", clim=None) -> str:
     """The part cut by the plane (origin, normal), keeping the half the normal points away from, colored by the
     nodal field; values that are nan are drawn gray."""
+    from ..mesh.clip import carry, clip_surface
+    from ..report import render as R
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     v = np.asarray(values, float)
     # the color range skips the odd node on a boundary that the field puts far from the rest
     lo, hi = clim or (float(np.nanpercentile(v, 2)), float(np.nanmax(v)))
     try:
-        grid = _tet_grid(X, tets, v)
-        cut = grid.clip(normal=tuple(normal), origin=tuple(origin), invert=True)
-        surf = _surface(cut)
-        span = float(np.linalg.norm(X.max(0) - X.min(0)))
-        p = _plotter((1600, 1000))
-        p.add_mesh(surf, scalars="v", cmap=cmap, clim=[lo, hi], nan_color="#4a4d52", smooth_shading=False,
-                   ambient=0.35, diffuse=0.75, scalar_bar_args=_bar(f"{label}\n{unit}"))
+        (a, b, t), faces = clip_surface(X, tets, origin, normal)
+        P = carry(X, a, b, t)
+        surf = R.surface(P, faces, {"v": carry(v, a, b, t)})
+        look = R.Look(cmap, (lo, hi), ambient=0.35, diffuse=0.75)
+        size = (1600, 1000)
+        cam = R.camera(iso_view(normal), P, size)
         g = np.asarray(mark_xyz if mark_xyz is not None else origin, float)
-        if mark_label:
-            _marker(p, g, span, mark_label, MARK)
-        _camera(p, X, iso_view(normal))
-        p.screenshot(str(path))
-        p.close()
+        R.compose(path, [R.Panel(R.draw(size, cam, surf, surf.fields["v"], look), cam,
+                                 (cmap, (lo, hi), f"{label}\n{unit}"), [R.Mark(g, mark_label)] if mark_label else [])])
     except Exception:  # noqa: BLE001  matplotlib fallback: the nodes near the plane
         if os.environ.get("WOBBL_DEBUG"):
             raise

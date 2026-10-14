@@ -22,39 +22,32 @@ MAX_TRIANGLES = 6000
 VERSION = 1
 
 
-def surface(X: np.ndarray, tets: np.ndarray, fields: dict[str, np.ndarray], cut=None):
+class Cut:
+    """A triangle surface with nodal fields on its vertices."""
+
+    def __init__(self, points: np.ndarray, faces: np.ndarray, point_data: dict[str, np.ndarray]):
+        self.points, self.faces, self.point_data = points, faces, point_data
+
+
+def surface(X: np.ndarray, tets: np.ndarray, fields: dict[str, np.ndarray], cut=None) -> Cut:
     """Outer triangles of a tetrahedral mesh, optionally cut by a plane (origin, normal) keeping the side the
     normal points away from, with the nodal fields carried to its vertices."""
-    import pyvista as pv
+    from ..mesh.clip import carry, clip_surface
 
-    from ..report.render import _surface
-
-    cells = np.hstack([np.full((len(tets), 1), tets.shape[1]), tets]).ravel()
-    ctype = pv.CellType.TETRA if tets.shape[1] == 4 else pv.CellType.QUADRATIC_TETRA
-    grid = pv.UnstructuredGrid(cells, np.full(len(tets), ctype, dtype=np.uint8), np.asarray(X, float))
-    for k, v in fields.items():
-        grid.point_data[k] = np.nan_to_num(np.asarray(v, float), nan=-1.0)
-    if cut is not None:
-        grid = grid.clip(normal=tuple(cut[1]), origin=tuple(cut[0]), invert=True)
-    surf = _surface(grid).triangulate().clean()
-    return surf
+    (a, b, t), faces = clip_surface(X, tets, *(cut if cut is not None else (None, None)))
+    data = {k: carry(np.nan_to_num(np.asarray(v, float), nan=-1.0), a, b, t) for k, v in fields.items()}
+    return Cut(carry(np.asarray(X, float), a, b, t), faces, data)
 
 
-def decimate(surf, max_triangles: int = MAX_TRIANGLES):
-    """Fewer triangles, same shape; fields move to the new vertices from the nearest old ones."""
-    from scipy.spatial import cKDTree
+def decimate(surf: Cut, max_triangles: int = MAX_TRIANGLES):
+    """Fewer triangles, same shape. Decimation keeps original vertices, so each carries its fields exactly."""
+    from ..life.playback import decimate as collapse
 
-    n = surf.n_cells
-    if n <= max_triangles:
-        out = surf
-    else:
-        out = surf.decimate(1.0 - max_triangles / n, volume_preservation=True)
-    V = np.asarray(out.points)
-    F = np.asarray(out.faces).reshape(-1, 4)[:, 1:]
-    idx = cKDTree(np.asarray(surf.points)).query(V)[1]
-    vals = {k: np.asarray(surf.point_data[k])[idx] for k in surf.point_data.keys()
-            if k not in ("vtkOriginalPointIds", "vtkOriginalCellIds")}
-    return V, F, vals
+    F = surf.faces
+    if len(F) > max_triangles:
+        F = collapse(surf.points, F, max_triangles // 2)
+    used, F = np.unique(F, return_inverse=True)
+    return surf.points[used], F.reshape(-1, 3), {k: v[used] for k, v in surf.point_data.items()}
 
 
 def _round(a, digits: int) -> list:

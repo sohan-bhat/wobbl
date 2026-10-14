@@ -62,3 +62,25 @@ def test_quadratic_cut_counts_midside_values(bar):
             assert np.abs(v).max() == expect
         else:
             assert (area * v[faces].mean(1)).sum() > 0.1 * area.sum()
+
+
+def test_clipped_half_is_closed_and_holds_half_the_volume(bar):
+    """Cutting the 200 x 20 x 10 bar at a slant leaves a closed surface facing out, whose enclosed volume (by the
+    divergence theorem) is exactly the half on the kept side, with a linear field carried onto it exactly."""
+    from wobbl.mesh.clip import carry, clip_surface
+
+    n = np.array([1.0, 0.0, 0.3]) / np.linalg.norm([1.0, 0.0, 0.3])
+    (a, b, t), faces = clip_surface(bar.X, bar.tets, [100.0, 10.0, 5.0], n)
+    P = carry(bar.X, a, b, t)
+    e = np.sort(faces[:, [0, 1, 1, 2, 2, 0]].reshape(-1, 2), axis=1)
+    _, count = np.unique(e, axis=0, return_counts=True)
+    assert (count == 2).all()                                  # closed, no cracks along the cut
+    tri = P[faces]
+    volume = np.einsum("ij,ij->i", tri[:, 0], np.cross(tri[:, 1], tri[:, 2])).sum() / 6
+    assert volume == pytest.approx(200 * 20 * 10 / 2, rel=1e-9)   # the plane passes through the bar's center
+    assert ((P - [100.0, 10.0, 5.0]) @ n).max() < 1e-9
+    f = 2.0 * bar.X[:, 0] - bar.X[:, 2]
+    assert np.allclose(carry(f, a, b, t), 2.0 * P[:, 0] - P[:, 2])
+    (a2, _, _), whole = clip_surface(bar.X, bar.tets)
+    tri = bar.X[a2][whole]
+    assert np.einsum("ij,ij->i", tri[:, 0], np.cross(tri[:, 1], tri[:, 2])).sum() / 6 == pytest.approx(40000.0)
