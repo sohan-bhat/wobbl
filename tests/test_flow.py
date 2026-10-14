@@ -61,6 +61,19 @@ def test_fluid_properties_match_handbooks():
         F.get_fluid("honey")
 
 
+def test_oils_and_glycol_follow_their_tables_and_grades():
+    oil = F.get_fluid("engine oil", 300 - 273.15)          # a tabulated point comes back exactly
+    assert (oil.rho, oil.mu, oil.k) == pytest.approx((884.1, 0.486, 0.145))
+    mid = F.get_fluid("engine-oil", 305 - 273.15).mu        # Andrade's law sits between the points, log wise
+    assert 0.253 < mid < 0.486 and mid == pytest.approx((0.253 * 0.486) ** 0.5, rel=0.03)
+    assert F.get_fluid("glycol", 20).nu == pytest.approx(19.1e-6, rel=0.02)
+    for grade, hot in F.VI100_AT_100C.items():              # ISO grades hold their definition at 40 C
+        assert F.get_fluid(f"ISO VG {grade}", 40).nu == pytest.approx(grade * 1e-6, rel=1e-9)
+        assert F.get_fluid(f"iso-vg-{grade}", 100).nu == pytest.approx(hot * 1e-6, rel=1e-9)
+    with pytest.raises(ValueError):
+        F.get_fluid("glycerin", 80)
+
+
 def test_flow_quantities_read_in_si():
     assert F.qty("20 L/min", "flowrate") == pytest.approx(20e-3 / 60)
     assert F.qty("40 CFM", "flowrate") == pytest.approx(0.018878, rel=1e-4)
