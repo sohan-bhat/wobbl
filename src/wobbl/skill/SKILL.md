@@ -163,17 +163,26 @@ solves it first. Stresses you already know run as
 `wobbl fatigue --material 4140 --amplitude "200 MPa" --mean "100 MPa" --kt 2 --radius "1 mm"`.
 It reads a vibration result folder the same way. Crack growth after a crack starts is a separate question.
 
-When a metal part reaches yield in a strength run, or someone asks whether it will bend for good or
-what load would collapse it, run the plastic study with the same loads and supports, as in
-`wobbl plastic hook.py -m mild-steel --fix "bolt holes d=8.5" --load "3 kN -z @ hole d=20"` (MCP
-`solve_plastic`). It finds the load multiple at first yield, applies and removes the load with the
-metal's true stress strain curve to measure the permanent set and peak plastic strain, and ramps an
-elastic perfectly plastic copy until it collapses. The verdict separates `holds` (stays elastic),
-`yields` (yields locally but carries the load), `marginal` (collapse below the target margin, 1.5 by
-default) and `collapses`, and the fixes are aimed at the hinge where it gives way. Quote the collapse
-load and the permanent set, not the elastic peak, and check the ductility line, since a peak plastic
-strain near the metal's elongation means it may tear first. Plastics and brittle materials are refused,
-so judge them with a strength run.
+When a part reaches yield in a strength run, or someone asks whether it will bend for good or what
+load would collapse it, ask for plasticity with the same loads and supports, as in
+`wobbl simulate hook.py "will 3 kN bend it for good?" --physics plastic -m mild-steel --fix "bolt holes d=8.5" --load "3 kN -z @ within 5 of 22,0,-16"`.
+It finds the load multiple at first yield, applies and removes the load with the material's true
+stress strain curve to measure the permanent set and peak plastic strain, and ramps an elastic
+perfectly plastic copy until it collapses. A measured curve goes in the curve option, as a tensile test
+like `engineering 250@0.00125, 400@0.2`, as true stress at plastic strain, or as a CSV file. The
+verdict separates `holds` (stays elastic), `yields` (yields locally but carries the load), `marginal`
+(collapse below the target margin, 1.5 by default) and `collapses`. Quote the collapse load and the
+permanent set, not the elastic peak, and check the ductility line. Ductile plastics run with a caveat
+that lowers the confidence, and brittle materials are refused because they have no plastic reserve.
+
+For an assembly whose bodies touch, slide or are bolted, ask about contact or bolts and Wobbl keeps the
+bodies apart where they meet, pairing every face that lies on another, as in
+`wobbl simulate clamp.step "does the jaw slip on the rod under 2 kN?" --physics contact -m mild-steel --fix "body 1 and bottom" --load "2 kN +x @ body 2 and top"`.
+Name faces of one body with `body 2 and top`. Bolts come from holes that run through two parts or more,
+sized from the hole and tightened to 70% of their proof load unless told otherwise, as in
+`wobbl simulate flange.step "does it stay closed under 30 kN?" --physics bolts -m mild-steel --fix "body 1 and bottom" --load "30 kN +z @ body 2 and top" --bolt "M8 8.8 torque 20 N*m"`,
+and a hole narrower than its bolt is read as tapped. Each bolt is checked as VDI 2230 does, for proof
+stress, opening, slip, head pressure and thread stripping, beside the hand calculation.
 
 For mechanisms, use the mechanism command (MCP `solve_mechanism`) instead of working torques by hand or
 writing a physics loop. It runs MuJoCo with each motor's torque speed line, compares the answer with a
