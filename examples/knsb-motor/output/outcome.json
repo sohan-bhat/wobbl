@@ -226,7 +226,8 @@
   "condensed_fraction": 0.430819,
   "files": {
    "thrust_csv": "thrust.csv",
-   "eng": "motor.eng"
+   "eng": "motor.eng",
+   "playback": "playback.json"
   },
   "_figures": [
    [
@@ -256,6 +257,6 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 17.93381,
+ "t_total": 24.206073,
  "solver": "Wobbl internal ballistics (Runge-Kutta, scipy) and Cantera 3.2.0"
 }

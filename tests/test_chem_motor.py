@@ -85,6 +85,27 @@ def test_the_motor_file_reads_back_in_the_motion_domain(tmp_path):
     assert eng.length == pytest.approx(0.4) and eng.propellant == pytest.approx(o.values["propellant_kg"], rel=1e-3)
 
 
+def test_the_playback_file_animates_the_burn(tmp_path):
+    import json
+
+    text = DESIGN.format(wall="1.6 mm").replace("count = 4", "count = 2") + (
+        '[[grain]]\nshape = "star"\ndiameter = "48 mm"\nlength = "75 mm"\npoints = 5\npoint_length = "16 mm"\n'
+        'point_width = "8 mm"\ninhibited_ends = 1\n')
+    o = run_motor(read_spec(text), tmp_path, render=False)
+    path = tmp_path / o.values["files"]["playback"]
+    assert path.stat().st_size < 300_000
+    d = json.loads(path.read_text())
+    assert d["manifest"]["kind"] == "solid-motor" and d["manifest"]["frames"] == len(d["frames"]) == 120
+    assert [s["type"] for s in d["grains"]] == [0, 0, 1]
+    bates, star = d["grain_types"]
+    assert bates["profile"] == "round" and len(bates["core_mm"]) == 120 and bates["core_mm"][0] == 20.0
+    assert star["profile"] == "outline" and star["port"][0] and len(star["port"][0][0]) > 10
+    peak = max(f["P_MPa"] for f in d["frames"])
+    assert peak == pytest.approx(o.values["peak_pressure_Pa"] / 1e6, rel=0.02)
+    assert d["motor"]["casing"]["allowable_MPa"] > 0 and any(f["casing_sf"] for f in d["frames"])
+    assert d["frames"] == json.loads(path.read_text())["frames"]
+
+
 def test_agents_get_the_chemistry_tools(tmp_path, monkeypatch):
     import asyncio
 

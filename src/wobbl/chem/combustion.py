@@ -194,6 +194,8 @@ def run_flame(fuel: str, oxidizer: str, phi: float, T: float, P: float, out_dir,
         except Exception as e:  # noqa: BLE001
             imgs["error"] = str(e)
     values["_figures"] = [["sweep", "Adiabatic flame temperature against equivalence ratio"]]
+    if (out / "playback.json").exists():
+        values["files"] = {"playback": "playback.json"}
     assumptions = [f"{key.capitalize()} ({nasa}) and {'air as O2 + 3.76 N2' if oxidizer == 'air' else 'oxygen'} at "
                    f"{fmt(T)} K and {fmt(P / 1000)} kPa, fully mixed.",
                    "Adiabatic and at constant pressure, with the products in chemical equilibrium on NASA's "
@@ -250,7 +252,12 @@ def _flame_sweep(out, fuel, oxidizer, T, P, phi, t_here, limit, in_air, o2, lim)
     # finer near stoichiometric, where the temperature peaks, and through the operating point
     phis = np.unique(np.concatenate([np.linspace(lo, hi, 20), np.linspace(0.8, 1.3, 6), [phi]]))
     phis = phis[(phis >= lo) & (phis <= hi)]
-    temps = [adiabatic(fuel, oxidizer, p, T, P)[1].T for p in phis]
+    states = [adiabatic(fuel, oxidizer, p, T, P)[1] for p in phis]
+    temps = [s.T for s in states]
+    from . import playback
+    playback.flame(out, phis, temps, [s.major(1e-5) for s in states], phi,
+                   {"fuel": fuel, "oxidizer": oxidizer, "phi": phi, "T_K": t_here, "pressure_Pa": P,
+                    "reactant_T_K": T, "limit_K": limit})
     return sweep_chart(out / "images" / "sweep.png", phis, temps, "equivalence ratio", "flame temperature, K",
                        (phi, t_here), limit, f"limit {fmt(limit)} K" if limit else "")
 
@@ -344,6 +351,8 @@ def run_propellant(name: str, pc: float, area_ratio: float | None, exit_P: float
         except Exception as e:  # noqa: BLE001
             imgs["error"] = str(e)
     values["_figures"] = [["isp", "Specific impulse against nozzle area ratio"]]
+    if (out / "playback.json").exists():
+        values["files"] = {"playback": "playback.json"}
     assumptions = [f"{label}, its ingredients' enthalpies from NASA's CEA data and the NIST WebBook.",
                    "CEA's infinite area combustor, with the chamber in equilibrium and the nozzle isentropic. Shifting "
                    "keeps the gas in equilibrium as it expands and frozen keeps the chamber composition, the two "
@@ -373,10 +382,12 @@ def _stations_table(sh, fr) -> str:
 def _isp_curve(out, eq, ch, sh, fr, pc, ambient, eps):
     from .charts import sweep_chart
 
+    from . import playback
+
     G_t = pc / sh.cstar
     G_tf = pc / fr.cstar
-    pts = []
-    pe_lo = min(sh.exit_P, ambient) / 4
+    pts, rows = [], []
+    pe_lo = min(sh.exit_P, ambient if ambient > 0 else sh.exit_P) / 4
     for P in np.geomspace(sh.stations[1].P * 0.9, pe_lo, 16):
         guess = ch.T * (P / pc) ** ((ch.gamma - 1) / ch.gamma)
         s1 = eq.sp(P, ch.s, guess)
@@ -385,6 +396,12 @@ def _isp_curve(out, eq, ch, sh, fr, pc, ambient, eps):
         v2 = math.sqrt(max(2 * (ch.h - s2.h), 0.0))
         g1, g2 = s1.rho * v1, s2.rho * v2
         pts.append((G_t / g1, (v1 + (P - ambient) / g1) / G0, (v2 + (P - ambient) / g2) / G0, G_tf / g2))
+        r = playback._r
+        rows.append({"P_MPa": r(P / 1e6), "area_ratio": r(G_t / g1), "T_K": r(s1.T), "v_m_s": r(v1),
+                     "condensed": r(s1.condensed_fraction, 3), "isp_s": r(pts[-1][1]),
+                     "frozen": {"area_ratio": r(G_tf / g2), "T_K": r(s2.T), "v_m_s": r(v2), "isp_s": r(pts[-1][2])}})
+    playback.nozzle(out, rows, {"chamber_pressure_Pa": pc, "chamber_T_K": ch.T, "ambient_Pa": ambient,
+                                "area_ratio": eps, "cstar_m_s": sh.cstar, "isp_s": sh.isp_amb})
     pts.sort()
     xs = [p[0] for p in pts]
     froz = list(np.interp(xs, sorted(p[3] for p in pts), [p[2] for p in sorted(pts, key=lambda p: p[3])]))

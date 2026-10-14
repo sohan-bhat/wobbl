@@ -97,7 +97,10 @@
     "sweep",
     "Adiabatic flame temperature against equivalence ratio"
    ]
-  ]
+  ],
+  "files": {
+   "playback": "playback.json"
+  }
  },
  "images": {
   "sweep": "images/sweep.png"
@@ -106,6 +109,6 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 20.444647,
+ "t_total": 28.054786,
  "solver": "Cantera 3.2.0"
 }

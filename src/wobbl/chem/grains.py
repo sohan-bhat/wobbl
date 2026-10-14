@@ -171,6 +171,11 @@ class MapGrain(Grain):
         p1, p2 = _length(gen.lines(x1)), _length(gen.lines(x2))
         self._perim[0] = p1 - (p2 - p1) / (x2 - x1) * x1
         self._perim[-1] = 0.0
+        self._gen = gen
+
+    def port_outline(self, x: float) -> list[np.ndarray]:
+        """The burning edge at regression x as polylines of (x, y) in m, the level line the perimeter measures."""
+        return [ln for ln in self._gen.lines(max(x, 0.0)) if len(ln) > 1]
 
     def face(self, x):
         a = float(np.interp(x, self._xs, self._area))

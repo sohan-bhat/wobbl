@@ -84,6 +84,8 @@ def run_motor(spec: MotorSpec, out_dir: str | Path, cb=None, render: bool = True
               "kn_initial": kns[0], "kn_max": max(kns), "kn_final": kns[-1], "cstar_m_s": m.cstar,
               "time_step_runs": runs, **ero_vals, **case_vals, **noz_vals, **chem_vals}
     files = write_curves(spec, b, out)
+    from . import playback
+    files["playback"] = playback.motor(spec, b, case_vals, out)
     values["files"] = files
     imgs = {}
     if render:
