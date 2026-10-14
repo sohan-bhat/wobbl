@@ -134,6 +134,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
     checks = [convergence_check([L["factor"] for L in levels], q["tol"], "first buckling factor", "times the load",
                                 stopped_by,
                                 min_levels=2)]
+    _robust(checks[0], levels, lam, verdict, target, shape, col, mat, gamma, yield_factor)
     rf, rm = support_reactions(built, res0, mesh)
     checks.append(balance_check(F, rf, M, rm, p.prep.diag))
     checks.append(euler_check(lam, col, mat))
@@ -185,6 +186,24 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
     save_study(study, out)
     clean_work(work, study.keep)
     return o
+
+
+def _robust(check, levels, lam, verdict, target, shape, col, mat, gamma, yield_factor) -> None:
+    """Soften an unsettled convergence check when the verdict cannot depend on it: the design factor at a buckling
+    factor cut by three times the last change between meshes (at most in half) gives the same verdict, as it does
+    when yielding, not buckling, sets the design factor."""
+    if check.status not in ("fail", "warn") or len(levels) < 2:
+        return
+    low = lam * max(0.5, 1 - 3 * change([L["factor"] for L in levels]))
+    if shape == "column" and col is not None:
+        d_low = column_curve(low, col, mat)[0]
+    else:
+        d_low = johnson(gamma * low, yield_factor, mat.ductile)[0]
+    if verdict_for(d_low, target) != verdict:
+        return
+    check.status = "warn" if check.status == "fail" else "info"
+    check.summary += (f". The verdict stays {verdict} even at {fmt(low)} times the load, so a finer mesh would not "
+                      "change the answer")
 
 
 def _buckle(exe, wl: Path, deck, mesh, n_modes: int):
