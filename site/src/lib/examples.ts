@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { ROOT } from './site';
+import type { FlightEvent } from './flight';
 
 export const ORDER = ['cast-motor-mount', 'shelf-bracket', 'motor-mount', 'enclosure', 'drone-arm', 'heat-sink',
   'battery-pack', 'circuits'];
@@ -37,6 +38,8 @@ export interface Outcome {
   domain: string; verdict: string; headline: string; confidence: string; question?: string;
   governing_MPa?: number; safety_factor?: number; target_sf?: number;
   metrics?: [string, string][]; checks?: Check[]; fixes?: Fix[]; images?: Record<string, string>;
+  // motion runs: what happened when, how long the run took and what the model included
+  events?: FlightEvent[]; runtime_s?: number; model?: { states: number; effects: string[] };
 }
 
 export interface Run {

@@ -152,6 +152,58 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .answer-img .run-img, .answer-img .run-metric { aspect-ratio: 4 / 3; object-fit: contain; border: 0; }
 .answer-img:hover .run-img { outline: 1px solid var(--line-2); }
 
+/* Altitude over time for a motion run: a stretched SVG line under HTML labels and ticks */
+.fc { margin: 0; min-width: 0; }
+.fc-chart { font: 500 12px/1.2 var(--mono); color: var(--muted); }
+.fc-ytitle { margin: 0 0 14px; color: var(--fg-2); }
+.fc-plot { position: relative; aspect-ratio: 16 / 10; margin: 0 4px 34px calc(var(--y-ch) * 1ch + 12px); touch-action: pan-y; }
+/* the SVG sits 6 px inside a clipping box, so the line's own width is never cut at the edges */
+.fc-draw { position: absolute; inset: -6px; overflow: hidden; }
+.fc-draw svg { position: absolute; left: 6px; top: 6px; width: calc(100% - 12px); height: calc(100% - 12px); overflow: visible; }
+.fc-line { fill: none; stroke: var(--yellow); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.fc-area { fill: var(--yellow); fill-opacity: 0.045; }
+.fc-grid { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--line); }
+.fc-ground { border-top-color: var(--muted); }
+.fc-yt { position: absolute; right: 100%; top: 0; padding-right: 12px; transform: translateY(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fc-xt { position: absolute; top: 100%; padding-top: 10px; transform: translateX(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fc-xt[data-edge="start"] { transform: none; }
+.fc-xt[data-edge="end"] { transform: translateX(-100%); }
+.fc-xtitle { margin: 0 4px 0 0; text-align: right; color: var(--fg-2); }
+.fc figcaption { margin-top: 10px; }
+/* events: a square on the line, and a name with its time and height beside it */
+.fc-ev { position: absolute; width: 0; height: 0; }
+.fc-ev::before { content: ""; position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; background: var(--yellow); box-shadow: 0 0 0 2px var(--bg); }
+.fc-ev-l {
+  position: absolute; display: grid; gap: 3px; padding: 3px 5px; white-space: nowrap;
+  background: color-mix(in srgb, var(--bg) 84%, transparent); transform: translate(var(--tx, 0), var(--ty, 0));
+}
+.fc-ev-l b { font: 650 13px/1.15 var(--sans); color: var(--fg); }
+.fc-ev-l span { font: 500 11.5px/1.15 var(--mono); color: var(--fg-2); }
+.fc-ev-l[data-align="right"] { text-align: right; }
+.fc-ev-l[data-align="center"] { text-align: center; }
+.fc-ev-l[data-lead]::after { content: ""; position: absolute; background: var(--muted); }
+.fc-ev-l[data-lead="down"]::after { left: 50%; top: 100%; width: 1px; height: var(--lead); }
+.fc-ev-l[data-lead="up"]::after { left: 50%; bottom: 100%; width: 1px; height: var(--lead); }
+.fc-ev-l[data-lead="right"]::after { left: 100%; top: 50%; height: 1px; width: var(--lead); }
+.fc-ev-l[data-lead="left"]::after { right: 100%; top: 50%; height: 1px; width: var(--lead); }
+/* the pointer readout: a hairline at the nearest instant and its time, height and speed */
+.fc-cross { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--fg-2); pointer-events: none; z-index: 2; }
+.fc-cross[hidden] { display: none; }
+.fc-cross::after { content: ""; position: absolute; left: -5px; top: var(--y, 0%); width: 9px; height: 9px; margin-top: -5px; background: var(--fg); box-shadow: 0 0 0 2px var(--bg); }
+.fc-read { position: absolute; top: 0; left: 10px; padding: 6px 8px; background: var(--bg-3); border: 1px solid var(--line-2); color: var(--fg); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fc-cross[data-flip] .fc-read { left: auto; right: 10px; }
+/* the line draws in once, left to right in time, and each event shows as the line reaches it:
+   the clipping box slides in from the left while the SVG inside it slides back, both on transform */
+.fc-armed .fc-draw { transform: translateX(-100%); }
+.fc-armed .fc-draw svg { transform: translateX(calc(100% + 12px)); }
+.fc-armed .fc-ev { opacity: 0; }
+.fc-armed.fc-play .fc-draw, .fc-armed.fc-play .fc-draw svg { transform: none; transition: transform 1.5s linear; }
+.fc-armed.fc-play .fc-ev { opacity: 1; transition: opacity 200ms ease-out calc(var(--at) * 1.5s); }
+/* the small version on example cards: the line and its events, no labels */
+.fc-compact { display: grid; align-content: center; aspect-ratio: 4 / 3; padding: 12% 10%; background: var(--bg); border-bottom: 1px solid var(--line); }
+.fc-compact .fc-plot { margin: 0; }
+.fc-compact .fc-ev::before { left: -4px; top: -4px; width: 8px; height: 8px; }
+
 /* Bake off: trials answered, one square each */
 .versus { display: grid; gap: 20px; margin-top: 32px; }
 @media (min-width: 900px) { .versus { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; } }
