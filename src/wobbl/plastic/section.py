@@ -9,11 +9,9 @@ for compact sections. The load factor that reaches it is the beam theory collaps
 """
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 
-from ..verify.beam import beam_estimate
+from ..verify.beam import beam_estimate, slice_tets
 
 
 def _subdivide(tri: np.ndarray, n: int = 6) -> tuple[np.ndarray, np.ndarray]:
@@ -35,8 +33,6 @@ def _subdivide(tri: np.ndarray, n: int = 6) -> tuple[np.ndarray, np.ndarray]:
 def plastic_section(mesh, at, model, fy: float, fix_nodes=None) -> tuple[dict | None, str]:
     """The beam theory collapse load factor through a section at ``at``, or None with the reason no section applies.
     ``fix_nodes`` are the supports that carry the load (all of them when not given)."""
-    import pyvista as pv
-
     F, M = model.applied_total()
     if fix_nodes is None:
         held = [c.nodes for c in model.constraints] + [c.nodes for c in model.normal_constraints]
@@ -49,13 +45,8 @@ def plastic_section(mesh, at, model, fy: float, fix_nodes=None) -> tuple[dict | 
     if est is None:
         return None, why
     axis, G = np.asarray(est["axis"]), np.asarray(est["centroid"])
-    corners = mesh.tets[:, :4]
-    cells = np.hstack([np.full((len(corners), 1), 4), corners]).ravel()
-    grid = pv.UnstructuredGrid(cells, np.full(len(corners), pv.CellType.TETRA, dtype=np.uint8), mesh.X)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        sl = grid.slice(normal=axis, origin=np.asarray(at, float)).triangulate().extract_surface().triangulate()
-    tris = np.asarray(sl.points)[sl.faces.reshape(-1, 4)[:, 1:]]
+    pts, faces = slice_tets(mesh.X, mesh.tets, axis, np.asarray(at, float))
+    tris = pts[faces]
     q, a = _subdivide(tris)
     A = float(a.sum())
     u = np.cross(axis, [1.0, 0, 0] if abs(axis[0]) < 0.9 else [0, 1.0, 0])

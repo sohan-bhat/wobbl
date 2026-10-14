@@ -41,15 +41,13 @@ If it lives somewhere unusual, set `WOBBL_NGSPICE` to the full path of the binar
 
 ## Headless Linux
 
-Wobbl draws its heatmaps with VTK off screen. On a server with no display, VTK needs a few
-system libraries for OpenGL and fonts, and the Ubuntu test machines install these.
+Wobbl draws its heatmaps itself with numpy and matplotlib, so a server with no display and no
+OpenGL draws the same pictures as a laptop. gmsh still links a few X and OpenGL libraries even
+when it shows nothing, and the Ubuntu test machines install these.
 
 ```sh
-sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxft2 libxinerama1 libgl1 xvfb
+sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxft2 libxinerama1 libgl1
 ```
-
-When VTK cannot render at all, Wobbl falls back to matplotlib for the images and keeps going,
-and `wobbl doctor` says which renderer is in use.
 
 ## Speed
 
