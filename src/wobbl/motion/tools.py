@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import uuid
+from pathlib import Path
 
 from .spec import SPHERE_CD, MotionStudy, SpecError, quantity, read_spec
 from .study import run_motion
@@ -57,6 +58,17 @@ def study_from(name: str = "", mass: str = "", density: str = "", diameter: str 
     return st
 
 
+def footprint() -> dict:
+    """What motion adds to an install. It runs on scipy, which Wobbl needs anyway, so it downloads nothing and
+    leaves nothing to prune, and its own code is a few dozen kilobytes."""
+    import scipy
+
+    code = sum(p.stat().st_size for p in Path(__file__).parent.glob("*.py"))
+    return {"download_bytes": 0, "code_bytes": code, "scipy": scipy.__version__,
+            "line": f"motion runs on scipy {scipy.__version__}, which came with Wobbl, so it downloads nothing and "
+                    f"its own code is {code / 1000:.0f} kB"}
+
+
 def solve_motion_tool(spec: str = "", name: str = "", mass: str = "", density: str = "", diameter: str = "",
                       cd: float | None = None, height: str = "", speed: str = "", angle: str = "", wind: str = "",
                       question: str = "") -> dict:
@@ -77,4 +89,4 @@ def solve_motion_tool(spec: str = "", name: str = "", mass: str = "", density: s
             "trajectory": str(out / "trajectory.csv"), "result_dir": o.workdir}
 
 
-__all__ = ["study_from", "solve_motion_tool"]
+__all__ = ["study_from", "solve_motion_tool", "footprint"]

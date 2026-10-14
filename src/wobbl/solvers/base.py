@@ -120,5 +120,5 @@ def _load_builtin():
         return
     from . import calculix, ngspice  # noqa: F401  (they register themselves)
     register(PlannedAdapter("OpenFOAM", ("cfd",), "0.3"))
-    register(PlannedAdapter("MuJoCo", ("motion",), "0.4"))
+    register(PlannedAdapter("MuJoCo", ("mechanisms",), "0.4"))
     register(PlannedAdapter("Elmer", ("multiphysics",), "0.3"))

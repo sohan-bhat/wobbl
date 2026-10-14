@@ -49,6 +49,8 @@ def setup(agents, no_agents, no_solvers, only, project, force, dry_run):
             for k, why in st.get("unavailable", {}).items():
                 ui.console.print(f"  [yellow]{k} unavailable: {why}[/yellow]")
             ui.console.print(f"  disk used {installer.disk_usage() / 1e6:.0f} MB")
+        from ..motion.tools import footprint
+        ui.console.print(f"  {footprint()['line']}")
     if not no_agents and agents != "none":
         ui.section("agents")
         found = ag.detect()
@@ -128,6 +130,10 @@ def doctor(as_json):
             add(name, False, st["unavailable"].get(name, "not installed; run 'wobbl setup'"))
         else:
             add(name, None, f"installs the first time you run a {recipe.domains[0]} study")
+    from ..motion.tools import footprint
+    fp = footprint()
+    add("motion", True, f"scipy {fp['scipy']}, built in, nothing to download ({fp['code_bytes'] / 1000:.0f} kB of "
+                        "code)")
     for a in base.adapters():
         if a.name in ("OpenFOAM", "MuJoCo", "Elmer"):
             add(a.name, None, a.install_hint)

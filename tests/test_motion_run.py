@@ -95,3 +95,14 @@ def test_a_spec_takes_todays_wind(tmp_path):
 
     st = study_from(spec=str(ROOT / "examples" / "rocket-launch" / "rocket.toml"), wind="20 mph")
     assert st.wind == pytest.approx(8.9408)
+
+
+def test_motion_downloads_nothing_and_setup_says_so(tmp_path, monkeypatch):
+    from wobbl.motion.tools import footprint
+
+    fp = footprint()
+    assert fp["download_bytes"] == 0 and 20_000 < fp["code_bytes"] < 200_000
+    monkeypatch.setenv("WOBBL_HOME", str(tmp_path))
+    r = CliRunner().invoke(cli, ["setup", "--dry-run", "--no-agents"])
+    assert r.exit_code == 0 and "motion runs on scipy" in r.output and "downloads nothing" in r.output
+    assert not any(tmp_path.iterdir())          # a dry run writes nothing
