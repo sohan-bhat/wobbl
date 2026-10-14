@@ -213,9 +213,11 @@ def magnetostatic(p: MagProblem, tags: dict[str, int]) -> str:
         cq.append(f"Integral {{ [ {geo} * (nu[{{d a}}] * SquNorm[{{d a}}] - wd[{{d a}}]) ]; In DomNL; Jacobian Vol; "
                   "Integration I1; }")
     if mags:
-        m = f"Integral {{ [ {geo} * 0.5 * nu[] * SquNorm[{{d a}} - br[]] ]; In DomM; Jacobian Vol; Integration I1; }}"
-        wq.append(m)
-        cq.append(m)
+        # in a magnet b = mu h + br: the energy density is mu h^2 / 2, the co-energy density mu h^2 / 2 + br . h
+        wq.append(f"Integral {{ [ {geo} * 0.5 * nu[] * SquNorm[{{d a}} - br[]] ]; In DomM; Jacobian Vol; "
+                  "Integration I1; }")
+        cq.append(f"Integral {{ [ {geo} * (0.5 * nu[] * SquNorm[{{d a}} - br[]] + br[] * (nu[] * ({{d a}} - br[]))) ]; "
+                  "In DomM; Jacobian Vol; Integration I1; }")
     pq = ["      { Name az; Value { Local { [ CompZ[{a}] ]; In Dom; Jacobian Vol; } } }",
           "      { Name b; Value { Local { [ {d a} ]; In Dom; Jacobian Vol; } } }",
           "      { Name nb; Value { Local { [ Norm[{d a}] ]; In Dom; Jacobian Vol; } } }",
@@ -357,6 +359,16 @@ class SoundProblem:
     plane: tuple | None = None                  # eigen search: (z, x0, x1, y0, y1, nx, ny) to sample mode shapes on
     shapes: int = 0                             # how many mode shapes to sample
 
+    def __post_init__(self):                    # plain floats, so the problem file never sees numpy reprs
+        self.freq, self.c, self.rho, self.shift = float(self.freq), float(self.c), float(self.rho), float(self.shift)
+        if self.radiation:
+            self.radiation = (self.radiation[0], float(self.radiation[1]))
+        if self.piston:
+            self.piston = (self.piston[0], float(self.piston[1]))
+        if self.plane:
+            self.plane = tuple(float(v) for v in self.plane)
+        self.probes = [tuple(float(v) for v in pt) for pt in self.probes]
+
 
 def helmholtz(p: SoundProblem, tags: dict[str, int]) -> str:
     """Acoustic pressure, time harmonic (e^{j w t}, outgoing waves e^{-j k r}) or as an eigenvalue problem."""
@@ -420,9 +432,9 @@ def helmholtz(p: SoundProblem, tags: dict[str, int]) -> str:
         po.append(f'Print[ p, OnPoint {{{pt[0]:.9g}, {pt[1]:.9g}, {pt[2]:.9g}}}, Format Table, File "probe{i}.txt" ];')
     if p.plane and not p.freq:
         z, x0, x1, y0, y1, nx, ny = p.plane
-        for i in range(p.shapes):
+        for i in range(1, p.shapes + 1):        # step 0 is the constant pressure mode at 0 Hz of a closed volume
             po.append(f'Print[ p, OnPlane {{{{{x0!r}, {y0!r}, {z!r}}}{{{x1!r}, {y0!r}, {z!r}}}{{{x0!r}, {y1!r}, {z!r}}}}} '
-                      f'{{{int(nx)}, {int(ny)}}}, TimeStep {i}, Format SimpleTable, File "mode{i}.txt" ];')
+                      f'{{{int(nx)}, {int(ny)}}}, TimeStep {i}, Format SimpleTable, File "mode{i - 1}.txt" ];')
     if p.fields:
         po.append('Print[ pa, OnElementsOf Dom, Format NodeTable, File "pa.txt" ];')
     out.append("PostOperation {\n  { Name P; NameOfPostProcessing H; Operation {\n    " + "\n    ".join(po or [""]) +
@@ -446,6 +458,11 @@ class WaveProblem:
     order: int = 2
     probe_line: tuple | None = None             # (x, y0, y1, n): sample H along the wire surface
     fields: bool = False
+
+    def __post_init__(self):
+        self.freq, self.gap_length, self.volts = float(self.freq), float(self.gap_length), float(self.volts)
+        if self.probe_line:
+            self.probe_line = tuple(float(v) for v in self.probe_line)
 
 
 def fullwave_axi(p: WaveProblem, tags: dict[str, int]) -> str:

@@ -12,6 +12,7 @@ _EXTRA = {
     "field": {"v/m": 1.0, "kv/m": 1e3, "v/mm": 1e3, "kv/mm": 1e6, "mv/m": 1e6, "kv/cm": 1e5},
     "speed": {"m/s": 1.0},
     "angle": {"deg": 1.0, "degree": 1.0, "degrees": 1.0, "rad": 180 / math.pi},
+    "fast_time": {"s": 1.0, "ms": 1e-3, "us": 1e-6, "ns": 1e-9, "ps": 1e-12},
 }
 
 
@@ -40,7 +41,7 @@ def value(params: dict, key: str, default, kind: str = "number"):
     if kind == "dbm":
         m = re.match(r"^\s*([-+]?\d+(?:\.\d+)?)\s*(dbm|dbw|mw|w)?\s*$", s.lower())
         if not m:
-            raise ParamError(f"could not read power '{s}' for '{key}'; use dBm, mW or W")
+            raise ParamError(f"could not read power '{s}' for '{key}'. Use dBm, mW or W")
         x, u = float(m.group(1)), m.group(2) or "dbm"
         return {"dbm": x, "dbw": x + 30, "mw": 10 * math.log10(max(x, 1e-30)),
                 "w": 10 * math.log10(max(x, 1e-30)) + 30}[u]
@@ -76,5 +77,5 @@ def flag(params: dict, key: str, default: bool = False) -> bool:
 def check_known(params: dict, known: set[str], template: str) -> None:
     bad = [k for k in params if k not in known]
     if bad:
-        raise ParamError(f"unknown value{'s' if len(bad) > 1 else ''} {', '.join(bad)} for {template}; "
-                         f"it takes {', '.join(sorted(known))}")
+        raise ParamError(f"unknown value{'s' if len(bad) > 1 else ''} {', '.join(bad)} for {template}. "
+                         f"It takes {', '.join(sorted(known))}")

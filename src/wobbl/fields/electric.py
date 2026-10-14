@@ -233,13 +233,13 @@ def run_electric(template: str, params: dict, out_dir: str | Path, question: str
             st = ("pass" if err < 0.01 else "warn") if s.dims["edge"] == "square" else ("pass" if err < 0.03 else "info")
             checks.append(Check("closed form", st,
                                 f"Kirchhoff's formula for square edged discs gives {fmt(ck * 1e12)} pF, the field solve "
-                                f"{fmt(C * 1e12)} pF ({100 * err:.2g}% apart, rounded edges sit a little lower); the "
+                                f"{fmt(C * 1e12)} pF ({100 * err:.2g}% apart, rounded edges sit a little lower). The "
                                 f"ideal parallel plate value without fringing is {fmt(par * 1e12)} pF",
                                 {"kirchhoff_F": ck, "parallel_plate_F": par}))
         else:
             checks.append(Check("closed form", "info",
                                 f"the ideal parallel plate value is {fmt(par * 1e12)} pF and the field solve gives "
-                                f"{fmt(C * 1e12)} pF; fringing through the air around the dielectric adds the rest"))
+                                f"{fmt(C * 1e12)} pF. Fringing through the air around the dielectric adds the rest"))
         e_uni = s.volts / d
         strength = paschen_air(d) if s.dielectric == "air" else diel.strength * 1e6
         exact_note = f"A uniform field would be {fmt(e_uni / 1e6)} kV/mm."
@@ -317,7 +317,7 @@ def run_electric(template: str, params: dict, out_dir: str | Path, question: str
     assumptions = [f"Electrostatic, {('axisymmetric' if template != 'coax' else 'a cross section of a long cable')}, "
                    "conductors are perfect and their surfaces are equipotential.",
                    f"Between the conductors is {diel.name} (relative permittivity {diel.epsr:g}, {diel.source}).",
-                   "Breakdown strength is a short term value at sea level; humidity, surface contamination, pressure "
+                   "Breakdown strength is a short term value at sea level. Humidity, surface contamination, pressure "
                    "and long term aging lower it, and gaps across a surface (creepage) break down sooner."]
     if template == "plates" and s.dielectric == "air":
         assumptions.append("Air breakdown uses Paschen's law for a uniform field across this gap.")

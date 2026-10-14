@@ -135,11 +135,13 @@ def _build_in(gmsh, model: Model2D, path: str) -> dict:
     occ = gmsh.model.occ
     gm = gmsh.model
     cx, cy = model.center
-    big = 4 * max(model.radius, model.shell)
+    reach = max((abs(v) for s in model.shapes for v in np.ravel(s.data)), default=1.0)
+    big = 4 * max(model.radius, model.shell, reach + abs(cx) + abs(cy))
     objs, names = [], []
-    air = _clipped(occ, occ.addDisk(cx, cy, 0, model.radius, model.radius), model.clip, big, model.center)
-    objs.append(air)
-    names.append("air")
+    if model.radius > 0:                 # radius 0: the shapes are the whole domain (a duct), no air around them
+        air = _clipped(occ, occ.addDisk(cx, cy, 0, model.radius, model.radius), model.clip, big, model.center)
+        objs.append(air)
+        names.append("air")
     if model.shell:
         outer = _clipped(occ, occ.addDisk(cx, cy, 0, model.shell, model.shell), model.clip, big, model.center)
         inner = _clipped(occ, occ.addDisk(cx, cy, 0, model.radius, model.radius), model.clip, big, model.center)
@@ -156,10 +158,14 @@ def _build_in(gmsh, model: Model2D, path: str) -> dict:
             pts = [occ.addPoint(x, y, 0) for x, y in s.data]
             ls = [occ.addLine(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
             t = occ.addPlaneSurface([occ.addCurveLoop(ls)])
-        objs.append(_clipped(occ, t, model.clip, big, model.center, within=model.shell or model.radius))
+        objs.append(_clipped(occ, t, model.clip if model.radius > 0 else "", big, model.center,
+                             within=model.shell or model.radius))
         names.append(s.name)
     flat = [dt for o in objs for dt in o]
-    _, mp = occ.fragment(flat, [])
+    if len(flat) > 1:
+        _, mp = occ.fragment(flat, [])
+    else:                                # a lone duct needs no fragmenting
+        mp = [[flat[0]]]
     occ.synchronize()
     owner: dict[int, int] = {}          # surface tag -> index of the last shape that covers it
     k = 0

@@ -80,7 +80,7 @@ def solenoid_spec(p: dict) -> Spec:
         raise ParamError("coil_od must be larger than coil_id")
     stroke = value(p, "stroke", 6, "length")
     if stroke >= d["lc"] - d["ls"]:
-        raise ParamError(f"a {stroke * 1e3:g} mm stroke would pull the plunger out of the coil; keep it under "
+        raise ParamError(f"a {stroke * 1e3:g} mm stroke would pull the plunger out of the coil. Keep it under "
                          f"{(d['lc'] - d['ls']) * 1e3:g} mm or shorten the stop")
     air = text(p, "core", "steel") in ("none", "air", "0", "no")
     s = Spec("solenoid", p, _gaps(p, stroke), value(p, "need", 0, "force"), value(p, "turns", 1000),
@@ -107,8 +107,10 @@ def solenoid_geometry(s: Spec, gap: float, k: float = 1.0) -> tuple[Model2D, Mag
     size = min(t / 2, (ro - ri) / 5, lc / 16)
     regions = [MagRegion("air"), MagRegion("coil", js=s.turns * s.current / s.coil_area)]
     if s.air_core:
+        # no steel and no gaps: the field is smooth, so elements follow the coil's size, not its winding thickness
+        size = max((ro - ri) / 2, min(ri / 4, lc / 60))
         shapes = [coil]
-        refine = [("coil", size / 2, 4 * size)]
+        refine = []
         body = []
         probes = [(0.3 * ri, 0.0)]
     else:
@@ -160,7 +162,7 @@ def pot_spec(p: dict) -> Spec:
     d["rpl"] = value(p, "plate_d", 2 * r3 * 1e3 + 10, "length") / 2
     d["r2"] = r3 - d["w"]
     if d["r2"] <= d["r1"] + 1 * MM:
-        raise ParamError("the pole and the wall leave no room for the coil; widen the magnet or narrow the pole")
+        raise ParamError("the pole and the wall leave no room for the coil. Widen the magnet or narrow the pole")
     stroke = value(p, "stroke", 3, "length")
     area = (d["r2"] - d["r1"] - 0.6 * MM) * (d["h"] - 0.5 * MM)
     s = Spec("electromagnet", p, _gaps(p, stroke), value(p, "need", 0, "force"), value(p, "turns", 500),
@@ -213,7 +215,7 @@ def magnet_spec(p: dict) -> Spec:
     grade = text(p, "grade", "n42")
     mag = get_magnetic(grade)
     if not mag.br:
-        raise ParamError(f"'{grade}' is not a magnet grade; use n35, n42, n52 or ferrite")
+        raise ParamError(f"'{grade}' is not a magnet grade. Use n35, n42, n52 or ferrite")
     s = Spec("magnet", p, _gaps(p, stroke), value(p, "need", 0, "force"), steel=text(p, "material", "1010-steel"),
              magnet=mag.key, pull=-1.0, dims=d)
     get_magnetic(s.steel)
@@ -364,18 +366,20 @@ def run_magnetic(template: str, params: dict, out_dir: str | Path, question: str
     knee = steel.knee()
     bmax = float(np.max(fine["bnl"])) if "bnl" in fine else 0.0
     frac = float(np.mean(fine["bnl"] > knee)) if "bnl" in fine else 0.0
-    sat_word = (f"the steel peaks at {fmt(bmax)} T, past its {fmt(knee)} T knee over {100 * frac:.0f}% of its "
-                "elements, so it is saturating" if bmax > knee else
-                f"the steel peaks at {fmt(bmax)} T, below its {fmt(knee)} T knee")
+    where = f"over {100 * frac:.0f}% of its area" if frac >= 0.01 else "in a few spots"
+    sat_word = (f"the steel peaks at {fmt(bmax)} T, past its {fmt(knee)} T knee {where}, so it is saturating"
+                if bmax > knee else f"the steel peaks at {fmt(bmax)} T, below its {fmt(knee)} T knee")
     checks.append(Check("saturation", "info", sat_word, {"b_max_T": bmax, "knee_T": knee, "fraction": frac}))
     demag = None
     if s.magnet and "hm" in fine:
         mag = get_magnetic(s.magnet)
         hmin = float(np.min(fine["hm"]))
         demag = -hmin / mag.hcj
-        checks.append(Check("demagnetization", "pass" if demag < 0.6 else ("warn" if demag < 0.9 else "fail"),
+        # a linear magnet model holds while the reverse field stays clear of the coercivity
+        checks.append(Check("demagnetization", "info" if demag < 0.8 else ("warn" if demag < 1.0 else "fail"),
                             f"the worst reverse field in the magnet is {fmt(-hmin / 1e3)} kA/m, {100 * demag:.0f}% "
-                            f"of the {fmt(mag.hcj / 1e3)} kA/m coercivity at 20 C"))
+                            f"of the {fmt(mag.hcj / 1e3)} kA/m coercivity at 20 C"
+                            + (", and coercivity falls about 0.6% per degree as NdFeB warms" if demag > 0.5 else "")))
     bgap = float(np.linalg.norm(fine["probes"][0][:2])) if fine["probes"] else 0.0
     sane = 0 < f_gov < 1e5 and bgap < 3.0
     checks.append(Check("units and sanity", "pass" if sane else "warn",
@@ -407,6 +411,11 @@ def run_magnetic(template: str, params: dict, out_dir: str | Path, question: str
                 f"at {fmt(s.gaps[int(np.argmax(f_sweep))] * 1e3)} mm.")
     head += sat_tail
     fixes = _fixes(s, f_sweep, f_gov, need, bmax > knee * 1.05) if need and verdict != "ok" else []
+    if demag is not None and demag > 0.5:
+        fixes.append({"kind": "grade", "title": "Use a high coercivity grade if the magnet runs warm",
+                      "summary": f"The reverse field reaches {100 * demag:.0f}% of the coercivity at 20 C. An SH or UH "
+                                 "grade keeps its coercivity to 150 C and above, at a few percent less remanence.",
+                      "auto": False})
     images = {}
     view = geom_fn(s, g, LEVELS[1])[2]
     mid = levels[1]

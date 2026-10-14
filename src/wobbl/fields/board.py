@@ -70,7 +70,7 @@ def spec(template: str, p: dict) -> BSpec:
               value(p, "thickness", 35e-3, "length"), epsr, diel if not p.get("er") else f"er={epsr:g}",
               value(p, "length", 0, "length"), value(p, "frequency", 100e6, "frequency"),
               target=value(p, "target", 50 if template != "coupled" else 0), tol=value(p, "tolerance", 0.1),
-              rise=value(p, "rise", 1e-9, "time"), swing=value(p, "swing", 3.3, "voltage"),
+              rise=value(p, "rise", 1e-9, "fast_time"), swing=value(p, "swing", 3.3, "voltage"),
               max_xt=value(p, "max_crosstalk", 0.05))
     if s.tol > 1:
         s.tol /= 100.0                   # 10 means 10%
@@ -101,7 +101,8 @@ def spec(template: str, p: dict) -> BSpec:
 def geometry(s: BSpec, k: float, epsr: float, drive: str) -> tuple[Model2D, ElecProblem, tuple]:
     """Cross section in meters, y up from the ground plane. drive is the conductor held at 1 V."""
     w, h, t = s.w, s.h, s.t
-    fine = max(min(t, w, h) / 3, 2 * UM)
+    edge = min(w, h, s.s or w) / 8          # along the conductors
+    corner = max(t / 2, 1 * UM)             # at their corners, where the field is singular
     if s.template == "coax":
         a, b = s.a, s.b
         shapes = [Shape("inner", "disk", (0.0, 0.0, a), hole=True, size=a / 12)]
@@ -121,23 +122,25 @@ def geometry(s: BSpec, k: float, epsr: float, drive: str) -> tuple[Model2D, Elec
         y0 = h
         regions_eps = {"air": epsr}
     else:
-        shapes.append(Shape("substrate", "rect", (-R, 0.0, R, h)))
+        shapes.append(Shape("substrate", "rect", (-1.05 * R, 0.0, 1.05 * R, h)))   # cut by the domain
         y0 = h
         regions_eps = {"substrate": epsr}
     if s.template in ("microstrip", "stripline"):
-        shapes.append(Shape("trace", "rect", (-w / 2, y0, w / 2, y0 + t), hole=True, size=fine))
+        shapes.append(Shape("trace", "rect", (-w / 2, y0, w / 2, y0 + t), hole=True, size=edge))
     elif s.template == "coupled":
         x1 = s.s / 2 + w / 2
-        shapes += [Shape("trace1", "rect", (-x1 - w / 2, y0, -x1 + w / 2, y0 + t), hole=True, size=fine),
-                   Shape("trace2", "rect", (x1 - w / 2, y0, x1 + w / 2, y0 + t), hole=True, size=fine)]
+        shapes += [Shape("trace1", "rect", (-x1 - w / 2, y0, -x1 + w / 2, y0 + t), hole=True, size=edge),
+                   Shape("trace2", "rect", (x1 - w / 2, y0, x1 + w / 2, y0 + t), hole=True, size=edge)]
     else:
-        shapes += [Shape("trace", "rect", (-w / 2, y0, w / 2, y0 + t), hole=True, size=fine),
-                   Shape("side", "rect", (w / 2 + s.s, y0, w / 2 + s.s + s.wg, y0 + t), hole=True, size=fine),
-                   Shape("side", "rect", (-w / 2 - s.s - s.wg, y0, -w / 2 - s.s, y0 + t), hole=True, size=fine)]
+        shapes += [Shape("trace", "rect", (-w / 2, y0, w / 2, y0 + t), hole=True, size=edge),
+                   Shape("side", "rect", (w / 2 + s.s, y0, w / 2 + s.s + s.wg, y0 + t), hole=True, size=edge),
+                   Shape("side", "rect", (-w / 2 - s.s - s.wg, y0, -w / 2 - s.s, y0 + t), hole=True, size=edge)]
     names = sorted({sh.name for sh in shapes if sh.hole})
+    spots = [(x, y, corner) for sh in shapes if sh.hole
+             for x in (sh.data[0], sh.data[2]) for y in (sh.data[1], sh.data[3])]
     size = min(h / 4, w / 4, (s.s / 3 if s.s else 1.0))
     model = Model2D("planar", shapes, R, clip=clip, size=size, far=R / 10, growth=0.25, lines=lines,
-                    refine=[(n, fine, 3 * max(w, h)) for n in names]).scaled(k)
+                    spots=spots).scaled(k)
     pots = {n: (1.0 if n == drive else 0.0) for n in names}
     pots.update({b: 0.0 for b in lines})
     prob = ElecProblem("planar", regions_eps, pots, fields=False)
@@ -175,7 +178,20 @@ def cohn_stripline(w: float, b: float, er: float) -> float:
 
     k = 1 / math.cosh(math.pi * w / (2 * b))
     kp = math.tanh(math.pi * w / (2 * b))
-    return ETA0 / (4 * math.sqrt(er)) * ellipk(kp ** 2) / ellipk(k ** 2)
+    return ETA0 / (4 * math.sqrt(er)) * ellipk(k ** 2) / ellipk(kp ** 2)
+
+
+def wheeler_stripline(w: float, b: float, t: float, er: float) -> float:
+    """Z0 of a centered stripline of finite thickness (Wheeler, IEEE MTT 1978, as given in Wadell's Transmission
+    Line Design Handbook), within about 0.5%."""
+    if t <= 0:
+        return cohn_stripline(w, b, er)
+    x = t / b
+    m = 2 / (1 + 2 / 3 * x / (1 - x))
+    dw = x / (math.pi * (1 - x)) * (1 - 0.5 * math.log((x / (2 - x)) ** 2 + (0.0796 * x / (w / b + 1.1 * x)) ** m))
+    wp = (w / (b - t) + dw) * (b - t)
+    q = 4 / math.pi * (b - t) / wp
+    return 30 / math.sqrt(er) * math.log(1 + q * (2 * q + math.sqrt((2 * q) ** 2 + 6.27)))
 
 
 def gcpw(w: float, s: float, h: float, er: float) -> tuple[float, float]:
@@ -264,8 +280,8 @@ def run_board(template: str, params: dict, out_dir: str | Path, question: str = 
         ref, ref_e = hammerstad_jensen(s.w, s.h, s.t, s.epsr)
         ref_name = "Hammerstad and Jensen's formula with its thickness correction"
     elif template == "stripline":
-        ref = cohn_stripline(s.w, 2 * s.h + s.t, s.epsr)
-        ref_name = "Cohn's exact formula for a zero thickness strip (a real strip's thickness lowers Z0)"
+        ref = wheeler_stripline(s.w, 2 * s.h + s.t, s.t, s.epsr)
+        ref_name = "Wheeler's formula for a strip of this thickness"
     elif template == "coplanar":
         ref, ref_e = gcpw(s.w, s.s, s.h, s.epsr)
         ref_name = "the conformal mapping formula for zero thickness and infinite side grounds"
@@ -338,7 +354,7 @@ def run_board(template: str, params: dict, out_dir: str | Path, question: str = 
                 if wn:
                     fixes.append({"kind": "width", "title": f"Make the trace about {fmt(wn * 1e3)} mm wide",
                                   "summary": f"Hammerstad and Jensen put a {fmt(wn * 1e3)} mm trace at "
-                                             f"{fmt(s.target)} ohm on this stackup; check it with another run.",
+                                             f"{fmt(s.target)} ohm on this stackup, so check it with another run.",
                                   "auto": False})
         else:
             verdict = "ok"
@@ -355,10 +371,10 @@ def run_board(template: str, params: dict, out_dir: str | Path, question: str = 
                                        skip_outline={msh.tags[n] for n in ("air", "substrate") if n in msh.tags},
                                        view=f["view"])}
     assumptions = [f"Quasi static TEM cross section of a long, uniform line. {_diel_text(s)}",
-                   f"Copper {fmt(s.t * 1e6)} um thick, perfect conductor for the fields; the ground plane is infinite.",
-                   "Loss, dispersion and surface roughness are not in the impedance; they matter above a few GHz."]
+                   f"Copper {fmt(s.t * 1e6)} um thick, perfect conductor for the fields, and the ground plane is infinite.",
+                   "Loss, dispersion and surface roughness are not in the impedance, and they matter above a few GHz."]
     if template == "microstrip":
-        assumptions.append("No solder mask over the trace; mask lowers Z0 by a few percent.")
+        assumptions.append("No solder mask over the trace, which would lower Z0 by a few percent.")
     o = GenericOutcome("board", template, question, verdict, head, metrics, lvl, reasons, checks, assumptions,
                        {**values, "params": {k: str(v) for k, v in params.items()},
                         "_figures": [["field", "Electric field around the trace"]]}, images, fixes,

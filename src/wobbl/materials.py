@@ -493,9 +493,9 @@ class Dielectric:
 
 DIELECTRICS: dict[str, Dielectric] = {d.key: d for d in [
     Dielectric("air", "Air at sea level", 1.0006, 3.0, aliases=("vacuum", "none"),
-               source="about 3 kV/mm in uniform fields across gaps of a few mm (Paschen); less across wider gaps"),
+               source="about 3 kV/mm in uniform fields across gaps of a few mm (Paschen), less across wider gaps"),
     Dielectric("fr4", "FR4 laminate", 4.4, 20.0, 0.02, aliases=("pcb", "g10"),
-               source="typical FR4 at 1 MHz to 1 GHz (IPC-4101/21 allows up to 5.4); strength through 1.6 mm"),
+               source="typical FR4 at 1 MHz to 1 GHz (IPC-4101/21 allows up to 5.4), strength through 1.6 mm"),
     Dielectric("ro4350b", "Rogers RO4350B", 3.66, 31.2, 0.0037, aliases=("rogers", "ro4350"),
                source="Rogers RO4350B datasheet, design Dk 3.66 at 8 to 40 GHz, 31.2 kV/mm"),
     Dielectric("ptfe", "PTFE", 2.1, 60.0, 0.0002, aliases=("teflon",), source="Chemours Teflon PTFE data, thin film"),
