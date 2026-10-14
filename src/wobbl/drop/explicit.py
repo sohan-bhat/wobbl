@@ -68,8 +68,8 @@ def omega_max(K: sp.csr_matrix, m3: np.ndarray, iters: int = 80, seed: int = 0) 
 
 def integrate(K: sp.csr_matrix, mass: np.ndarray, X: np.ndarray, contact: Contact, v0: np.ndarray,
               gravity: np.ndarray, watch: np.ndarray, t_max: float, frames: int = 100, wmax: float | None = None,
-              max_steps: int = 60_000, damping: float = 0.3, progress=None) -> History:
-    """March from first touch until the part has left the floor and rung for a while, or t_max.
+              max_steps: int = 60_000, damping: float = 0.3, ring: float = 0.5, progress=None) -> History:
+    """March from first touch until the part has left the floor and rung for ring times the pulse, or t_max.
 
     damping is the damping ratio given to the mesh's highest frequency through stiffness proportional damping,
     beta = 2 damping / omega_max: it calms the ringing that a sudden contact sets off at the scale of the
@@ -164,7 +164,7 @@ def integrate(K: sp.csr_matrix, mass: np.ndarray, X: np.ndarray, contact: Contac
         if first is not None and quiet > 0:
             pulse = last - first
             # the part has left the floor: let the stress waves ring for half a pulse more, then stop
-            if (t - last) >= max(0.5 * pulse, 20 * dt) and not (p > set_).any():
+            if (t - last) >= max(ring * pulse, 20 * dt) and not (p > set_).any():
                 reason = "the part left the floor"
                 break
         if ke > 50 * ke0 + 1e-12:

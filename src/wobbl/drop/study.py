@@ -27,7 +27,7 @@ from .explicit import Contact, History, integrate, omega_max
 from .floors import FloorMaterial, get_floor
 
 G = 9810.0                   # mm/s2
-LEVELS = {"fast": (1.0,), "normal": (1.0, 0.7)}
+TOP = {"fast": 1, "normal": 2, "fine": 3}          # screened landings run again on quadratic tets
 TOL = 0.10                   # drop peaks settle to about 10% between meshes
 RIGID_FLOOR = 10.0           # a hard floor is ten times stiffer than a layer of the part one element deep
 
@@ -133,8 +133,10 @@ def candidates(spec: str, X: np.ndarray, mass: np.ndarray, quality: str = "norma
     out: list[tuple[str, np.ndarray]] = []
     want = set()
     for part in [p.strip() for p in s.replace(" and ", ",").split(";") if p.strip()] or ["worst"]:
-        if part in ("worst", "all", "any", "auto"):
-            want |= {"face", "corner"} | ({"edge"} if quality != "fast" else set())
+        if part in ("worst", "any", "auto"):
+            want |= {"face", "corner"} | ({"edge"} if quality == "fine" else set())
+        elif part == "all":
+            want |= {"face", "edge", "corner"}
         elif part.rstrip("s") in ("face", "edge", "corner"):
             want.add(part.rstrip("s"))
         elif part == "flat":
@@ -230,7 +232,7 @@ def contact_for(model: Model, d: np.ndarray, floor: FloorMaterial, E: float, ban
 
 
 def simulate(model: Model, d: np.ndarray, v0: float, floor: FloorMaterial, mat: dict, watch: np.ndarray,
-             frames: int = 100, progress=None) -> tuple[History, Contact]:
+             frames: int = 100, ring: float = 0.5, progress=None) -> tuple[History, Contact]:
     band = 0.15 * float(np.ptp(model.X @ d)) + 2 * model.h
     c = contact_for(model, d, floor, mat["E"], band)
     # long enough for a soft floor: a spring and mass pulse on the softest floor patch, plus ringing
@@ -240,7 +242,7 @@ def simulate(model: Model, d: np.ndarray, v0: float, floor: FloorMaterial, mat: 
     cw = np.sqrt(mat["E"] / mat["density"])
     t_max = min(max(3 * pulse, 20 * float(np.ptp(model.X, axis=0).max()) / cw), 0.05)
     hist = integrate(model.K, model.mass, model.X, c, v0 * d, G * d, watch, t_max, frames, model.wmax,
-                     progress=progress)
+                     ring=ring, progress=progress)
     return hist, c
 
 
@@ -352,14 +354,10 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
         lin = make_model(prep, h0, mat, 1, base=quad0)
         finish(lin, _restrict(extra, quad0, lin))
         lw = _restrict_nodes(watch, quad0, lin)
-        for i, (name, d) in enumerate(cands):
-            say("screen", f"{i + 1}/{len(cands)}: {name}")
-            hist, c = simulate(lin, d, v0, floor, mat, lw, frames=40)
-            ev = evaluate(lin, hist, c, mat, ductile, v0, lw, g_cut)
-            screen.append({"name": name, "d": d.tolist(), "governing": ev["governing"], "g_watch": ev["g_watch"],
-                           "g_rigid": ev["g_rigid"], "pulse_ms": ev["pulse_ms"]})
+        say("screen", f"{len(cands)} landings on linear tets")
+        screen = screen_landings(lin, cands, v0, floor, mat, lw, ductile, g_cut, say)
         order = np.argsort([-s["governing"] for s in screen])
-        top = [int(i) for i in order[:1 if study.quality == "fast" else 3]]
+        top = [int(i) for i in order[:TOP.get(study.quality, 2)]]
     else:
         top = [0]
     # the worst few again on quadratic tets, then the worst of those refined
@@ -373,16 +371,23 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
     name, d = cands[worst]
     levels = [_level(0, quad0, runs[worst][2])]
     last = (quad0, *runs[worst])
-    for k, f in enumerate(LEVELS.get(study.quality, LEVELS["normal"])[1:], start=1):
-        h = h0 * f
-        say("mesh", f"level {k}: {h:.3g} mm tets for {name}")
-        mk = make_model(prep, h, mat, 2)
+    if study.quality != "fast":
+        # refine where the peak is: a finer patch of mesh around it, the rest as it was
+        from ..mesh.mesher import Refinement, Sizing, build_mesh
+
+        g0 = quad0.X[runs[worst][2]["node"]]
+        say("mesh", f"level 1: {0.5 * h0:.3g} mm tets around the peak for {name}")
+        mesh = build_mesh(prep, Sizing(h=h0, order=2, curvature=12,
+                                       refinements=[Refinement(0.5 * h0, points=[tuple(g0)], radius=3 * h0,
+                                                               label="drop peak")]))
+        mk = make_model(prep, h0, mat, 2, base=_Base(mesh))
+        mk.h = 0.5 * h0
         ex, wk, _ = added_masses(study, mk, feats)
         finish(mk, ex)
-        say("solve", f"level {k}: {len(mk.X):,} nodes")
+        say("solve", f"level 1: {len(mk.X):,} nodes")
         hist, c = simulate(mk, d, v0, floor, mat, wk)
         ev = evaluate(mk, hist, c, mat, ductile, v0, wk, g_cut)
-        levels.append(_level(k, mk, ev))
+        levels.append(_level(1, mk, ev))
         last = (mk, hist, c, ev)
         watch = wk
     model, hist, c, ev = last
@@ -430,6 +435,47 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
         o.notes.append(f"playback.json was not written ({str(e)[:120]})")
     shutil.rmtree(out / "work", ignore_errors=True)
     return o.write(out)
+
+
+class _Base:
+    """A mesh made elsewhere, for make_model."""
+    def __init__(self, mesh):
+        self.mesh = mesh
+
+
+def screen_landings(lin: Model, cands, v0, floor, mat, watch, ductile, g_cut, say) -> list[dict]:
+    """Every landing on the linear tet model, a few at a time in worker processes when the machine has cores to
+    spare, stopping each run when the part leaves the floor."""
+    import os
+    from concurrent.futures import ProcessPoolExecutor
+    import multiprocessing as mp
+
+    light = Model(lin.X, lin.tets, lin.tris, lin.tri_surf, lin.K, lin.mass, lin.h, lin.wmax, lin.order)
+    jobs = [(light, name, d, v0, floor, mat, watch, ductile, g_cut) for name, d in cands]
+    workers = min(len(jobs), max(1, (os.cpu_count() or 2) // 3), 4)
+    if workers > 1:
+        try:
+            with ProcessPoolExecutor(workers, mp_context=mp.get_context("spawn")) as ex:
+                out = []
+                for k, r in enumerate(ex.map(_screen_one, jobs)):
+                    say("screen", f"{k + 1}/{len(jobs)}: {r['name']}, {fmt(r['governing'])} MPa")
+                    out.append(r)
+                return out
+        except Exception:  # noqa: BLE001  no worker processes here: run them one after another
+            pass
+    out = []
+    for k, job in enumerate(jobs):
+        out.append(_screen_one(job))
+        say("screen", f"{k + 1}/{len(jobs)}: {out[-1]['name']}, {fmt(out[-1]['governing'])} MPa")
+    return out
+
+
+def _screen_one(job) -> dict:
+    model, name, d, v0, floor, mat, watch, ductile, g_cut = job
+    hist, c = simulate(model, d, v0, floor, mat, watch, frames=40, ring=0.0)
+    ev = evaluate(model, hist, c, mat, ductile, v0, watch, g_cut)
+    return {"name": name, "d": [float(x) for x in d], "governing": ev["governing"], "g_watch": ev["g_watch"],
+            "g_rigid": ev["g_rigid"], "pulse_ms": ev["pulse_ms"]}
 
 
 def _level(k: int, model: Model, ev: dict) -> dict:

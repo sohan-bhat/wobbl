@@ -60,7 +60,7 @@ def drop(job):
     if land:
         job.use("orientation", land)
     else:
-        land = job.value("orientation", "worst", "landing not given, so every face, edge and corner is tried")
+        land = job.value("orientation", "worst", "landing not given, so every face and corner is tried")
     mat = material(job, "abs")
     num = job.number
     st = DropStudy(str(job.path), mat, height, land, fl, job.values("mass"), job.value("watch") or "",
@@ -87,8 +87,8 @@ register(Analysis(
     options=(Option("height", "Drop height; a bare number is meters", "1 m"),
              Option("floor", "concrete, steel, tile, stone, wood, vinyl, carpet, foam, grass, or "
                              "'layer:E=5,t=10' (MPa, mm)", "concrete"),
-             Option("orientation", "worst, faces, edges, corners, flat, or a direction pointing down such as -z "
-                                   "or 1,1,-1", "worst"),
+             Option("orientation", "worst (every face and corner, edges too at fine quality), all, faces, edges, "
+                                   "corners, flat, or a direction pointing down such as -z or 1,1,-1", "worst"),
              Option("mass", "A point mass on the part, like a battery: '45 g @ 0,0,5' or '45 g @ <faces>'",
                     multiple=True),
              Option("watch", "Where the accelerometer sits: 'x,y,z' or faces (default the first mass, else the "

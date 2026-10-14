@@ -96,7 +96,8 @@ def test_landings_floors_and_words():
     from wobbl.drop.study import candidates, parse_height, unique_landings
 
     X = np.array([[x, y, z] for x in (0, 40) for y in (0, 20) for z in (0, 10)], float)
-    cands = candidates("worst", X, np.ones(8))
+    assert len(candidates("worst", X, np.ones(8))) == 14       # faces and corners; edges too at fine quality
+    cands = candidates("all", X, np.ones(8))
     assert len(cands) == 26 and all(abs(np.linalg.norm(d) - 1) < 1e-12 for _, d in cands)
     keep, same = unique_landings(cands, [0, 1, 2])
     assert len(keep) == 7      # three faces, three edges and one corner for a box symmetric three ways
