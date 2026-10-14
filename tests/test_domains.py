@@ -119,6 +119,17 @@ def test_generic_model_on_a_toy_domain(tmp_path):
     assert {x["input"] for x in r["sensitivity"]["indices"]} >= {"a", "b"}
 
 
+def test_readings_of_any_value_keep_their_name_and_convert_their_unit(tmp_path):
+    from wobbl.credibility.readings import read_tests
+
+    (tmp_path / "t.csv").write_text("name,quantity,value,uncertainty,unit\nALT,apogee_m,10000,30,ft\n"
+                                    "I,i_led_A,20,0.1,mA\nT,t_max_C,212,1,F\n")
+    rs, _ = read_tests(tmp_path / "t.csv")
+    assert [r.quantity for r in rs] == ["apogee_m", "i_led_A", "t_max_C"]
+    assert rs[0].value == pytest.approx(3048.0) and rs[0].u == pytest.approx(9.144)
+    assert rs[1].value == pytest.approx(0.02) and rs[2].value == pytest.approx(100.0)
+
+
 def test_registry_spec_leaves():
     spec = {"thing": "/x/bar.step", "kind": "step", "question": "q",
             "options": {"material": ["6061-t6"], "load": ["220 N down @ top", "60 N +y @ x=max"], "fix": ["x=min"],
