@@ -91,18 +91,24 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None, quick: b
     def stop_net(size, area):
         return area0 > 0 and abs(force0) / max(area0 - area, 1e-9) * hi >= flow
 
+    part = PartShape(unc.mesh)
     res_path = grow(prep, first.crack, build_model, material, law, spectrum, adapter, work, h, first.wall,
-                    st.quality, st.steps, GROWTH_STEP, stop_k, stop_net, st.budget, say, st.keep,
-                    PartShape(unc.mesh))
+                    st.quality, st.steps, GROWTH_STEP, stop_k, stop_net, st.budget, say, st.keep, part)
     steps = res_path.steps
     s = np.array([x.size for x in steps])
     k = np.array([x.k_lead for x in steps])
     area = np.array([x.area for x in steps])
     x_prof, sig_prof = stress_profile(unc, first, max(spec.a, s[0]) * 1.05)
     small = _small_crack(x_prof, sig_prof, s[0], k[0])
-    if len(s) == 1:   # failed on the first solve: give the table a second point so it can be read
+    solved = len(s)
+    end_fails = res_path.end_fails
+    if res_path.stuck:
+        s, k, area = _extrapolate(s, k, area, res_path, first, part)
+        end_fails = True
+    elif len(s) == 1:   # one crack and nothing after it: give the table a second point so it can be read
         s, k, area = np.append(s, s[0] * 1.001), np.append(k, k[0] * 1.0005), np.append(area, area[0])
-    cpath = CrackPath(s, k, area, area0, force0, small, res_path.end, res_path.end_fails)
+    cpath = CrackPath(s, k, area, area0, force0, small, res_path.end, end_fails)
+    cpath.solved = solved
     inp = LifeInputs(law, spectrum, flow, st.wheeler)
     say("life", f"Monte Carlo over {scatter.samples:,} parts")
     mc = monte_carlo(cpath, inp, spec.a, scatter, st.target_life)
@@ -145,6 +151,27 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None, quick: b
     if not st.keep:
         shutil.rmtree(work, ignore_errors=True)
     return o
+
+
+def _extrapolate(s, k, area, res_path, first, part):
+    """When a step cannot be meshed, carry K on past the last solved crack as K grows with the square root of size,
+    the same shape the crack had, up to the far side of the wall ahead of the last front, where it counts as
+    failed. The checks say how much of the life rests on this."""
+    last = np.asarray(res_path.steps[-1].fronts[0]["xyz"]) if res_path.steps[-1].fronts else None
+    mid = last[len(last) // 2] if last is not None else first.origin
+    way = first.toward
+    if last is not None and len(res_path.steps) > 1 and res_path.steps[-2].fronts:
+        prev = np.asarray(res_path.steps[-2].fronts[0]["xyz"])
+        d = mid - prev[len(prev) // 2]
+        if np.linalg.norm(d) > 1e-9:
+            way = d / np.linalg.norm(d)
+    ahead = part.ahead(mid, way, 1e-6 * s[-1])
+    if not np.isfinite(ahead) or ahead <= 0.02 * s[-1]:
+        ahead = 0.02 * s[-1]
+    ext = s[-1] + ahead * np.linspace(0.2, 1.0, 5)
+    k_ext = k[-1] * np.sqrt(ext / s[-1])
+    a_ext = area[-1] * (ext / s[-1]) ** 2
+    return np.concatenate([s, ext]), np.concatenate([k, k_ext]), np.concatenate([area, a_ext])
 
 
 def _small_crack(x, sig, s0: float, k0: float):
@@ -209,8 +236,18 @@ def _checks(st, res_path, first, cpath, inp, mc, unc, x_prof, sig_prof, material
                                 f"({100 * ch:.2g}% apart)", {"block": mc.nominal, "cycle_by_cycle": ref}))
     s = cpath.s
     ran = mc.ran_out
-    path_note = (f"{len(res_path.steps)} solved cracks from {fmt(s[0])} to {fmt(s[-1])} mm, ended by {res_path.end}")
-    if ran:
+    path_note = (f"{len(res_path.steps)} solved cracks from {fmt(s[0])} to {fmt(s[cpath.solved - 1])} mm, ended by "
+                 f"{res_path.end}")
+    if res_path.stuck:
+        n_solved = float(lives(cpath, inp, a0, 1.0, 1.0, inp.law.kc, n_grid=400)[0][0])
+        to_last = _life_to(cpath, inp, a0, float(s[cpath.solved - 1]))
+        share = 1.0 - to_last / n_solved if np.isfinite(n_solved) and n_solved > 0 else 1.0
+        status = "warn" if share <= 0.25 else "fail"
+        checks.append(Check("crack path", status,
+                            path_note + f". Past {fmt(s[cpath.solved - 1])} mm K is carried on as the square root "
+                            f"of size to the far side of the wall at {fmt(s[-1])} mm, and {_pct(share)} of the "
+                            "nominal life rests on that estimate", {"extrapolated_share": share}))
+    elif ran:
         share = ran / mc.lives.size
         status = "warn" if share <= 0.1 else "fail"
         text = (path_note + f". {_pct(share)} of the parts were still growing at its end and count their life "
@@ -258,6 +295,14 @@ def _handbook(st, first, cpath, unc, x_prof, sig_prof) -> Check:
         s += ". The handbook case ignores the part's shape away from the crack, so a gap this size is expected " \
              "when the crack is large next to its feature"
     return Check("hand calculation", status, s, {"handbook": k_hb, "fea": k_fe})
+
+
+def _life_to(cpath, inp, a0: float, size: float) -> float:
+    """Cycles for the nominal part to grow from a0 to ``size``."""
+    sizes, cycles = growth_curve(cpath, inp, a0)
+    if not len(sizes):
+        return 0.0
+    return float(np.interp(size, sizes, cycles))
 
 
 def _depth(unc, first) -> float:

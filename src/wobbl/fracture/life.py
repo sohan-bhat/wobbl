@@ -35,6 +35,7 @@ class CrackPath:
     small: Callable[[np.ndarray], np.ndarray] | None = None   # K below the smallest crack solved
     end: str = ""                 # why the path stops
     end_fails: bool = False       # the path stops because the part has failed there (the crack cut through it)
+    solved: int = 0               # how many of the sizes come from solved cracks (the rest are extrapolated)
 
     def k_at(self, s) -> np.ndarray:
         """K at crack sizes s, a power law between solved cracks; below the first, ``small`` or constant beta.
