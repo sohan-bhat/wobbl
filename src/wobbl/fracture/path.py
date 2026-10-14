@@ -159,6 +159,7 @@ class PathResult:
     end_fails: bool = False       # the crack has cut through, so reaching the end of the path is failure
     stuck: bool = False           # a step could not be meshed or solved, so the path stops short of failure
     dormant: bool = False         # every front point is below the growth threshold, so the crack stopped
+    cut: bool = False             # the next front would reach the far side of the wall the crack grows across
 
 
 def front_size(size: float, crack: Crack, h: float, wall: float, quality: str) -> float:
@@ -188,7 +189,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
     size = crack.size
     E, nu = material.E, material.nu
     end = f"the step limit ({max_steps})"
-    end_fails = stuck = dormant = False
+    end_fails = stuck = dormant = cut = False
     for j in range(max_steps + 1):
         t0 = time.time()
         hf = front_size(size, crack, h, wall, quality)
@@ -259,9 +260,9 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
         if part is not None and any(_leaves(part, sampled[i]["xyz"], m[0], m[1]) for i, m in moved.items()):
             # the next front would leave the part: the crack has reached the far side of the wall it runs through
             end = "the crack cutting through the wall it grows across"
-            end_fails = True
-            notes.append(f"After step {j} the crack reaches the far side of the wall it grows across. The few cycles "
-                         "it takes to cut the last of that wall are not counted, which errs short.")
+            end_fails = cut = True
+            notes.append(f"After step {j} the crack reaches the far side of the wall it grows across, where the part "
+                         "counts as failed.")
             break
         lead_i = max(moved, key=lambda i: moved[i][1].max())
         lead = int(np.argmax(moved[lead_i][1]))
@@ -278,7 +279,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
         size += da_max
         if not keep:
             shutil.rmtree(workdir / f"step{j}", ignore_errors=True)
-    return PathResult(steps, crack, end, first, convergence, balance, notes, end_fails, stuck, dormant)
+    return PathResult(steps, crack, end, first, convergence, balance, notes, end_fails, stuck, dormant, cut)
 
 
 def _leaves(part, old: np.ndarray, new: np.ndarray, da: np.ndarray) -> bool:

@@ -102,7 +102,7 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None, quick: b
     small = _small_crack(x_prof, sig_prof, s[0], k[0])
     solved = len(s)
     end_fails = res_path.end_fails
-    if res_path.stuck or res_path.dormant:
+    if res_path.stuck or res_path.dormant or res_path.cut:
         # past the last crack K follows the square root of size: a part whose crack is below threshold there
         # never fails, and one with a bigger flaw or load grows on this estimate
         s, k, area = _extrapolate(s, k, area, res_path, first, part)
@@ -249,11 +249,14 @@ def _checks(st, res_path, first, cpath, inp, mc, unc, x_prof, sig_prof, material
                             f"does not grow in a typical part. {_pct(grows)} of the parts sampled, those with "
                             "larger flaws or loads, grow past it, on K carried on as the square root of size",
                             {"growing_share": grows}))
-    elif res_path.stuck:
+    elif res_path.stuck or res_path.cut:
         n_solved = float(lives(cpath, inp, a0, 1.0, 1.0, inp.law.kc, n_grid=400)[0][0])
         to_last = _life_to(cpath, inp, a0, float(s[cpath.solved - 1]))
         share = 1.0 - to_last / n_solved if np.isfinite(n_solved) and n_solved > 0 else 1.0
-        status = "warn" if share <= 0.25 else "fail"
+        if res_path.cut:   # the wall ahead is all that is left, so the estimate covers the crack's last stretch
+            status = "pass" if share <= 0.25 else "warn"
+        else:
+            status = "warn" if share <= 0.25 else "fail"
         checks.append(Check("crack path", status,
                             path_note + f". Past {fmt(s[cpath.solved - 1])} mm K is carried on as the square root "
                             f"of size to the far side of the wall at {fmt(s[-1])} mm, and {_pct(share)} of the "
