@@ -1,6 +1,6 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift). Wobbl meshes the CAD, runs CalculiX, ngspice or a scipy flight integrator, checks its own answer and returns a picture, a confidence level and fixes.
+description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice or a scipy flight integrator, checks its own answer and returns a picture, a confidence level and fixes.
 ---
 
 # Wobbl: simulate before you build
@@ -75,6 +75,20 @@ and drag on a sphere, cylinder, plate or cube from published drag curves, as in
 `wobbl flow drag sphere --size "22 cm" --speed "20 m/s"`. A drag result near the drag crisis comes back
 with low confidence, because roughness and turbulence decide it there.
 
+When someone asks how likely a part is to fail, which input matters most, whether the model matches
+their tests, or which physical tests they can skip, build the evidence on a finished run's folder.
+`wobbl uncertainty wobbl-out/part --vary "load lognormal 10%" --vary "yield 8%" --vary "E 3%"`
+(MCP `quantify_uncertainty`) gives the probability of failure with its 95% interval, the spread of the
+answer and Sobol indices that rank the inputs. Scatter is written as a percentage, an `sd`, a `tol`
+band or a range, as in `"thickness tol 0.2"` or `"film uniform 3..8"`. Load, stiffness and strength
+scatter on a strength run scale the solution exactly and take seconds, while geometry, heat and circuit
+inputs need new solves and a polynomial chaos surrogate whose leave one out error comes back with the
+answer. `wobbl validate-against wobbl-out/part readings.csv` (MCP `validate_against_tests`) compares the
+run with strain, displacement, temperature or circuit readings as ASME V&V 20 does, adds the area metric
+and calibrates the uncertain inputs. `wobbl credibility wobbl-out/part --influence high --consequence medium`
+(MCP `assess_credibility`) maps all of it to a V&V 40 style assessment, writes `credibility.html` for a
+reviewer and a test plan, which `wobbl test-plan wobbl-out/part` (MCP `plan_tests`) also writes alone.
+
 ## Never skip
 
 - **Never quote a low confidence number as the answer.** Say what failed and rerun with
@@ -88,3 +102,6 @@ with low confidence, because roughness and turbulence decide it there.
   can lift off and sliding faces each have their own type; pick the one that matches the build.
 - **Do not use `--quality fast` for a final answer**; it is for quick looks.
 - **State the assumptions** Wobbl returns, especially guesses it made from a plain question.
+- **Never call a model validated, certified or approved.** Wobbl supplies credibility evidence and
+  proposes levels, and the reviewer, customer or regulator decides what it is enough for. Say plainly
+  when readings are synthetic, and quote a failure probability with its interval.
