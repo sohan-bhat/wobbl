@@ -18,7 +18,6 @@ import numpy as np
 from ..fe import StaticResult
 from ..mesh.mesher import build_mesh
 from ..solvers import base as solvers
-from ..solvers.calculix import read_frd
 from ..structural.build import build_static
 from ..structural.outcome import process_caveat
 from ..structural.run import failure_measure, support_reactions
@@ -78,7 +77,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
         say("solve", f"level {k}: buckling of {mesh.n_nodes:,} nodes with {adapter.name}")
         ccx.run(exe, wl, "buckle", ccx.buckle_inp(deck, n_modes))
         factors = ccx.read_buckling_factors(wl / "buckle.dat")
-        blocks = read_frd(wl / "buckle.frd", mesh.n_nodes + 2 * len(deck.extra))
+        blocks = ccx.read_blocks(wl / "buckle.frd", mesh.n_nodes + 2 * len(deck.extra), ("DISP", "STRESS", "FORC"))
         (wl / "buckle.frd").unlink(missing_ok=True)
         pos = [f for f in factors if f > 0]
         if not pos:

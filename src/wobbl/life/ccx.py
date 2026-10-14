@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from ..fe import RigidCoupling, StaticModel
-from ..solvers.calculix import _run, read_frd, write_static_inp
+from ..solvers.calculix import _run, write_static_inp
 
 STEP_SUPPORTS = ("*BOUNDARY",)
 STEP_LOADS = ("*CLOAD", "*DLOAD")
@@ -269,12 +269,52 @@ def read_node_print(path: Path) -> dict[float, tuple[np.ndarray, np.ndarray, np.
     return res
 
 
+def read_blocks(path: Path, n: int, names: tuple[str, ...] = ("DISP", "STRESS")) -> dict[str, list]:
+    """Nodal result blocks of an ASCII .frd: name -> [(time, (n, k) float32 array), ...] for the names asked.
+
+    The values sit in fixed 12 character columns, often with no space between them, so each block's numbers are
+    cut out as bytes and converted by numpy in one go. A modal job on a large mesh writes hundreds of megabytes,
+    which a line by line reader would hold as Python objects many times over.
+    """
+    out: dict[str, list] = {}
+    t, name, k, ids, vals = 0.0, None, 0, [], []
+    with open(path, "rb") as fh:
+        for line in fh:
+            if line.startswith(b"  100C"):
+                try:
+                    t = float(line.split()[2])
+                except (IndexError, ValueError):
+                    t = 0.0
+            elif line.startswith(b" -4"):
+                parts = line.split()
+                name, k = parts[1].decode(), int(parts[2])
+                ids, vals = [], []
+                if name not in names:
+                    name = None
+            elif name is None:
+                continue
+            elif line.startswith(b" -1"):
+                ids.append(line[3:13])
+                vals.append(line[13:].rstrip(b"\r\n").ljust(12 * k)[:12 * k])
+            elif line.startswith(b" -3"):
+                arr = np.zeros((n, k), np.float32)
+                if ids:
+                    idx = np.array(ids, dtype="S10").astype(np.int64) - 1
+                    v = np.char.strip(np.frombuffer(b"".join(vals), dtype="S12").reshape(len(vals), k))
+                    v[v == b""] = b"0"
+                    keep = (idx >= 0) & (idx < n)
+                    arr[idx[keep]] = v[keep].astype(np.float64)
+                out.setdefault(name, []).append((t, arr))
+                name = None
+    return out
+
+
 def read_modes(path: Path, n: int, n_extra: int = 0) -> tuple[list[float], np.ndarray, np.ndarray | None]:
     """Mode shapes from a .frd: (labels, displacements (m, n + n_extra, 3), stresses (m, n, 6) or None).
 
     Each mode block carries its natural frequency, or its buckling factor, as the time.
     """
-    blocks = read_frd(path, n + n_extra)
+    blocks = read_blocks(path, n + n_extra)
     disp = blocks.get("DISP", [])
     labels = [t for t, _ in disp]
     U = np.array([a[:, :3] for _, a in disp], dtype=np.float32) if disp else np.zeros((0, n + n_extra, 3), np.float32)
@@ -286,7 +326,7 @@ def read_modes(path: Path, n: int, n_extra: int = 0) -> tuple[list[float], np.nd
 
 def read_harmonic_field(path: Path, n: int) -> dict[float, tuple[np.ndarray, np.ndarray]]:
     """The complex displacement and stress of the field writing step: frequency -> (U (n,3), S (n,6)) complex."""
-    b = read_frd(path, n)
+    b = read_blocks(path, n, ("DISP", "DISPI", "STRESS", "STRESSI"))
     out = {}
     if not all(k in b for k in ("DISP", "DISPI", "STRESS", "STRESSI")):
         return out

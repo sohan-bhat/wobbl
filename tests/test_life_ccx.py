@@ -131,6 +131,41 @@ def test_body_load_includes_attached_masses():
     assert "12,3,4.903325" in s     # 50 g times one g, on the attachment's reference node
 
 
+FRD = """    1C
+  100CL  101 54.46361875           3                     2    1MODAL      1
+ -4  DISP        4    1
+ -5  D1          1    2    1    0
+ -1         1 1.00000E+00-2.50000E-01 3.00000E-03
+ -1         3-1.00000E+00 0.00000E+00-7.25000E+02
+ -3
+  100CL  101 54.46361875           3                     2    1MODAL      1
+ -4  STRESS      6    1
+ -1         2 1.00000E+00 2.00000E+00 3.00000E+00 4.00000E+00 5.00000E+00-6.00000E+00
+ -3
+  100CL  102 108.7412965           3                     2    2MODAL      1
+ -4  DISP        4    1
+ -1         2 5.00000E-01 5.00000E-01 5.00000E-01
+ -3
+ 9999
+"""
+
+
+def test_fast_frd_reader_matches_the_plain_one(tmp_path):
+    from wobbl.solvers.calculix import read_frd
+
+    p = tmp_path / "m.frd"
+    p.write_text(FRD)
+    fast = ccx.read_blocks(p, 3)
+    plain = read_frd(p, 3)
+    assert [t for t, _ in fast["DISP"]] == [t for t, _ in plain["DISP"]] == [54.46361875, 108.7412965]
+    for (_, a), (_, b) in zip(fast["DISP"] + fast["STRESS"], plain["DISP"] + plain["STRESS"]):
+        assert np.allclose(a, b[:, :a.shape[1]])
+    # CalculiX announces four displacement components and writes three
+    assert fast["DISP"][0][1][2, :3] == pytest.approx([-1.0, 0.0, -725.0])
+    labels, U, S = ccx.read_modes(p, 3)
+    assert labels == [54.46361875, 108.7412965] and U.shape == (2, 3, 3) and S.shape == (1, 3, 6)
+
+
 def test_blocks_and_element_numbers():
     step = "*STEP\n*STATIC\n*BOUNDARY\nA,1,1\n** note\nA,2,2\n*CLOAD\n3,1,1.\n*END STEP\n"
     blocks = ccx._blocks(step)
