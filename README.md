@@ -43,6 +43,9 @@ point marked and fixes with numbers.
   meshes from [gmsh](https://gmsh.info) and OpenCASCADE that are refined around the
   peaks until the stress settles.
 - Heat, steady and transient, also with CalculiX.
+- Buckling, vibration and fatigue, also with CalculiX, for struts that buckle, arms
+  and brackets that ring at a motor's speed or on a shaker, and how many load cycles
+  a part lasts.
 - Circuits with [ngspice](https://ngspice.sourceforge.io), for LEDs, RC networks,
   buck converters, MOSFETs or any netlist.
 - Motion with [scipy](https://scipy.org)'s ODE integrators, from a rock falling off
@@ -286,6 +289,54 @@ MuJoCo installs itself the first time a mechanism study runs, a 7.8 MB download
 that takes 18.3 MB once Wobbl leaves out its headers, plugins, viewer and renderers,
 or straight away with `wobbl setup --only mujoco`.
 
+## Buckling, vibration and fatigue
+
+The same meshes answer how a part lasts, not only whether it holds once.
+`wobbl buckling` finds the factor on the loads at which the part buckles with
+CalculiX's buckling step, then cuts it by an imperfection knockdown for the shape
+and by yielding. Struts follow the European column curves, thin cylinders NASA
+SP-8007 and flat plates keep their factor, while shapes with no published test data
+take 0.5 and say so. Linear buckling overpredicts the collapse of real parts, most
+of all thin shells, so the verdict always uses the knocked down factor.
+
+```console
+$ wobbl buckling examples/strut-buckling/strut.py -m 6061-t6 --fix "z=min" \
+    --fix "fixed-xy z=max" --load "7 kN -z @ z=max" --target-sf 3
+MARGINAL. Buckles at 3.25 times the applied load (22764 N) in a column mode. With a knockdown of 0.81 for imperfections and yielding the design factor is 2.65 against a target of 3.
+```
+
+`wobbl vibration` finds the natural frequencies and mode shapes of the part as it
+is held, with each motor, battery or payload given as a mass, and judges them
+against a rotor's once per turn and blade pass bands or any other tone, keeping
+every mode that moves mass 20% clear. A shaker sweep gives the peak stress, which
+Wobbl sums over the modes and CalculiX solves again with its steady state dynamics
+step reading the same modes. A random input such as NASA GEVS gives the 3 sigma
+stress by Segalman's method and Steinberg's fatigue estimate over the test. Every
+answer checks the meshes, the mass against the volume and density, Rayleigh's
+quotient from the sag under 1 g and a single mode estimate, Miles' equation for
+random input.
+
+`wobbl fatigue` turns a finished strength or vibration result, or stresses you
+give, into the cycles before a crack starts and a safety factor on stress. It uses
+sourced S-N data for each library material, Marin factors for surface, size, load
+and reliability, Peterson's notch sensitivity on the stress concentration the
+strength result found, Goodman, Gerber or Soderberg for the mean stress and Miner's
+rule for a duty cycle.
+
+| Run | Answer | Checked against |
+|---|---|---|
+| [Drone arm resonance](examples/drone-arm-resonance) | modes at 197 and 219 Hz sit inside the propeller's once per turn and blade pass bands, so it fails | Rayleigh's quotient within 0.1% of the first mode, the mass to 0.0003% and two meshes 1.2% apart |
+| [Strut buckling](examples/strut-buckling) | buckles at 3.25 times 7 kN, a design factor of 2.65 against 3 after the column curve | Euler's column within 0.5% |
+| [Motor mount fatigue](examples/motor-mount-fatigue) | ten years of starts and running use 63% of the fatigue life, a factor of 1.03 on stress | the same verdict under Goodman, Gerber and Soderberg |
+
+Agents get `solve_buckling`, `solve_vibration` and `fatigue_life`, which download
+nothing because they run on the CalculiX that strength already installs. CalculiX
+has no random response step, so Wobbl sums random response from its modes. Damping
+is one ratio for every mode, 2% for metals and 3% for plastics unless you give one,
+and the response at a resonance scales with one over it. Fatigue lives scatter by a
+factor of three to ten at the same stress, so the safety factor on stress is the
+number to lead with, and crack growth after a crack starts is a separate study.
+
 ## An agent on its own versus Wobbl
 
 Given a CAD file, a strength question and 15 minutes, a capable coding agent
@@ -414,7 +465,7 @@ where the two servo idealizations disagree, a load cell in service and coupons.
 
 ## Validation
 
-Forty four cases with known answers run through the same pipeline you get. Every
+Forty nine cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
@@ -429,6 +480,7 @@ modeled setup lands within 2%.
 | Solid motors (steady Kn against the closed form, a neutral grain's web time, two MIT static fires) | 4 | 9.26%, the impulse of the O3800 static fire, whose peak pressure came out 7% low |
 | Uncertainty and calibration (a cantilever's mean and spread of deflection against lognormal propagation, Ishigami Sobol indices, two calibrations from synthetic data) | 5 | 0.97%, a film coefficient from a cooling curve |
 | Mechanisms (a pendulum's large swing, a four bar's sweep, a two link arm's holding torque, a gear train's output speed, an elastic and a half elastic collision) | 6 | 0.05%, the struck ball's speed after the half elastic hit |
+| Buckling, vibration and fatigue (Euler's column, a cantilever's first three bending frequencies, a simply supported plate's first three modes, a sine peak on a tip mass, Shigley's fatigue example) | 5 | 2.28%, Shigley's example, where the book reads f off a chart |
 
 The full table is [on the website](https://sohan-bhat.github.io/wobbl/validation/). Run it yourself with
 `wobbl validate`, which takes about 30 minutes.
@@ -446,6 +498,9 @@ reports, heatmaps and summaries, and each has a page [on the website](https://so
 | [motor-mount](examples/motor-mount) | Do the ribs on a printed NEMA 17 mount earn their keep? | strength |
 | [enclosure](examples/enclosure) | Does a PC enclosure survive a thumb press, and how far does it dent? | strength, thin walls |
 | [drone-arm](examples/drone-arm) | Is a PA12 drone arm strong enough at full throttle? | strength, rigid loads |
+| [drone-arm-resonance](examples/drone-arm-resonance) | Does that arm resonate with its propeller anywhere from hover to full throttle? | vibration |
+| [strut-buckling](examples/strut-buckling) | Does a slender aluminum strut carry 7 kN with a factor of 3 against buckling? | buckling |
+| [motor-mount-fatigue](examples/motor-mount-fatigue) | Does the cast motor mount last ten years of starts and running without a crack? | fatigue |
 | [heat-sink](examples/heat-sink) | Does a 15 W chip stay under 85 C without a fan? | heat |
 | [battery-pack](examples/battery-pack) | When does a pack in a sealed box pass 60 C? | transient heat |
 | [falling-rock](examples/falling-rock) | How fast does a rock hit the ground after a 300 m fall? | motion |
@@ -475,7 +530,9 @@ Each folder has a `run.sh` that regenerates its outputs.
 
 - Materials are linear elastic, so Wobbl reports whether yield is reached but not
   what happens after, and large deflection is checked with a nonlinear re-solve.
-- Loads are static, and fatigue, impact and vibration are not modeled yet.
+- Impact is not modeled yet. Buckling is linear, with knockdowns from test data
+  standing in for imperfections, vibration is linear with one damping ratio for
+  every mode, and fatigue covers crack initiation by the stress life method.
 - Contact is limited to rigid walls the part can push on but not pull, and bolted
   joints are modeled as clamped holes without preload.
 - Each study uses one material, and assemblies of touching bodies are bonded.
@@ -498,8 +555,7 @@ Each folder has a `run.sh` that regenerates its outputs.
   straight torque speed line, with a rotor inertia assumed where datasheets give none.
   A hobby servo's continuous rating is taken as a third of its stall torque.
 
-Shell elements, fatigue estimates and bolt preload come next in 0.2, then CFD with
-OpenFOAM in 0.3.
+Shell elements and bolt preload come next in 0.2, then CFD with OpenFOAM in 0.3.
 
 ## Contributing
 

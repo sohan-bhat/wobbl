@@ -24,6 +24,28 @@
 - Six validation cases against exact answers, all within 0.05%, and two examples,
   a desktop arm on hobby servos and a windshield wiper linkage.
 
+**Buckling, vibration and fatigue**
+- `wobbl buckling` finds the load factor and mode shapes with CalculiX's
+  buckling step and cuts the factor by an imperfection knockdown for the shape,
+  the European column curves for struts, NASA SP-8007 for thin cylinders, none
+  for flat plates and 0.5 for shapes with no test data, and by yielding. It
+  checks Euler's column, force balance, mode separation and the meshes.
+- `wobbl vibration` finds natural frequencies, mode shapes and effective mass
+  with attached masses, judges them against rotor speeds and tones, gives the
+  peak stress of a sine sweep (checked against CalculiX's steady state dynamics
+  step) and the 3 sigma stress and fatigue of random input such as NASA GEVS.
+  Each answer checks the mass, Rayleigh's quotient and a single mode estimate.
+- `wobbl fatigue` gives the cycles before a crack starts and a safety factor on
+  stress from a strength or vibration result or from given stresses, with
+  sourced S-N data per material, Marin factors, notch sensitivity, Goodman,
+  Gerber or Soderberg and Miner's rule for a duty cycle.
+- Agents get `solve_buckling`, `solve_vibration` and `fatigue_life`. Nothing new
+  is downloaded, since they run on the CalculiX strength uses.
+- Five validation cases, Euler's column, a cantilever's and a plate's modes, a
+  sine peak on a tip mass and Shigley's fatigue example, and three examples, a
+  drone arm's resonance, a strut's buckling and a motor mount's fatigue, each
+  with a `playback.json` for the website to animate.
+
 **Rocket motors and combustion**
 - `wobbl motor` burns a solid motor design back to its thrust curve, from
   BATES, tube, end burner, star, finocyl, moon and X core grains, KNSB, KNDX,
