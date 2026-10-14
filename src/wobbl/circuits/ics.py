@@ -207,17 +207,18 @@ def timer(name: str) -> Part | None:
     rq = 5.0 / iq
     rs, rk = (10, 10) if tech == "bipolar" else (60, 10)
     m = f"U_{name}"
-    s = "0.5*(1+tanh(200*(V(lo,gnd)-V(trig,gnd))))"
-    t = "0.5*(1+tanh(200*(V(thres,gnd)-V(ctrl,gnd))))"
-    rr = "0.5*(1+tanh(20*(0.7-V(reset,gnd))))"
-    h = "0.5*(1+tanh(40*(V(q)-0.5)))"
-    qh = "0.5*(1+tanh(60*(V(q)-0.5)))"     # the latch state as the output and discharge see it: on or off
+    # comparators and the latch on their own nodes, so ngspice differentiates small expressions
     text = (f".subckt {m} gnd trig out reset ctrl thres disch vcc\n"
             f"R1 vcc ctrl 5k\nR2 ctrl lo 5k\nR3 lo gnd 5k\nRq vcc gnd {_g(rq)}\n"
-            f"Bq 0 q I = 1m*(0.5*(1+tanh(40*((1-{rr})*({s} + (1-{s})*(1-{t})*{h}) - 0.5))) - V(q))\nCq q 0 10p\n"
-            f"Bsrc vcc out I = {qh}*max(0, min({isrc}, (V(vcc,gnd)-{vdrop}-V(out,gnd))/{rs}))\n"
-            f"Bsnk out gnd I = (1-{qh})*max(0, min({isnk}, (V(out,gnd)-0.05)/{rk}))\n"
-            f"Bdis disch gnd I = (1-{qh})*min(0.2, max(0, V(disch,gnd))/15) + 1n\n"
+            "Bs s 0 V = 0.5*(1+tanh(200*(V(lo,gnd)-V(trig,gnd))))\n"
+            "Bt t 0 V = 0.5*(1+tanh(200*(V(thres,gnd)-V(ctrl,gnd))))\n"
+            "Br r 0 V = 0.5*(1+tanh(20*(0.7-V(reset,gnd))))\n"
+            "Bh h 0 V = 0.5*(1+tanh(40*(V(q)-0.5)))\n"
+            "Bq 0 q I = 1m*(0.5*(1+tanh(40*((1-V(r))*(V(s)+(1-V(s))*(1-V(t))*V(h))-0.5)))-V(q))\nCq q 0 10p\n"
+            "Bx x 0 V = 0.5*(1+tanh(60*(V(q)-0.5)))\n"
+            f"Bsrc vcc out I = V(x)*max(0, min({isrc}, (V(vcc,gnd)-{vdrop}-V(out,gnd))/{rs}))\n"
+            f"Bsnk out gnd I = (1-V(x))*max(0, min({isnk}, (V(out,gnd)-0.05)/{rk}))\n"
+            f"Bdis disch gnd I = (1-V(x))*min(0.2, max(0, V(disch,gnd))/15) + 1n\n"
             f"Co out gnd 10p\nCd disch gnd 10p\n.ends")
     return Part(name, "timer", {"vsupply_V": vabs, "iout_A": max(isrc, isnk), "theta_ja": thja, "tj_max_C": 150},
                 "x", m, text, ("gnd", "trig", "out", "reset", "ctrl", "thres", "disch", "vcc"),

@@ -378,9 +378,10 @@ def _amp(e, P, w, every, s, r, prm, ta):
     if vs_avg < prm.get("vs_min", 0):
         s.items.append(Item("supply voltage", vs_avg, prm["vs_min"], "V", None, "fails",
                             f"below the {fmt(prm['vs_min'])} V it needs"))
+    m = w.window if w.kind == "tran" and w.window is not None else slice(None)
     if e.kind in ("opamp", "comparator"):
-        hi = np.maximum(P.v("inp"), P.v("inn")) - (P.v("vcc") - prm.get("cm_high", 0))
-        lo = (P.v("vee") + prm.get("cm_low", 0)) - np.minimum(P.v("inp"), P.v("inn"))
+        hi = (np.maximum(P.v("inp"), P.v("inn")) - (P.v("vcc") - prm.get("cm_high", 0)))[m]
+        lo = ((P.v("vee") + prm.get("cm_low", 0)) - np.minimum(P.v("inp"), P.v("inn")))[m]
         over = max(float(np.max(hi)), float(np.max(lo)))
         if over > 0.05:
             s.items.append(Item("input range", over, None, "V", None, "warn",

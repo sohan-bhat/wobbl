@@ -285,7 +285,7 @@ def run_tran(c: Circuit, work: Path, tag: str = "tran", step: float | None = Non
             return w
         T = max(time_scales(c)[0] or [0]) or None
         ok, chg = settled(w, T)
-        span = max(1, math.floor(0.15 * stop / T)) * T if T and T < stop / 4 else 0.15 * stop
+        span = max(3, math.floor(0.3 * stop / T)) * T if T and T < stop / 6 else 0.2 * stop
         w.window = w.t >= stop - span
         if ok or k == tries - 1:
             if not ok:

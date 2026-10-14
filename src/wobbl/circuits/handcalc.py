@@ -21,7 +21,8 @@ from .parts import VT
 from .solve import Wave
 from .stress import Stress, _Pins
 
-HIGH_Z = ("opamp", "comparator", "nmos", "pmos")
+HIGH_Z = {"opamp": ("inp", "inn"), "comparator": ("inp", "inn"), "nmos": ("g",), "pmos": ("g",),
+          "timer": ("trig", "thres", "ctrl"), "regulator": ("adj",)}
 
 
 def checks(c: Circuit, w: Wave, stress: list[Stress]) -> list[Check]:
@@ -59,7 +60,7 @@ def _dividers(c: Circuit, w: Wave) -> list[Check]:
             continue
         rs = [(e, p) for e, p in on if e.letter == "r" and e.value]
         rest = [(e, p) for e, p in on if e.letter != "r"]
-        if len(rs) != 2 or any(e.kind not in HIGH_Z and not (e.kind == "regulator" and p == "adj") for e, p in rest):
+        if len(rs) != 2 or any(p not in HIGH_Z.get(e.kind, ()) for e, p in rest):
             continue
         (ra, _), (rb, _) = rs
         ta = next(n for n in ra.nodes if n != mid)
@@ -110,9 +111,10 @@ def _diode_chains(c: Circuit, w: Wave) -> list[Check]:
             continue
         top = next(n for n in r.nodes if n != mid)
         bot = d.nodes[1]
-        vs = _mean(w, w.volt(top) - w.volt(bot))
-        if vs <= 0.3:
-            continue
+        drive = w.volt(top) - w.volt(bot)
+        vs = _mean(w, drive)
+        if vs <= 0.3 or (w.kind == "tran" and np.ptp(drive[w.window]) > 0.01 * abs(vs)):
+            continue        # a drive that moves in the window has no single operating point to check
         isat, n, rs = mp["is"], mp["n"], mp.get("rs", 0.0)
         i = max(vs / r.value / 2, 1e-12)
         for _ in range(200):

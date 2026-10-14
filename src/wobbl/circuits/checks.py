@@ -86,9 +86,7 @@ def key_values(stress: list[Stress]) -> dict[str, float]:
     out = {}
     for s in stress:
         out[f"{s.ref} power"] = s.p
-        w = s.worst
-        if w is not None:
-            out[f"{s.ref} {w.what}"] = w.value
+        out[f"{s.ref} current"] = s.i
     return out
 
 
@@ -100,13 +98,13 @@ def compare(a: dict[str, float], b: dict[str, float], name: str, how: str) -> Ch
         vb = b.get(k)
         if vb is None:
             continue
-        ref = max(abs(va), abs(vb), 1e-3 * scale if "power" in k else 1e-9)
+        ref = max(abs(va), abs(vb), 1e-3 * scale if "power" in k else 1e-6)
         d = abs(va - vb) / ref
         if d > worst:
             worst, which = d, k
     st = "pass" if worst < 0.01 else "warn" if worst < 0.05 else "fail"
     shown = f"; the most moved is {which}: {fmt(a[which])} and {fmt(b[which])}" if which else ""
-    return Check(name, st, f"every part's power and most used rating agree to {100 * worst:.2g}% {how}{shown}",
+    return Check(name, st, f"every part's power and current agree to {100 * worst:.2g}% {how}{shown}",
                  {"change": worst, "value": which})
 
 
