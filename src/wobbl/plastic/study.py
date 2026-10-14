@@ -11,8 +11,10 @@ stretches before it breaks.
 """
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import asdict, dataclass, field, replace
+from dataclasses import replace as dc_replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -57,21 +59,81 @@ class PlasticStudy:
         return asdict(self)
 
 
-def check_metal(mat: Material):
-    """Plasticity theory describes metals. Plastics creep and draw, printed ones split at layer lines, and wood and
-    brittle materials break near their elastic limit."""
+def check_metal(mat: Material) -> str:
+    """Brittle materials break near their elastic limit, so they have no plastic reserve to find. A ductile plastic
+    yields, and von Mises plasticity describes it only roughly, which the answer says. Returns that caveat."""
     if not mat.ductile:
         raise SpecError(f"{mat.name} is brittle: it breaks near its tensile strength instead of yielding, so it has "
                         "no plastic reserve to find. Run 'wobbl run' for the elastic answer")
-    if mat.category != "metal" and mat.key != "custom":
-        raise SpecError(f"{mat.name} is a {mat.category}, and plasticity theory describes metals. Plastics creep and "
-                        "draw with time and temperature, so judge them with 'wobbl run' against their yield stress")
+    if mat.category == "metal" or mat.key == "custom":
+        return ""
+    made = " A printed part also tears between its layers well before it yields along them." \
+        if getattr(mat, "process", "") == "printed" else ""
+    return (f"{mat.name} is a {mat.category}. Von Mises plasticity describes it only roughly: a plastic yields "
+            "higher in compression than in tension, more slowly loaded it yields lower, and under a load held for "
+            "hours it creeps on, so the collapse load here is a short term one." + made)
 
 
 def curve_for(mat: Material, which: str = "auto") -> Hardening:
-    if which == "perfect":
+    """The curve past yield: 'auto' for the material's own, 'perfect' for a flat line at yield, or the user's, as
+    'true 250@0, 300@0.02, 420@0.15' (true stress MPa at plastic strain), 'engineering 250@0.00125, 400@0.2'
+    (engineering stress at total engineering strain, as a tensile test reads), or a CSV file of either."""
+    w = (which or "auto").strip()
+    if w.lower() == "auto":
+        return hardening_curve(mat)
+    if w.lower() == "perfect":
         return Hardening(((mat.yield_strength, 0.0),), "perfect", "elastic perfectly plastic at the yield stress")
-    return hardening_curve(mat)
+    return parse_curve(w, mat)
+
+
+_PAIR = re.compile(r"([-+]?\d*\.?\d+(?:e[-+]?\d+)?)\s*[@:,;\s]\s*([-+]?\d*\.?\d+(?:e[-+]?\d+)?)", re.I)
+
+
+def parse_curve(text: str, mat: Material) -> Hardening:
+    t = text.strip()
+    engineering = t.lower().startswith(("engineering", "eng "))
+    if engineering or t.lower().startswith("true "):
+        t = t.split(None, 1)[1] if " " in t else ""
+    path = Path(t).expanduser()
+    if path.suffix.lower() in (".csv", ".txt", ".tsv", ".dat") or (len(t) < 400 and path.is_file()):
+        if not path.is_file():
+            raise SpecError(f"cannot find the stress strain curve file {t}")
+        raw = path.read_text(errors="replace")
+        engineering = engineering or "eng" in raw.splitlines()[0].lower() if raw.strip() else engineering
+        rows = []
+        for ln in raw.splitlines():
+            vals = re.findall(r"[-+]?\d*\.?\d+(?:e[-+]?\d+)?", ln, re.I)
+            if len(vals) >= 2 and not re.search(r"[a-df-z]", ln.replace("e-", "").replace("e+", ""), re.I):
+                rows.append((float(vals[0]), float(vals[1])))
+        where = path.name
+    else:
+        rows = [(float(a), float(b)) for a, b in _PAIR.findall(t.replace(",", " ").replace(";", " "))]
+        where = "the text given"
+    if not rows:
+        raise SpecError(f"could not read a stress strain curve from '{text[:60]}'; give pairs of stress MPa and strain, "
+                        "as in 'true 250@0, 300@0.02, 420@0.15' or 'engineering 250@0.00125, 400@0.2'")
+    sig, eps = np.array(rows, float).T
+    E = mat.E
+    if engineering:
+        sig, eps = sig * (1 + eps), np.log1p(eps)          # true stress and true total strain
+        plastic = eps - sig / E
+    elif eps[0] > 0 and abs(eps[0] - sig[0] / E) < 0.5 * sig[0] / E:
+        plastic = eps - sig / E                              # a true curve with total strains
+    else:
+        plastic = eps
+    keep = plastic >= -0.05 * sig / E          # points on the elastic line, within reading error
+    if not keep.any():
+        raise SpecError("every point of the curve lies on the elastic line, so it gives no yield")
+    sig, plastic = sig[keep], np.maximum(plastic[keep], 0.0)
+    order = np.argsort(plastic, kind="stable")
+    sig, plastic = sig[order], plastic[order]
+    plastic[0] = 0.0
+    pts = [(float(sig[0]), 0.0)]
+    for sg, pe in zip(sig[1:], plastic[1:]):
+        if pe > pts[-1][1] + 1e-9 and sg >= pts[-1][0]:      # past the peak the metal necks, so it stays flat
+            pts.append((float(sg), float(pe)))
+    return Hardening(tuple(pts), "user", f"the {'engineering' if engineering else 'true'} curve from {where}, "
+                                         f"{len(pts)} points from {fmt(pts[0][0])} MPa at yield")
 
 
 def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=None,
@@ -82,7 +144,11 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
     work = out / "work"
     say = progress or (lambda a, b: None)
     mat = resolve_material(study.material)
-    check_metal(mat)
+    caveat = check_metal(mat)
+    curve = curve_for(mat, study.curve)
+    if curve.kind == "user":
+        # the collapse run and first yield follow the yield stress of the curve given
+        mat = dc_replace(mat, yield_strength=curve.points[0][0])
     adapter = solvers.for_domain("structural")
     adapter.require()
     base = StructuralStudy(str(study.part), study.material, [parse_load(x) for x in study.loads],
@@ -94,7 +160,6 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
         pre = describe_part(base.part, work, base.scale, base.body, base.params)
     prep, feats = pre
     loads, fixtures, _ = resolve_selections(base, feats)
-    curve = curve_for(mat, study.curve)
     q = dict(fineness=1.0, nodes=QUALITY.get(study.quality, QUALITY["normal"]))
     s0 = initial_sizing(prep, feats, base, q, loads)
     levels, last = [], None
@@ -122,7 +187,7 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
             service = service_run(built, mat, curve, y["factor"], work / "service", every=study.playback)
         except Exception as e:  # noqa: BLE001  the collapse answer stands without it
             service = {"error": str(e)[:200]}
-    o = evaluate(study, mat, curve, prep, feats, loads, mesh, built, lin, y, lim, levels, service)
+    o = evaluate(study, mat, curve, prep, feats, loads, mesh, built, lin, y, lim, levels, service, caveat)
     o.t_total = time.time() - t0
     if render_images:
         say("render", "drawing the plastic strain and the load path")
@@ -220,7 +285,8 @@ def verdict_for(lam_y: float, lam_c: float, target: float) -> str:
     return "yields" if lam_y < 1.0 else "holds"
 
 
-def evaluate(study, mat, curve, prep, feats, loads, mesh, built, lin, y, lim, levels, service) -> NonlinearOutcome:
+def evaluate(study, mat, curve, prep, feats, loads, mesh, built, lin, y, lim, levels, service,
+             caveat: str = "") -> NonlinearOutcome:
     from .section import plastic_section
 
     sm = built.model
@@ -304,6 +370,8 @@ def evaluate(study, mat, curve, prep, feats, loads, mesh, built, lin, y, lim, le
     checks.append(Check("load steps", "pass" if bracket <= 0.01 else "warn", steps,
                         {"bracket": bracket, "increments": lim["increments"]}))
     checks.append(_sanity(prep, mat, lam_y, lam_c, service))
+    if caveat:
+        checks.append(Check("material model", "warn", caveat))
     level, reasons = confidence(checks, extra)
     verdict = verdict_for(lam_y, lam_c, target)
     where_y = where(mesh, feats.faces, y["xyz"])
@@ -333,7 +401,8 @@ def evaluate(study, mat, curve, prep, feats, loads, mesh, built, lin, y, lim, le
         metrics += [("permanent set", f"{fmt(service['set'])} mm"),
                     ("peak plastic strain", f"{100 * service['peeq']:.2g}%")]
     o = NonlinearOutcome("plastic", str(study.part), study.question, verdict, head, metrics, level, reasons, checks,
-                         assumptions(mat, curve, study, service), solver=lim["solver"])
+                         assumptions(mat, curve, study, service) + ([caveat] if caveat else []),
+                         solver=lim["solver"])
     o.values = {"first_yield_factor": lam_y, "first_yield_xyz": y["xyz"], "first_yield_MPa": y["stress"],
                 "collapse_factor": lam_c, "collapsed": lim["collapsed"], "ramp_factor": lim["ramp"],
                 "twice_elastic_slope_factor": lim["tes"], "hinge_xyz": hinge.tolist(), "target": target,

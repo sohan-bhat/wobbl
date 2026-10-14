@@ -69,15 +69,34 @@ def test_verdicts_separate_yielding_from_collapse():
     assert verdict_for(0.6, 0.9, 1.5) == "collapses"
 
 
-def test_brittle_and_plastic_materials_are_turned_away():
+def test_brittle_materials_are_turned_away_and_ductile_plastics_carry_a_caveat():
     from wobbl.plastic.study import check_metal
     from wobbl.structural.spec import SpecError
 
-    for name in ("pla", "petg", "wood"):
+    for name in ("pla", "wood"):
         with pytest.raises(SpecError):
             check_metal(get_material(name))
-    check_metal(get_material("6061-t6"))
-    check_metal(parse_custom("custom:E=200000,nu=0.3,yield=250"))
+    assert check_metal(get_material("6061-t6")) == ""
+    assert check_metal(parse_custom("custom:E=200000,nu=0.3,yield=250")) == ""
+    assert "creeps" in check_metal(get_material("pc"))
+    assert "layers" in check_metal(get_material("petg"))
+
+
+def test_any_stress_strain_curve_is_read_as_true_stress_against_plastic_strain(tmp_path):
+    from wobbl.plastic.study import curve_for
+
+    m = parse_custom("custom:E=200000,nu=0.3,yield=250")
+    assert curve_for(m, "true 250@0, 300@0.02, 420@0.15").points == ((250, 0), (300, 0.02), (420, 0.15))
+    # a tensile test: engineering stress at total strain, the first point on the elastic line; the engineering drop
+    # after the peak is still a rise in true stress
+    h = curve_for(m, "engineering 250@0.00125, 300@0.02, 400@0.2, 380@0.3")
+    assert h.points[0] == (pytest.approx(250 * 1.00125), 0.0) and h.points[3][0] == pytest.approx(494)
+    assert h.points[2] == (pytest.approx(480), pytest.approx(math.log(1.2) - 480 / 200000))
+    # true stress at total strain, from a file with a header
+    (tmp_path / "c.csv").write_text("stress_MPa,strain\n250,0.00125\n330,0.0217\n")
+    h = curve_for(m, str(tmp_path / "c.csv"))
+    assert h.points == ((250, 0.0), (330, pytest.approx(0.0217 - 330 / 200000)))
+    assert curve_for(m, "perfect").points == ((250, 0.0),)
 
 
 def test_collapse_fixes_aim_at_the_hinge_and_scale_with_the_shortfall():
