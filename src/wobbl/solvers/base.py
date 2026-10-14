@@ -119,6 +119,7 @@ def _load_builtin():
     if _REGISTRY:
         return
     from . import calculix, ngspice  # noqa: F401  (they register themselves)
-    from . import getdp  # noqa: F401
+    from .getdp import GetDP    # imported directly by the setup registry, so it registers here, not on import
+    register(GetDP())
     register(PlannedAdapter("OpenFOAM", ("cfd",), "0.3"))
     register(PlannedAdapter("Elmer", ("multiphysics",), "0.3"))

@@ -493,6 +493,19 @@ register(Recipe("mujoco", ("mechanism",), (), check=_mech("check"), installer=_m
                 present=_mech("available")))
 
 
+def _getdp(name: str):
+    """A function of wobbl.solvers.getdp, imported only when the registry calls it."""
+    def call(*args):
+        from ..solvers import getdp
+        return getattr(getdp, name)(*args)
+    return call
+
+
+# GetDP is one self contained binary from getdp.info rather than a conda package
+register(Recipe("getdp", ("magnetic", "electric", "board", "antenna", "sound"), (), check=_getdp("check"),
+                installer=_getdp("install"), present=_getdp("available")))
+
+
 # ---------------------------------------------------------------------- disk
 def remove_all(log: Log = print) -> None:
     home = wobbl_home()
