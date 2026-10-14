@@ -119,6 +119,10 @@ def magnetic_part(job):
     bodies, notes = assign.magnetic(sc, a)
     targets = [b.name for t in job.values("force-on") for b in sc.select(t)]
     need = job.value("need")
+    m = None if need else re.search(r"(?:pull|hold|force|lift|attract)\D{0,24}?(\d+(?:\.\d+)?)\s*n\b", job.focus, re.I)
+    if m:
+        need = f"{m.group(1)} N"
+        job.use("need", need)
     from .params import value
     s = ms3d.MagSetup(bodies, targets, value({"n": need}, "n", 0, "force") if need else 0.0, notes)
     _situate(job, sc, {n: b.kind for n, b in bodies.items()})
@@ -166,7 +170,7 @@ def _situate(job, sc, roles: dict) -> None:
 
 register(Analysis(
     "part", "magnetic", "Magnetic forces, torque, inductance and saturation of magnets, coils and steel in any CAD",
-    magnetic_part, kinds=PART_KINDS,
+    magnetic_part, kinds=PART_KINDS, covers=("stress",),       # "pulls 5 N" is a magnetic force, not a load
     keywords=(r"\bmagnet", r"\bsolenoid", r"\bcoils?\b", r"\bwinding", r"inductance", r"\bflux\b", r"\btesla\b",
               r"\bgauss\b", r"\bn(?:35|42|52)\b", r"\bplunger\b", r"\barmature\b", r"\bpull force\b"),
     aliases=("magnetics", "magnetostatic", "magnetostatics"),
