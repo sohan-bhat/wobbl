@@ -1,0 +1,37 @@
+FAILS. A 1.27 mm through crack at the edge of the 8 mm hole at (91.7, -3.6, 2.5) fails after about 83,365 cycles in a typical part. One part in ten fails by 53,242 cycles and one in a hundred by 36,607. 71.5% of parts fail before the 100000 cycle target (allowed 1%).
+
+Confidence: high. passed SIF mesh convergence, hand calculation, force balance, integration step, Monte Carlo samples, crack path
+nominal life: 83,365 cycles
+B10: 53,242 cycles
+B1: 36,607 cycles
+fail before target: 71.5%
+inspect every: 41,682 cycles
+
+Checks:
+  [pass] SIF mesh convergence: largest K at the starting crack 7.17 -> 7.17 MPa sqrt(m) with front elements of 0.0926 and 0.0618 mm, last change 0.1%
+  [pass] hand calculation: the edge crack weight function (Glinka and Shen) over the uncracked stress along the crack gives 7.77 MPa sqrt(m) for the 0.865 mm starting crack; the finite element K is 7.17 (-7.7%)
+  [pass] force balance: reactions balance the loads to 4.9e-05% (forces) and 7.1e-06% (moments)
+  [pass] integration step: nominal life 83,366 cycles with 200 steps in crack size and 83,365 with 400, 0.0015% apart
+  [pass] Monte Carlo samples: B1 36,607 cycles from 20,000 parts, 90% sampling band 35,843 to 37,050 (within 1.6%), and 36,200 from the first half of the parts (1.1% off)
+  [pass] crack path: 10 solved cracks from 0.865 to 9.17 mm, ended by the crack cutting through the part. Parts whose crack reaches its end count as failed there, which leaves out the last cycles and errs short
+
+Assumptions:
+  - Aluminum 7075-T6: NASGRO growth with C 1.16e-07 mm/cycle and n 3.7, threshold 1.8 MPa sqrt(m) at R = 0, toughness 29 MPa sqrt(m). Source: Paris fit and K_Ic from Dowling, Mechanical Behavior of Materials, 4th ed. (2013), Table 11.2 (Walker C0 and m); threshold 1.8 MPa sqrt(m), the IIW lower bound for aluminium at R = 0 (Hobbacher 2016).
+  - Loads cycle as constant amplitude between 0.1 and 1 of the load (R = 0.1), with the loads given as the peak.
+  - The crack plane at the start is normal to the largest principal stress at the origin, 190 MPa before the crack.
+  - The path starts from a crack 0.68 times the size given, the smallest tenth of the starting flaws sampled; smaller cracks follow the uncracked stress through the edge crack weight function, matched to the first solved K.
+  - K for growth combines the three modes by energy, sqrt(K_I^2 + K_II^2 + K_III^2 / (1 - nu)), and the turn uses K_I and K_II only (maximum tangential stress).
+  - Failure is K_max reaching the toughness or the average stress over the remaining ligament reaching the flow stress, 538 MPa, the mean of yield and tensile strength. Bending in the ligament is not counted, so net section yield is approximate.
+  - Parts scatter as lognormal: starting flaw 0.3, growth coefficient 0.25, load 0.05, toughness 0.07 (standard deviations of the logarithm). One part's failure cycle cannot be predicted; the percentiles describe many parts.
+  - The Monte Carlo keeps the solved path's shape and changes only how fast a part's crack travels along it.
+  - Linear elastic fracture mechanics: crack tip plasticity, crack face contact and environment are not modeled.
+  - A crack that cuts through the wall it grows across counts as a failed part, even where another load path remains, such as the far side of a lug, which errs short.
+
+Suggested fixes:
+  - Lower the stress at the crack's origin by 21%: Growth goes as the stress range to the power 3.7, so lowering the stress where the crack starts by 21% (a larger radius, a thicker section or a smaller load) brings B1 to the 100000 cycle target.
+  - Use Mild steel (ASTM A36): With Mild steel (ASTM A36)'s crack growth constants on the same path, B1 is 1.41e+06 cycles against 36,768 now. Its stiffness does not change K under the same loads, but check its strength and weight with a strength study.
+  - Use Stainless steel 304 (annealed): With Stainless steel 304 (annealed)'s crack growth constants on the same path, B1 is 1.01e+06 cycles against 36,768 now. Its stiffness does not change K under the same loads, but check its strength and weight with a strength study.
+  - Inspect every 41,682 cycles: Damage tolerance practice: the first inspection at half the nominal life from the starting crack (41,682 cycles), then every half of the life from a 1.27 mm crack, the size an inspection is taken to find reliably, to failure (83,365 cycles).
+
+Images: path: images/path.png, growth: images/growth.png, life: images/life.png
+Report: report.html

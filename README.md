@@ -354,6 +354,43 @@ and the response at a resonance scales with one over it. Fatigue lives scatter b
 factor of three to ten at the same stress, so the safety factor on stress is the
 number to lead with, and crack growth after a crack starts is a separate study.
 
+## Crack growth
+
+Crack growth follows a fatigue crack through any part from the place it starts to the place it
+fails the part. Ask it in words, or start from a finished strength or fatigue result, which brings
+its part, loads, supports and governing point, and from a fatigue result its duty cycle and
+required life.
+
+```console
+$ wobbl simulate bracket.py "how long until a crack from the pin hole grows critical?" -m 7075-t6 \
+    --fix "bolt holes d=6.6" --load "4 kN 0.866,0.5,0 bearing @ hole d=8" --target-life 100000
+```
+
+Unless a crack is given, it starts as the flaw damage tolerance practice assumes (MIL-A-83444 and
+JSSG-2006) at the most stressed point: a corner crack at a hole, a semicircular surface crack
+elsewhere, or a crack through a thin wall. The crack is cut into the CAD and meshed with a fine
+tube of quarter point elements along its front. K_I, K_II and K_III come from the opening of the
+crack faces, and every front point turns by the maximum tangential stress angle and moves at its
+own growth rate, with a new mesh each step, so the path comes from the geometry rather than from
+an assumption. Growth follows the NASGRO equation with sourced constants for 7075-T6, the common
+aluminum alloys and three classes of steel, other metals get BS 7910's steel law scaled by their
+stiffness and flagged as estimated, and loads cycle at an R ratio, as a file of cycles or as
+blocks such as `100% x 3650 R=0`.
+
+The K found along the path drives a Monte Carlo over 20,000 parts with scattered starting
+flaws, growth constants, loads and toughness. The answer is the spread of lives, B50, B10 and B1,
+the share failing before the target and an inspection interval, because no model can say when one
+particular part will fail.
+
+| Run | Answer | Checked against |
+|---|---|---|
+| [Bracket crack](examples/bracket-crack) | a crack at the pin hole cuts the lug after about 83,400 cycles, one bracket in a hundred by 36,600, so 71.5% fail before 100,000 | K on two front meshes 0.1% apart, a weight function within 8%, the force balance and the Monte Carlo's sampling band |
+
+Each run writes `playback.json` with the part, every front and the spread of lives, which a
+viewer plays back. Crack growth is linear elastic fracture mechanics, so crack tip plasticity,
+crack faces pressing on each other and the environment are not modeled, and plastics need
+measured growth constants.
+
 ## An agent on its own versus Wobbl
 
 Given a CAD file, a strength question and 15 minutes, a capable coding agent
@@ -485,7 +522,7 @@ where the two servo idealizations disagree, a load cell in service and coupons.
 
 ## Validation
 
-Fifty two cases with known answers run through the same pipeline you get. Every
+Fifty seven cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
@@ -502,6 +539,7 @@ modeled setup lands within 2%.
 | Uncertainty and calibration (a cantilever's mean and spread of deflection against lognormal propagation, Ishigami Sobol indices, two calibrations from synthetic data) | 5 | 0.97%, a film coefficient from a cooling curve |
 | Mechanisms (a pendulum's large swing, a four bar's sweep, a two link arm's holding torque, a gear train's output speed, an elastic and a half elastic collision) | 6 | 0.05%, the struck ball's speed after the half elastic hit |
 | Buckling, vibration and fatigue (Euler's column, a cantilever's first three bending frequencies, a simply supported plate's first three modes, a sine peak on a tip mass, a force swept through resonance, Shigley's fatigue example) | 6 | 2.28%, Shigley's example, where the book reads f off a chart |
+| Crack growth (a center and an edge crack against Tada, a surface crack against Newman and Raju, Paris life against its closed form, the turn of a crack at 45 degrees) | 5 | 3.45%, the surface crack, where Newman and Raju's fit is good to 5% |
 
 The full table is [on the website](https://sohan-bhat.github.io/wobbl/validation/). Run it yourself with
 `wobbl validate`, which takes about 30 minutes.
@@ -522,6 +560,7 @@ reports, heatmaps and summaries, and each has a page [on the website](https://so
 | [drone-arm-resonance](examples/drone-arm-resonance) | Does that arm resonate with its propeller anywhere from hover to full throttle? | vibration |
 | [strut-buckling](examples/strut-buckling) | Does a slender aluminum strut carry 7 kN with a factor of 3 against buckling? | buckling |
 | [motor-mount-fatigue](examples/motor-mount-fatigue) | Does the cast motor mount last ten years of starts and running without a crack? | fatigue |
+| [bracket-crack](examples/bracket-crack) | Where does a crack at a lug's pin hole go, and do 99% of brackets last 100,000 cycles? | crack growth |
 | [heat-sink](examples/heat-sink) | Does a 15 W chip stay under 85 C without a fan? | heat |
 | [battery-pack](examples/battery-pack) | When does a pack in a sealed box pass 60 C? | transient heat |
 | [falling-rock](examples/falling-rock) | How fast does a rock hit the ground after a 300 m fall? | motion |
