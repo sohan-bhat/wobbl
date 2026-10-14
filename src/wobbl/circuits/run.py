@@ -168,6 +168,10 @@ def run_circuit(template: str, params: dict, out_dir: str | Path, question: str 
         zoom = tt >= tt[-1] - 3 * period
         imgs["waveform"] = line_plot(out / "images" / "waveform.png", (tt[zoom] - tt[zoom][0]) * 1e6,
                                      {"v(out)": vo[zoom]}, "us", "V")
+        from ..fields import ringing
+        if ringing.wanted(p):                    # board parasitics in the hot loop: simulate the switch node too
+            verdict, head = ringing.attach(p, work, out, checks, values, imgs, fixes, assumptions, metrics, verdict,
+                                           head)
     elif template == "mosfet":
         tt, vd, idr = data["time"], data["v(d)"], data["i(vs)"]
         f = p["frequency"]
@@ -221,6 +225,8 @@ def run_circuit(template: str, params: dict, out_dir: str | Path, question: str 
                             "_figures": [["waveform", "Simulated waveform"]]}, imgs, fixes, solver=solver,
                            t_total=time.time() - t0)
     out_o.confidence, out_o.confidence_reasons = confidence(checks, extra)
+    if "ringing" in imgs:
+        out_o.values["_figures"].append(["ringing", "Switch node with and without the board's parasitics"])
     (out / "netlist.cir").write_text(tpl.netlist)
     return out_o.write(out)
 
