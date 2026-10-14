@@ -3,12 +3,11 @@
 A workload is a Wobbl command line. The CLI itself parses it without running it, which gives its command, its
 parameters and the files it reads. Domains plug in through one registry, keyed by the command a user types:
 
-    register("run", domain="strength", solves=1.0, refine=run_submodel)
+    register("run", domain="strength", solves=1.0)
     register("flow pipe", domain="flow", cost=my_cost_function)
 
 ``cost`` predicts a run outright. ``solves`` says that the command meshes a CAD part and how many static solves
-of that mesh its procedure costs, and the shared CalculiX model prices it from the part's first mesh. ``refine``
-takes a finished result and refines it locally. A command with none of these is still predicted, from the
+of that mesh its procedure costs, and the shared CalculiX model prices it from the part's first mesh. A command with none of these is still predicted, from the
 measured runs of the same command on this machine, and before any from the run of its bundled example on the
 reference machine.
 
@@ -43,44 +42,19 @@ class Hooks:
     cost: Callable | None = None       # (Workload) -> estimate.Cost
     solves: float | None = None        # static solves per mesh, for a command that meshes a CAD part
     dof: int = 3                       # 3 for displacements, 1 for temperatures
-    refine: Callable | None = None     # (result_dir, at, radius, size, out, progress) -> dict
 
 
 REGISTRY: dict[str, Hooks] = {}
 
 
 def register(command: str, **hooks) -> Hooks:
-    """Plug a domain's command into the cost model, the jobs and the refinements. Later calls update earlier."""
+    """Plug a domain's command into the cost model and the jobs. Later calls update earlier."""
     h = REGISTRY.setdefault(command, Hooks())
     for k, v in hooks.items():
         if not hasattr(h, k):
             raise TypeError(f"unknown hook {k}")
         setattr(h, k, v)
     return h
-
-
-def refiner(domain: str) -> Callable | None:
-    """The refinement registered for a domain's results, if any."""
-    for h in REGISTRY.values():
-        if h.domain == domain and h.refine is not None:
-            return h.refine
-    return None
-
-
-def refine(result_dir: str | Path, at=None, radius: float | None = None, size: float | None = None,
-           out: str | Path | None = None, progress: Callable | None = None) -> dict:
-    """Refine a finished result of any domain locally, with the refinement its domain registered."""
-    d = Path(result_dir)
-    try:
-        domain = json.loads((d / "outcome.json").read_text()).get("domain", "")
-    except (OSError, ValueError):
-        raise WorkloadError(f"no Wobbl result in {d}", "Pass the folder a Wobbl run printed") from None
-    fn = refiner(domain)
-    if fn is None:
-        meshed = sorted({h.domain for h in REGISTRY.values() if h.refine is not None})
-        raise WorkloadError(f"{domain or 'this'} results have no local refinement, which needs a meshed field with "
-                            "a local peak", "Results that have one: " + ", ".join(meshed))
-    return fn(d, at, radius, size, out, progress)
 
 
 @dataclass
@@ -505,9 +479,7 @@ def _run_plan_cost(w: Workload):
 
 
 def _builtin():
-    from ..structural.submodel import run_submodel
-
-    register("run", domain="strength", solves=1.0, refine=run_submodel)
+    register("run", domain="strength", solves=1.0)
     register("thermal", domain="thermal", solves=1.0, dof=1)
     register("buckling", domain="buckling", solves=2.5)
     register("vibration", domain="vibration", solves=2.0)

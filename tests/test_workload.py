@@ -56,7 +56,6 @@ def test_a_domain_plugs_in_through_one_registry(home):
         e = E.estimate_command(["flow", "pipe"], M)
         assert e.verdict == "fits" and e.seconds == pytest.approx(120.0) and e.cost.solver == "wobbl flow pipe"
         assert "flow domain's own model" in e.basis[0]
-        assert WL.refiner("strength") is not None and WL.refiner("flow") is None
         with pytest.raises(TypeError):
             WL.register("flow pipe", nonsense=1)
     finally:

@@ -43,7 +43,7 @@ def _protect_stdout():
 # the tools agents should reach for; every other tool is a deprecated alias of simulate and says so
 GENERAL = {"simulate", "physics", "inspect_geometry", "verify", "render", "suggest_fix", "quantify_uncertainty",
            "validate_against_tests", "assess_credibility", "plan_tests", "estimate_cost", "start_job", "job_status",
-           "job_logs", "cancel_job", "resume_job", "list_materials", "solve_submodel"}
+           "job_logs", "cancel_job", "resume_job", "list_materials"}
 
 
 def _deprecate(srv) -> None:
@@ -436,17 +436,14 @@ def build_server():
     @srv.tool()
     def solve_submodel(result_dir: str, at: list[float] | None = None, radius: float | None = None,
                        size: float | None = None) -> dict:
-        """Refine only around the peak of a finished result, with the refinement its domain registered. For a
-        solve_structural result the part is cut down to a ball around the peak (or around at=[x, y, z] in mm),
-        meshed finely and held on its cut where the global solution moved (CalculiX *SUBMODEL). Returns the local
-        peak against the global one, and two checks on the cut, the peak's distance from it in feature sizes and
-        the stress agreement across it. Quote the local peak only when trusted is true. Use it when the global
-        mesh is too coarse at the peak and a finer whole model would be too big."""
-        from ..jobs.workload import refine
+        """Refine only around the peak of a finished solve_structural result, the part.submodel analysis of
+        simulate. Returns the local peak, the safety factor it gives and two checks on the cut. Quote it only when
+        confidence is high."""
+        from ..cli.submodel import run
         try:
-            return refine(result_dir, at, radius, size)
+            return run(result_dir, at, radius, size)
         except Exception as e:  # noqa: BLE001
-            return {"error": str(e), **({"hint": e.hint} if getattr(e, "hint", "") else {})}
+            return {"error": str(e).strip("'\""), **({"hint": e.hint} if getattr(e, "hint", "") else {})}
 
     @srv.tool()
     def estimate_cost(command: list[str] | None = None, path: str = "", solver: str = "", nodes: float = 0,

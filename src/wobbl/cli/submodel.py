@@ -1,24 +1,28 @@
-"""wobbl submodel: a fine local model of the peak of any finished result whose domain registered one."""
+"""wobbl submodel, kept as a hidden alias of wobbl simulate RESULT "refine the stress around the peak"."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import click
 
 from . import ui
 
 
-def _xyz(text: str):
-    try:
-        v = [float(x) for x in text.replace(" ", "").split(",")]
-    except ValueError:
-        v = []
-    if len(v) != 3:
-        raise click.BadParameter("give a point as x,y,z in mm, for example 10,-4,2.5")
-    return v
+def run(result: str, at=None, radius: float | None = None, size: float | None = None, out: str | None = None,
+        progress=None) -> dict:
+    """The part.submodel analysis of wobbl simulate on a finished strength result, returned as its outcome."""
+    from ..simulate import route, run_plan
+
+    xyz = ",".join(str(v) for v in at) if isinstance(at, (list, tuple)) else at
+    options = {k: [str(v)] for k, v in (("at", xyz), ("radius", radius), ("size", size)) if v}
+    plan = route(str(result), "", ["submodel"], "part")
+    steps = run_plan(plan, options, Path(out) if out else Path(result) / "submodel", progress)
+    o = steps[0].outcome
+    return o if isinstance(o, dict) else o.to_dict()
 
 
-@click.command()
+@click.command(hidden=True)
 @click.argument("result", type=click.Path(exists=True, file_okay=False))
 @click.option("--at", "at", default="", help="Center of the local model as x,y,z in mm (default the global peak).")
 @click.option("--radius", type=float, default=None, help="Radius of the local model in mm (default 2.5 feature sizes).")
@@ -26,39 +30,16 @@ def _xyz(text: str):
 @click.option("--out", default=None, help="Folder for the local model (default RESULT/submodel).")
 @click.option("--json", "as_json", is_flag=True)
 def submodel(result, at, radius, size, out, as_json):
-    """Refine only around the peak of a finished result.
-
-    The result's own domain does the refining. For a strength result the part is cut down to a ball around the
-    peak, meshed finely, and held on its cut where the global solution moved. The peak comes back with two checks
-    on the cut.
-
-    \b
-    wobbl submodel result
-    wobbl submodel result --at 12,0,4 --radius 20
-    """
-    from ..jobs.workload import refine
-
-    point = _xyz(at) if at else None
+    """Refine only around the peak of a finished strength result, as wobbl simulate RESULT --physics submodel."""
     try:
         with ui.progress(not as_json) as cb:
-            r = refine(result, point, radius, size, out, cb)
+            d = run(result, at or None, radius, size, out, cb)
     except Exception as e:  # noqa: BLE001
-        ui.fail(str(e), getattr(e, "hint", ""))
+        ui.fail(str(e).strip("'\""), getattr(e, "hint", ""))
     if as_json:
-        click.echo(json.dumps(r, indent=1))
+        click.echo(json.dumps(d, indent=1, default=str))
         return
-    word, key = ("TRUSTED", "ok") if r["trusted"] else ("CHECK THE CUT", "marginal")
-    sign = "+" if r["change_pct"] >= 0 else ""
-    ui.verdict_panel(word, key, f"local peak {r['submodel_peak_MPa']:.4g} MPa against {r['global_peak_MPa']:.4g} MPa "
-                     f"in the global model ({sign}{r['change_pct']:.3g}%)",
-                     [("local peak", f"{r['submodel_peak_MPa']:.4g} MPa"), ("radius", f"{r['radius_mm']:.3g} mm"),
-                      ("element", f"{r['element_size_mm']:.3g} mm"), ("nodes", f"{r['nodes']:,}"),
-                      ("time", f"{r['time_s']:.0f} s")],
-                     "high" if r["trusted"] else "low",
-                     [f"{r['measure']} at ({', '.join(f'{v:.4g}' for v in r['where_mm'])}) mm",
-                      f"feature size from {r['feature']}"])
-    ui.checks_table(r["checks"])
-    if r["notes"]:
-        ui.section("notes")
-        ui.bullets(r["notes"])
-    ui.console.print(f"\n  local model in {r['folder']}\n")
+    ui.verdict_panel(d["verdict"].upper(), d["verdict"], d["headline"], [tuple(m) for m in d["metrics"]],
+                     d["confidence"], d["confidence_reasons"])
+    ui.checks_table(d["checks"])
+    ui.console.print(f"\n  report {d.get('report', '')}\n")
