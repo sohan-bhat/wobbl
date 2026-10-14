@@ -144,14 +144,36 @@ class CircuitPredictor(Predictor):
         work = Path(model.dir) / "work" / "validate"
         count = [0]
 
+        wave = [k for k, r in zip(keys, readings) if "(" in k and r.time is not None]
+
         def solve(row):
+            from ..circuits.run import simulate
+            from ..circuits.templates import TEMPLATES
+
             count[0] += 1
-            o = run_circuit(model.template, {**model.params, **row}, work / f"d{count[0]}")
-            missing = [k for k in keys if k not in o.values]
-            if missing:
-                raise ReadingError(f"the {model.template} template has no value {missing[0]} (it has "
-                                   f"{', '.join(k for k in o.values if not k.startswith('_') and k != 'params')})")
-            return [float(o.values[k]) for k in keys]
+            p = {**model.params, **row}
+            o = run_circuit(model.template, p, work / f"d{count[0]}")
+            data = {}
+            if wave:   # waveform readings: the simulated signal at each reading's time
+                tpl = TEMPLATES[model.template](p)
+                data = simulate(tpl, work / f"w{count[0]}")
+                if "time" not in data:
+                    raise ReadingError(f"the {model.template} template is a steady operating point, so it has no "
+                                       "waveform to read at a time")
+            out = []
+            for k, r in zip(keys, readings):
+                if k in wave:
+                    if k not in data:
+                        raise ReadingError(f"the {model.template} template has no signal {k} (it has "
+                                           f"{', '.join(x for x in data if x != 'time')})")
+                    out.append(float(np.interp(r.time, data["time"], data[k])))
+                elif k in o.values:
+                    out.append(float(o.values[k]))
+                else:
+                    raise ReadingError(f"the {model.template} template has no value {k} (it has "
+                                       f"{', '.join(x for x in o.values if not x.startswith('_') and x != 'params')}"
+                                       ", or a signal such as v(out) with a time)")
+            return out
         solve.cleanup = lambda: __import__("shutil").rmtree(work, ignore_errors=True)
         if self.inputs:
             self.sur = design_surrogate(solve, self.inputs, keys, progress, solves, "ngspice run")

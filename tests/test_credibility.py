@@ -275,6 +275,28 @@ def test_circuit_uncertainty_through_ngspice(tmp_path):
 
 
 @pytest.mark.solver
+@needs_spice
+def test_waveform_readings_calibrate_a_resistor(tmp_path):
+    """Scope readings of an RC charging curve made with R = 10.3 kohm, against a run at 10 kohm."""
+    from wobbl.circuits.run import run_circuit
+    from wobbl.credibility.against import run_validation
+
+    run_circuit("rc", {"r": "10k", "c": "10u", "v": "5"}, tmp_path / "rc")
+    tau = 10.3e3 * 10e-6
+    rng = np.random.default_rng(3)
+    rows = ["# synthetic scope trace", "name,quantity,time,value,uncertainty,unit"]
+    for t in (0.5 * tau, tau, 2 * tau, 3 * tau):
+        v = 5 * (1 - math.exp(-t / tau)) + 0.005 * rng.standard_normal()
+        rows.append(f"scope,v(out),{t:.6g},{v * 1000:.2f},5,mV")
+    (tmp_path / "scope.csv").write_text("\n".join(rows) + "\n")
+    r = run_validation(tmp_path / "rc", tmp_path / "scope.csv", ["r 5%"], solves=8)
+    c = r["calibration"]["inputs"][0]
+    assert c["input"] == "r" and c["ci95"][0] < 10.3e3 < c["ci95"][1]
+    # the run at 10 kohm, read at the true time constant
+    assert r["readings"][1]["simulation"] == pytest.approx(5 * (1 - math.exp(-1.03)), rel=0.01)
+
+
+@pytest.mark.solver
 @needs_ccx
 def test_geometry_tolerance_through_new_studies(tmp_path):
     """A toleranced thickness of a parametric bar gets new converged studies and a fitted surrogate, while the load
