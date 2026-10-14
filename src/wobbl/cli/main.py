@@ -6,6 +6,7 @@
     wobbl check  wobbl-out/part                       re-read the checks of a finished run
     wobbl report wobbl-out/part --open                rebuild and open the HTML report
     wobbl fix    wobbl-out/part --apply               apply suggested fixes and compare
+    wobbl motion rocket.toml                          a drop, a throw or a rocket flight
     wobbl doctor | setup | uninstall | materials | mcp | validate
 """
 from __future__ import annotations
@@ -307,6 +308,9 @@ def _load_outcome(result_dir: str):
     if data.get("domain") == "strength":
         from ..structural.outcome import Outcome
         return Outcome.load(d / "outcome.json")
+    if data.get("domain") == "motion":
+        from ..motion.study import MotionOutcome
+        return MotionOutcome.load(d / "outcome.json")
     from ..outcome_generic import GenericOutcome
     return GenericOutcome.load(d / "outcome.json")
 
@@ -417,9 +421,10 @@ def mcp():
 def _register():
     from .admin import doctor, setup, uninstall
     from .circuits import circuit
+    from .motion import motion
     from .thermal import thermal
 
-    for c in (setup, doctor, uninstall, thermal, circuit):
+    for c in (setup, doctor, uninstall, thermal, circuit, motion):
         cli.add_command(c)
 
 
