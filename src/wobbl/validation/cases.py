@@ -284,6 +284,86 @@ def buck(out: Path):
     return o.values["ripple_V"] * 1000, buck_tpl(p).expect["ripple_v"] * 1000, {"confidence": o.confidence}
 
 
+# --- motion -----------------------------------------------------------------------
+# Each flight goes through the motion domain's own integrator, events, phases and checks, reduced to a setup with
+# an exact answer: gravity held at 9.80665 m/s2 and either no air or air of one density.
+def _flight(**kw):
+    from ..motion.spec import MotionStudy
+    from ..motion.study import analyze
+
+    a = analyze(MotionStudy(uniform_gravity=True, **kw))
+    return a.flight, {"confidence": a.confidence, "events": len(a.flight.events)}
+
+
+def free_fall(out: Path):
+    """A ball dropped from 300 m with no air, t = sqrt(2h/g)."""
+    from ..motion.atmosphere import G0
+
+    fl, info = _flight(name="ball", mass=1.0, diameter=0.1, height=300.0, air="vacuum")
+    return fl.end.t, math.sqrt(2 * 300.0 / G0), info
+
+
+def drag_fall(out: Path):
+    """The falling rock example's 9 cm granite sphere, Cd 0.6, dropped 300 m through air of constant density.
+    The fall time comes from h = vt^2/g ln cosh(g t / vt), and the impact speed is vt tanh(g t / vt)."""
+    from ..motion.atmosphere import G0
+
+    m, d, cd, rho, h = 2700 * math.pi / 6 * 0.09 ** 3, 0.09, 0.6, 1.225, 300.0
+    fl, info = _flight(name="rock", mass=m, diameter=d, cd=cd, height=h, air=rho)
+    vt = math.sqrt(2 * m * G0 / (rho * cd * math.pi * d * d / 4))
+    t = vt / G0 * math.acosh(math.exp(G0 * h / vt ** 2))
+    v = math.hypot(fl.end.y[2], fl.end.y[3])
+    return v, vt * math.tanh(G0 * t / vt), {**info, "time_s": round(fl.end.t, 6), "closed_form_time_s": round(t, 6)}
+
+
+def projectile_range(out: Path):
+    """A ball thrown at 30 m/s, 40 deg above level, from the ground with no air, R = v^2 sin(2 theta) / g."""
+    from ..motion.atmosphere import G0
+
+    fl, info = _flight(name="ball", mass=0.2, diameter=0.07, speed=30.0, angle=40.0, air="vacuum")
+    return float(fl.end.y[0]), 30.0 ** 2 * math.sin(math.radians(80.0)) / G0, info
+
+
+def _vertical_rocket():
+    """A rocket on a vertical rail in a vacuum, 1000 N for 4 s burning 4 kg of propellant (an exhaust speed of
+    1000 m/s), 11 kg at ignition and 7 kg at burnout."""
+    from ..motion.spec import Motor
+
+    thrust, burn, dry, case, prop = 1000.0, 4.0, 5.0, 2.0, 4.0
+    motor = Motor("constant", [(0.0, thrust), (burn, thrust)], prop, case + prop)
+    fl, info = _flight(name="rocket", mass=dry, diameter=0.1, air="vacuum", rail_length=1.0, motor=motor)
+    return fl, info, dry + case + prop, dry + case, thrust * burn / prop, burn
+
+
+def rocket_speed(out: Path):
+    """Burnout speed of the vertical rocket, ve ln(m0 / m1) - g tb."""
+    from ..motion.atmosphere import G0
+
+    fl, info, m0, m1, ve, tb = _vertical_rocket()
+    return float(fl.event("burnout").y[3]), ve * math.log(m0 / m1) - G0 * tb, info
+
+
+def rocket_height(out: Path):
+    """Burnout altitude of the vertical rocket, ve tb - ve (m1 / mdot) ln(m0 / m1) - g tb^2 / 2."""
+    from ..motion.atmosphere import G0
+
+    fl, info, m0, m1, ve, tb = _vertical_rocket()
+    mdot = (m0 - m1) / tb
+    exact = ve * tb - ve * m1 / mdot * math.log(m0 / m1) - G0 * tb ** 2 / 2
+    return float(fl.event("burnout").y[1]), exact, info
+
+
+def chute_descent(out: Path):
+    """A 5 kg payload let go from 500 m under a 2 m parachute with Cd 1.5 in air of constant density. It lands at
+    the terminal speed sqrt(2 m g / (rho Cd A))."""
+    from ..motion.atmosphere import G0
+    from ..motion.spec import Chute
+
+    chute = Chute("main", 2.0, 1.5)
+    fl, info = _flight(name="payload", mass=5.0, diameter=0.2, height=500.0, air=1.225, chutes=[chute])
+    return float(-fl.end.y[3]), math.sqrt(2 * 5.0 * G0 / (1.225 * chute.drag_area)), info
+
+
 CASES = [
     Case("cantilever-tip", "Cantilever tip deflection", "strength", "Timoshenko beam theory", "tip deflection",
          "mm", 0.03, True, cantilever_tip),
@@ -325,6 +405,18 @@ CASES = [
          True, rc),
     Case("buck", "Buck converter output ripple", "circuit", "ideal triangular current through C and ESR",
          "peak to peak ripple", "mV", 0.15, False, buck),
+    Case("free-fall", "Ball dropped 300 m without air", "motion", "t = sqrt(2 h / g)", "fall time", "s", 0.001,
+         True, free_fall),
+    Case("drag-fall", "Granite sphere dropped 300 m through air", "motion",
+         "v = vt tanh(g t / vt), h = vt^2 / g ln cosh(g t / vt)", "impact speed", "m/s", 0.001, True, drag_fall),
+    Case("projectile", "Ball thrown at 30 m/s and 40 deg without air", "motion", "R = v^2 sin(2 theta) / g",
+         "range", "m", 0.001, True, projectile_range),
+    Case("rocket-speed", "Vertical rocket at constant thrust in a vacuum", "motion", "ve ln(m0 / m1) - g tb",
+         "burnout speed", "m/s", 0.001, True, rocket_speed),
+    Case("rocket-height", "Vertical rocket at constant thrust in a vacuum", "motion",
+         "ve tb - ve (m1 / mdot) ln(m0 / m1) - g tb^2 / 2", "burnout altitude", "m", 0.001, True, rocket_height),
+    Case("chute-descent", "Payload under a 2 m parachute", "motion", "v = sqrt(2 m g / (rho Cd A))",
+         "descent rate at the ground", "m/s", 0.001, True, chute_descent),
 ]
 
 
