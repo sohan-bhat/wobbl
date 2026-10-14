@@ -75,6 +75,7 @@ export interface Sim {
   frames: string;           // t, x, y, speed and phase index of the rows the playback steps through
   phases: string;           // the phases the frames point at, as key=label
   scale: number;            // stage units per meter, the same along the ground and up
+  origin: number;           // where the start sits along the stage
   ground: number;           // the ground line on the stage
   events: string;           // when each event happens and its name, for the flags
   speedup: number;
@@ -170,7 +171,7 @@ export function sim(run: Run): Sim {
   flagEvents.sort((p, q) => parseFloat(p) - parseFloat(q));
   return {
     drop, rocket, cliff, rail, trail, end: { x: r1(X(last.x)), y: r1(Y(last.alt)), a: Math.round(a) }, chutes, ghost, frames,
-    phases: phaseNames.map((p) => `${p}=${PHASE[p] ?? cap(p)}`).join(';'), scale: s, ground: GROUND,
+    phases: phaseNames.map((p) => `${p}=${PHASE[p] ?? cap(p)}`).join(';'), scale: s, origin: r1(x0), ground: GROUND,
     events: flagEvents.join(';'),
     speedup: speedup(tEnd), decimals, bar, answer, readouts, widths,
     said: `${answer}. The run marks ${events.map((e) => `${e.name} at ${secs(e.t_s)}, ${meters(e.alt_m ?? 0)} up`).join(', then ')}.`

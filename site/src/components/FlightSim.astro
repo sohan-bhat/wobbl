@@ -22,7 +22,7 @@ const both = s.chutes.length === 2;
 <figure class:list={['sim', { 'sim-compact': compact }]} data-sim={compact ? undefined : ''}
         data-frames={compact ? undefined : s.frames} data-phases={compact ? undefined : s.phases}
         data-events={compact ? undefined : s.events} data-speed={s.speedup} data-decimals={s.decimals}
-        data-scale={s.scale.toPrecision(6)} data-ground={s.ground} data-w={W} data-h={H}
+        data-scale={s.scale.toPrecision(6)} data-origin={s.origin} data-ground={s.ground} data-w={W} data-h={H}
         data-ghost={s.ghost && !compact ? `${s.ghost.t},${s.ghost.x},${s.ghost.top}` : undefined}>
   <div class="sim-stage">
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
