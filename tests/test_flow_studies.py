@@ -107,7 +107,9 @@ def test_playback_quantizes_fields_and_stays_small(tmp_path):
 def test_heat_sink_geometry_and_losses():
     from wobbl.flow.heatsink import FanSinkStudy, entry_exit_k, sink_geometry
 
-    part = "examples/fan-heat-sink/heatsink.py"
+    from pathlib import Path
+
+    part = str(Path(__file__).resolve().parents[1] / "examples" / "heat-sink" / "heatsink.py")
     g = sink_geometry(FanSinkStudy(part))
     assert g["fins"] == 9 and g["gap"] == pytest.approx(5.8125e-3) and g["channels"] == 8
     assert entry_exit_k(1.0) == 0 and entry_exit_k(0.5) == pytest.approx(0.42 * 0.75 + 0.25)
