@@ -120,8 +120,9 @@ def assess(result_dir, influence: str = "medium", consequence: str = "medium", q
     mf = (v or {}).get("model_form")
     if mf:
         decided = mf["favours"] == mf["assumed"] and mf["log10_likelihood_ratio"] >= 2
-        ev += (f". The readings favour {mf['favours']} over the other idealization, by a log10 likelihood ratio of "
-               f"{mf['log10_likelihood_ratio']:.1f}")
+        from .against import ratio_words
+
+        ev += f". The readings favour {mf['favours']} over the other idealization {ratio_words(mf)}"
         if v["tests"].get("synthetic"):
             ev += ", but the readings are synthetic, so this shows how a real test would settle it"
         elif decided:
@@ -184,7 +185,7 @@ def assess(result_dir, influence: str = "medium", consequence: str = "medium", q
     # the answer's own uncertainty against the decision
     lvl, ev = _answer(o, u)
     F.append(_factor("uncertainty in the answer", "applicability", lvl, goal, ev,
-                     "the failure probability or the margin leaves too little room; narrow the dominant input"))
+                     "the failure probability or the margin leaves too little room, so narrow the dominant input"))
 
     met = sum(f["meets"] for f in F)
     res = {"kind": "credibility", "domain": dom, "wobbl": __version__,

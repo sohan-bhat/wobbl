@@ -264,8 +264,9 @@ def odds(pr: dict) -> str:
         return f"below 1 in {_round_odds(1 / hi)} (no failures in {n:,} samples, 95% upper bound {_pct(hi)})"
     if pr["failures"] == n:
         return f"all {n:,} samples fail"
-    one_in = f"about 1 in {_round_odds(1 / p)}" if p < 0.5 else f"{_pct(p)}"
-    return f"{one_in} ({_pct(p)}, 95% interval {_pct(lo)} to {_pct(hi)})"
+    if p >= 0.5:
+        return f"{_pct(p)} (95% interval {_pct(lo)} to {_pct(hi)})"
+    return f"about 1 in {_round_odds(1 / p)} ({_pct(p)}, 95% interval {_pct(lo)} to {_pct(hi)})"
 
 
 def _round_odds(x: float) -> str:

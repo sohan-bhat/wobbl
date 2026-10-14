@@ -301,6 +301,13 @@ def model_form(pred: StrengthPredictor, data: np.ndarray, sigma: np.ndarray) -> 
             "log10_likelihood_ratio": float(abs(log10)), "assumed": rows[0]["idealization"]}
 
 
+def ratio_words(mf: dict) -> str:
+    x = mf["log10_likelihood_ratio"]
+    if x < 1:
+        return "barely"
+    return f"by a likelihood ratio of about {round(10 ** x):,}" if x < 3 else "by a likelihood ratio of more than 1,000"
+
+
 def _q(v: float, quantity: str) -> str:
     if quantity == "strain":
         return f"{fmt(v * 1e6)} microstrain"
@@ -333,10 +340,7 @@ def headline(r: dict) -> str:
     mf = r.get("model_form")
     if mf:
         other = next(x["idealization"] for x in mf["idealizations"] if x["idealization"] != mf["favours"])
-        x = mf["log10_likelihood_ratio"]
-        strength = ("barely" if x < 1 else f"by a likelihood ratio of about {round(10 ** x):,}" if x < 3 else
-                    "by a likelihood ratio of more than 1,000")
-        out += f" The readings favour {mf['favours']} over {other} {strength}, with the modulus fitted to each."
+        out += f" The readings favour {mf['favours']} over {other} {ratio_words(mf)}, with the modulus fitted to each."
     for c in (r.get("calibration") or {}).get("inputs", []):
         u = f" {c['unit']}" if c["unit"] and c["unit"] != "x" else ""
         out += (f" Calibration puts {c['input']} at {fmt(c['mean'])}{u} (95% interval {fmt(c['ci95'][0])} to "

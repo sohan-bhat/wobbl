@@ -358,7 +358,8 @@ def plan_tests(result_dir: str) -> dict:
 
 def _plan(r: dict) -> dict:
     return {"headline": r["headline"],
-            "tests": [{k: t.get(k) for k in ("order", "kind", "what", "why", "how_many", "gauges")} for t in r["tests"]],
+            "tests": [{k: t.get(k) for k in ("order", "kind", "what", "why", "how_many", "gauges")}
+                      for t in r["tests"]],
             "replace": r["replace"]}
 
 

@@ -30,7 +30,7 @@ INPUT_TESTS = {
     "strength": ("material coupons", "Tensile test coupons from the same lot, casting or print settings, measuring "
                  "the {label} ({name})"),
     "stiffness": ("material coupons", "Measure Young's modulus on the same coupons with an extensometer"),
-    "load": ("service load", "Measure the real {label} in service, with a load cell or a strain gauged link"),
+    "load": ("service load", "Measure {label} in service, with a load cell or a strain gauged link"),
     "geometry": ("first article inspection", "Measure the {name} on the first parts made, to replace the tolerance "
                  "band with the real spread"),
     "boundary": ("boundary condition", "Measure {label} on the real setup, for example from how fast a heated part "
@@ -71,9 +71,9 @@ def plan(result_dir) -> dict:
         after = sd * np.sqrt(max(1.0 - g["share"], 0.0))
         g.update({"score": g["share"], "addresses": [f"the scatter of {', '.join(g['inputs'])}"],
                   "what": ". ".join(dict.fromkeys(g["test"])) + ".",
-                  "why": (f"Knowing the {' and '.join(g['inputs'])} exactly removes about {100 * g['share']:.0f}% of the "
-                          f"variance of the {u['decision'].replace('_', ' ')}, taking its standard deviation from "
-                          f"{fmt(sd)} to about {fmt(after)}.")})
+                  "why": (f"Knowing the {' and '.join(g['inputs'])} exactly removes about {100 * g['share']:.0f}% of "
+                          f"the variance of the {u['decision'].replace('_', ' ')}, taking its standard deviation "
+                          f"from {fmt(sd)} to about {fmt(after)}.")})
         if g["kind"] == "material coupons":
             g["how_many"] = ("At least 10 coupons, since the uncertainty in the lot mean falls with the square root "
                              "of their number, to a third of the scatter at 9.")

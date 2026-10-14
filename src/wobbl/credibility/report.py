@@ -148,7 +148,8 @@ def uncertainty_section(r: dict, d: Path) -> str:
                                                        "95% interval"], rows, {1, 2, 3, 4}))
     m = r.get("model", {})
     note = (f"{r['samples']:,} {r['sampling']} samples. The model is {m.get('method', '')}. Sobol indices use "
-            f"{r['sensitivity']['base_samples']:,} base points of a scrambled Sobol sequence, with bootstrap intervals.")
+            f"{r['sensitivity']['base_samples']:,} base points of a scrambled Sobol sequence, with bootstrap "
+            "intervals.")
     parts.append(f"<p class='muted'>{esc(note)}</p>")
     return "".join(parts)
 
