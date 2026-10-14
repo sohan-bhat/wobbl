@@ -9,7 +9,7 @@
 
 <p align="center">
   <strong>Simulate anything before you build it.</strong><br>
-  Verified strength, heat, circuit and motion simulation for coding agents and the people who design physical things.
+  Verified simulation of parts, circuits, mechanisms, flights, flows, fields and chemistry, for coding agents and the people who design physical things.
 </p>
 
 <p align="center">
@@ -33,11 +33,14 @@
 ## What it is
 
 Wobbl is a command line tool, an MCP server and an agent skill that run real
-engineering solvers and check every answer before anyone acts on it. Point it at
-a STEP, IGES, STL or parametric Python part, ask a question in plain words or
-with explicit loads and supports, and you get back the number, where it happens,
-a confidence level with its reasons, the assumptions, a heatmap with the failure
-point marked and fixes with numbers.
+engineering solvers and check every answer before anyone acts on it. It has one
+command, `wobbl simulate`, that takes whatever describes the thing (a STEP, IGES,
+STL or parametric Python part, a netlist or KiCad schematic, a mechanism or rocket
+spec, a fluid case, a molecule, material or reaction, or a sentence) and the
+question in plain words. It works out which physics the question needs, runs each
+one, and gives back the number, where it happens, a confidence level with its
+reasons, every assumption with the option that overrides it, a 3D view of the
+scenario playing out and fixes with numbers.
 
 - Strength with [CalculiX](http://www.calculix.de), on second order tetrahedral
   meshes from [gmsh](https://gmsh.info) and OpenCASCADE that are refined around the
@@ -82,7 +85,7 @@ conda-forge into `~/.wobbl` (about 70 MB, no admin rights). Use
 This first answer needs no files.
 
 ```sh
-wobbl "will a blue LED on 5V with a 47 ohm resistor fry?"
+wobbl simulate "will a blue LED on 5V with a 47 ohm resistor fry?"
 ```
 
 Then try your own part.
@@ -92,8 +95,8 @@ Then try your own part.
 wobbl inspect part.step
 
 # ask in plain words, or give the material, supports and loads yourself
-wobbl part.step "will this 6061 bracket yield under 50 lbf at the tip?"
-wobbl run part.step -m petg --fix "bolt holes d=5.5" \
+wobbl simulate part.step "will this 6061 bracket yield under 50 lbf at the tip?"
+wobbl simulate part.step --physics stress -m petg --fix "bolt holes d=5.5" \
   --load "250 N down at 0,-15,31 @ holes d=3.4 rigid"
 
 # build the fixes (fillets, gussets, thicker walls) and run each again
@@ -115,6 +118,60 @@ cd wobbl/examples/shelf-bracket && ./run.sh
 | Linux arm64 | native | not packaged, so install it with your package manager and Wobbl finds it |
 | Windows x64 | native | native |
 
+## One command for any thing
+
+`wobbl simulate THING "question"` reads what the thing is from its file, its
+contents or its words, picks the physics from the question, and prints the route it
+took and every guess before it runs. A question that asks several things runs
+several physics, each with its own load case.
+
+```console
+$ wobbl simulate bracket.py "will it survive a 1 m drop and hold a 10 kg shelf?" --plan
+PLAN
+  bracket.py is a .py file, read as a part (parametric)
+  override with --domain part
+  physics stress from "hold", drop from "drop"
+  override with --physics stress,drop
+  stress answers "hold a 10 kg shelf"
+  drop answers "will it survive a 1 m drop"
+
+WHAT WOBBL READ FROM THE QUESTION
+  drop  height 1 m
+  override with --height '1 m'
+
+WHAT WOBBL WOULD ASSUME
+  stress  material not mentioned: assumed aluminum 6061-T6
+  override with --material 6061-t6
+  stress  supports not given: bolted through the 4.5 mm holes (the most common hole size)
+  override with --fix 'bolt holes d=4.5'
+  stress  load placement: 10 kgf pushing down on face 7, the flat face farthest from the supports (98.07 N)
+  override with --load '10 kgf down @ face 7'
+  drop  floor not given, so Wobbl assumed concrete
+  override with --floor concrete
+  drop  landing not given, so every face and corner is tried (worst)
+  override with --orientation worst
+```
+
+Every run ends with the explicit command that repeats it with nothing guessed,
+writes `request.json` beside each result so uncertainty and credibility studies can
+run it again, and opens a 3D view of the scenario in the browser. `wobbl simulate
+--list` shows every domain, its physics and their options, and any option a physics
+reads works as a flag, such as `--power "12 W"` or `--rpm 6000`.
+
+| Thing | Physics |
+|---|---|
+| a part (STEP, STL, BREP, IGES, parametric Python) | strength, heat, vibration, buckling, fatigue, plasticity, drops, composite layups, crack growth, contact, bolted joints, CFD and cooling, casting, printing and molding, submodels |
+| a finished result folder | its verdict, the same study with changes, fatigue, crack growth, a submodel |
+| a circuit (netlist, KiCad schematic, words) | every part against its ratings, operating point, transient, frequency response, tolerances |
+| a mechanism (spec, URDF, MJCF, words) | motor torque, kinematics, collisions, stability, contact and dynamics in MuJoCo |
+| a flight (body in words, rocket or motor spec) | trajectory, solid motor ballistics |
+| a fluid case (pipe, body in a stream, prop, hull, OpenFOAM case) | pressure drop, drag, thrust and hover, hull resistance, CFD |
+| a field device (coil, magnet, plates, trace, antenna, room) | magnetics, electrostatics, trace impedance, antennas, acoustics |
+| chemistry (name, formula, SMILES, equation, material, cell) | properties, structure, spectra, thermochemistry, reactions and equilibrium, combustion, propellants, crystals, thermal runaway |
+
+The domain and scenario commands from earlier releases (`run`, `thermal`,
+`circuit`, `motion`, `mechanism`, `flow` and the rest) still work as hidden aliases.
+
 ## Example output
 
 This is a printed PLA shelf bracket, screwed to a wall and carrying its share of
@@ -123,7 +180,7 @@ with `report.html`, `outcome.json`, heatmaps and `result.vtu` for ParaView.
 
 ```console
 $ cd examples/shelf-bracket
-$ wobbl run bracket.py -m pla --fix "bolt holes d=4.5" --fix "wall x=min" \
+$ wobbl simulate bracket.py --physics stress -m pla --fix "bolt holes d=4.5" --fix "wall x=min" \
     --load "40 N down @ top and within 12 of 65,12.5,6" -o output
 $ cat output/summary.txt
 FAILS. Peak 52.3 MPa on the 0.5 mm inside fillet (face 3) at (6.19, 12.6, 6.11). The part cracks at about 0.96x this load.
@@ -167,7 +224,7 @@ curve and drogue and main parachutes. The simplest run is a rock dropped off a
 cliff, and it takes one line.
 
 ```console
-$ wobbl motion --name rock --diameter "9 cm" --density "2700 kg/m3" --cd 0.6 --height "300 m"
+$ wobbl simulate "a 9 cm rock dropped from 300 m" --cd 0.6
 OK. Hits the ground 8.72 s after release at 56.8 m/s (205 km/h). Without air it would land after 7.82 s at 76.7 m/s, so drag takes 26% off the impact speed.
 ```
 
@@ -178,7 +235,7 @@ apogee against a target, landing speed and drift, and when one falls short it gi
 the nose weight, fin span, rail length or main parachute that would pass.
 
 ```console
-$ wobbl motion examples/rocket-launch/rocket.toml
+$ wobbl simulate examples/rocket-launch/rocket.toml "what is the apogee?"
 OK. Reaches 3439 m (11284 ft) at Mach 1.27 and lands 29.3 m upwind of the pad at 5.72 m/s, with a 1.88 caliber margin and 30.6 m/s off the rail.
 ```
 
@@ -198,7 +255,7 @@ nothing.
 
 ## Rocket motors and combustion
 
-`wobbl motor` takes a solid motor design, its propellant, its grains from the
+`wobbl simulate` takes a solid motor design, its propellant, its grains from the
 forward end, its nozzle and its casing, and burns it back to a thrust curve. It
 knows BATES segments, tubes, end burners and star, finocyl, moon and X cores, and
 KNSB, KNDX and KNSU with Nakka's burn rate laws and two MIT APCP propellants, or
@@ -206,7 +263,7 @@ your own burn rate and combustion data. The design is a TOML file, as in
 [`examples/knsb-motor/motor.toml`](examples/knsb-motor/motor.toml), or a line of flags.
 
 ```console
-$ wobbl motor examples/knsb-motor/motor.toml
+$ wobbl simulate examples/knsb-motor/motor.toml
 MARGINAL. Peak chamber pressure 4.14 MPa against a casing that yields at 16.8 MPa, a safety factor of 4.07 (target 2). J602 motor, 1238 N s over 2.06 s at 120 s Isp.
 ```
 
@@ -219,18 +276,18 @@ hand calculation and Barlow's burst pressure beside it, the port to throat ratio
 and core mass flux that drive erosive burning, and nozzle separation. Each fix,
 a wider throat, a thicker wall, a segment fewer, wider cores or a smaller exit, is
 simulated before it is suggested. The run writes `thrust.csv` and a RASP
-`motor.eng`, and a rocket spec for `wobbl motion` can fly the design directly
+`motor.eng`, and a rocket spec can fly the design directly
 with `design = "motor.toml"` under `[motor]`.
 
-`wobbl flame` finds a fuel's adiabatic flame temperature and equilibrium products
-in air or oxygen, checked against GRI-Mech 3.0's own data, the temperature with no
+Given a fuel or a combustion equation, `wobbl simulate` finds the adiabatic flame
+temperature and equilibrium products in air or oxygen, checked against GRI-Mech 3.0's own data, the temperature with no
 dissociation and the flammability limits, and finds the leaner mixture that keeps
-a flame under a limit. `wobbl propellant` gives c* and Isp for shifting and frozen
+a flame under a limit. Given a propellant, it gives c* and Isp for shifting and frozen
 expansion the way NASA's CEA does, for a preset or a composition such as
 `ap:70,al:16,htpb:14`.
 
 ```console
-$ wobbl flame propane --phi 1
+$ wobbl simulate propane "what is the flame temperature in air?"
 OK. Adiabatic flame temperature 2266 K (1992 C) for propane in air at an equivalence ratio of 1, with 1.25% CO and 0.234% NO at equilibrium.
 ```
 
@@ -239,7 +296,7 @@ OK. Adiabatic flame temperature 2266 K (1992 C) for propane in air at an equival
 | [KNSB motor](examples/knsb-motor) | J602 peaking at 4.14 MPa, a casing safety factor of 4.07, ports too narrow at 1.59 times the throat | the closed form pressure, the mass balance, half the time step and Cantera's c* for KNSB |
 | [Propane flame](examples/propane-flame) | 2266 K with 1.25% CO and 0.234% NO | GRI-Mech 3.0's data, the 2392 K no dissociation bound and the flammability limits |
 
-Agents get `solve_motor`, `solve_flame` and `solve_propellant`. Cantera installs
+Agents reach all of it through the `simulate` tool. Cantera installs
 itself the first time a combustion or motor study runs, a 6 MB download that takes
 about 16 MB once Wobbl prunes what it never reads, or straight away with
 `wobbl setup --only cantera`. The burning in a motor comes from the propellant's
@@ -247,7 +304,8 @@ burn rate law rather than resolved flame chemistry, and erosive burning, ignitio
 delay and throat erosion are flagged rather than modeled. Wobbl models given
 designs only and gives no guidance on making or handling propellants.
 
-`wobbl runaway` asks whether a lithium ion cell can run away on its own. A charged
+`wobbl simulate 18650 "can it run away at 60 C?"` asks whether a lithium ion cell
+can run away on its own. A charged
 cell's SEI, electrodes and electrolyte decompose at Arrhenius rates, and Wobbl
 finds the surrounding temperature at which that heat outruns the cell's
 convection and radiation, by Semenov's criterion and by a transient with the
@@ -257,7 +315,7 @@ It can take its surroundings from a finished heat study, so the
 battery pack example and finds runaway would need 155 C. The kinetics are
 Hatchard's for a fully charged LiCoO2 18650, which Wobbl places within a kelvin
 of the published 155 C oven onset, so for other chemistries the answer is
-indicative, and agents get the same as `solve_runaway`.
+indicative, and agents get the same through `simulate`.
 
 ## Mechanisms
 
@@ -326,7 +384,7 @@ and renderers, or straight away with `wobbl setup --only mujoco`.
 ## Buckling, vibration and fatigue
 
 The same meshes answer how a part lasts, not only whether it holds once.
-`wobbl buckling` finds the factor on the loads at which the part buckles with
+Asked whether a part buckles, Wobbl finds the factor on the loads at which it buckles with
 CalculiX's buckling step, then cuts it by an imperfection knockdown for the shape
 and by yielding. Struts follow the European column curves, thin cylinders NASA
 SP-8007 and flat plates keep their factor, while shapes with no published test data
@@ -334,12 +392,12 @@ take 0.5 and say so. Linear buckling overpredicts the collapse of real parts, mo
 of all thin shells, so the verdict always uses the knocked down factor.
 
 ```console
-$ wobbl buckling examples/strut-buckling/strut.py -m 6061-t6 --fix "z=min" \
+$ wobbl simulate examples/strut-buckling/strut.py "will it buckle?" -m 6061-t6 --fix "z=min" \
     --fix "fixed-xy z=max" --load "7 kN -z @ z=max" --target-sf 3
 MARGINAL. Buckles at 3.25 times the applied load (22764 N) in a column mode. With a knockdown of 0.81 for imperfections and yielding the design factor is 2.65 against a target of 3.
 ```
 
-`wobbl vibration` finds the natural frequencies and mode shapes of the part as it
+Asked about vibration, it finds the natural frequencies and mode shapes of the part as it
 is held, with each motor, battery or payload given as a mass, and judges them
 against a rotor's once per turn and blade pass bands or any other tone, keeping
 every mode that moves mass 20% clear. A shaker sweep gives the peak stress, which
@@ -351,7 +409,7 @@ Steinberg's fatigue estimate over the test. Every answer checks the meshes, the 
 against the volume and density, Rayleigh's quotient from the sag under 1 g and a
 single mode estimate, Miles' equation for random input.
 
-`wobbl fatigue` turns a finished strength or vibration result, a part and its loads
+Asked how long a part lasts, it turns a finished strength or vibration result, a part and its loads
 (solved first), or stresses you give, into the cycles before a crack starts and a
 safety factor on stress. The load can cycle at one ratio, through blocks of a duty
 cycle or through a measured load history counted by rainflow. It uses sourced S-N
@@ -360,7 +418,7 @@ reliability, Peterson's notch sensitivity on the stress concentration the streng
 result found, Goodman, Gerber or Soderberg for the mean stress and Miner's rule.
 
 All three take any part with any supports and loads, walls included, the way a
-strength study does, and run through `wobbl simulate` as well as their own commands.
+strength study does.
 
 | Run | Answer | Checked against |
 |---|---|---|
@@ -368,7 +426,7 @@ strength study does, and run through `wobbl simulate` as well as their own comma
 | [Strut buckling](examples/strut-buckling) | buckles at 3.25 times 7 kN, a design factor of 2.65 against 3 after the column curve | Euler's column within 0.5% |
 | [Motor mount fatigue](examples/motor-mount-fatigue) | ten years of starts and running use 63% of the fatigue life, a factor of 1.03 on stress | the same verdict under Goodman, Gerber and Soderberg |
 
-Agents get `solve_buckling`, `solve_vibration` and `fatigue_life`, which download
+They download
 nothing because they run on the CalculiX that strength already installs. CalculiX
 has no random response step, so Wobbl sums random response from its modes. Damping
 is one ratio for every mode, 2% for metals and 3% for plastics unless you give one,
@@ -447,24 +505,25 @@ exactly what it added.
 | Cursor | `mcpServers.wobbl` in `~/.cursor/mcp.json` | `~/.cursor/skills/wobbl/SKILL.md` |
 | Gemini CLI | extension at `~/.gemini/extensions/wobbl/` | `WOBBL.md` in the same extension |
 
-The agent gets 27 tools, `inspect_geometry`, `mesh`, `new_study`,
-`set_material`, `apply_load`, `add_fixture`, `solve_structural`, `verify`,
-`render`, `suggest_fix`, `quantify_uncertainty`, `validate_against_tests`,
-`assess_credibility`, `plan_tests`, `solve_thermal`, `solve_circuit`,
-`solve_motion`, `solve_motor`, `solve_flame`, `solve_propellant`, `solve_flow`,
-`solve_buckling`, `solve_vibration`, `fatigue_life`, `solve_plastic`,
-`solve_mechanism` and `list_materials`.
-Results are compact JSON with image and report paths. The skill teaches the
+The agent gets one `simulate` tool for every physics, with structured fields for
+the material, loads, supports and any option, and `physics` to list what can run.
+Beside them sit the general tools `inspect_geometry`, `verify`, `render`,
+`suggest_fix`, `quantify_uncertainty`, `validate_against_tests`,
+`assess_credibility`, `plan_tests`, `estimate_cost`, the job tools and
+`list_materials`. The older `solve_*` tools stay as deprecated aliases. Results are
+compact JSON that lead with the 3D view, then every decision and guess with its
+override and the explicit values used. The skill teaches the
 workflow and what never to skip, which means reading the checks before the number,
 never quoting an excluded peak and making the supports match the real build.
 
 ```text
 > Will this printed PLA shelf bracket hold its share of an 8 kg shelf?
 
-agent: solve_structural(path="bracket.py", material="pla",
-                        fixtures=["bolt holes d=4.5", "wall x=min"],
-                        loads=["40 N down @ top and within 12 of 65,12.5,6"])
+agent: simulate(thing="bracket.py", question="will it hold its share of an 8 kg shelf?",
+                material="pla", fixtures=["bolt holes d=4.5", "wall x=min"],
+                loads=["40 N down @ top and within 12 of 65,12.5,6"])
        verdict fails, 52.3 MPa on the 0.5 mm inside fillet, safety factor 0.96, confidence high
+       opens the view: the bracket on the wall, the shelf load coming on, the fillet turning red
 agent: suggest_fix(result_dir, apply=true)
        3 mm fillet 24.1 MPa (2.08), legs at 10 mm 21 MPa (2.38), gusset 9.82 MPa (5.09)
 ```
@@ -601,7 +660,7 @@ Each folder has a `run.sh` that regenerates its outputs.
 - [Getting started](https://sohan-bhat.github.io/wobbl/get-started/), to install, set up and run a first study
 - [Guides](https://sohan-bhat.github.io/wobbl/guides/) for strength, heat and circuits, the inputs, the results and fixing parts
 - [CLI reference](https://sohan-bhat.github.io/wobbl/guides/cli/) with every command and option
-- [Agents and MCP](https://sohan-bhat.github.io/wobbl/guides/agents/) with what `wobbl setup` registers, the 15 tools and the skill
+- [Agents and MCP](https://sohan-bhat.github.io/wobbl/guides/agents/) with what `wobbl setup` registers, the tools and the skill
 - [How it checks itself](https://sohan-bhat.github.io/wobbl/guides/results/checks/), every check and what sets the confidence
 - [Validation](https://sohan-bhat.github.io/wobbl/validation/), the 25 cases and their setups
 - [Bake-off](https://sohan-bhat.github.io/wobbl/validation/bakeoff/), a coding agent on its own versus Wobbl
@@ -651,7 +710,10 @@ wobbl setup --no-agents               # CalculiX and ngspice
 python -m pytest -m solver            # end to end tests with the solvers
 ```
 
-A new solver plugs in as one adapter class, as
+New physics plugs in as a `domain.py` in its package that registers what the
+analysis reads, which question words ask for it and the function that runs it, so it
+reaches `wobbl simulate` and the MCP `simulate` tool with no new command or tool, as
+[the CLI notes](docs/cli.md) show. A new solver plugs in as one adapter class, as
 [contributing](https://sohan-bhat.github.io/wobbl/get-started/contributing/) explains. If you change the physics, add or update a
 case in `src/wobbl/validation/cases.py` so `wobbl validate` covers it.
 
