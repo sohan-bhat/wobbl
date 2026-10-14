@@ -218,7 +218,7 @@ def unique_landings(cands, axes: list[int]) -> tuple[list, dict]:
         key = d.copy()
         for a in axes:
             key[a] = abs(key[a])
-        k = tuple(np.round(key, 4))
+        k = tuple(np.round(key, 2))      # the center of mass of a mesh sits a hair off the mirror plane
         if k in seen:
             same.setdefault(seen[k], []).append(name)
             continue
@@ -314,8 +314,8 @@ def evaluate(model: Model, hist: History, c: Contact, mat: dict, ductile: bool, 
     ci = int(np.argmax(peak))
     fi = int(np.argmax(S[:, gi]))
     up = c.normal
-    acc = hist.accel @ up
-    acc_f = lowpass(acc, hist.dt, g_cutoff, before=-G) if g_cutoff else acc
+    acc = hist.accel @ up + G             # what an accelerometer reads: zero in free fall
+    acc_f = lowpass(acc, hist.dt, g_cutoff, before=0.0) if g_cutoff else acc
     m = model.mass.sum()
     vz = hist.com_v @ up
     t0, t1 = hist.t_contact
@@ -454,6 +454,15 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
         playback(out / "playback.json", model, hist, ev, d, H, v0, floor, name, watch, gov)
     except Exception as e:  # noqa: BLE001  a bonus file, never a reason to fail
         o.notes.append(f"playback.json was not written ({str(e)[:120]})")
+    try:
+        from .scene import write_scene
+        write_scene(out, model, hist, ev, d, H, v0, floor, name, watch, gov, allow, verdict, head, study.question,
+                    study.part, measure)
+    except Exception as e:  # noqa: BLE001  the 3D view is a bonus, never a reason to fail
+        import os
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
+        o.notes.append(f"the 3D view was not written ({str(e)[:120]})")
     shutil.rmtree(out / "work", ignore_errors=True)
     return o.write(out)
 
