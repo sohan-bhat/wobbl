@@ -317,3 +317,79 @@ def fatigue_data(mat: Material) -> FatigueData | None:
                            estimated=True)
     return None
 
+
+# --- past yield ---------------------------------------------------------------------------------------------------
+@dataclass(frozen=True)
+class Hardening:
+    """True stress against plastic strain past yield, for elastic plastic studies. Beyond the last point the stress
+    stays flat, which is where the metal would start to neck."""
+    points: tuple[tuple[float, float], ...]   # (true stress MPa, true plastic strain), the first at plastic strain 0
+    kind: str                                 # multilinear or bilinear
+    source: str
+
+
+YUN_GARDNER = ("Yun and Gardner (2017), Stress-strain curves for hot-rolled steels, J. Constr. Steel Res. 133, "
+               "quad-linear model through the yield and tensile strength")
+ARRAYAGO = ("Arrayago, Real and Gardner (2015), Description of stress-strain curves for stainless steel alloys, "
+            "Materials and Design 87, two stage Ramberg-Osgood with n = 7 for austenitic grades")
+STEINHARDT = ("Ramberg-Osgood knee up to the 0.2% proof stress with Steinhardt's exponent n = f0.2 / 10, as given "
+              "in Mazzolani (1995), Aluminium Alloy Structures, 2nd ed., then straight to the tensile strength at "
+              "half the elongation at break")
+HARDENING_MODELS = {"mild-steel": "hot rolled", "ss304": "austenitic", "6061-t6": "aluminum", "7075-t6": "aluminum",
+                    "6063-t5": "aluminum", "5052-h32": "aluminum", "a356-t6": "aluminum"}
+
+
+def hardening_curve(m: Material) -> Hardening:
+    """The true stress strain curve past yield: a published model for the metals that have one, else a bilinear
+    curve from the datasheet yield and tensile strength."""
+    model = HARDENING_MODELS.get(m.key.rstrip("*"))
+    fy, fu, E = m.yield_strength, max(m.tensile_strength, m.yield_strength), m.E
+    if model == "hot rolled" and fu > fy:
+        r = fy / fu
+        e_sh = min(max(0.1 * r - 0.055, 0.015), 0.03)
+        e_u = max(0.6 * (1.0 - r), 0.06)
+        c1 = (e_sh + 0.25 * (e_u - e_sh)) / e_u
+        f_c1 = fy + (fu - fy) / (0.4 * (e_u - e_sh)) * (c1 * e_u - e_sh)
+        eng = [(fy / E, fy), (e_sh, fy), (c1 * e_u, f_c1), (e_u, fu)]
+        return Hardening(_true_plastic(eng, E), "multilinear", YUN_GARDNER)
+    if model == "austenitic" and fu > fy:
+        n, e_u, m2 = 7.0, 1.0 - fy / fu, 1.0 + 2.8 * fy / fu
+        e_y = E / (1.0 + 0.002 * n * E / fy)
+        eng = [(s / E + 0.002 * (s / fy) ** n, s) for s in (0.6 * fy, 0.7 * fy, 0.8 * fy, 0.9 * fy, fy)]
+        eng += [(0.002 + fy / E + (s - fy) / e_y + e_u * ((s - fy) / (fu - fy)) ** m2, s)
+                for s in (fy + (fu - fy) * k for k in (0.05, 0.15, 0.3, 0.5, 0.7, 0.85, 1.0))]
+        return Hardening(_true_plastic(eng, E, start=1e-4), "multilinear", ARRAYAGO)
+    if model == "aluminum" and fu > fy:
+        # the exponent describes the knee up to the proof stress; past it the curve runs straight to the tensile
+        # strength at half the elongation at break, an estimate of where necking starts
+        n = fy / 10.0
+        eng = [(fy * (p / 0.002) ** (1.0 / n) / E + p, fy * (p / 0.002) ** (1.0 / n))
+               for p in (1e-4, 3e-4, 6e-4, 1e-3, 1.5e-3, 2e-3)]
+        eng.append((max(0.5 * m.elongation / 100.0, 0.004 + fu / E), fu))
+        return Hardening(_true_plastic(eng, E, start=1e-4), "multilinear", STEINHARDT)
+    # bilinear: yield, then straight to the tensile strength at half the elongation at break, an estimate of the
+    # uniform elongation where necking starts
+    e_u = max(0.5 * m.elongation / 100.0, 2.0 * fy / E)
+    eng = [(fy / E, fy), (e_u, fu)] if fu > fy else [(fy / E, fy)]
+    src = ("bilinear from the datasheet yield and tensile strength, reached at half the elongation at break"
+           if fu > fy else "elastic perfectly plastic at the datasheet yield, since no tensile strength is given")
+    return Hardening(_true_plastic(eng, E), "bilinear", src)
+
+
+def _true_plastic(eng: list[tuple[float, float]], E: float, start: float = 0.0) -> tuple[tuple[float, float], ...]:
+    """Engineering (strain, stress) points to CalculiX's (true stress, true plastic strain), the first one at plastic
+    strain zero. ``start`` drops points below that plastic strain, so a rounded Ramberg-Osgood knee begins at its
+    0.01% proof stress."""
+    out = []
+    for e, s in eng:
+        st, et = s * (1.0 + e), math.log1p(e)
+        ep = max(et - st / E, 0.0)
+        if ep < 0.99 * start:
+            continue
+        if not out:
+            ep = 0.0
+        elif ep <= out[-1][1] or st < out[-1][0]:
+            continue
+        out.append((round(float(st), 4), round(float(ep), 6)))
+    return tuple(out)
+
