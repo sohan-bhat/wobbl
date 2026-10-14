@@ -332,29 +332,24 @@ def _laminate(f, model: ShellModel):
             f.write(f"*MATERIAL, NAME={mats[L.name]}\n*ELASTIC, TYPE=ENGINEERING CONSTANTS\n"
                     + ",".join(f"{v:.8g}" for v in c[:8]) + f"\n{c[8]:.8g}\n*DENSITY\n{L.density:.10g}\n")
     e1, e2, nrm = element_frames(model.mesh, model.ref_dir)
-    orient: dict[tuple, str] = {}
-    groups: dict[tuple, list[int]] = {}
-    for e in range(model.mesh.n_elems):
-        names = []
-        for L in model.layers:
-            c, s = np.cos(np.radians(L.angle)), np.sin(np.radians(L.angle))
-            a = c * e1[e] + s * e2[e]
-            b = np.cross(nrm[e], a)
-            key = tuple(np.round(np.concatenate([a, b]), 4))
-            if key not in orient:
-                orient[key] = f"OR{len(orient) + 1}"
-                f.write(f"*ORIENTATION, NAME={orient[key]}, SYSTEM=RECTANGULAR\n" + ",".join(f"{v:.6f}" for v in key)
-                        + "\n")
-            names.append(orient[key])
-        groups.setdefault(tuple(names), []).append(e)
-    for g, (names, elems) in enumerate(groups.items()):
+    ang = np.radians([L.angle for L in model.layers])
+    a = np.cos(ang)[None, :, None] * e1[:, None, :] + np.sin(ang)[None, :, None] * e2[:, None, :]   # (m,plies,3)
+    b = np.cross(np.broadcast_to(nrm[:, None, :], a.shape), a)
+    keys = np.round(np.concatenate([a, b], axis=2), 4).reshape(-1, 6) + 0.0      # + 0.0 folds -0.0 into 0.0
+    uniq, which = np.unique(keys, axis=0, return_inverse=True)
+    f.write("".join(f"*ORIENTATION, NAME=OR{i + 1}, SYSTEM=RECTANGULAR\n" + ",".join(f"{v:.6f}" for v in row) + "\n"
+                    for i, row in enumerate(uniq)))
+    per_elem = which.reshape(len(e1), len(model.layers))
+    stacks, group = np.unique(per_elem, axis=0, return_inverse=True)
+    group = group.ravel()
+    for g, names in enumerate(stacks):
         f.write(f"*ELSET, ELSET=LAM{g + 1}\n")
-        ids = np.asarray(elems) + 1
+        ids = np.flatnonzero(group == g) + 1
         for i in range(0, len(ids), 12):
             f.write(", ".join(map(str, ids[i:i + 12])) + "\n")
         f.write(f"*SHELL SECTION, ELSET=LAM{g + 1}, COMPOSITE\n")
         for L, o in zip(model.layers, names):
-            f.write(f"{L.thickness:.8g},,{mats[L.name]},{o}\n")
+            f.write(f"{L.thickness:.8g},,{mats[L.name]},OR{o + 1}\n")
 
 
 def _nset(f, name: str, nodes):
@@ -392,43 +387,100 @@ def solve_shell(model: ShellModel, workdir: str | Path, job: str = "shell", time
 
 
 def read_frd_nodes(path: str | Path) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
-    """Node ids, coordinates and the last result of each nodal block of an ASCII .frd."""
-    ids, xyz, blocks = [], [], {}
-    cur, rows, vals, in_nodes = None, None, None, False
-    with open(path, "r", errors="replace") as fh:
-        for line in fh:
-            if line.startswith("    2C"):
-                in_nodes = True
-                continue
-            if in_nodes:
-                if line.startswith(" -1"):
-                    ids.append(int(line[3:13]))
-                    b = line[13:].rstrip("\n")
-                    xyz.append([float(b[i:i + 12]) for i in range(0, 36, 12)])
-                    continue
-                in_nodes = False
-            if line.startswith(" -4"):
-                cur, rows, vals = line.split()[1], [], []
-            elif line.startswith(" -3") and cur is not None:
-                width = max((len(v) for v in vals), default=0)
-                mat = np.zeros((len(vals), width))
-                for i, v in enumerate(vals):
-                    mat[i, :len(v)] = v
-                blocks[cur] = (np.asarray(rows, dtype=np.int64), mat)
-                cur = None
-            elif cur is not None and line.startswith(" -1"):
-                rows.append(int(line[3:13]))
-                b = line[13:].rstrip("\n")
-                vals.append([float(b[i:i + 12]) for i in range(0, len(b) - 11, 12)])
-            elif cur is not None and line.startswith(" -2"):
-                b = line[13:].rstrip("\n")
-                vals[-1] = vals[-1] + [float(b[i:i + 12]) for i in range(0, len(b) - 11, 12)]
-    return np.asarray(ids, dtype=np.int64), np.asarray(xyz, float), blocks
+    """Node ids, coordinates and the last result of each nodal block of an ASCII .frd.
+
+    The records are fixed width, so each block is cut into columns by numpy in one go: a composite shell model
+    writes a node for every ply boundary, and a line by line reader spends a minute on its 150,000 nodes.
+    """
+    raw = Path(path).read_bytes().splitlines()
+    n = len(raw)
+    ids, xyz, blocks = np.zeros(0, np.int64), np.zeros((0, 3)), {}
+    i = 0
+    while i < n:
+        line = raw[i]
+        if line.startswith(b"    2C"):
+            j = i + 1
+            while j < n and raw[j].startswith(b" -1"):
+                j += 1
+            ids = _fixed(raw[i + 1:j], 3, 10, 1, np.int64)[:, 0]
+            xyz = _fixed(raw[i + 1:j], 13, 12, 3)
+            i = j
+            continue
+        if line.startswith(b" -4"):
+            name = line.split()[1].decode()
+            j = i + 1
+            while j < n and raw[j].startswith(b" -5"):
+                j += 1
+            k = j
+            while k < n and not raw[k].startswith(b" -3"):
+                k += 1
+            blocks[name] = _result_block(raw[j:k])
+            i = k + 1
+            continue
+        i += 1
+    return ids, xyz, blocks
+
+
+def _fixed(lines: list[bytes], start: int, width: int, count: int, kind=float) -> np.ndarray:
+    """(len(lines), count) values from fixed width fields starting at a column; missing fields read 0."""
+    if not lines:
+        return np.zeros((0, count), kind)
+    w = start + width * count
+    a = np.array(lines, dtype=f"S{w}")
+    cols = np.ascontiguousarray(a.view("S1").reshape(len(lines), w)[:, start:])
+    f = cols.view(f"S{width}").reshape(len(lines), count)
+    return np.where(f == b"", b"0", f).astype(kind)
+
+
+def _result_block(body: list[bytes]) -> tuple[np.ndarray, np.ndarray]:
+    """Node ids and values of one result block; a record longer than six values carries on in -2 lines."""
+    if any(b.startswith(b" -2") for b in body):
+        rows, vals = [], []
+        for b in body:
+            v = [float(b[c:c + 12]) for c in range(13, len(b) - 11, 12)]
+            if b.startswith(b" -1"):
+                rows.append(int(b[3:13]))
+                vals.append(v)
+            elif vals:
+                vals[-1] = vals[-1] + v
+        width = max((len(v) for v in vals), default=0)
+        mat = np.zeros((len(vals), width))
+        for r, v in enumerate(vals):
+            mat[r, :len(v)] = v
+        return np.asarray(rows, dtype=np.int64), mat
+    width = max(((len(b) - 13) // 12 for b in body), default=0)
+    return _fixed(body, 3, 10, 1, np.int64)[:, 0], _fixed(body, 13, 12, width)
 
 
 def expanded_owner(mesh: ShellMesh, P: np.ndarray, thickness: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """For each expanded node, the shell node it grew from and its signed position along that node's normal
-    (negative toward the inner face)."""
+    (negative toward the inner face).
+
+    Most expanded nodes sit right on the normal of their nearest shell node; only those around folds, which
+    CalculiX expanded along an element's own normal, need the slower search through every nearby normal.
+    """
+    from scipy.spatial import cKDTree
+
+    k = min(4, mesh.n_nodes)
+    _, near = cKDTree(mesh.X).query(P, k=k)
+    near = near.reshape(len(P), k)
+    nrm = mesh.normals[near]
+    rel = P[:, None, :] - mesh.X[near]
+    s = np.einsum("pkj,pkj->pk", rel, nrm)
+    perp = np.linalg.norm(rel - s[..., None] * nrm, axis=-1)
+    half = 0.5 * thickness[near]
+    perp = np.where(np.abs(s) <= 1.05 * half + 1e-6, perp, np.inf)
+    two = np.sort(perp, axis=1)[:, :2] if k > 1 else np.column_stack([perp[:, 0], np.full(len(P), np.inf)])
+    j = np.argmin(perp, axis=1)
+    rows = np.arange(len(P))
+    owner, pos = near[rows, j], s[rows, j]
+    unsure = ~((two[:, 0] <= 0.2 * half[rows, j]) & (two[:, 0] <= 0.1 * two[:, 1]))
+    if unsure.any():
+        owner[unsure], pos[unsure] = _owner_search(mesh, P[unsure], thickness)
+    return owner, pos
+
+
+def _owner_search(mesh: ShellMesh, P: np.ndarray, thickness: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     from scipy.spatial import cKDTree
 
     en, _, _ = mesh.element_geometry()
