@@ -166,8 +166,9 @@ class StrengthModel(Model):
         if geo:
             ratio, sur = self._geometry_surrogate(geo, progress, solves)
             info = {"kind": "polynomial chaos", "method": f"polynomial chaos of degree {sur.degree} fitted to "
-                    f"{sur.n_train} new studies across the {', '.join(i.name for i in geo)} range, times the exact "
-                    "scaling for load, stiffness and strength", "surrogate": sur.summary()}
+                    f"{sur.n_train} new studies across the {', '.join(i.name for i in geo)} range, leave one out "
+                    f"error {100 * max(sur.loo):.2g}% of the variance, times the exact scaling for load, stiffness "
+                    "and strength", "surrogate": sur.summary()}
         names = [i.name for i in inputs]
 
         def f(X):

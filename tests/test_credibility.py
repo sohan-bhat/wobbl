@@ -272,3 +272,28 @@ def test_circuit_uncertainty_through_ngspice(tmp_path):
     assert r["outputs"]["i_led_A"]["mean"] == pytest.approx(i0, rel=0.02)
     assert r["probability"]["failure"]["value"] < 0.01         # 20 mA nominal against a 30 mA rating
     assert {x["input"] for x in r["sensitivity"]["indices"]} >= {"resistor", "supply", "vf"}
+
+
+@pytest.mark.solver
+@needs_ccx
+def test_geometry_tolerance_through_new_studies(tmp_path):
+    """A toleranced thickness of a parametric bar gets new converged studies and a fitted surrogate, while the load
+    still scales exactly on top of it."""
+    from wobbl.structural.pipeline import analyze_strength
+    from wobbl.structural.spec import StructuralStudy, parse_fixture, parse_load
+
+    part = tmp_path / "bar.py"
+    part.write_text('PARAMS = {"thickness": 10.0}\n\n\ndef build(occ, thickness):\n'
+                    '    occ.addBox(0, 0, 0, 200.0, 20.0, thickness)\n')
+    st = StructuralStudy(str(part), "6061-t6", [parse_load("100 N -z @ x=max")], [parse_fixture("x=min")],
+                         quality="fast", budget=120)
+    analyze_strength(st, tmp_path / "run", render=False, fixes=False)
+    m = for_result(tmp_path / "run")
+    assert m.known["thickness"].role == "geometry" and m.known["thickness"].nominal == 10.0
+    r = run_uncertainty(tmp_path / "run", ["thickness uniform 9..11", "load 5%"], samples=20000, solves=4)
+    s = r["model"]["surrogate"]
+    assert r["model"]["kind"] == "polynomial chaos" and s["solves"] == 4
+    # bending stress goes as 1 / t^2, so a 10% thickness band matters more than a 5% load scatter
+    thick = {x["input"]: x for x in r["sensitivity"]["indices"]}["thickness"]
+    assert thick["total"] > 0.3
+    assert s["loo_error"]["deflection ratio"] < 0.05
