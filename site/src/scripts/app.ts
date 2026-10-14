@@ -143,6 +143,7 @@ document.addEventListener('astro:page-load', () => {
   contents();
   countUp();
   flightSims();
+  benches();
   heroPart();
 });
 
@@ -266,6 +267,16 @@ function flightSims() {
   import('./sim').then((m) => {
     if (!figs[0].isConnected) return;
     cleanups.push(m.initSims(figs));
+  });
+}
+
+/** Circuit benches on the landing page and the examples; they stop when the page is left. */
+function benches() {
+  const figs = $$('[data-bench]');
+  if (!figs.length) return;
+  import('./bench').then((m) => {
+    if (!figs[0].isConnected) return;
+    cleanups.push(m.initBenches(figs));
   });
 }
 
