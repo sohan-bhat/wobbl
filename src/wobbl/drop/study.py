@@ -28,6 +28,7 @@ from .floors import FloorMaterial, get_floor
 
 G = 9810.0                   # mm/s2
 TOP = {"fast": 1, "normal": 2, "fine": 3}          # screened landings run again on quadratic tets
+MAX_NODES = 80_000           # the largest solid mesh, estimated, a drop marches
 TOL = 0.10                   # drop peaks settle to about 10% between meshes
 RIGID_FLOOR = 10.0           # a hard floor is ten times stiffer than a layer of the part one element deep
 
@@ -361,6 +362,13 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
     prep, feats = pre
     t_wall = feats.thickness_typical or prep.diag / 10
     h0 = study.mesh_size or min(prep.diag / 14.0, 1.5 * t_wall)
+    # a ten node tet mesh has about 9.4 V / h^3 nodes, and no element can be larger than the wall it sits in
+    estimate = 9.4 * max(prep.volume, 1e-9) / min(h0, t_wall) ** 3
+    if estimate > MAX_NODES and not study.mesh_size:
+        raise SpecError(f"walls of {fmt(t_wall)} mm on a part {fmt(prep.diag)} mm across need about "
+                        f"{estimate / 1000:.0f} thousand nodes as a solid, more than an explicit drop can march "
+                        f"here (about {MAX_NODES // 1000} thousand). Pass --mesh-size to force a coarser mesh, or "
+                        "drop a shorter piece of the part")
     ductile = material.ductile
     say("mesh", f"meshing with {h0:.3g} mm tets")
     lin = None
