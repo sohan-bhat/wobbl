@@ -76,6 +76,16 @@
   get a plain answer that it does not buckle.
 - They run through `wobbl simulate`, with the old commands kept, and Python
   callers get `wobbl.life.api.buckling`, `vibration` and `fatigue`.
+- Each run writes a 3D scene its report opens with: the mode shapes that matter
+  oscillating in turn, the buckling shape growing as the load climbs, and the
+  fatigue damage building up on the part when its strength result kept its
+  field.
+- Every element's mass is integrated over its curved shape, which coarse meshes
+  of round parts need, and every study reaches a second mesh to check
+  convergence, thin walls and parts full of holes included.
+- A sweep over all eight example parts and eight parts nobody tuned for (thin
+  sheet, chunky block, hook, thin can, dome, shaft, an STL mesh and two touching
+  bodies) runs modes, swept loads, buckling and two kinds of fatigue on each.
 - Agents get `solve_buckling`, `solve_vibration` and `fatigue_life`. Nothing new
   is downloaded, since they run on the CalculiX strength uses.
 - Six validation cases, Euler's column, a cantilever's and a plate's modes, a
