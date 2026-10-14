@@ -240,6 +240,8 @@ _DOMAIN_WORD = {"thermal": "heat", "circuit": "circuit", "motion": "motion", "fl
                 "combustion": "combustion"}
 _RERUN_TOOL.update({"buckling": "solve_buckling", "vibration": "solve_vibration", "fatigue": "fatigue_life"})
 _DOMAIN_WORD.update({"buckling": "buckling", "vibration": "vibration", "fatigue": "fatigue"})
+_RERUN_TOOL.update({"plastic": "solve_plastic"})
+_DOMAIN_WORD.update({"plastic": "plasticity"})
 
 
 def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = None) -> dict:

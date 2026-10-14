@@ -1,6 +1,6 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice, Cantera or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
+description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice, Cantera or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
 ---
 
 # Wobbl: simulate before you build
@@ -129,6 +129,18 @@ result into the cycles before a crack starts and a safety factor on stress, a du
 `wobbl fatigue wobbl-out/bracket --block "100% x 2e4" --block "60% x 1e6" --repeats 10`, and stresses you
 already know run as `wobbl fatigue --material 4140 --amplitude "200 MPa" --mean "100 MPa" --kt 2 --radius "1 mm"`.
 It reads a vibration result folder the same way. Crack growth after a crack starts is a separate question.
+
+When a metal part reaches yield in a strength run, or someone asks whether it will bend for good or
+what load would collapse it, run the plastic study with the same loads and supports, as in
+`wobbl plastic hook.py -m mild-steel --fix "bolt holes d=8.5" --load "3 kN -z @ hole d=20"` (MCP
+`solve_plastic`). It finds the load multiple at first yield, applies and removes the load with the
+metal's true stress strain curve to measure the permanent set and peak plastic strain, and ramps an
+elastic perfectly plastic copy until it collapses. The verdict separates `holds` (stays elastic),
+`yields` (yields locally but carries the load), `marginal` (collapse below the target margin, 1.5 by
+default) and `collapses`, and the fixes are aimed at the hinge where it gives way. Quote the collapse
+load and the permanent set, not the elastic peak, and check the ductility line, since a peak plastic
+strain near the metal's elongation means it may tear first. Plastics and brittle materials are refused,
+so judge them with a strength run.
 
 ## Never skip
 

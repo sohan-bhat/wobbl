@@ -425,6 +425,7 @@ def _register():
     from .credibility import credibility, test_plan, uncertainty, validate_against
     from .flow import flow
     from .motion import motion
+    from .nonlinear import plastic
     from .thermal import thermal
 
     for c in (setup, doctor, uninstall, thermal, circuit, motion, uncertainty, flow, validate_against, credibility,
@@ -434,6 +435,8 @@ def _register():
         cli.add_command(c)
     from .life import buckling, fatigue, vibration
     for c in (buckling, vibration, fatigue):
+        cli.add_command(c)
+    for c in (plastic,):
         cli.add_command(c)
 
 

@@ -2,6 +2,7 @@
 import math
 
 import pytest
+from conftest import needs_ccx
 
 from wobbl.materials import LIBRARY, get_material, hardening_curve, parse_custom
 
@@ -89,6 +90,39 @@ def test_collapse_fixes_aim_at_the_hinge_and_scale_with_the_shortfall():
     assert "13.7 mm" in out[0]["summary"]          # sqrt(1.5 / 0.8) times deeper
     assert "469 MPa" in out[1]["title"] and "4140" in out[1]["summary"]
     assert fixes("yields", get_material("mild-steel"), 0.5, 2.0, 1.5, section, "") == []
+
+
+def test_cli_turns_away_a_brittle_part_before_meshing(parts):
+    from click.testing import CliRunner
+
+    from wobbl.cli.main import cli
+
+    r = CliRunner().invoke(cli, ["plastic", parts["cantilever"], "-m", "pla", "--fix", "x=min",
+                                 "--load", "100 N -z @ x=max"])
+    assert r.exit_code != 0 and "brittle" in r.output
+
+
+@pytest.mark.solver
+@needs_ccx
+def test_end_moment_collapses_at_the_fully_plastic_moment(tmp_path):
+    """A half width 100 x 10 x 10 steel bar under an end moment through a rigid end, its root a symmetry plane.
+    Collapse comes at sigma_y b h^2 / 4, first yield at two thirds of that, and the part keeps a permanent set."""
+    from wobbl.plastic.study import PlasticStudy, run_plastic
+    from wobbl.validation import geometry as G
+
+    part = G.box(tmp_path / "bar.step", 100.0, 5.0, 10.0)
+    mp = 250.0 * 10 * 10 ** 2 / 4 / 2
+    st = PlasticStudy(str(part), "custom:E=200000,nu=0.3,yield=250,uts=400",
+                      [f"{0.8 * mp / 1000} N*m +y at 100,2.5,5 @ x=max rigid"],
+                      ["roller x=min", "roller y=min", "fixed-z x=min and box -1,-1,4,1,6,6"], quality="fast")
+    o = run_plastic(st, tmp_path / "out")
+    assert o.values["collapse_factor"] * 0.8 == pytest.approx(1.0, rel=0.02)
+    assert o.values["first_yield_factor"] * 0.8 == pytest.approx(2 / 3, rel=0.02)
+    assert o.verdict == "marginal" and o.values["permanent_set_mm"] > 0
+    names = {c.name: c.status for c in o.checks}
+    assert names["force balance"] == "pass" and names["unloading balance"] == "pass"
+    assert names["hand calculation"] == "pass" and names["collapse"] == "pass"
+    assert not (tmp_path / "out" / "work").exists()      # the solver's scratch is gone unless kept
 
 
 def test_custom_metal_without_a_tensile_strength_is_perfectly_plastic():

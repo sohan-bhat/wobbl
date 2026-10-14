@@ -21,7 +21,8 @@ Buckling of struts, plates and shells: solve_buckling. Natural frequencies again
 sweeps and random vibration: solve_vibration. Fatigue life of a finished strength or vibration result: fatigue_life.
 Odds of failure under scatter, comparison with test readings, credibility evidence and a test plan for a
 finished study: quantify_uncertainty, validate_against_tests, assess_credibility and plan_tests. Wobbl
-supplies evidence and never certifies a model."""
+supplies evidence and never certifies a model.
+Metal parts loaded past yield (permanent set, collapse load): solve_plastic."""
 
 
 def _protect_stdout():
@@ -268,6 +269,19 @@ def build_server():
         from ..life.tools import fatigue_life_tool
         return fatigue_life_tool(result_dir, material, amplitude, mean, kt, radius, ratio, cycles, blocks, repeats,
                                  duration, surface, reliability, mean_stress, target_sf)
+
+    @srv.tool()
+    def solve_plastic(path: str, material: str, loads: list[str], fixtures: list[str], target: float | None = None,
+                      quality: str = "normal", curve: str = "auto") -> dict:
+        """Elastic plastic study of a metal part past first yield, with the same loads and fixtures as
+        solve_structural. Returns the load multiple at first yield, the collapse (limit) load multiple, the
+        permanent set and peak plastic strain after the load is applied and removed, and a verdict that separates
+        holds (stays elastic), yields (yields locally but carries the load), marginal and collapses, with checks
+        (collapse load over two meshes, a fully plastic section from beam theory, balance at collapse, ductility)
+        and fixes aimed at the collapse mechanism. target is the margin wanted on collapse (default 1.5 for most
+        metals). Takes one to five minutes."""
+        from ..plastic.tools import solve_plastic_tool
+        return solve_plastic_tool(path, material, loads, fixtures, target, quality, curve)
 
     @srv.tool()
     def list_materials() -> dict:
