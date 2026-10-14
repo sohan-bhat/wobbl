@@ -119,6 +119,7 @@ class NonlinearResult:
     iterations: int = 0
     bolt_force: dict[str, np.ndarray] = field(default_factory=dict)        # name -> force at each frame, N
     last_attempt: float = float("nan")       # increment of the last attempt, as a fraction of its step
+    contact_totals: dict[str, list[dict]] = field(default_factory=dict)   # pair -> totals at each saved time
 
 
 def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
@@ -368,6 +369,8 @@ def _write_step(f, model: NonlinearModel, s: Step, prev: float, rigid: dict, bol
         f.write(f"*EL FILE{freq}\n{','.join(el)}\n")
     if model.contact:
         f.write(f"*CONTACT FILE{freq}\nCDIS,CSTR\n")
+        for cp in model.contact:   # the total force on each slave surface, exact where integrating nodal values is not
+            f.write(f"*CONTACT PRINT{freq}, SLAVE={cp.name}S, MASTER={cp.name}M\nCF\n")
     # totals and monitor points at every increment, for load paths and collapse curves
     if s.every_increment:
         for name in sets:
@@ -453,7 +456,8 @@ def solve_nonlinear(model: NonlinearModel, workdir: str | Path, job: str = "nonl
     forces = {b.name: np.array([bolt_forces([b], info["bolts"], fr["U_extra"], n)[b.name] if "U_extra" in fr
                                 else np.nan for fr in frames]) for b in model.bolts}
     return NonlinearResult(times, reactions, monitor, frames, finished, log, t, f"CalculiX {_version()}",
-                           incs, iters, forces, last_attempt(work / f"{job}.sta"))
+                           incs, iters, forces, last_attempt(work / f"{job}.sta"),
+                           read_contact_totals(work / f"{job}.dat"))
 
 
 def read_sta(path: Path) -> tuple[int, int, int]:
@@ -481,6 +485,40 @@ def last_attempt(path: Path) -> float:
         return float(rows[-1][6]) if rows else float("nan")
     except ValueError:
         return float("nan")
+
+
+_CF_HEAD = re.compile(r"statistics for slave set (\S+), master set (\S+) and time\s+(\S+)")
+
+
+def read_contact_totals(path: Path) -> dict[str, list[dict]]:
+    """CalculiX's own totals for each contact pair (*CONTACT PRINT, CF): the force and moment on the slave surface,
+    the contact area, and the normal and shear forces. They come from its integration points, exact where summing
+    nodal pressures over quadratic faces is not."""
+    out: dict[str, list[dict]] = {}
+    if not path.exists():
+        return out
+    lines = path.read_text(errors="replace").splitlines()
+    for i, ln in enumerate(lines):
+        m = _CF_HEAD.search(ln)
+        if not m:
+            continue
+        nums = []
+        for row in lines[i + 1:i + 24]:
+            if _CF_HEAD.search(row):
+                break
+            try:
+                vals = [float(x) for x in row.split()]
+            except ValueError:
+                continue
+            if vals:
+                nums.append(vals)
+        if len(nums) < 4:
+            continue
+        name = m.group(1)[:-1] if m.group(1).endswith("S") else m.group(1)
+        out.setdefault(name, []).append({"time": float(m.group(3)), "force": nums[0][:3], "moment": nums[0][3:6],
+                                         "center": nums[1][:3], "normal": nums[1][3:6], "area": nums[3][0],
+                                         "normal_force": -nums[3][1], "shear_force": nums[3][2]})
+    return out
 
 
 _DAT_HEAD = re.compile(r"^\s*(displacements|total force|forces)\s.*?for set (\S+) and time\s+(\S+)")

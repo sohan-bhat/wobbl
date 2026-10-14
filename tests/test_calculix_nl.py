@@ -109,6 +109,24 @@ def test_read_sta_counts_finished_increments_and_every_iteration(tmp_path):
     assert nl.read_sta(tmp_path / "j.sta") == (3, 22, 2)
 
 
+def test_contact_totals_come_from_calculix_statistics(tmp_path):
+    (tmp_path / "j.dat").write_text(
+        "\n                        S T E P       2\n\n\n                                INCREMENT     6\n\n\n\n"
+        " statistics for slave set C1S, master set C1M and time  0.2000000E+01\n\n"
+        "   total surface force (fx,fy,fz) and moment about the origin (mx,my,mz)\n\n"
+        "   -1.799998E+03  2.963228E-10  6.000000E+03  1.200000E+05 -2.052902E+05  3.599996E+04\n\n"
+        "   center of gravity and mean normal\n\n"
+        "    3.004966E+01  2.000006E+01  9.999685E+00 -3.094196E-06 -1.620858E-08 -1.000000E+00\n\n"
+        "   moment about the center of gravity(mx,my,mz)\n\n"
+        "   -3.541188E-01 -6.992855E+03 -9.257969E-02\n\n"
+        "   area,  normal force (+ = tension) and shear force (size)\n\n"
+        "    5.999912E+02 -5.999994E+03  1.800016E+03\n")
+    t = nl.read_contact_totals(tmp_path / "j.dat")["C1"][0]
+    assert t["time"] == 2.0 and t["area"] == pytest.approx(599.9912)
+    assert t["normal_force"] == pytest.approx(5999.994) and t["shear_force"] == pytest.approx(1800.016)
+    assert t["force"][0] == pytest.approx(-1799.998)
+
+
 def test_read_dat_reads_totals_and_nodal_rows(tmp_path):
     (tmp_path / "j.dat").write_text(
         "                        S T E P       1\n\n\n                                INCREMENT     1\n\n\n"
