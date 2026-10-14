@@ -53,6 +53,7 @@ class ContactStudy:
     scale: float = 1.0
     params: dict = field(default_factory=dict)
     keep: bool = False
+    playback: bool = False               # also write playback.json with every increment, for a player
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -94,6 +95,8 @@ def run_contact(study: ContactStudy, out_dir: str | Path, progress=None, asm: As
     if render_images:
         say("render", "drawing the stress and the contact pressure")
         o.images = render(out / "images", last)
+    if study.playback:
+        o.images["playback"] = playback(out / "playback.json", study, last, bool(moves))
     o.notes = list(asm.prep.notes)
     o.write(out)
     clean_work(work, study.keep)
@@ -131,11 +134,13 @@ def solve_level(asm, study, mesh, loads, fixtures, moves, move_sel, work: Path, 
     springs = S.springs_for(mesh, floating, mat_of)
     pairs = S.contact_pairs(asm, mesh, asm.pairs, mat_of, study.friction, notes)
     hold = [(f"MOVE{i + 1}", d + 1, 0.0) for i, m in enumerate(moves) for d in range(3) if abs(m.vector[d]) > 1e-12]
-    steps = [nl.Step(1.0, first=0.25, largest=0.5, smallest=1e-5, prescribed=hold)]
+    every = study.playback
+    steps = [nl.Step(1.0, first=0.25, largest=0.5 if not every else 0.25, smallest=1e-5, prescribed=hold,
+                     every_increment=every)]
     if moves:
         go = [(f"MOVE{i + 1}", d + 1, float(m.vector[d])) for i, m in enumerate(moves) for d in range(3)
               if abs(m.vector[d]) > 1e-12]
-        steps.append(nl.Step(1.0, first=0.1, largest=0.25, smallest=1e-5, prescribed=go))
+        steps.append(nl.Step(1.0, first=0.1, largest=0.25, smallest=1e-5, prescribed=go, every_increment=every))
     model = nl.NonlinearModel(sm, mats, steps, contact=pairs, springs=springs, node_sets=move_sets,
                               fields=("U", "RF", "S"))
     say("solve", f"level {k}: contact on {mesh.n_nodes:,} nodes, {len(pairs)} contact pair"
@@ -219,6 +224,9 @@ def results(asm, study, mesh, built, pairs, springs, move_sets, floating, mat_of
                     "peak_xyz": mesh.X[nodes[i]].tolist() if len(p) else None,
                     "contact_area_mm2": float(tot.get("area", ww[touching].sum())), "area_mm2": float(ww.sum()),
                     "sliding_share": float(ww[sliding].sum() / max(ww[touching].sum(), 1e-30)),
+                    # gross slip: the shear the pair carries against friction on its normal force
+                    "friction_use": float(tot["shear_force"] / (cp.mu * tot["normal_force"]))
+                    if cp.mu > 0 and tot.get("normal_force", 0) > 0 else 0.0,
                     "max_opening_mm": float(opening[~touching].max()) if (~touching).any() else 0.0,
                     "max_slip_mm": float(slip.max()) if len(slip) else 0.0,
                     "penetration_mm": float(p[i] / cp.stiffness) if len(p) else 0.0,
@@ -289,7 +297,7 @@ def evaluate(study, asm, r, levels, moves) -> NonlinearOutcome:
                         f"movement {fmt(float(np.linalg.norm(fr['U'], axis=1).max()))} mm"))
     level, reasons = confidence(checks, extra)
     verdict = "holds" if sf >= target else ("marginal" if sf >= 1 else "fails")
-    slid = [p for p in r["pairs"] if p["contact_area_mm2"] > 0 and p["sliding_share"] > 0.9 and p["mu"] > 0]
+    slid = [p for p in r["pairs"] if p["mu"] > 0 and p["friction_use"] >= 0.95]
     opened = [p for p in r["pairs"] if p["contact_area_mm2"] <= 0.02 * p["area_mm2"] and p["gap"] <= 1e-3 * asm.prep.diag]
     if slid and not moves:
         verdict = "slips"
@@ -355,7 +363,7 @@ def _contact_checks(asm, r, F, moves) -> list[Check]:
         out.append(Check("contact balance", "pass" if err < 0.01 else ("warn" if err < 0.03 else "fail"),
                          f"body {b} is pressed onto its contact with {fmt(load)} N and the contact pressure adds up "
                          f"to {fmt(got)} N ({100 * err:.2g}% apart)", {"load_N": load, "contact_N": got}))
-    slid = [p for p in r["pairs"] if p["mu"] > 0 and p["sliding_share"] > 0.5 and p["normal_force_N"] > 0]
+    slid = [p for p in r["pairs"] if p["mu"] > 0 and p["friction_use"] >= 0.95 and p["normal_force_N"] > 0]
     for p in slid:
         ratio = p["shear_force_N"] / p["normal_force_N"]
         err = abs(ratio - p["mu"]) / p["mu"]
@@ -429,6 +437,37 @@ def fixes(verdict, mat, sf, target, slid, study) -> list[dict]:
                                f"{fmt(p['mu'] * p['normal_force_N'])} N there. More clamping force, a rougher "
                                "interface or a shoulder that takes the load in bearing stops it.", "auto": False})
     return out
+
+
+def playback(path: Path, study, r, moved: bool) -> str:
+    """Every increment of the run on the assembly's surface: the loads coming on, then any prescribed movement,
+    with the stress and the contact pressure at each."""
+    from ..plastic.common import write_playback
+
+    mesh = r["mesh"]
+    frames = []
+    top_s = top_p = 1e-9
+    for fr in r["res"].frames:
+        t = float(fr["time"])
+        vm = nl.von_mises(fr["S"])
+        pres = np.clip(fr.get("pressure", np.zeros(mesh.n_nodes)), 0, None)
+        top_s, top_p = max(top_s, float(np.percentile(vm, 99.5))), max(top_p, float(pres.max()))
+        frames.append({"t": t, "label": "loading" if t <= 1 + 1e-9 else "moving", "U": fr["U"], "stress": vm,
+                       "pressure": pres, "values": {"load": min(t, 1.0), "move": max(t - 1.0, 0.0)}})
+    body = np.zeros(mesh.n_nodes)
+    for b in np.unique(mesh.body):
+        body[np.unique(mesh.tets[mesh.body == b].ravel())] = b
+    return write_playback(
+        path, mesh, frames,
+        {"kind": "contact", "title": Path(study.part).name, "question": study.question,
+         "units": {"length": "mm", "stress": "MPa", "pressure": "MPa"},
+         "phases": ["loading"] + (["moving"] if moved else []),
+         "about": "Frames play in order of t. From t 0 to 1 the loads come on in proportion; past 1 the faces given "
+                  "a movement move to it. stress is von Mises (colours clip at the 99.5th percentile, so a single "
+                  "corner does not wash the rest out) and pressure is the contact pressure, zero where faces are "
+                  "apart. mesh.body numbers the parts."},
+        {"stress": {"unit": "MPa", "min": 0.0, "max": top_s}, "pressure": {"unit": "MPa", "min": 0.0, "max": top_p}},
+        body=body)
 
 
 def render(out: Path, r) -> dict:
