@@ -1,9 +1,12 @@
-"""Flames and propellant performance against published values. Skips without Cantera."""
+"""Flames and propellant performance, and the three chemistry commands. Cantera parts skip without Cantera."""
+import json
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 from wobbl.chem import install
+from wobbl.cli.main import cli
 
 ROOT = Path(__file__).resolve().parents[1]
 needs_cantera = pytest.mark.skipif(not install.available(), reason="Cantera not installed (wobbl setup --only cantera)")
@@ -49,3 +52,25 @@ def test_propellant_performance_checks_itself_and_flags_an_overexpanded_nozzle(t
     assert big.verdict == "marginal" and big.fixes[0]["kind"] == "area_ratio"
     with pytest.raises(ValueError, match="no published composition"):
         run_propellant("ocean-water", 5e6, 8.0, None, tmp_path / "ow", render=False)
+
+
+def test_motor_command_from_a_spec_and_from_flags(tmp_path):
+    r = CliRunner().invoke(cli, ["motor", str(ROOT / "examples" / "knsb-motor" / "motor.toml"), "-o",
+                                 str(tmp_path / "a"), "--json"])
+    assert r.exit_code == 0, r.output
+    d = json.loads(r.output[r.output.index("{"):])
+    assert d["domain"] == "motor" and d["verdict"] == "marginal" and d["values"]["designation"].startswith("J")
+    r = CliRunner().invoke(cli, ["motor", "--propellant", "knsb", "--grain", "bates d=48 core=20 L=75 x4",
+                                 "--throat", "12", "--exit", "30", "--casing", "6061-t6 od=54 wall=1.6", "-o",
+                                 str(tmp_path / "b"), "--json"])
+    assert r.exit_code == 0, r.output
+    assert (tmp_path / "b" / "motor.eng").exists()
+    r = CliRunner().invoke(cli, ["motor", "--propellant", "knsb", "--throat", "12"])
+    assert r.exit_code != 0 and "--grain" in r.output
+
+
+def test_flame_and_propellant_commands_parse(tmp_path):
+    r = CliRunner().invoke(cli, ["flame", "methane", "--phi", "0", "-o", str(tmp_path / "f")])
+    assert r.exit_code != 0 and "phi" in r.output
+    r = CliRunner().invoke(cli, ["propellant", "knsb", "--area-ratio", "0.5", "-o", str(tmp_path / "p")])
+    assert r.exit_code != 0 and "area ratio" in r.output.replace("-", " ")
