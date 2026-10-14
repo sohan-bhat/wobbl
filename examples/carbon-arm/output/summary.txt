@@ -1,0 +1,30 @@
+HOLDS. First ply failure at 5.17x the load, target 1.5. Ply 1 at 0 degrees goes first by Tsai-Wu at (37.5, -1.97e-04, 12) mm, and Hashin gives 8.88x by fiber compression. Confidence is medium.
+
+Confidence: medium. mesh convergence: load factor at first ply failure still moving: 4.7 -> 5.01 -> 5.17 x, last change 3.0% (stopped by level limit); expect about that much error
+first ply failure: 5.17x load
+target: 1.5
+governing ply: 1 (0 deg)
+max deflection: 3.79 mm
+laminate: 8 plies, 1 mm
+Ex (CLT): 103979 MPa
+
+Checks:
+  [warn] mesh convergence: load factor at first ply failure still moving: 4.7 -> 5.01 -> 5.17 x, last change 3.0% (stopped by level limit); expect about that much error
+  [pass] force balance: reactions balance the loads to 4.1e-09% (forces; shell supports also hold rotations, whose reaction moments are not compared)
+  [pass] hand calculation: beam theory with the laminate's CLT moduli, 103979 MPa stretching and 118322 MPa bending through a section 120 mm from the supports gives a peak axial strain of 750 microstrain; the shell model gives 751 (1x)
+  [info] layup: 0/45/-45/0/0/-45/45/0: under 10% of the plies at 90 degrees, so loads off the main axis fall on the matrix
+  [info] singularities: within 3.12 mm of the supports and rigid attachments the first ply reads 4.05x, set by how the model holds the laminate there; Wobbl reports the value away from them. A real clamp spreads the load over its length, so check the joint itself with a test or a detailed model
+  [pass] units and sanity: part 402 mm across, max deflection 3.79 mm (0.94% of size), peak ply strain 1282 microstrain: all plausible
+
+Assumptions:
+  - Laminate [0/±45/0]s, 8 plies of Carbon/epoxy T300/5208, 1 mm, plies listed from the inner face out, angles measured from the longest axis of the part.
+  - Carbon/epoxy T300/5208: E1 181000, E2 10300, G12 7170 MPa, nu12 0.28; Xt 1500, Xc 1500, Yt 40, Yc 246, S12 68 MPa; 0.125 mm plies (Tsai and Hahn (1980), Introduction to Composite Materials, as tabulated in Kaw, Mechanics of Composite Materials, 2nd ed.). nu23 0.49, the density and the 0.125 mm ply are typical carbon/epoxy values, not from the source.
+  - Plies are linear elastic up to first ply failure; Wobbl does not follow the damage past it, where the laminate often carries more load.
+  - Tsai-Wu uses the interaction term F12 = -sqrt(F11 F22)/2; Hashin's matrix compression takes the transverse shear strength equal to S12.
+  - Shell theory: in plane ply stresses only. Free edge, interlaminar and through thickness stresses, and delamination, are not modeled.
+  - The laminate sits on the midsurface of the CAD walls; the shell model holds 99% of the part's material in 1 wall faces.
+  - Points within 3.12 mm of supports and rigid attachments are left out of the answer.
+  - Loads are static. Fatigue, impact, moisture and temperature knockdowns are not applied.
+
+Images: failure: images/failure.png, plies: images/plies.png, deformed: images/deformed.png
+Report: report.html

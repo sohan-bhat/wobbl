@@ -1,0 +1,335 @@
+{
+ "domain": "laminate",
+ "part": "../arm.py",
+ "question": "Is this carbon fiber arm strong enough for 120 N at the motor?",
+ "verdict": "holds",
+ "headline": "First ply failure at 5.17x the load, target 1.5. Ply 1 at 0 degrees goes first by Tsai-Wu at (37.5, -1.97e-04, 12) mm, and Hashin gives 8.88x by fiber compression. Confidence is medium.",
+ "metrics": [
+  [
+   "first ply failure",
+   "5.17x load"
+  ],
+  [
+   "target",
+   "1.5"
+  ],
+  [
+   "governing ply",
+   "1 (0 deg)"
+  ],
+  [
+   "max deflection",
+   "3.79 mm"
+  ],
+  [
+   "laminate",
+   "8 plies, 1 mm"
+  ],
+  [
+   "Ex (CLT)",
+   "103979 MPa"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "mesh convergence: load factor at first ply failure still moving: 4.7 -> 5.01 -> 5.17 x, last change 3.0% (stopped by level limit); expect about that much error"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "warn",
+   "summary": "load factor at first ply failure still moving: 4.7 -> 5.01 -> 5.17 x, last change 3.0% (stopped by level limit); expect about that much error",
+   "detail": {
+    "values": [
+     4.696175,
+     5.012673,
+     5.169214
+    ],
+    "last_change": 0.030283,
+    "tolerance": 0.03,
+    "stopped_by": "level limit"
+   }
+  },
+  {
+   "name": "force balance",
+   "status": "pass",
+   "summary": "reactions balance the loads to 4.1e-09% (forces; shell supports also hold rotations, whose reaction moments are not compared)",
+   "detail": {
+    "applied_N": [
+     0.0,
+     0.0,
+     120.0
+    ],
+    "reaction_N": [
+     0.0,
+     0.0,
+     -120.0
+    ],
+    "force_error": 0.0
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "beam theory with the laminate's CLT moduli, 103979 MPa stretching and 118322 MPa bending through a section 120 mm from the supports gives a peak axial strain of 750 microstrain; the shell model gives 751 (1x)",
+   "detail": {
+    "beam_strain": 0.00075,
+    "shell_strain": 0.000751,
+    "ratio": 1.000133,
+    "section_at_mm": 120.002366,
+    "axis": "x",
+    "E_MPa": 103978.867812
+   }
+  },
+  {
+   "name": "layup",
+   "status": "info",
+   "summary": "0/45/-45/0/0/-45/45/0: under 10% of the plies at 90 degrees, so loads off the main axis fall on the matrix",
+   "detail": {
+    "symmetric": true,
+    "balanced": true,
+    "shares": {
+     "0": 0.5,
+     "45": 0.5,
+     "90": 0.0
+    }
+   }
+  },
+  {
+   "name": "singularities",
+   "status": "info",
+   "summary": "within 3.12 mm of the supports and rigid attachments the first ply reads 4.05x, set by how the model holds the laminate there; Wobbl reports the value away from them. A real clamp spreads the load over its length, so check the joint itself with a test or a detailed model",
+   "detail": {
+    "support_ratio": 4.045679,
+    "radius_mm": 3.125
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "part 402 mm across, max deflection 3.79 mm (0.94% of size), peak ply strain 1282 microstrain: all plausible",
+   "detail": {
+    "deflection_ratio": 0.009447,
+    "max_strain": 0.001282
+   }
+  }
+ ],
+ "assumptions": [
+  "Laminate [0/\u00b145/0]s, 8 plies of Carbon/epoxy T300/5208, 1 mm, plies listed from the inner face out, angles measured from the longest axis of the part.",
+  "Carbon/epoxy T300/5208: E1 181000, E2 10300, G12 7170 MPa, nu12 0.28; Xt 1500, Xc 1500, Yt 40, Yc 246, S12 68 MPa; 0.125 mm plies (Tsai and Hahn (1980), Introduction to Composite Materials, as tabulated in Kaw, Mechanics of Composite Materials, 2nd ed.). nu23 0.49, the density and the 0.125 mm ply are typical carbon/epoxy values, not from the source.",
+  "Plies are linear elastic up to first ply failure; Wobbl does not follow the damage past it, where the laminate often carries more load.",
+  "Tsai-Wu uses the interaction term F12 = -sqrt(F11 F22)/2; Hashin's matrix compression takes the transverse shear strength equal to S12.",
+  "Shell theory: in plane ply stresses only. Free edge, interlaminar and through thickness stresses, and delamination, are not modeled.",
+  "The laminate sits on the midsurface of the CAD walls; the shell model holds 99% of the part's material in 1 wall faces.",
+  "Points within 3.12 mm of supports and rigid attachments are left out of the answer.",
+  "Loads are static. Fatigue, impact, moisture and temperature knockdowns are not applied."
+ ],
+ "values": {
+  "strength_ratio": 5.169214,
+  "criterion": "tsai-wu",
+  "tsai_wu": 5.169214,
+  "hashin": 8.884278,
+  "hashin_mode": "fiber compression",
+  "governing_ply": 1,
+  "governing_angle": 0.0,
+  "governing_xyz": [
+   37.500124,
+   -0.000197,
+   11.996555
+  ],
+  "max_deflection_mm": 3.793716,
+  "layup": "0/45/-45/0/0/-45/45/0",
+  "laminate_thickness_mm": 1.0,
+  "clt": {
+   "Ex": 103978.867812,
+   "Ey": 29215.522997,
+   "Gxy": 26880.431086,
+   "nuxy": 0.674807,
+   "Efx": 118322.056416,
+   "Efy": 24345.352867
+  },
+  "plies": [
+   {
+    "ply": 1,
+    "angle": 0.0,
+    "material": "t300-5208",
+    "thickness": 0.125,
+    "tsai_wu": 5.169214,
+    "hashin": 8.524854,
+    "hashin_mode": "fiber compression"
+   },
+   {
+    "ply": 2,
+    "angle": 45.0,
+    "material": "t300-5208",
+    "thickness": 0.125,
+    "tsai_wu": 5.231733,
+    "hashin": 5.791549,
+    "hashin_mode": "matrix tension"
+   },
+   {
+    "ply": 3,
+    "angle": -45.0,
+    "material": "t300-5208",
+    "thickness": 0.125,
+    "tsai_wu": 5.274949,
+    "hashin": 5.808576,
+    "hashin_mode": "matrix tension"
+   },
+   {
+    "ply": 4,
+    "angle": 0.0,
+    "material": "t300-5208",
+    "thickness": 0.125,
+    "tsai_wu": 5.26838,
+    "hashin": 8.642344,
+    "hashin_mode": "fiber compression"
+   },
+   {
+    "ply": 5,
+    "angle": 0.0,
+    "material": "t300-5208",
+    "thickness": 0.125,
+    "tsai_wu": 5.29996,
+    "hashin": 8.673266,
+    "hashin_mode": "fiber compression"
+   },
+   {
+    "ply": 6,
+    "angle": -45.0,
+    "material": "t300-5208",
+    "thickness": 0.125,
+    "tsai_wu": 5.276722,
+    "hashin": 5.760609,
+    "hashin_mode": "matrix tension"
+   },
+   {
+    "ply": 7,
+    "angle": 45.0,
+    "material": "t300-5208",
+    "thickness": 0.125,
+    "tsai_wu": 5.219915,
+    "hashin": 5.711655,
+    "hashin_mode": "matrix tension"
+   },
+   {
+    "ply": 8,
+    "angle": 0.0,
+    "material": "t300-5208",
+    "thickness": 0.125,
+    "tsai_wu": 5.353984,
+    "hashin": 8.426306,
+    "hashin_mode": "fiber compression"
+   }
+  ],
+  "levels": [
+   {
+    "level": 0,
+    "h": 6.25,
+    "n_nodes": 6228,
+    "t_solve": 56.411452,
+    "node": 23,
+    "ply": 0,
+    "strength_ratio": 4.696175,
+    "tsai_wu": 4.696175,
+    "hashin": 8.055902,
+    "hashin_mode": "matrix tension",
+    "criterion": "tsai-wu",
+    "max_disp": 3.844347,
+    "xyz": [
+     34.140699,
+     -0.002281,
+     12.000314
+    ]
+   },
+   {
+    "level": 1,
+    "h": 4.375,
+    "n_nodes": 7864,
+    "t_solve": 72.158769,
+    "node": 1099,
+    "ply": 1,
+    "strength_ratio": 5.012673,
+    "tsai_wu": 5.012673,
+    "hashin": 5.528184,
+    "hashin_mode": "matrix tension",
+    "criterion": "tsai-wu",
+    "max_disp": 3.84574,
+    "xyz": [
+     30.470476,
+     1.331554,
+     -11.943957
+    ]
+   },
+   {
+    "level": 2,
+    "h": 3.125,
+    "n_nodes": 15356,
+    "t_solve": 168.036021,
+    "node": 38,
+    "ply": 0,
+    "strength_ratio": 5.169214,
+    "tsai_wu": 5.169214,
+    "hashin": 8.884278,
+    "hashin_mode": "fiber compression",
+    "criterion": "tsai-wu",
+    "max_disp": 3.793716,
+    "xyz": [
+     37.500124,
+     -0.000197,
+     11.996555
+    ]
+   }
+  ],
+  "resultants": {
+   "N_per_mm": [
+    -98.473548,
+    0.693148,
+    0.075134
+   ],
+   "M_per_mm": [
+    -0.426418,
+    -0.16981,
+    -0.042893
+   ]
+  },
+  "mass_kg": 0.048159,
+  "_figures": [
+   [
+    "failure",
+    "Failure index (1 over the strength ratio) of the worst ply at each point"
+   ],
+   [
+    "plies",
+    "Lowest strength ratio of each ply"
+   ],
+   [
+    "deformed",
+    "Deflection"
+   ]
+  ]
+ },
+ "images": {
+  "failure": "images/failure.png",
+  "plies": "images/plies.png",
+  "deformed": "images/deformed.png"
+ },
+ "fixes": [],
+ "notes": [
+  "Built from arm.py with diameter=25, wall=1, length=400.",
+  "The shell model holds 99% of the part's material in 1 wall faces.",
+  "2 faces that are rims, edges or chunky features such as bosses are not walls and are left out of the shell."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 386.676613,
+ "solver": "CalculiX 2.23",
+ "criteria": [
+  {
+   "name": "first ply failure",
+   "value": "strength_ratio",
+   "limit": 1.0,
+   "sense": "min"
+  }
+ ]
+}

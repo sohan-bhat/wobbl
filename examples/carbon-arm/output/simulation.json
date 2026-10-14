@@ -1,0 +1,51 @@
+{
+ "thing": "arm.py",
+ "question": "Is this carbon fiber arm strong enough for 120 N at the motor?",
+ "plan": {
+  "thing": "arm.py",
+  "question": "Is this carbon fiber arm strong enough for 120 N at the motor?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "composite"
+  ],
+  "reasons": [
+   {
+    "decided": "arm.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics composite, as asked",
+    "override": "--physics composite"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ]
+ },
+ "verdict": "pass",
+ "situation": {
+  "supports": [
+   "fixed box -1,-13,-13,25,13,13"
+  ],
+  "loads": [
+   "120 N +z at 400,0,0 @ x=max rigid"
+  ],
+  "material": "t300-5208"
+ },
+ "steps": [
+  {
+   "analysis": "composite",
+   "domain": "part",
+   "verdict": "holds",
+   "headline": "First ply failure at 5.17x the load, target 1.5. Ply 1 at 0 degrees goes first by Tsai-Wu at (37.5, -1.97e-04, 12) mm, and Hashin gives 8.88x by fiber compression. Confidence is medium.",
+   "confidence": "medium",
+   "result_dir": ".",
+   "report": "report.html",
+   "assumptions": []
+  }
+ ]
+}

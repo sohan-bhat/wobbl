@@ -1,0 +1,27 @@
+{
+ "domain": "part",
+ "analysis": "composite",
+ "spec": {
+  "thing": "../arm.py",
+  "kind": "parametric",
+  "question": "Is this carbon fiber arm strong enough for 120 N at the motor?",
+  "options": {
+   "layup": [
+    "[0/\u00b145/0]s"
+   ],
+   "ply": [
+    "t300-5208"
+   ],
+   "load": [
+    "120 N +z at 400,0,0 @ x=max rigid"
+   ],
+   "fix": [
+    "fixed box -1,-13,-13,25,13,13"
+   ],
+   "material": [
+    "t300-5208"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}
