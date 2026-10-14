@@ -68,8 +68,9 @@ class FinalMesh:
     def cleanup(self):
         shutil.rmtree(self.work, ignore_errors=True)
 
-    def solve(self, loads=None, nu: float | None = None):
-        """Solve the study with these loads (default all) and Poisson's ratio. Returns (result, failure measure)."""
+    def solve(self, loads=None, nu: float | None = None, stiffness: dict[int, float] | None = None):
+        """Solve the study with these loads (default all), Poisson's ratio and stiffness of elastic supports (by
+        fixture index). Returns the result, the failure measure, the material and the print axis."""
         from ..materials import resolve_material
         from ..solvers import base as solvers
         from ..structural.build import build_static
@@ -78,6 +79,8 @@ class FinalMesh:
         st = copy.deepcopy(self.study)
         if loads is not None:
             st.loads = list(loads)
+        for j, k in (stiffness or {}).items():
+            st.fixtures[j].stiffness = float(k)
         mat = resolve_material(st.material)
         if nu is not None:
             mat = mat.with_overrides(nu=float(nu))

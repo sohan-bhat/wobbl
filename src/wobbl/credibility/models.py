@@ -151,6 +151,12 @@ class StrengthModel(Model):
             self.known["E"] = Known(self.E0, "MPa", "stiffness", "Young's modulus")
             self.known["nu"] = Known(self.mat.nu, "", "material", "Poisson's ratio")
             self.aliases.update({"poisson": "nu"})
+        springs = [(k, fx) for k, fx in enumerate(self.study.get("fixtures", [])) if fx.get("kind") == "elastic"]
+        for k, fx in springs:   # how stiff an elastic support is, solved again on the final mesh
+            name = "support" if len(springs) == 1 else f"support{k + 1}"
+            self.known[name] = Known(float(fx["stiffness"]), "N/mm3", "boundary", f"the stiffness of {fx['text']}")
+            if len(springs) == 1:
+                self.aliases.update({"spring": name, "springs": name, "foundation": name})
         self.known[self.limit_name] = Known(self.allow0, "MPa", "strength",
                                             "yield strength" if ductile else "tensile strength")
         self.geometry = {}
@@ -173,12 +179,12 @@ class StrengthModel(Model):
     def evaluator(self, inputs, progress=None, solves=None):
         geo = [i for i in inputs if i.role == "geometry"]
         per = [i for i in inputs if re.fullmatch(r"load\d+", i.name)]
-        nu = next((i for i in inputs if i.name == "nu"), None)
-        ratio = sup = nu_ratio = None
+        fine = [i for i in inputs if i.name == "nu" or i.name.startswith("support")]
+        ratio = sup = fine_ratio = None
         parts = ["exact scaling of the converged solution, where stress follows the load and not the modulus and "
                  "deflection follows the load over the modulus"]
         info = {"kind": "exact"}
-        if per or nu:
+        if per or fine:
             from .resolve import FinalMesh, Superposition
 
             fm = FinalMesh(self.dir)
@@ -188,10 +194,11 @@ class StrengthModel(Model):
                     parts.append(f"an exact sum of {len(self.per_load)} solves on the final mesh, one per load")
                     if not sup.quadratic:
                         info["samples_cap"] = 50000
-                if nu:
-                    nu_ratio, sur = self._nu_surrogate(fm, nu, progress, solves)
+                if fine:
+                    fine_ratio, sur = self._final_mesh_surrogate(fm, fine, progress, solves)
+                    what = " and ".join("Poisson's ratio" if i.name == "nu" else i.label for i in fine)
                     parts.append(f"a polynomial chaos fit of degree {sur.degree} to {sur.n_train} solves on the final "
-                                 f"mesh across Poisson's ratio, leave one out error {100 * max(sur.loo):.2g}% of the "
+                                 f"mesh across {what}, leave one out error {100 * max(sur.loo):.2g}% of the "
                                  "variance")
                     info.update(kind="polynomial chaos", surrogate=sur.summary())
             finally:
@@ -213,8 +220,8 @@ class StrengthModel(Model):
             m = self._col(X, inputs, "mesh", 1.0)
             g, dsp = (np.ones(len(X)), np.ones(len(X))) if ratio is None else ratio(X[:, [names.index(i.name)
                                                                                            for i in geo]])
-            if nu_ratio is not None:
-                gn, dn = nu_ratio(X[:, [names.index("nu")]])
+            if fine_ratio is not None:
+                gn, dn = fine_ratio(X[:, [names.index(i.name) for i in fine]])
                 g, dsp = g * gn, dsp * dn
             if sup is not None:
                 A = np.column_stack([a * self._col(X, inputs, f"load{k + 1}", p) / p
@@ -226,17 +233,23 @@ class StrengthModel(Model):
             return np.column_stack([y / gov, gov, self.disp0 * a * e * dsp])
         return f, info
 
-    def _nu_surrogate(self, fm, nu: Input, progress, solves):
-        """Solves on the final mesh at a Latin hypercube of Poisson's ratios, as ratios to the converged answer."""
-        n = solves or uq.design_size(1)
-        X = uq.sample([nu], n, "lhs", seed=7)
+    def _final_mesh_surrogate(self, fm, fine: list[Input], progress, solves):
+        """Solves on the final mesh at a Latin hypercube of Poisson's ratios and elastic support stiffnesses, fitted
+        as ratios to the converged answer. The mesh does not change, so the fit carries no meshing noise."""
+        n = solves or uq.design_size(len(fine))
+        X = uq.sample(fine, n, "lhs", seed=7)
+        springs = [k for k, fx in enumerate(fm.study.fixtures) if fx.kind == "elastic"]
         Y = []
-        for k, (v,) in enumerate(X):
+        for k, row in enumerate(X):
+            vals = dict(zip((i.name for i in fine), row))
             if progress:
-                progress("solve", f"Poisson's ratio {v:.3g}, solve {k + 1} of {n} on the final mesh")
-            res, meas, _, _ = fm.solve(nu=v)
+                progress("solve", f"solve {k + 1} of {n} on the final mesh, " +
+                         ", ".join(f"{a} {fmt(b)}" for a, b in vals.items()))
+            stiff = {j: vals[f"support{j + 1}" if len(springs) > 1 else "support"] for j in springs
+                     if (f"support{j + 1}" if len(springs) > 1 else "support") in vals}
+            res, meas, _, _ = fm.solve(nu=vals.get("nu"), stiffness=stiff)
             Y.append([fm.governing(meas) / self.gov0, float(res.displacement_magnitude().max()) / self.disp0])
-        sur = uq.fit_pce([nu], X, np.array(Y), ["stress ratio", "deflection ratio"])
+        sur = uq.fit_pce(fine, X, np.array(Y), ["stress ratio", "deflection ratio"])
         return (lambda Xn: (sur(Xn)[:, 0], sur(Xn)[:, 1])), sur
 
     def _geometry_surrogate(self, geo: list[Input], progress, solves):
