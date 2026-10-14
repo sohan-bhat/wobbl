@@ -1,0 +1,283 @@
+=== divider_adc.cir
+* 12 V divider into an ADC input
+V1 vin 0 12
+R1 vin adc 10k ; 0603
+R2 adc 0 4.7k ; 0603
+C1 adc 0 100n ; 16V X7R
+
+=== divider_hot.cir
+* 24 V divider made of two 100 ohm 0805 resistors
+V1 vin 0 24
+R1 vin mid 100 ; 0805
+R2 mid 0 100 ; 0805
+
+=== rc_lowpass.cir
+* RC low pass at 1.6 kHz
+V1 in 0 SIN(0 1 1k) AC 1
+R1 in out 1k
+C1 out 0 100n
+
+=== sallen_key.cir
+* second order Sallen-Key low pass, TL072 on +-12 V
+V1 vp 0 12
+V2 0 vn 12
+V3 in 0 SIN(0 1 500) AC 1
+R1 in a 10k
+R2 a b 10k
+C1 a out 22n
+C2 b 0 10n
+XU1 b out vp vn out TL072
+
+=== led_array_usb.cir
+* four blue LEDs on USB, each with 100 ohm
+V1 vbus 0 5 ; USB
+R1 vbus a1 100 ; 0603
+R2 vbus a2 100 ; 0603
+R3 vbus a3 100 ; 0603
+R4 vbus a4 100 ; 0603
+D1 a1 0 LED_BLUE_0603
+D2 a2 0 LED_BLUE_0603
+D3 a3 0 LED_BLUE_0603
+D4 a4 0 LED_BLUE_0603
+
+=== led_string_12v.cir
+* three white LEDs in series from 12 V through 82 ohm
+V1 v12 0 12
+R1 v12 a 82 ; 1206
+D1 a b LED_WHITE_5MM
+D2 b c LED_WHITE_5MM
+D3 c 0 LED_WHITE_5MM
+
+=== npn_led_switch.cir
+* 2N3904 switching an LED from a 5 V logic signal
+V1 vcc 0 5
+V2 sig 0 PULSE(0 5 0 1u 1u 5m 10m)
+R1 sig b 10k
+Q1 k b 0 2N3904
+R2 vcc a 220
+D1 a k LED_RED
+
+=== npn_relay_flyback.cir
+* 2N2222 driving a 12 V relay coil with a flyback diode
+V1 v12 0 12
+V2 sig 0 PULSE(0 5 0 1u 1u 20m 40m)
+R1 sig b 1k
+Q1 coil b 0 2N2222A
+Rcoil v12 m 400
+Lcoil m coil 1.2
+D1 coil v12 1N4148
+
+=== mosfet_heater.cir
+* IRLZ44N switching a 2 ohm heater at 12 V from a 5 V gate
+V1 v12 0 12
+V2 g 0 5
+RHEAT v12 d 2
+M1 d g 0 IRLZ44N
+
+=== mosfet_3v3_irf540.cir
+* IRF540N driven straight from a 3.3 V pin into a 6 ohm load
+V1 v12 0 12
+V2 g 0 3.3
+RL v12 d 6
+M1 d g 0 IRF540N
+
+=== pmos_high_side.cir
+* AO3401 high side switch for a 100 ohm load, gate pulled down by an NPN
+V1 v5 0 5
+V2 en 0 PULSE(0 3.3 0 1u 1u 5m 10m)
+R1 v5 g 10k
+R2 en b 4.7k
+Q1 g b 0 2N3904
+M1 out g v5 AO3401
+RL out 0 100
+
+=== hbridge_motor.cir
+* H bridge of IRF9540N and IRFZ44N driving a 2 ohm motor winding one way
+V1 v12 0 12
+VGA ga 0 0
+VGB gb 0 12
+VLA la 0 0
+VLB lb 0 10
+M1 a ga v12 IRF9540N
+M2 b gb v12 IRF9540N
+M3 a la 0 IRFZ44N
+M4 b lb 0 IRFZ44N
+Rm a mm 2
+Lm mm b 1m
+
+=== opamp_inverting.cir
+* LM358 inverting gain of 10 on +-12 V
+V1 vp 0 12
+V2 0 vn 12
+V3 in 0 0.5
+R1 in inn 10k
+R2 inn out 100k
+XU1 0 inn vp vn out LM358
+RL out 0 10k
+
+=== comparator_lm393.cir
+* LM393 comparing a sensor against half the supply, open collector with a pull up
+V1 v5 0 5
+V2 sens 0 SIN(2.5 1 50)
+R1 v5 ref 10k
+R2 ref 0 10k
+R3 v5 out 10k
+XU1 sens ref v5 0 out LM393
+
+=== opamp_heavy_load.cir
+* LM358 follower asked to drive 5 V into 100 ohm
+V1 v12 0 12
+V2 in 0 5
+XU1 in out v12 0 out LM358
+RL out 0 100
+
+=== ne555_led.cir
+* NE555 astable near 1 kHz driving an LED
+V1 v9 0 9
+XU1 0 thr out v9 cv thr dis v9 NE555
+R1 v9 dis 1k
+R2 dis thr 6.8k
+C1 thr 0 100n
+C2 cv 0 10n
+R3 out a 330
+D1 a 0 LED_GREEN
+
+=== lm7805_board.cir
+* 7805 from 9 V supplying 300 mA
+V1 vin 0 9
+XU1 vin 0 v5 LM7805
+C1 vin 0 330n ; 25V
+C2 v5 0 100n ; 16V
+RLOAD v5 0 16.7
+
+=== lm317_5v.cir
+* LM317 set to about 5 V from 12 V at 100 mA
+V1 vin 0 12
+XU1 vin adj out LM317
+R1 out adj 240
+R2 adj 0 720
+C1 out 0 10u ; 16V
+RLOAD out 0 50
+
+=== ams1117_from_liion.cir
+* AMS1117-3.3 fed from a Li-ion cell at 3.7 V with a 300 mA load
+V1 vbat 0 3.7 ; 18650
+XU1 vbat 0 v33 AMS1117-3.3
+C1 v33 0 22u ; 10V
+RLOAD v33 0 11
+
+=== zener_24v.cir
+* 9.1 V zener shunt from 24 V through 470 ohm with a 10 mA load
+V1 v24 0 24
+R1 v24 z 470
+D1 0 z 1N4739A
+RLOAD z 0 910
+
+=== buck_switch.cir
+* switch level buck converter, 12 V to 5 V at 1 A, 200 kHz, open loop
+V1 vin 0 12
+VG g 0 PULSE(0 5 0 25n 25n 2.1u 5u)
+S1 vin sw g 0 SWM
+.model SWM SW(VT=2.5 VH=0.1 RON=0.05 ROFF=1meg)
+D1 0 sw SS34
+L1 sw out 22u
+C1 out 0 100u ; 16V electrolytic
+RLOAD out 0 5
+
+=== boost_switch.cir
+* switch level boost converter, 5 V to about 12 V, 100 kHz
+V1 vin 0 5
+VG g 0 PULSE(0 5 0 50n 50n 6u 10u)
+L1 vin sw 47u
+S1 sw 0 g 0 SWM
+.model SWM SW(VT=2.5 VH=0.1 RON=0.05 ROFF=1meg)
+D1 sw out 1N5819
+C1 out 0 47u ; 25V
+RLOAD out 0 60
+
+=== bridge_rectifier.cir
+* 12 V AC through a 1N4007 bridge into 2200 uF and a 100 ohm load
+V1 w acn SIN(0 17 50)
+RW w ac 1
+RG acn 0 1meg
+D1 ac dc 1N4007
+D2 acn dc 1N4007
+D3 0 ac 1N4007
+D4 0 acn 1N4007
+C1 dc 0 2200u ; 25V electrolytic
+RLOAD dc 0 100
+
+=== tp4056_usbc.cir
+* TP4056 charging a cell at 3.7 V from USB-C with 1.2k on PROG
+V1 vbus 0 5 ; USB-C
+XU1 vbus 0 bat prog chrg TP4056
+R1 prog 0 1.2k
+VCELL bat 0 3.7
+R2 vbus led 1k
+D1 led chrg LED_RED
+
+=== mcu_power_tree.cir
+* 12 V into a 7805, then an AMS1117-3.3 for an ESP32 with an LED on a pin
+V1 v12 0 12
+XU1 v12 0 v5 LM7805
+C1 v12 0 330n ; 25V
+C2 v5 0 10u ; 16V
+XU2 v5 0 v33 AMS1117-3.3
+C3 v33 0 22u ; 10V
+XU3 v33 0 io2 ESP32
+R1 io2 a 330
+D1 a 0 LED_RED
+
+=== arduino_led_47r.cir
+* ATmega328P at 5 V lighting a red LED through 47 ohm
+V1 v5 0 5
+XU1 v5 0 pin ATMEGA328P
+R1 pin a 47
+D1 a 0 LED_RED
+
+=== opto_input.cir
+* PC817 isolating a 12 V signal into a 3.3 V logic input
+V1 v12 0 12
+V2 v33 0 3.3
+R1 v12 a 2.2k
+XU1 a 0 c 0 PC817
+R2 v33 c 10k
+
+=== tl431_5v.cir
+* TL431 shunt reference set to 5 V from 12 V
+V1 v12 0 12
+R1 v12 k 1k
+XU1 k 0 ref TL431
+R2 k ref 10k
+R3 ref 0 10k
+
+=== common_emitter.cir
+* 2N3904 common emitter amplifier with divider bias
+V1 vcc 0 12
+V2 in 0 SIN(0 10m 1k) AC 1
+C1 in b 10u
+R1 vcc b 47k
+R2 b 0 10k
+Q1 c b e 2N3904
+RC vcc c 4.7k
+RE e 0 1k
+CE e 0 100u
+
+=== tip120_solenoid.cir
+* TIP120 driving a 12 V solenoid with a flyback diode
+V1 v12 0 12
+V2 sig 0 PULSE(0 5 0 1u 1u 50m 100m)
+R1 sig b 1k
+Q1 sol b 0 TIP120
+Rsol v12 m 12
+Lsol m sol 50m
+D1 sol v12 1N4007
+
+=== unknown_parts.cir
+* a switch built from parts Wobbl does not know
+V1 vcc 0 5
+V2 sig 0 5
+R1 sig b 4.7k
+Q1 c b 0 XYZ9000
+R2 vcc c 1k
+D1 c vcc MYSTERYDIODE

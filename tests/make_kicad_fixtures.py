@@ -108,8 +108,42 @@ def charger_usb() -> Sheet:
     return s
 
 
+def relay_driver() -> Sheet:
+    """A 2N2222 switching a 12 V coil (drawn as its inductance and resistance) with a flyback diode, its base
+    driven by an ATtiny85 on a 5 V rail."""
+    s = Sheet("relay_driver")
+    s.part("MCU_Microchip_ATtiny:ATtiny85-20PU", "U1", "ATtiny85-20PU", (60, 70))
+    s.part("Device:R", "R1", "1k", (100, 60), angle=90, footprint=R0805)
+    s.part("Device:Q_NPN_BCE", "Q1", "2N2222A", (130, 75), footprint="Package_TO_SOT_THT:TO-92_Inline")
+    s.part("Device:L", "L1", "1.2", (140, 40))
+    s.part("Device:R", "R2", "400", (140, 20))
+    s.part("Device:D", "D1", "1N4148", (165, 30), angle=90, footprint="Diode_THT:D_DO-35_SOD27_P7.62mm_Horizontal")
+    s.part("Device:C", "C1", "100n 16V", (40, 90), footprint=C0805)
+    s.power("+5V", ("U1", "8"), ("C1", "1"))
+    s.power("+12V", ("R2", "1"), ("D1", "1"))
+    s.power("GND", ("U1", "4"), ("Q1", "3"), ("C1", "2"))
+    s.net("DRIVE", ("U1", "5"), ("R1", "1"))
+    s.net("BASE", ("R1", "2"), ("Q1", "1"))
+    s.net("COIL_R", ("R2", "2"), ("L1", "1"))
+    s.net("COIL", ("L1", "2"), ("Q1", "2"), ("D1", "2"))
+    return s
+
+
+def led_matrix() -> Sheet:
+    """Six blue 0805 LEDs on a 5 V rail, each with its own 68 ohm 0603 resistor."""
+    s = Sheet("led_matrix")
+    for k in range(6):
+        s.part("Device:R", f"R{k + 1}", "68", (40 + 20 * k, 50), footprint="Resistor_SMD:R_0603_1608Metric")
+        s.part("Device:LED", f"D{k + 1}", "Blue", (40 + 20 * k, 80), angle=90,
+               footprint="LED_SMD:LED_0805_2012Metric")
+        s.power("+5V", (f"R{k + 1}", "1"))
+        s.net(f"LED{k + 1}", (f"R{k + 1}", "2"), (f"D{k + 1}", "2"))
+        s.power("GND", (f"D{k + 1}", "1"))
+    return s
+
+
 BOARDS = {"led_battery": led_battery, "ldo_mcu_board": ldo_mcu_board, "blinker_555": blinker_555,
-          "opamp_dual": opamp_dual, "charger_usb": charger_usb}
+          "opamp_dual": opamp_dual, "charger_usb": charger_usb, "relay_driver": relay_driver, "led_matrix": led_matrix}
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
