@@ -1,7 +1,13 @@
-"""Any circuit on a breadboard: every pin lands on its own net and the wires carry the run's currents."""
+"""Any circuit on a breadboard: every pin lands on its own net, the wires carry the run's currents, and the
+bench drawing shows them."""
+import re
+import xml.etree.ElementTree as ET
+
+import numpy as np
 import pytest
 
-from wobbl.circuits import board
+from conftest import needs_spice
+from wobbl.circuits import board, draw
 from wobbl.circuits.netlist import parse_spice
 
 NETLISTS = {
@@ -87,3 +93,44 @@ def test_wires_carry_the_runs_currents_by_kirchhoff():
     assert next(i_ for i_ in pl["instruments"] if i_["name"] == "V1")["current"] == pytest.approx(i)
     r2 = next(p for p in pl["parts"] if p["name"] == "R2")
     assert r2["power"] == pytest.approx(i * i * 4.7e3) and r2["heat"] == pytest.approx(i * i * 4.7e3 / 0.25, abs=1e-3)
+
+
+def test_bench_drawing_moves_current_at_its_size():
+    c = parse_spice("* two loads\nV1 vcc 0 9\nR1 vcc 0 90\nR2 vcc 0 900\n")
+    data = {"v(vcc)": [9.0], "i(v1)": [-0.11]}
+    svg = draw.board_setup(board.plan(c, data), "warm")
+    root = ET.fromstring(svg)
+    assert root.get("data-live") and "WARM" in svg and "110 mA" in svg and "SUPPLY CURRENT" in svg
+    speeds = sorted(float(v) for v in re.findall(r'data-flow="([\d.]+)"', svg))
+    assert speeds[0] == pytest.approx(90 * 10 / 110, rel=0.01) and speeds[-1] == pytest.approx(90)  # R2 and the lead
+    assert len(svg.encode()) < 40_000 and "base64" not in svg
+    ids = [e.get("id") for e in root.iter() if e.get("id")]
+    assert len(ids) == len(set(ids))
+    assert "data-drift" in svg  # R1 burns 0.9 W in a 0.25 W part
+
+
+def test_a_changing_current_plays_its_shape():
+    c = parse_spice("* rc\nV1 in 0 5\nR1 in out 1k\nC1 out 0 1u\n")
+    t = np.linspace(0, 5e-3, 200)
+    vout = 5 * (1 - np.exp(-t / 1e-3))
+    pl = board.plan(c, {"time": t, "v(in)": np.full_like(t, 5.0), "v(out)": vout, "i(v1)": -(5 - vout) / 1e3})
+    r1 = next(p for p in pl["parts"] if p["name"] == "R1")
+    assert pl["span"] == pytest.approx(5e-3) and r1["k"][0] == pytest.approx(1) and r1["k"][-1] < 0.02
+    svg = draw.board_setup(pl)
+    assert 'data-live="3"' in svg and "data-k" in svg
+
+
+@pytest.mark.solver
+@needs_spice
+def test_any_netlist_runs_instrumented_and_draws(tmp_path):
+    from wobbl.solvers import base
+
+    c = parse_spice(NETLISTS["darlington"] + ".op\n")
+    vecs = [f"v({n})" for n in c.nodes() if n != "0"] + [f"i({v})" for _, _, v in c.probes()]
+    data = base.for_domain("circuit").run(c.spice(instrument=True, analyses=c.analyses, save=False), tmp_path,
+                                          vecs, "run")[0]
+    out = draw.write_circuit(tmp_path / "images", c, data)
+    svg = (tmp_path / "images" / "setup.svg").read_text()
+    assert set(out) == {"setup", "schematic"} and svg.count("data-flow") >= 4
+    rl = next(p for p in board.plan(c, data)["parts"] if p["name"] == "RL")
+    assert rl["current"] > 0.05 and rl["heat"] > 1  # the load runs hot in a quarter watt resistor

@@ -132,8 +132,12 @@ def ladder(parts: list[Part]):
                 return None
             ch = chain(e, node)
             (chains if ch else onward).append(ch or e)
+        long = [ch for ch in chains if len(ch) > 1]
         if not onward and len(spine) == 1 and len(chains) == 1 and len(chains[0]) > 1:
             onward, chains = [chains[0][0][0]], []  # a lone chain off the source: its first part runs along the top
+        elif not onward and len(long) == 1 and long[0][0][0].kind in "rl":
+            # the last stage of a ladder: its resistor or inductor runs on along the top, the rest hangs down
+            onward, chains = [long[0][0][0]], [ch for ch in chains if ch is not long[0]]
         if len(onward) > 1:
             return None
         used.update(q.name for ch in chains for q, _, _ in ch)
@@ -294,7 +298,7 @@ def _draw_ladder(lad, title, models, notes, ns):
     # a switch in the bottom row needs a row under it for its drive
     depth += any(q.kind in "smqj" and i == len(ch) - 1 for _, ch in place for i, (q, _, _) in enumerate(ch))
     top_drive = any(q.kind in "smqj" for _, _, q, _ in spans)
-    cw, rh = (170.0 if col <= 3 else 150.0), 110.0
+    cw, rh = (170.0 if col <= 3 else 150.0 if col <= 5 else 125.0), 110.0
     yg = depth * rh
 
     def X(c):
@@ -351,9 +355,9 @@ def _draw_ladder(lad, title, models, notes, ns):
         tag = node + (f" {notes[node]}" if node in notes else "")
         s.text(X(c) + 8, -14, tag, size=11, fill=MUTED if node not in notes else FG2)
         ext[1] = max(ext[1], X(c) + 8 + 6.6 * len(tag))
-    # scale the whole drawing to fill the panel under the title, never past 1.3 times or under 0.75
+    # scale the whole drawing to fill the panel under the title, never past 1.3 times or under 0.55
     k = min(1.3, (W - 48) / (ext[1] - ext[0]), (H - 66) / (ext[3] - ext[2]))
-    if k < 0.75:
+    if k < 0.55:
         return None
     tx = W / 2 - k * (ext[0] + ext[1]) / 2
     ty = 50 + (H - 58 - k * (ext[3] - ext[2])) / 2 - k * ext[2]

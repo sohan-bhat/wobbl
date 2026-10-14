@@ -15,9 +15,11 @@ from pathlib import Path
 import numpy as np
 
 from ..units import fmt
-from .bench import (BG, BLACK_LEAD, RED_LEAD, VERDICT, YEL, W, Breadboard, Svg, capacitor_top, clip, cubic, eng,
-                    flow, heatsink, instrument, jumper, lead, led, mat, mix, num, nums, pin, plug, poly, power_resistor,
-                    probe, readout, resistor, scope, shimmer, terminal, to220, toroid)
+from .bench import (BG, BLACK_LEAD, RED_LEAD, VERDICT, YEL, H, W, Breadboard, Svg, capacitor_top, clip, cubic,
+                    diode_axial, dip, eng, flow, heatsink, inductor_axial, inductor_drum, instrument, jumper, lead,
+                    led, mat, meter, mix, module, num, nums, pin, plug, poly, power_resistor, probe, readout,
+                    resistor, scope, shimmer, terminal, to92, to220, to220_standing, toroid)
+from .board import plan
 from .schematic import schematic
 
 SERIES = (7, 13)  # the series part runs between these columns in row c; column 12 is a gap in the rails
@@ -337,3 +339,151 @@ def write_schematic(images: Path, netlist: str) -> dict[str, str]:
     images.mkdir(parents=True, exist_ok=True)
     path = _save(images / "schematic.svg", lambda: schematic(netlist))
     return {"schematic": path} if path else {}
+
+
+# ---- any circuit, from its board plan ----------------------------------------------------------
+
+INSTRUMENT = {"supply": "DC POWER SUPPLY", "generator": "FUNCTION GENERATOR", "current": "CURRENT SOURCE"}
+
+
+def _flight(a, z):
+    """A flexible jumper's arc from hole to hole, lifted off the board."""
+    lift = min(70.0, 10 + 0.28 * math.hypot(z[0] - a[0], z[1] - a[1]))
+    return a, (a[0], a[1] - lift), (z[0], z[1] - lift), z
+
+
+def _rev(c):
+    return c[::-1]
+
+
+def board_setup(pl: dict, verdict: str = "ok", key: dict | None = None, ns: str = "brd") -> str:
+    """setup.svg for any circuit from its plan (board.plan): the board with its parts and wires, the bench
+    instruments and their leads, the measured current moving along every wire, and one live reading.
+
+    key is the reading to show live: {"label", "value", "unit", "series", "limit", "note"}. Without one the
+    supply's current is shown."""
+    s = Svg(ns)
+    mat(s)
+    ins = pl["instruments"]
+    right = W - 236
+    gap = 10
+    iw = min(176.0, (right - 20 - gap * max(len(ins) - 1, 0)) / max(len(ins), 1))
+    posts = {}
+    for k, inst in enumerate(ins):
+        x = 20 + k * (iw + gap)
+        rows = [tuple(r) for r in inst["readings"]][:2] or [("", "")]
+        ends = {ld["post"]: ld["x"] for ld in inst["leads"]}
+        order = ("+", "-") if ends.get("+", 1e9) < ends.get("-", -1e9) else ("-", "+")  # leads that do not cross
+        if inst["kind"] == "meter":
+            posts[inst["name"]] = meter(s, x, 18, min(iw, 124), 118, *rows[-1], posts=order)
+        else:
+            name = INSTRUMENT[inst["kind"]]
+            posts[inst["name"]] = instrument(s, x, 18, iw, 118, name if iw >= 150 else name.split()[-1], rows,
+                                             lamp="CV" if inst["kind"] == "supply" else "OUT", posts=order)
+    b = pl["board"]
+    top = 156
+    p = min(16.5, (W - 40) / b["width"], (H - top - 12) / b["height"])
+    bx, by = (W - b["width"] * p) / 2, top + (H - top - 12 - b["height"] * p) / 2
+
+    def at(x, y):
+        return bx + x * p, by + y * p
+
+    Breadboard(s, bx, by, p, b["cols"])
+    paths = []  # (cubic or polyline points, current, k) for the moving dots
+    for w in pl["wires"]:
+        pts = [at(*q) for q in w["points"]]
+        if w["kind"] == "jumper":
+            c = _flight(pts[0], pts[-1])
+            lead(s, cubic(*c), w["color"], 3.4)
+            for x, y in (pts[0], pts[-1]):
+                s.add("circle", cx=x, cy=y, r=2.2, fill="#b8bdc3", stroke="#5b574d", stroke_width=0.8)
+            paths.append(("c", c, w["current"], w["k"]))
+        else:
+            jumper(s, pts, w["color"])
+            paths.append(("p", pts, w["current"], w["k"]))
+    peak = pl.get("peak") or 0.0
+    for prt in pl["parts"]:
+        hs = [at(pn["x"], pn["y"]) for pn in prt["pins"]]
+        body, kd = prt["body"], prt["kind"]
+        cx, cy = sum(x for x, _ in hs) / len(hs), sum(y for _, y in hs) / len(hs)
+        heat = prt.get("heat") or 0
+        if heat > 0.5:
+            s.add("circle", cx=cx, cy=cy, r=2.2 * p, opacity=min(1.0, heat - 0.35),
+                  fill=s.grad("radial", [(0, "#ff5a1f", 0.7), (1, "#ff5a1f", 0)]))
+        if body == "axial-resistor":
+            resistor(s, hs[0], hs[1], prt["value"] or 0, p)
+        elif body == "radial-capacitor":
+            capacitor_top(s, hs[0], hs[1], prt["value"] or 1e-7, p)
+        elif body.startswith("inductor"):
+            if body == "inductor-radial" or math.dist(hs[0], hs[1]) < 3 * p:
+                inductor_drum(s, hs[0], hs[1], p)
+            else:
+                inductor_axial(s, hs[0], hs[1], prt["value"], p)
+        elif body == "axial-diode":
+            diode_axial(s, hs[0], hs[1], p)
+        elif body == "led-5mm":
+            cur = abs(prt["current"] or 0)
+            ks = prt["k"] or [1.0]
+            glow = [min(1.0, math.sqrt(k * (peak if prt["k"] else cur) / 0.015)) for k in ks]
+            led(s, hs[0], hs[1], prt["color"] or "red", p, glow, math.sqrt(max(cur, 1e-6) / 0.015))
+        elif body == "to92":
+            to92(s, hs, p, prt["name"])
+        elif body == "to220":
+            to220_standing(s, hs, p, prt["name"])
+        elif body == "dip":
+            tops = [h for h, pn in zip(hs, prt["pins"]) if pn["hole"][1] in "abcde"]
+            bots = [h for h, pn in zip(hs, prt["pins"]) if pn["hole"][1] not in "abcde"]
+            dip(s, tops, bots, p, prt["model"] or prt["name"])
+        else:
+            module(s, hs, p, prt["name"])
+        if len(hs) == 2:
+            paths.append(("p", hs, prt["current"], prt["k"]))
+        if heat > 1:
+            shimmer(s, cx + 1.6 * p, cy - 0.8 * p, VERDICT["fails"])
+    for inst in ins:
+        for ld in inst["leads"]:
+            px, py = posts[inst["name"]][ld["post"]]
+            hx, hy = at(ld["x"], ld["y"])
+            dy = max(hy - py, 30)
+            c = ((px, py), (px, py + 0.45 * dy), (hx, hy - 0.45 * dy), (hx, hy))
+            col = RED_LEAD if ld["post"] == "+" else BLACK_LEAD
+            lead(s, cubic(*c), col)
+            pin(s, hx, hy, math.degrees(math.atan2(hy - c[2][1], hx - c[2][0])))
+            plug(s, px, py, col)
+            paths.append(("c", c, ld["current"], ld["k"]))
+    # the measured current along every wire and part, at a speed proportional to it
+    imax = max([abs(cur) for _, _, cur, _ in paths if cur] + [0.0])
+    live = 3.0 if pl.get("span") else 1.6
+    for kind, pts, cur, k in paths:
+        if not cur or abs(cur) < 0.02 * imax:
+            continue
+        pts = pts if cur > 0 else _rev(pts)
+        d = cubic(*pts) if kind == "c" else poly(pts)
+        if k:
+            flow(s, d, min(240.0, 90 * peak / imax), data_k=nums(k, 3))
+        else:
+            flow(s, d, 90 * abs(cur) / imax, data_k=nums(_climb(), 3))
+    if key is None:  # the supply's current, else the largest current through a part
+        sup = next((i for i in ins if i["kind"] == "supply" and abs(i.get("current") or 0) > 1e-9), None)
+        big = max(pl["parts"], key=lambda q: abs(q["current"] or 0), default=None)
+        name, amps = (("SUPPLY", abs(sup["current"])) if sup else
+                      (big["name"].upper(), abs(big["current"] or 0)) if big else ("SUPPLY", 0.0))
+        milli = amps < 1
+        key = {"label": f"{name} CURRENT", "value": amps * (1000 if milli else 1), "unit": "mA" if milli else "A",
+               "limit": None, "note": f"from {sup['name']}" if sup else "the largest on the board"}
+    series = key.get("series") or _climb(key["value"])
+    readout(s, key["label"], key["value"], key["unit"], series, key.get("limit"), key.get("note", ""), verdict)
+    n = len(pl["parts"])
+    label = (f"Bench setup drawn from this run, with {n} part{'s' if n != 1 else ''} on a breadboard, "
+             f"{len(ins)} instrument{'s' if len(ins) != 1 else ''} and the measured current on every wire.")
+    return s.svg(label, live=live)
+
+
+def write_circuit(images: Path, circuit, data: dict | None = None, verdict: str = "ok",
+                  key: dict | None = None) -> dict[str, str]:
+    """setup.svg and schematic.svg for any circuit: its parts placed and wired on a breadboard by board.plan,
+    carrying the run's currents (the vectors of Circuit.spice(instrument=True)), and its schematic."""
+    images.mkdir(parents=True, exist_ok=True)
+    out = {"setup": _save(images / "setup.svg", lambda: board_setup(plan(circuit, data), verdict, key)),
+           "schematic": _save(images / "schematic.svg", lambda: schematic(circuit.spice()))}
+    return {k: v for k, v in out.items() if v}
