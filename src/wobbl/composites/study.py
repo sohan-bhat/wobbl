@@ -221,6 +221,28 @@ def run_laminate(study: LaminateStudy, out_dir: str | Path, progress=None, pre=N
         playback(out / "playback.json", shell, res, pf, excl, lam, R, gov, target)
     except Exception as e:  # noqa: BLE001  the playback file is a bonus, never a reason to fail
         notes.append(f"playback.json was not written ({str(e)[:120]})")
+    try:
+        from ..shells.scene import ramp_scene
+
+        fi = 1.0 / np.maximum(np.minimum(pf.tsai_wu, pf.hashin).min(1), 1e-12)
+        fi = np.where(np.isfinite(fi), fi, 0.0)
+        tone = {"holds": "pass", "marginal": "warn", "fails": "fail"}[verdict]
+        ramp_scene(out, title=f"{Path(study.part).stem.replace('_', ' ').capitalize()}, {lam.angles()} laminate",
+                   domain="laminate", question=study.question, model=model, values=fi, field="failure index",
+                   unit="", U=res.U, end=R, limit=1.0, limit_label="first ply failure", keep=int(gi),
+                   peak_label=f"ply {gj + 1} at {fmt(_wrap(ply.angle))} deg",
+                   readouts=[("worst ply index", 1.0 / R, "", 1.0), ("deflection", umax, "mm", None)],
+                   events=[(R, "first ply failure", f"ply {gj + 1} at {fmt(_wrap(ply.angle))} degrees, {mode}",
+                            "fail")],
+                   verdict=(verdict.upper(), f"The first ply cracks at {R:.3g} times the load, target {target:g}.",
+                            tone),
+                   source="Frames scale the solved laminate strains by the load, exact for this linear model up "
+                          "to first ply failure.")
+    except Exception as e:  # noqa: BLE001  the 3D view is a bonus, never a reason to fail
+        import os
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
+        notes.append(f"the 3D view was not written ({str(e)[:120]})")
     if not study.keep:
         shutil.rmtree(out / "work", ignore_errors=True)
     return o.write(out, [_ply_section(table)])
