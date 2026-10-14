@@ -348,13 +348,17 @@ def load_toml(text: str) -> dict:
         raise SpecError(f"the spec is not valid TOML ({e})") from None
 
 
-def read_spec(source: str | Path, question: str = "") -> MotionStudy:
-    """A study from a TOML file, or from TOML text (what an agent passes over MCP)."""
-    path = Path(source) if "\n" not in str(source) else None
-    if path is not None and not path.exists():
-        raise SpecError(f"there is no spec file at {source}")
-    d = load_toml(path.read_text() if path else str(source))
-    base = path.parent if path else Path.cwd()
+def read_spec(source: str | Path | dict, question: str = "", base: str | Path | None = None) -> MotionStudy:
+    """A study from a TOML file, from TOML text (what an agent passes over MCP), or from a spec already parsed,
+    whose relative file names are read against base."""
+    if isinstance(source, dict):
+        path, d = None, source
+    else:
+        path = Path(source) if "\n" not in str(source) else None
+        if path is not None and not path.exists():
+            raise SpecError(f"there is no spec file at {source}")
+        d = load_toml(path.read_text() if path else str(source))
+    base = path.parent if path else Path(base or Path.cwd())
     _check_keys(d, {"name", "rocket", "body", "nose", "fins", "motor", "launch", "drogue", "main", "targets",
                     "world"}, "spec")
     if ("rocket" in d) == ("body" in d):

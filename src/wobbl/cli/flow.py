@@ -29,6 +29,7 @@ def _common(f):
 
 def _run(kind: str, params: dict, name: str, out, as_json: bool, note: str):
     """Build the study the same way the MCP tool does, run it and show the result."""
+    from ..credibility.domains import save_request
     from ..flow.tools import build
     from .main import _out_dir
 
@@ -38,6 +39,7 @@ def _run(kind: str, params: dict, name: str, out, as_json: bool, note: str):
             cb("solve", note)
             kw = {"progress": cb} if "progress" in inspect.signature(run).parameters else {}
             o = run(study, _out_dir(re.sub(r"[^\w-]", "_", name), out), **kw)
+        save_request(o.workdir, "flow", params, kind)
     except ValueError as e:
         ui.fail(str(e), getattr(e, "hint", ""))
     _finish(o, as_json)

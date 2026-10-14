@@ -76,12 +76,14 @@ def build(kind: str, params: dict):
 
 
 def solve_flow_tool(kind: str, params: dict | None = None) -> dict:
+    from ..credibility.domains import save_request
     from ..solvers.locate import wobbl_home
 
     out = wobbl_home() / "results" / f"flow-{kind}-{uuid.uuid4().hex[:6]}"
     try:
         study, run = build(kind, params or {})
         o = run(study, out)
+        save_request(out, "flow", params or {}, kind)
     except Exception as e:  # noqa: BLE001
         return {"error": str(e), **({"hint": e.hint} if getattr(e, "hint", "") else {})}
     return {"verdict": o.verdict, "headline": o.headline, "metrics": dict(o.metrics),

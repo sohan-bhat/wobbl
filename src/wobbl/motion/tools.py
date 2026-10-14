@@ -5,7 +5,7 @@ import math
 import uuid
 from pathlib import Path
 
-from .spec import SPHERE_CD, MotionStudy, SpecError, quantity, read_spec
+from .spec import SPHERE_CD, MotionStudy, SpecError, load_toml, quantity, read_spec
 from .study import run_motion
 
 
@@ -78,6 +78,7 @@ def solve_motion_tool(spec: str = "", name: str = "", mass: str = "", density: s
         st = study_from(name, mass, density, diameter, cd, height, speed, angle, wind, question, spec)
         out = wobbl_home() / "results" / f"{st.name}-motion-{uuid.uuid4().hex[:6]}"
         o = run_motion(st, out)
+        save_request(out, spec, name, mass, density, diameter, cd, height, speed, angle, wind, question)
     except Exception as e:  # noqa: BLE001
         hint = getattr(e, "hint", "")
         return {"error": str(e), **({"hint": hint} if hint else {})}
@@ -89,4 +90,25 @@ def solve_motion_tool(spec: str = "", name: str = "", mass: str = "", density: s
             "trajectory": str(out / "trajectory.csv"), "result_dir": o.workdir}
 
 
-__all__ = ["study_from", "solve_motion_tool", "footprint"]
+def save_request(out, spec: str = "", name: str = "", mass: str = "", density: str = "", diameter: str = "",
+                 cd: float | None = None, height: str = "", speed: str = "", angle: str = "", wind: str = "",
+                 question: str = ""):
+    """request.json for the run: the flags as given, or the spec parsed with the folder its files are read from,
+    so uncertainty and credibility can fly it again with other values."""
+    from pathlib import Path
+
+    from ..credibility.domains import save_request as save
+
+    if spec:
+        path = Path(spec) if "\n" not in spec else None
+        d = load_toml(path.read_text() if path else spec)
+        body = {"toml": d, "base": str((path.parent if path else Path.cwd()).resolve()), "name": name,
+                "wind": wind, "question": question}
+        save(out, "motion", body, "spec")
+    else:
+        flags = {"name": name, "mass": mass, "density": density, "diameter": diameter, "cd": cd, "height": height,
+                 "speed": speed, "angle": angle, "wind": wind, "question": question}
+        save(out, "motion", {k: v for k, v in flags.items() if v not in ("", None)}, "flags")
+
+
+__all__ = ["study_from", "solve_motion_tool", "footprint", "save_request"]

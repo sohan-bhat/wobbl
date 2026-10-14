@@ -25,6 +25,7 @@ def _err(e: Exception) -> dict:
 
 def solve_motor_tool(spec: str = "", propellant: str = "", grains: list[str] | None = None, throat: str = "",
                      exit: str = "", casing: str = "", efficiency: float | None = None, question: str = "") -> dict:
+    from ..credibility.domains import save_request
     from .motor import run_motor
     from .spec import read_spec, spec_from_flags
 
@@ -33,6 +34,7 @@ def solve_motor_tool(spec: str = "", propellant: str = "", grains: list[str] | N
                        question)
         out = wobbl_home() / "results" / f"{ms.name}-motor-{uuid.uuid4().hex[:6]}"
         o = run_motor(ms, out)
+        save_request(out, "motor", {"toml": ms.raw, "question": question}, "spec")
     except Exception as e:  # noqa: BLE001
         return _err(e)
     files = {k: str(Path(o.workdir) / v) for k, v in o.values["files"].items()}
@@ -75,6 +77,7 @@ def solve_propellant_tool(propellant: str, chamber_pressure: str = "6.895 MPa", 
 def solve_runaway_tool(cell: str = "18650", ambient: str = "25 C", film: str = "", emissivity: float = 0.8,
                        from_result: str = "", question: str = "") -> dict:
     from ..units import parse_quantity
+    from ..credibility.domains import save_request
     from .runaway import cell_from, run_runaway, surroundings_from
 
     try:
@@ -86,6 +89,9 @@ def solve_runaway_tool(cell: str = "18650", ambient: str = "25 C", film: str = "
             Ta = parse_quantity(ambient, "temperature").value + 273.15
         out = wobbl_home() / "results" / f"{cell}-runaway-{uuid.uuid4().hex[:6]}"
         o = run_runaway(c, Ta, out, question, source)
+        if not from_result:
+            save_request(out, "battery", {"cell": cell, "ambient": ambient, "film": film, "emissivity": emissivity,
+                                          "question": question}, "runaway")
     except Exception as e:  # noqa: BLE001
         return _err(e)
     return _compact(o)

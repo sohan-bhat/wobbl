@@ -32,7 +32,7 @@ def motion(spec, name, mass, density, diameter, cd, height, speed, angle, wind, 
     wobbl motion rocket.toml
     """
     from ..motion.study import run_motion
-    from ..motion.tools import study_from
+    from ..motion.tools import save_request, study_from
     from .main import _out_dir
 
     try:
@@ -40,6 +40,7 @@ def motion(spec, name, mass, density, diameter, cd, height, speed, angle, wind, 
         out_dir = _out_dir(spec or st.name, out)
         with ui.progress(not as_json) as cb:
             o = run_motion(st, out_dir, cb)
+        save_request(out_dir, spec, name, mass, density, diameter, cd, height, speed, angle, wind, question)
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e), getattr(e, "hint", ""))
     if as_json:

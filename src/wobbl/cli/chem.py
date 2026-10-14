@@ -41,6 +41,7 @@ def motor(spec, propellant, grains, throat, exit_, efficiency, casing, out, ques
     'wobbl motion' can name the design with design = "motor.toml" under [motor].
     """
     from ..chem.motor import run_motor
+    from ..credibility.domains import save_request
     from ..chem.spec import read_spec, spec_from_flags
     from .main import _out_dir
 
@@ -53,6 +54,7 @@ def motor(spec, propellant, grains, throat, exit_, efficiency, casing, out, ques
     try:
         with ui.progress(not as_json) as cb:
             o = run_motor(ms, out_dir, cb)
+        save_request(out_dir, "motor", {"toml": ms.raw, "question": question}, "spec")
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e), getattr(e, "hint", ""))
     _finish(o, as_json)
@@ -152,6 +154,7 @@ def runaway(cell, ambient, film, emissivity, from_, out, question, as_json):
     wobbl runaway --cell 21700 --film "sealed box" --from wobbl-out/pack
     """
     from ..chem.runaway import cell_from, run_runaway, surroundings_from
+    from ..credibility.domains import save_request
     from ..units import parse_quantity
     from .main import _out_dir
 
@@ -165,6 +168,9 @@ def runaway(cell, ambient, film, emissivity, from_, out, question, as_json):
         with ui.progress(not as_json) as cb:
             cb("kinetics", f"{c.label} cell around {Ta - 273.15:.4g} C")
             o = run_runaway(c, Ta, _out_dir(f"{cell}-runaway", out), question, source)
+        if not from_:
+            save_request(o.workdir, "battery", {"cell": cell, "ambient": ambient, "film": film,
+                                                "emissivity": emissivity, "question": question}, "runaway")
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e), getattr(e, "hint", ""))
     _finish(o, as_json)
