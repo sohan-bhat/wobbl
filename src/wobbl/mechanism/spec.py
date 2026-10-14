@@ -195,7 +195,7 @@ def _axis(v) -> tuple:
 def _take(d: dict, where: str, allowed: set):
     extra = set(d) - allowed
     if extra:
-        raise SpecError(f"unknown settings in {where}: {', '.join(sorted(extra))}")
+        raise SpecError(f"unknown settings in {where} ({', '.join(sorted(extra))})")
 
 
 def read_spec(source: str | Path | dict) -> Mechanism:

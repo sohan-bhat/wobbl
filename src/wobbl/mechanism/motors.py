@@ -84,9 +84,9 @@ class Motor:
     def describe(self) -> str:
         from ..units import fmt
 
-        speed = (f"{fmt(self.no_load_speed * 60 / (2 * math.pi))} rpm" if math.isfinite(self.no_load_speed)
-                 else "no speed limit")
-        return f"{self.name}: stall {Q.fmt_torque(self.stall_torque)}, no load {speed}"
+        speed = (f"turns {fmt(self.no_load_speed * 60 / (2 * math.pi))} rpm with no load"
+                 if math.isfinite(self.no_load_speed) else "has no speed limit")
+        return f"{self.name}, which stalls at {Q.fmt_torque(self.stall_torque)} and {speed}"
 
 
 def _servo(key, name, kgcm, s60, grams, volts, source="manufacturer datasheet"):
@@ -125,8 +125,8 @@ def get_motor(key: str) -> Motor:
         return CATALOG[k]
     close = difflib.get_close_matches(k, list(CATALOG), n=3)
     hint = f" Did you mean {', '.join(close)}?" if close else ""
-    raise ValueError(f"unknown servo or motor '{key}'.{hint} Known: {', '.join(CATALOG)}, or give stall_torque "
-                     "and no_load_speed")
+    raise ValueError(f"unknown servo or motor '{key}'.{hint} The known ones are {', '.join(CATALOG)}, or give "
+                     "stall_torque and no_load_speed")
 
 
 def motor_from(d) -> Motor:

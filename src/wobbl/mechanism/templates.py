@@ -39,7 +39,7 @@ class Params:
         try:
             return read(v)
         except (ValueError, TypeError) as e:
-            raise SpecError(f"could not read {key}={v}: {e}") from None
+            raise SpecError(f"could not read {key}={v} ({e})") from None
 
     def given(self, key: str) -> bool:
         return key in self.raw
@@ -47,7 +47,7 @@ class Params:
     def done(self, extra: set = frozenset()):
         unknown = set(self.raw) - set(self.defaults) - set(self.used) - set(extra)
         if unknown:
-            raise SpecError(f"unknown values {', '.join(sorted(unknown))}; this template takes "
+            raise SpecError(f"unknown values {', '.join(sorted(unknown))}, where this template takes "
                             f"{', '.join(sorted(self.defaults))}")
 
 
@@ -76,7 +76,7 @@ def pendulum(raw: dict) -> Built:
     m.bodies.append(Body("rod", fromto=(0, 0, 0, 0, 0, -L), radius=max(L / 500, 1e-3), mass=0.0, collide=False))
     m.joints.append(Joint("pivot", "rod", axis=(0.0, 1.0, 0.0), start=th0))
     m.masses.append(PointMass("bob", "rod", mass, (0.0, 0.0, -L), radius=max(L / 1000, 5e-4)))
-    m.duration = p.get("periods", Q.number) * period
+    m.duration = (max(p.get("periods", Q.number), 1.0) + 0.1) * period     # a little past the last turning point
     p.done()
     return Built(m, "pendulum", p.used, {"period_s": period, "small_angle_s": 2 * math.pi * math.sqrt(L / T.G),
                                          "length_m": L, "angle_rad": th0})
@@ -198,7 +198,7 @@ def fourbar(raw: dict) -> Built:
     cls, full = T.grashof(d, a, b, c)
     t4, t3 = T.freudenstein(d, a, b, c, t2_0)
     if not math.isfinite(float(t4)):
-        raise SpecError(f"these links cannot be assembled with the crank at {math.degrees(t2_0):.0f} degrees; "
+        raise SpecError(f"these links cannot be assembled with the crank at {math.degrees(t2_0):.0f} degrees, so "
                         "pick another start")
     t4, t3 = float(t4), float(t3)
     m = Mechanism("four bar linkage", timestep=p.get("timestep", Q.time), gravity=(0.0, 0.0, -T.G))

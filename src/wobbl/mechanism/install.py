@@ -147,12 +147,12 @@ def install(log: Log = print, force: bool = False) -> dict:
         f = pick_wheel(json.loads(meta.read_text()).get("urls", []))
         if f is None:
             raise SetupError(f"MuJoCo {MUJOCO_VERSION} has no wheel for Python {sys.version_info.major}."
-                             f"{sys.version_info.minor} on this platform; 'pip install mujoco' may find a newer one")
+                             f"{sys.version_info.minor} on this platform, and 'pip install mujoco' may find a newer one")
         log(f"downloading {f['filename']} ({f['size'] / 1e6:.1f} MB)")
         whl = download(f["url"], tmp / f["filename"], log)
         want = (f.get("digests") or {}).get("sha256", "")
         if want and hashlib.sha256(whl.read_bytes()).hexdigest() != want:
-            raise SetupError("the MuJoCo download does not match PyPI's checksum; run the install again")
+            raise SetupError("the MuJoCo download does not match PyPI's checksum, so run the install again")
         stage = dest.with_name("mujoco.partial")
         shutil.rmtree(stage, ignore_errors=True)
         done = False
@@ -172,7 +172,7 @@ def install(log: Log = print, force: bool = False) -> dict:
                     z.extractall(stage)
                 err = _smoke(stage)
                 if err:
-                    raise SetupError(f"MuJoCo {MUJOCO_VERSION} does not import on this machine: {err}")
+                    raise SetupError(f"MuJoCo {MUJOCO_VERSION} does not import on this machine ({err})")
             info = {"version": MUJOCO_VERSION, "wheel": f["filename"], "download_bytes": int(f["size"]),
                     "unpacked_bytes": unpacked, "installed_bytes": tree_size(stage), "pruned": pruned,
                     "path": str(dest)}
@@ -196,7 +196,7 @@ def check(log: Log = print) -> dict | str:
 
     mj = load()
     if mj is None:
-        return "MuJoCo is not installed; it installs the first time you run a mechanism study"
+        return "MuJoCo is not installed, and it installs the first time you run a mechanism study"
     ok, err = False, ""
     try:
         m = mj.MjModel.from_xml_string(

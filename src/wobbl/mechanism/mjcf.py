@@ -15,7 +15,7 @@ from .spec import Mechanism, SpecError
 
 PALETTE = ["0.98 0.83 0.0 1", "0.29 0.56 0.85 1", "0.24 0.81 0.48 1", "1.0 0.42 0.42 1", "0.75 0.6 0.95 1",
            "0.95 0.6 0.25 1"]
-POINT_DENSITY = 2000.0          # kg/m3, sets the size of a point mass drawn as a ball
+POINT_DENSITY = 7800.0          # kg/m3, steel, sets the size of a point mass drawn as a ball
 # MuJoCo scales a soft constraint's stiffness with the inertia it holds, so a tiny gear carrying real torque would
 # slip by radians at the default impedance; 0.9999 makes loops and meshes as near to rigid as MuJoCo allows
 HARD = "0.9999 0.9999 0.001 0.5 2"
