@@ -125,9 +125,9 @@ function arrow() {
 }
 
 /**
- * One canvas, one or more parts. Each part is { run, arrays, top } where top is the stress at the top
- * of the color scale. frame({ camera, views, k, heat }) draws every part into its view rectangle
- * ([x, y, w, h] in CSS pixels from the top left).
+ * One canvas, one or more parts. Each part is { run, arrays, top, row } where top is the stress at the
+ * top of the color scale and row the view it is drawn in. frame({ camera, views, k, heat }) draws every
+ * part into its view rectangle ([x, y, w, h] in CSS pixels from the top left).
  */
 export function createStage({ canvas, w, h, px, kind }) {
   const renderer = new WebGLRenderer({ canvas, antialias: px < 2, alpha: true, powerPreference: 'default' });
@@ -140,7 +140,7 @@ export function createStage({ canvas, w, h, px, kind }) {
   let cssW = w, cssH = h;
   const parts = [];
 
-  function add({ run, arrays, top }) {
+  function add({ run, arrays, top, row = 0 }) {
     const scene = new Scene();
     const geo = new BufferGeometry();
     geo.setIndex(new BufferAttribute(arrays.index, 1));
@@ -170,7 +170,7 @@ export function createStage({ canvas, w, h, px, kind }) {
       load = arrow();
       scene.add(load);
     }
-    const part = { run, arrays, scene, geo, uniforms, load, nv, pair: [-1, -1] };
+    const part = { run, arrays, scene, geo, uniforms, load, nv, row, pair: [-1, -1] };
     parts.push(part);
     return part;
   }
@@ -238,8 +238,8 @@ export function createStage({ canvas, w, h, px, kind }) {
       renderer.setScissor(0, 0, cssW, cssH);
       renderer.setViewport(0, 0, cssW, cssH);
       renderer.clear();
-      parts.forEach((part, i) => {
-        const [x, y, vw, vh] = f.views[i];
+      parts.forEach((part) => {
+        const [x, y, vw, vh] = f.views[part.row];
         part.uniforms.uK.value = f.k;
         if (part.load) aim(part, f.k, f.radius);
         if (f.heat) {

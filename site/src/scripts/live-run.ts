@@ -6,6 +6,7 @@
 // the script runs, the figure keeps Wobbl's own heatmap and the final numbers. Nothing here reads or
 // writes the URL. initLiveRuns returns a function that tears everything down when the page is left.
 import { Orbit, orbitControls } from './orbit.js';
+import { decoder, inWorker, offscreen, onPage, webgl, type Back } from './play-back';
 
 interface Ev { k: number; text: string }
 interface Poster { src: string; srcset: string; width: number; height: number; alt: string }
@@ -16,7 +17,6 @@ interface Data {
   meter: { lo: number; top: number; marks: { at: number; text: string }[] };
   panes: PaneData[];
 }
-interface Decoded { arrays: Record<string, any>; vertices: number }
 
 const LEAD = 0.6; // seconds the part sits unloaded, or at the start of the clock, before the run plays
 const NB = ' ';
@@ -39,51 +39,18 @@ function interp(xs: number[], ys: number[], x: number): number {
   return ys[lo] + ((ys[hi] - ys[lo]) * (x - xs[lo])) / (xs[hi] - xs[lo]);
 }
 
-/** WebGL that a graphics card draws, as the landing page's part asks for it; software WebGL counts as none. */
-function webgl(): boolean {
-  try {
-    const c = document.createElement('canvas');
-    const o = { failIfMajorPerformanceCaveat: true };
-    const ctx = (c.getContext('webgl2', o) || c.getContext('webgl', o)) as WebGLRenderingContext | null;
-    ctx?.getExtension('WEBGL_lose_context')?.loseContext();
-    return !!ctx;
-  } catch {
-    return false;
-  }
-}
-
-/** One decoding worker for the page, shared by every figure on it. */
-function decoder() {
-  let worker: Worker | null = null, id = 0;
-  const waiting = new Map<number, { ok: (d: Decoded) => void; fail: (e: Error) => void }>();
-  return {
-    decode(file: string, run: Record<string, any>): Promise<Decoded> {
-      if (!worker) {
-        worker = new Worker(new URL('./play-worker.js', import.meta.url), { type: 'module' });
-        worker.onmessage = (e) => {
-          const w = waiting.get(e.data.id);
-          waiting.delete(e.data.id);
-          if (e.data.error) w?.fail(new Error(e.data.error)); else w?.ok(e.data);
-        };
-        worker.onerror = (e) => { for (const w of waiting.values()) w.fail(new Error(e.message || 'the playback worker failed')); waiting.clear(); };
-      }
-      return new Promise((ok, fail) => { waiting.set(++id, { ok, fail }); worker!.postMessage({ id, file: new URL(file, document.baseURI).href, run }); });
-    },
-    dispose() { worker?.terminate(); worker = null; waiting.clear(); },
-  };
-}
-
 export function initLiveRuns(): () => void {
   const figs = [...document.querySelectorAll<HTMLElement>('figure[data-lrun]')];
   if (!figs.length) return () => {};
   const live = !matchMedia('(prefers-reduced-motion: reduce)').matches && 'DecompressionStream' in window && 'Worker' in window
     && 'IntersectionObserver' in window && 'ResizeObserver' in window && webgl();
   const dec = decoder();
-  const stops = figs.map((fig) => liveRun(fig, live, dec));
+  const worker = live && offscreen();
+  const stops = figs.map((fig) => liveRun(fig, live, worker, dec));
   return () => { for (const s of stops) s(); dec.dispose(); };
 }
 
-function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder>): () => void {
+function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnType<typeof decoder>): () => void {
   const data: Data = JSON.parse(fig.querySelector('[data-lrun-data]')!.textContent || '{}');
   const q = <T extends Element = HTMLElement>(s: string, r: ParentNode = fig) => r.querySelector<T>(s)!;
   const qa = <T extends Element = HTMLElement>(s: string, r: ParentNode = fig) => [...r.querySelectorAll<T>(s)];
@@ -191,13 +158,8 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
   }
 
   // ---- the 3D view ------------------------------------------------------------------------------
-  let stage: any = null, canvas: HTMLCanvasElement | null = null, orbit: Orbit | null = null;
-  const parts: any[] = [];
-  const meshes = new Map<number, Promise<Decoded>>();
-  const mesh = (pi: number) => {
-    if (!meshes.has(pi)) meshes.set(pi, dec.decode(data.panes[pi].file, data.panes[pi].run));
-    return meshes.get(pi)!;
-  };
+  // back draws the parts; ready once every shown part has come in
+  let back: Back | null = null, ready = false, canvas: HTMLCanvasElement | null = null, orbit: Orbit | null = null;
   let t = 0, playing = false, started = false, done = false, visible = false, last = 0, raf = 0, pending = 0;
   let w = 1, h = 1, px = 1;
   const duration = data.pace.seconds;
@@ -242,7 +204,7 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
 
   function draw() {
     pending = 0;
-    if (!stage || !orbit) return;
+    if (!ready || !back || !orbit) return;
     const k = u();
     const f: any = {
       camera: { position: orbit.eye, target: orbit.target, fov: orbit.fov, aspect: orbit.aspect },
@@ -260,10 +222,10 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
         f.k = k >= 1 ? 1 : interp(lead.warmup.t_s, lead.warmup.theta, simSeconds(k));
       }
     }
-    stage.frame(f);
+    back.frame(f);
     markers(k);
   }
-  const requestDraw = () => { if (!pending && stage) pending = requestAnimationFrame(draw); };
+  const requestDraw = () => { if (!pending && ready) pending = requestAnimationFrame(draw); };
 
   /** The ring on each part's peak (or the hottest point, where it is on the surface), moved with the bending. */
   function markers(k: number) {
@@ -297,7 +259,7 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
     raf = requestAnimationFrame(tick);
   }
   function play() {
-    if (playing || done || !stage) return;
+    if (playing || done || !ready) return;
     playing = true;
     last = 0;
     raf = requestAnimationFrame(tick);
@@ -326,12 +288,12 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
   }
   const canGo = () => visible && !document.hidden;
   function maybeStart() {
-    if (!stage || !canGo()) return;
+    if (!ready || !canGo()) return;
     if (!started) {
       started = true;
       canvas!.style.opacity = '';
       // the poster stays under the canvas while it fades in
-      setTimeout(() => { if (stage) view.dataset.state = 'live'; }, 320);
+      setTimeout(() => { if (ready) view.dataset.state = 'live'; }, 320);
       tag.hidden = false;
       status.textContent = '';
       restart();
@@ -342,15 +304,6 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
 
   async function build() {
     status.textContent = strength ? 'Loading the 3D part' : 'Loading the run';
-    const draw3d = import('./play-draw.js');
-    // the fix beside the part can change while the files come in, so wait for whichever is chosen
-    let ids: number[], decoded: Decoded[];
-    do {
-      ids = [...shown];
-      decoded = await Promise.all(ids.map(mesh));
-    } while (ids.some((v, i) => v !== shown[i]));
-    const { createStage } = await draw3d;
-    if (abort.signal.aborted) return;
     w = view.clientWidth || 1;
     h = view.clientHeight || 1;
     const coarse = matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 600;
@@ -363,9 +316,15 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
     canvas.style.opacity = '0';
     canvas.style.transition = 'opacity 0.3s ease';
     view.prepend(canvas);
-    stage = createStage({ canvas, w, h, px, kind: data.kind });
-    decoded.forEach((d, row) => { parts[row] = stage.add({ run: data.panes[shown[row]].run, arrays: d.arrays, top }); });
-    stage.compile();
+    back = worker ? inWorker(canvas, data.kind, w, h, px) : await onPage(canvas, data.kind, w, h, px, dec);
+    // the fix beside the part can change while the files come in, so wait for whichever is chosen
+    let ids: number[];
+    do {
+      ids = [...shown];
+      await Promise.all(ids.map((pi, row) => back!.add(row, data.panes[pi].file, data.panes[pi].run, top)));
+    } while (ids.some((v, i) => v !== shown[i]));
+    if (abort.signal.aborted) return;
+    ready = true;
     const target = [0, 1, 2].map((i) => (lo[i] + hi[i]) / 2);
     orbit = new Orbit({ target, az: 0, el: 0, dist: radius * 4, fov: 30, aspect: 1, near: radius / 50, far: radius * 40,
       minDist: radius * 1.1, maxDist: radius * 8 });
@@ -386,7 +345,7 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
       if (!nw || !nh || (nw === w && nh === h)) return;
       w = nw;
       h = nh;
-      stage.size(w, h, px);
+      back!.size(w, h, px);
       fitCamera();
       requestDraw();
     });
@@ -403,18 +362,14 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
         const pi = Number(b.dataset.fix);
         if (pi === shown[1]) return;
         for (const o of fixBtns) o.setAttribute('aria-pressed', String(o === b));
-        if (!stage) {
+        if (!ready) {
           showPane(1, pi);
           finalState();
           return;
         }
-        let d: Decoded;
-        try { d = await mesh(pi); } catch { return; }
+        try { await back!.add(1, data.panes[pi].file, data.panes[pi].run, top); } catch { return; }
         if (abort.signal.aborted || b.getAttribute('aria-pressed') !== 'true') return;
         showPane(1, pi);
-        stage.remove(parts[1]);
-        parts[1] = stage.add({ run: data.panes[pi].run, arrays: d.arrays, top });
-        stage.compile();
         restart();
       });
     }
@@ -423,20 +378,24 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
 
   on(replay, 'click', () => restart());
   on(document, 'visibilitychange', () => { if (document.hidden) pause(); else maybeStart(); });
+  // the part loads once the figure comes near the screen, and then when the browser has a moment
+  let idle = 0;
   const near = new IntersectionObserver((entries) => {
     if (!entries.some((e) => e.isIntersecting)) return;
     near.disconnect();
-    build().catch((err) => {
-      if (abort.signal.aborted) return;
-      console.error(err);
-      canvas?.remove();
-      stage?.dispose();
-      stage = null;
-      view.dataset.state = 'poster';
-      status.textContent = 'The 3D view did not load, so this is the heatmap Wobbl drew.';
-      finalState();
-    });
+    idle = 'requestIdleCallback' in window ? requestIdleCallback(go, { timeout: 1200 }) : window.setTimeout(go, 150);
   }, { rootMargin: '400px 0px' });
+  const go = () => build().catch((err) => {
+    if (abort.signal.aborted) return;
+    console.error(err);
+    canvas?.remove();
+    back?.dispose();
+    back = null;
+    ready = false;
+    view.dataset.state = 'poster';
+    status.textContent = 'The 3D view did not load, so this is the heatmap Wobbl drew.';
+    finalState();
+  });
   near.observe(fig);
   const seen = new IntersectionObserver(([e]) => {
     visible = e.intersectionRatio >= 0.4;
@@ -450,8 +409,10 @@ function liveRun(fig: HTMLElement, live: boolean, dec: ReturnType<typeof decoder
     seen.disconnect();
     pause();
     cancelAnimationFrame(pending);
-    stage?.dispose();
-    stage = null;
+    if ('cancelIdleCallback' in window) cancelIdleCallback(idle); else clearTimeout(idle);
+    back?.dispose();
+    back = null;
+    ready = false;
     canvas?.remove();
   };
 }
