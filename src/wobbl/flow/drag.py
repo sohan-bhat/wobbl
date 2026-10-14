@@ -146,4 +146,6 @@ def run_drag(st: DragStudy, out_dir: str | Path) -> GenericOutcome:
               "_figures": [["curve", "The published drag curve with this body marked"]]}
     o = GenericOutcome("flow", name, st.question, verdict, head, metrics, level, reasons, checks, assumptions, values,
                        imgs, fixes, solver="published drag curves", t_total=time.time() - t0)
+    if st.max_drag:
+        o.criteria = [{"name": "drag", "value": "drag_N", "limit": st.max_drag, "sense": "max"}]
     return o.write(out)

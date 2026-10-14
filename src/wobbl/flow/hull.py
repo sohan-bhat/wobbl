@@ -235,4 +235,6 @@ def run_hull(study: HullStudy, out_dir):
               "_figures": [["resistance", "Resistance against speed, with this speed marked"]]}
     o = GenericOutcome("flow", "hull", study.question, verdict, head, metrics, level, reasons, checks, assumptions,
                        values, imgs, fixes, solver="Holtrop and Mennen (1982)", t_total=time.time() - t0)
+    if study.power:
+        o.criteria = [{"name": "engine power", "value": "engine_power_W", "limit": study.power, "sense": "max"}]
     return o.write(out)

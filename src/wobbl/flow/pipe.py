@@ -211,6 +211,8 @@ def run_pipe(st: PipeStudy, out_dir: str | Path, progress=None) -> GenericOutcom
     o = GenericOutcome("flow", "pipe", st.question, verdict, head, metrics, level, reasons, checks, assumptions,
                        values, imgs, fixes, solver="Darcy Weisbach" + (" and OpenFOAM" if cfd_f else ""),
                        t_total=time.time() - t0)
+    if st.max_dp:
+        o.criteria = [{"name": "pressure drop", "value": "dp_Pa", "limit": st.max_dp, "sense": "max"}]
     return o.write(out)
 
 

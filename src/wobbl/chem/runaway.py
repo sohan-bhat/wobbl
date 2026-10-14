@@ -361,6 +361,7 @@ def run_runaway(cell: Cell, ambient: float, out_dir, question: str = "", source:
     o = GenericOutcome("battery", f"{cell.label} cell", question, verdict, head, metrics, level, reasons, checks,
                        assumptions, values, imgs, fixes, solver="Wobbl lumped Arrhenius kinetics (scipy LSODA)",
                        t_total=time.time() - t0)
+    o.criteria = [{"name": "runaway margin", "value": "margin_K", "limit": 0.0, "sense": "min"}]
     return o.write(out)
 
 

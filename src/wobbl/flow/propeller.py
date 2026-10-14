@@ -204,6 +204,10 @@ def run_prop(study: PropStudy, out_dir: str | Path) -> GenericOutcome:
     o = GenericOutcome("flow", prop.name, study.question, verdict, head, metrics, level, reasons, checks,
                        assumptions, values, imgs, fixes, solver="blade element momentum theory",
                        t_total=time.time() - t0)
+    if limit:
+        o.criteria.append({"name": "speed", "value": "rpm", "limit": float(limit), "sense": "max"})
+    if tw is not None and study.mass:
+        o.criteria.append({"name": "thrust to weight", "value": "thrust_to_weight", "limit": TW_LOW, "sense": "min"})
     return o.write(out)
 
 

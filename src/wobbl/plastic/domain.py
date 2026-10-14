@@ -13,7 +13,10 @@ def plastic(job):
                       job.number("target"), job.value("curve") or "auto", base.quality, job.question, base.scale,
                       base.body, base.params, job.flag("keep"))
     job.situate(supports=[f.text for f in base.fixtures], loads=[x.text for x in base.loads])
-    return run_plastic(st, job.out, job.log)
+    o = run_plastic(st, job.out, job.log)
+    if isinstance(o.values.get("collapse_factor"), (int, float)):
+        job.criterion("collapse", "collapse_factor", 1.0, "min")
+    return o
 
 
 register(Analysis(

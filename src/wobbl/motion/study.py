@@ -267,6 +267,13 @@ def run_motion(st: MotionStudy, out_dir: str | Path, progress=None) -> MotionOut
     o.events = events
     o.model = {"states": states, "effects": effects(st)}
     o.runtime_s = o.t_total = round(time.time() - t0, 3)
+    if st.rocket:
+        v = o.values
+        o.criteria = [c for c in (
+            {"name": "stability margin", "value": "margin_cal", "limit": st.stability_min, "sense": "min"},
+            {"name": "rail exit speed", "value": "rail_exit_speed_mps", "limit": st.rail_exit_min, "sense": "min"},
+            {"name": "landing speed", "value": "landing_speed_mps", "limit": st.landing_limit, "sense": "max"})
+            if isinstance(v.get(c["value"]), (int, float))]
     return o.write(out)
 
 
