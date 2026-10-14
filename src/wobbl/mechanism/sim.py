@@ -48,6 +48,7 @@ class Run:
     steps: int
     wall_s: float
     model_info: dict = field(default_factory=dict)
+    poses: dict = field(default_factory=dict)  # t, and every geom's position and quaternion, for playback
 
     def col(self, joint: str) -> int:
         return self.joints.index(joint)
@@ -121,7 +122,7 @@ def _names(model, kind) -> list[str]:
 
 
 def simulate(m: Mechanism, timestep: float | None = None, end: float | None = None, samples: int = 800,
-             frames: int = 9, ideal: bool = False) -> Run:
+             frames: int = 9, ideal: bool = False, poses: int = 150) -> Run:
     """Simulate ``m`` to ``end`` (default its move plus hold, or its duration). ``ideal`` drops every motor limit,
     which shows what a move needs."""
     mujoco = _mj()
@@ -203,6 +204,8 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
     fr = {jnames[i]: {"body": bnames[model.jnt_bodyid[i]], "tilt": np.zeros(nrec), "z": np.zeros(nrec),
                       "xy": np.zeros((nrec, 2)), "vel": np.zeros((nrec, 3))} for i in free}
     frame_at = set(np.linspace(0, steps, frames).round().astype(int).tolist()) if frames else set()
+    pose_at = set(np.linspace(0, steps, poses).round().astype(int).tolist()) if poses else set()
+    pose_t, pose_x, pose_m = [], [], []
     frame_list = []
     contacts: dict[str, dict] = {}
     gname = _names(model, "geom")
@@ -309,6 +312,10 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
                 pts[k][r] = d.geom_xpos[g]
         if step in frame_at:
             frame_list.append((t, d.geom_xpos.copy(), d.geom_xmat.copy()))
+        if step in pose_at:
+            pose_t.append(t)
+            pose_x.append(d.geom_xpos.copy())
+            pose_m.append(d.geom_xmat.copy())
         # contacts and constraints belong to the state at the start of this step
         pk = dp = fsum = 0.0
         fxy = [0.0, 0.0]
@@ -372,7 +379,7 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
                frame_list, dt, steps, time.time() - t_wall,
                {"nbody": model.nbody, "njnt": model.njnt, "nv": model.nv, "neq": model.neq, "warnings": warned,
                 "mass_kg": total_mass,
-                "geoms": _geom_table(model, gname)})
+                "geoms": _geom_table(model, gname)}, _quats(mujoco, pose_t, pose_x, pose_m))
 
 
 def _assemble(model, d, held: list[int], tol: float = 1e-9, max_steps: int = 20000):
@@ -397,6 +404,18 @@ def _assemble(model, d, held: list[int], tol: float = 1e-9, max_steps: int = 200
     d.time = 0.0
     d.qvel[:] = 0
     d.qacc[:] = 0
+
+
+def _quats(mujoco, t, xpos, xmat) -> dict:
+    """Recorded geom poses as positions and unit quaternions (w, x, y, z)."""
+    if not t:
+        return {}
+    mats = np.asarray(xmat)
+    quat = np.zeros(mats.shape[:2] + (4,))
+    for i in range(mats.shape[0]):
+        for g in range(mats.shape[1]):
+            mujoco.mju_mat2Quat(quat[i, g], mats[i, g])
+    return {"t": np.asarray(t), "pos": np.asarray(xpos), "quat": quat}
 
 
 def _geom_table(model, gname) -> list[dict]:

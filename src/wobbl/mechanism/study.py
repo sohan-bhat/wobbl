@@ -186,6 +186,86 @@ def write_trajectory(path: Path, run: Run, events: list[dict], slide: set | None
             w.writerow([row[0]] + [round(float(x), 5) + 0.0 for x in row[1:]])
 
 
+PLAYBACK_BYTES = 300_000
+
+
+def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome") -> int:
+    """playback.json, enough to animate the run truthfully: every geom as a primitive with its pose at up to 150
+    instants, and each joint's angle, torque, needed torque and motor limit at the same instants. Returns its
+    size in bytes, kept under PLAYBACK_BYTES by dropping every other instant if it has to."""
+    import json
+
+    P = run.poses
+    if not P:
+        return 0
+    t = P["t"]
+    keep = np.arange(len(t))
+    geoms = run.model_info["geoms"]
+    drives = {d.joint: d.at_joint for d in mech.drives if d.motor is not None}
+
+    def at(series):
+        return np.interp(t[keep], run.t, series)
+
+    def r(x, k):
+        return [round(float(v), k) + 0.0 for v in x]
+
+    while True:
+        bodies = []
+        for g, info in enumerate(geoms):
+            pos, quat = P["pos"][keep, g], P["quat"][keep, g]
+            fixed = bool(np.ptp(pos, axis=0).max() < 1e-7 and np.ptp(quat, axis=0).max() < 1e-7)
+            rgba = info["rgba"]
+            bodies.append({"name": info["name"], "shape": info["type"], "size": r(info["size"], 5),
+                           "color": "#" + "".join(f"{int(round(255 * c)):02x}" for c in rgba[:3]),
+                           "static": fixed,
+                           "pos": r(pos[0], 5) if fixed else [r(p, 5) for p in pos],
+                           "quat": r(quat[0], 4) if fixed else [r(q, 4) for q in quat]})
+        series = {}
+        for c, j in enumerate(run.joints):
+            s = {"angle": {"unit": "rad", "values": r(at(run.q[:, c]), 4)},
+                 "speed": {"unit": "rad/s", "values": r(at(run.v[:, c]), 4)},
+                 "torque": {"unit": "N m", "values": r(at(run.tau[:, c]), 4)}}
+            if j in drives:
+                need = at(run.tau_need[:, c])
+                w = at(run.v[:, c])
+                lim = [drives[j].limit(float(wi))[1 if ni >= 0 else 0] for wi, ni in zip(w, need)]
+                s["needed"] = {"unit": "N m", "values": r(need, 4)}
+                s["limit"] = {"unit": "N m", "values": r(lim, 4),
+                              "note": "the motor's torque at that speed, in the direction the joint needs it"}
+            series[j] = s
+        extra = {}
+        if any(not c["support"] for c in run.contacts.values()):
+            extra["contact force"] = {"unit": "N", "values": r(at(run.peak_force), 3)}
+        for f in run.free.values():
+            extra[f"{f['body']} tilt"] = {"unit": "deg", "values": r(at(f["tilt"]), 3)}
+        dur = float(t[-1] - t[0]) if len(t) > 1 else 0.0
+        doc = {
+            "manifest": {
+                "format": "wobbl-playback", "version": 1, "domain": "mechanism", "title": mech.name,
+                "question": o.question, "verdict": o.verdict, "headline": o.headline, "solver": o.solver,
+                "frames": int(len(keep)), "duration_s": round(dur, 6),
+                "suggested_seconds": round(min(max(dur, 2.0), 12.0), 3),
+                "units": {"length": "m", "time": "s", "angle": "rad", "torque": "N m", "force": "N"},
+                "axes": "z is up; quaternions are w, x, y, z and turn each shape from its own frame into the world",
+                "shapes": "sizes follow MuJoCo: sphere [radius], capsule and cylinder [radius, half length] along "
+                          "their own z axis, box [half x, half y, half z], plane [half x, half y] at z = pos",
+                "source": "recorded by the MuJoCo run itself at evenly spaced steps; series are interpolated "
+                          "from the run's samples at the same instants",
+            },
+            "t": r(t[keep], 6),
+            "bodies": bodies,
+            "joints": series,
+            "series": extra,
+            "events": o.events,
+        }
+        text = json.dumps(doc, separators=(",", ":"))
+        if len(text) <= PLAYBACK_BYTES or len(keep) < 20:
+            break
+        keep = keep[::2]
+    Path(path).write_text(text, encoding="utf-8")
+    return len(text)
+
+
 def load_target(target: str, params: dict) -> Mechanism:
     """A spec file, or an MJCF or URDF model run as it is (its own gravity and contacts, nothing driven)."""
     from . import quantities as Q
@@ -249,5 +329,8 @@ def run_mechanism(target: str, params: dict | None, out_dir: str | Path, questio
                          solver=f"MuJoCo {mj.__version__}")
     o.events = a.events
     o.model = a.model
+    if a.run is not None and a.run.poses:
+        o.values["playback"] = "playback.json"
+        write_playback(out / "playback.json", a.run, mech, o)
     o.runtime_s = o.t_total = round(time.time() - t0, 3)
     return o.write(out)

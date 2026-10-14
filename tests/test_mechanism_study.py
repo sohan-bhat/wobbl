@@ -65,6 +65,15 @@ def test_a_pendulum_writes_every_output_and_passes_its_checks(tmp_path):
     assert d["values"]["trajectory"] == "trajectory.csv" and d["images"]["swing"] == "images/swing.png"
     rows = _rows(tmp_path / "trajectory.csv")
     assert 100 < len(rows) <= 500 and set(rows[0]) >= {"t_s", "pivot_deg", "pivot_rpm", "pivot_Nm", "bob_z_m"}
+    pb = json.loads((tmp_path / "playback.json").read_text())
+    assert pb["manifest"]["format"] == "wobbl-playback" and pb["manifest"]["frames"] == len(pb["t"]) <= 150
+    bob = next(b for b in pb["bodies"] if b["name"] == "bob")
+    assert bob["shape"] == "sphere" and not bob["static"] and len(bob["pos"]) == len(pb["t"])
+    w, x, y, z = bob["quat"][0]
+    assert w * w + x * x + y * y + z * z == pytest.approx(1, abs=1e-3)
+    assert bob["pos"][0][2] == pytest.approx(-0.0, abs=1e-6)      # released level with the pivot at 90 degrees
+    assert len(pb["joints"]["pivot"]["angle"]["values"]) == len(pb["t"])
+    assert (tmp_path / "playback.json").stat().st_size < 300_000
     back = MechanismOutcome.load(tmp_path / "outcome.json")
     assert back.events == o.events and back.runtime_s > 0
     assert "Events" in (tmp_path / "report.html").read_text()
