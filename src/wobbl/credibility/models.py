@@ -133,7 +133,7 @@ class StrengthModel(Model):
             ld = loads[0]
             unit = {"pressure": "MPa", "moment": "N mm"}.get(ld["kind"], "N")
             self.load_nominal = float(ld["magnitude"])
-            self.known["load"] = Known(self.load_nominal, unit, "load", ld.get("text") or "the load")
+            self.known["load"] = Known(self.load_nominal, unit, "load", f"the {fmt(self.load_nominal)} {unit} load")
         else:
             self.load_nominal = 1.0
             what = "self weight" if loads and all(x.get("kind") == "gravity" for x in loads) else "every load"
