@@ -216,6 +216,117 @@ def solid_sample(prep, n_points: int = 4000) -> np.ndarray:
     return pts[inside(pts, sm.X, sm.tris[:, :3])][:n_points]
 
 
+# --------------------------------------------------------------------------------------------- calibration
+def calibration_path() -> Path:
+    from .solvers.locate import wobbl_home
+
+    return wobbl_home() / "calibration.json"
+
+
+def load_calibration() -> dict:
+    try:
+        return json.loads(calibration_path().read_text())
+    except (OSError, ValueError):
+        return {"runs": []}
+
+
+def factor(solver: str, what: str = "time") -> tuple[float, int]:
+    """This machine's measured over modeled ratio for a solver, from its most recent runs, and how many runs
+    it rests on. 1.0 with no runs."""
+    runs = [r for r in load_calibration().get("runs", []) if r.get("solver") == solver
+            and r.get(f"predicted_{what}") and r.get(f"measured_{what}")][-12:]
+    if not runs:
+        return 1.0, 0
+    ratios = [r[f"measured_{what}"] / r[f"predicted_{what}"] for r in runs]
+    return float(np.clip(math.exp(float(np.median(np.log(ratios)))), 0.1, 10.0)), len(runs)
+
+
+def record(solver: str, predicted_time: float, measured_time: float, predicted_memory: float = 0.0,
+           measured_memory: float = 0.0, size: dict | None = None, source: str = "job"):
+    """Add one measured run. Times are one core seconds, so runs on any thread count compare."""
+    cal = load_calibration()
+    cal.setdefault("runs", []).append({"solver": solver, "predicted_time": predicted_time,
+                                       "measured_time": measured_time, "predicted_memory": predicted_memory,
+                                       "measured_memory": measured_memory, "size": size or {},
+                                       "source": source, "when": time.time()})
+    cal["runs"] = cal["runs"][-200:]
+    p = calibration_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(cal, indent=1))
+    tmp.replace(p)
+
+
+def measured_run(argv: list[str], cwd: str | Path, env: dict | None = None,
+                 timeout: float = 3600.0) -> tuple[float, float, int]:
+    """Run a solver and return its wall seconds, its peak memory in bytes (0 where the platform cannot say) and
+    its exit code."""
+    import subprocess
+
+    t0 = time.time()
+    p = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if sys.platform == "win32":
+        code = p.wait(timeout=timeout)
+        return time.time() - t0, 0.0, code
+    _, status, ru = os.wait4(p.pid, 0)
+    p.returncode = os.waitstatus_to_exitcode(status)
+    rss = float(ru.ru_maxrss) * (1.0 if sys.platform == "darwin" else 1024.0)
+    return time.time() - t0, rss, p.returncode
+
+
+def calibrate(log=print, threads: int | None = None) -> dict:
+    """Solve three small parts with CalculiX here, a block and a plate on gmsh meshes, and record each run's
+    measured time and memory against the model. Takes about a minute on the reference machine."""
+    import tempfile
+
+    from .fe import NodeConstraint, StaticModel
+    from .geometry.cad import prepare
+    from .mesh.mesher import Sizing, build_mesh
+    from .solvers import base as solvers
+    from .solvers.calculix import write_static_inp
+    from .solvers.locate import tool_env
+    from .validation import geometry as G
+
+    ccx = solvers.get("calculix").require()
+    n_threads = threads or min(default_threads(), physical_cores())
+    env = tool_env(ccx, n_threads)
+    for k in ("OMP_NUM_THREADS", "CCX_NPROC_EQUATION_SOLVER", "CCX_NPROC_RESULTS", "CCX_NPROC_STIFFNESS"):
+        env[k] = str(n_threads)
+    runs = []
+    with tempfile.TemporaryDirectory() as tmp:
+        work = Path(tmp)
+        for shape, dims, h in (("block", (100, 40, 20), 6.0), ("plate", (200, 80, 5), 4.0),
+                               ("block", (100, 40, 20), 4.0)):
+            step = work / f"{shape}.step"
+            if not step.exists():
+                G.box(step, *dims)
+            mesh = build_mesh(prepare(step, work / f"prep_{shape}"), Sizing(h=h))
+            X = mesh.X
+            lo = np.nonzero(X[:, 0] < 1e-6)[0]
+            tip = np.nonzero(X[:, 0] > dims[0] - 1e-6)[0]
+            F = np.zeros((len(X), 3))
+            F[tip, 2] = -100.0 / len(tip)
+            write_static_inp(work / "cal.inp", StaticModel(mesh, 200000.0, 0.3, 7.85e-9, [NodeConstraint("lo", lo)],
+                                                          forces=F))
+            wall, rss, code = measured_run([str(ccx), "-i", "cal"], work, env)
+            if code != 0:
+                raise RuntimeError(f"CalculiX failed on the calibration {shape} (exit {code})")
+            cost = calculix_cost(len(X), len(mesh.tets), X)
+            core = wall * amdahl(n_threads, cost.parallel)
+            record("calculix", cost.core_seconds, core, cost.peak_bytes, rss,
+                   {"nodes": len(X), "threads": n_threads, "wall_s": round(wall, 2)}, "calibration")
+            runs.append({"shape": shape, "nodes": len(X), "wall_s": round(wall, 2),
+                         "predicted_s": round(cost.core_seconds / amdahl(n_threads, cost.parallel), 2),
+                         "memory_mb": round(rss / 1e6), "predicted_memory_mb": round(cost.peak_bytes / 1e6)})
+            log(f"{shape} with {len(X):,} nodes: {wall:.1f} s against {runs[-1]['predicted_s']:.1f} s modeled, "
+                f"{rss / 1e6:.0f} MB against {cost.peak_bytes / 1e6:.0f} MB")
+            for ext in (".frd", ".dat", ".sta", ".cvg", ".12d"):
+                (work / f"cal{ext}").unlink(missing_ok=True)
+    f, n = factor("calculix")
+    return {"threads": n_threads, "runs": runs, "time_factor": round(f, 3),
+            "memory_factor": round(factor("calculix", "memory")[0], 3), "calibrated_from": n}
+
+
 # --------------------------------------------------------------------------------------------- cost models
 @dataclass
 class Cost:
@@ -348,3 +459,197 @@ def deck_cost(deck) -> Cost:
         writes = int(deck.end_time / deck.output_interval) if deck.output_interval else 1
         return cfd_cost(deck.n_elements, iters, writes)
     raise ValueError(f"no cost model for {deck.solver}")
+
+
+# ------------------------------------------------------------------------------------------------- estimates
+def duration(s: float) -> str:
+    if s < 90:
+        return f"{s:.0f} s"
+    if s < 5400:
+        return f"{s / 60:.0f} min"
+    if s < 172800:
+        return f"{s / 3600:.1f} h"
+    return f"{s / 86400:.1f} days"
+
+
+def nbytes(b: float) -> str:
+    if b < 1e9:
+        return f"{b / 1e6:.0f} MB"
+    if b < 1e12:
+        return f"{b / 1e9:.1f} GB"
+    return f"{b / 1e12:.1f} TB"
+
+
+@dataclass
+class Estimate:
+    cost: Cost
+    machine: Machine
+    seconds: float                # wall clock on the machine
+    peak_bytes: float
+    disk_bytes: float
+    verdict: str                  # fits, long, too long, does not fit
+    problems: list[str] = field(default_factory=list)
+    options: list[dict] = field(default_factory=list)
+    basis: list[str] = field(default_factory=list)
+    target: str = ""
+
+    @property
+    def fits(self) -> bool:
+        return self.verdict != "does not fit"
+
+    def to_dict(self) -> dict:
+        return {"target": self.target, "solver": self.cost.solver, "procedure": self.cost.procedure,
+                "size": self.cost.size, "machine": self.machine.to_dict(), "time_s": round(self.seconds, 1),
+                "time": duration(self.seconds), "peak_memory_gb": round(self.peak_bytes / 1e9, 3),
+                "disk_gb": round(self.disk_bytes / 1e9, 3), "verdict": self.verdict, "fits": self.fits,
+                "problems": self.problems, "options": self.options, "basis": self.basis}
+
+    def headline(self) -> str:
+        m = self.machine
+        where = f"{m.threads} cores of {m.name}" if m.threads > 1 else f"one core of {m.name}"
+        return (f"About {duration(self.seconds)} on {where}, {nbytes(self.peak_bytes)} of memory at the peak and "
+                f"{nbytes(self.disk_bytes)} on disk.")
+
+
+def predict(cost: Cost, machine: Machine | None = None, max_hours: float | None = None, target: str = "",
+            advise_options: bool = True) -> Estimate:
+    """Put a cost on a machine: wall time on its threads with this machine's calibration, and whether it fits."""
+    m = machine or this_machine()
+    basis = list(cost.basis)
+    tf = mf = 1.0
+    if m.name == "this machine":
+        tf, nt = factor(cost.solver, "time")
+        mf, _ = factor(cost.solver, "memory")
+        basis.append(f"Calibrated on this machine from {nt} measured run{'s' if nt != 1 else ''}." if nt else
+                     "Not calibrated on this machine yet, so the reference machine's speed is used. "
+                     "Run wobbl estimate --calibrate to measure it.")
+    seconds = cost.core_seconds * tf * m.speed / amdahl(m.threads, cost.parallel)
+    mem, disk = cost.peak_bytes * mf, cost.disk_bytes
+    problems = []
+    if mem > 0.85 * m.ram:
+        problems.append(f"It needs about {nbytes(mem)} of memory and {m.name} has {nbytes(m.ram)}.")
+    if disk > m.disk_free - DISK_RESERVE:
+        problems.append(f"It writes about {nbytes(disk)} and {m.name} has {nbytes(m.disk_free)} free, which must "
+                        f"keep {nbytes(DISK_RESERVE)} spare.")
+    limit = (max_hours or 24.0) * 3600.0
+    if problems:
+        verdict = "does not fit"
+    elif seconds > limit:
+        verdict = "too long"
+        problems.append(f"It would take about {duration(seconds)}, past the {duration(limit)} limit.")
+    else:
+        verdict = "long" if seconds > LONG_JOB else "fits"
+    est = Estimate(cost, m, seconds, mem, disk, verdict, problems, [], basis, target)
+    if advise_options:
+        est.options = advise(est, max_hours)
+    return est
+
+
+def coarser(cost: Cost, f: float) -> Cost:
+    """The same CalculiX run with elements ``f`` times larger: nodes fall as f cubed and each cut as f squared."""
+    sz = cost.size
+    n = max(8, int(sz["nodes"] / f ** 3))
+    F, M = cost.sums
+    solves = sz.get("solves", 1.0)
+    c = calculix_cost(n, int(sz["elements"] / f ** 3), sums=(F / f ** 6, M / f ** 4), dof=max(1, sz["dof"] // sz["nodes"]),
+                      solves=solves, outputs=sz.get("result_sets", 1), procedure=cost.procedure)
+    c.basis = cost.basis
+    return c
+
+
+def advise(est: Estimate, max_hours: float | None = None) -> list[dict]:
+    """What to do about a run that is long, too long or does not fit: a background job, a coarser first pass, a
+    submodel, a remote machine the user owns or a cloud machine, each with its own predicted cost."""
+    c, m = est.cost, est.machine
+    target = est.target or "DECK"
+    limit = (max_hours or 24.0) * 3600.0
+    opts = []
+    if est.verdict in ("long", "too long") and not any("memory" in p or "free" in p for p in est.problems):
+        opts.append({"kind": "background", "command": f"wobbl jobs start {target}",
+                     "summary": f"Run it in the background with wobbl jobs start {target}, which keeps going after "
+                                "the terminal closes, shows progress and an ETA, and resumes from its last "
+                                "checkpoint."})
+    if est.verdict not in ("too long", "does not fit"):
+        return opts
+    if c.solver == "calculix" and c.sums:
+        for f in (1.15, 1.3, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0):
+            e = predict(coarser(c, f), m, max_hours, advise_options=False)
+            if e.fits and e.seconds <= min(limit, 7200.0) and e.peak_bytes <= 0.6 * m.ram:
+                opts.append({"kind": "coarser", "element_factor": f, "nodes": e.cost.size["nodes"],
+                             "time_s": round(e.seconds), "peak_memory_gb": round(e.peak_bytes / 1e9, 2),
+                             "summary": f"A first pass with elements about {f:g} times larger, about "
+                                        f"{e.cost.size['nodes']:,} nodes, takes {duration(e.seconds)} and needs "
+                                        f"{nbytes(e.peak_bytes)}."})
+                break
+        if "static" in c.procedure:
+            loc = predict(calculix_cost(50000, sums=compact_sums(50000)), m, advise_options=False)
+            opts.append({"kind": "submodel", "time_s": round(loc.seconds),
+                         "summary": "Then refine only around the peak. wobbl submodel takes the coarse result and "
+                                    "drives a fine local model from its displacements, and a local model of 50,000 "
+                                    f"nodes takes about {duration(loc.seconds)} here."})
+    elif c.solver == "openradioss":
+        half = predict(Cost(c.solver, c.procedure, c.core_seconds / 2, c.parallel, c.peak_bytes, c.disk_bytes,
+                            c.size, c.basis), m, max_hours, advise_options=False)
+        opts.append({"kind": "coarser", "time_s": round(half.seconds),
+                     "summary": f"Mass scaling to a time step twice as long halves the run to about "
+                                f"{duration(half.seconds)}. Check that the added mass stays a small share of the "
+                                "model's."})
+    from .jobs.remote import machines as remote_machines
+
+    remotes = remote_machines()
+    for name, rm in remotes.items():
+        e = predict(c, rm, max_hours, advise_options=False)
+        opts.append({"kind": "remote", "name": name, "time_s": round(e.seconds), "fits": e.fits,
+                     "command": f"wobbl jobs start {target} --on {name}",
+                     "summary": f"On {name} ({rm.cores} cores, {nbytes(rm.ram)}) it takes about "
+                                f"{duration(e.seconds)}" + ("" if e.fits else " but does not fit there either") +
+                                f". Run it there with wobbl jobs start {target} --on {name}."})
+    if not remotes:
+        opts.append({"kind": "remote", "command": "wobbl remote add NAME user@host",
+                     "summary": "Add a workstation or server you own with wobbl remote add NAME user@host, and "
+                                "Wobbl runs the job there over SSH, sending only the input and bringing back only "
+                                "the results."})
+    from .jobs.cloud import cheapest
+
+    best = cheapest(c, limit)
+    if best:
+        opts.append({"kind": "cloud", **best,
+                     "summary": f"On an AWS {best['instance']} ({best['cores']} cores, {best['ram_gb']:g} GB) it "
+                                f"takes about {duration(best['time_s'])} for about ${best['cost_usd']:.2f} at on "
+                                f"demand prices. wobbl jobs start {target} --cloud aws --instance "
+                                f"{best['instance']} shows the full plan and starts nothing until you confirm it."})
+    return opts
+
+
+# ------------------------------------------------------------------------------------------------ entry points
+def estimate_deck(path: str | Path, machine: Machine | None = None, max_hours: float | None = None) -> Estimate:
+    """Read a deck or an OpenFOAM case without loading it and predict its run."""
+    from .decks import read_deck
+
+    deck = read_deck(path)
+    est = predict(deck_cost(deck), machine or this_machine(Path(path).resolve().parent), max_hours, str(path))
+    est.basis += deck.notes
+    return est
+
+
+def estimate_size(solver: str, nodes: int = 0, elements: int = 0, end_time: float = 0.0, time_step: float = 0.0,
+                  iterations: int = 0, procedure: str = "static", solves: float = 1.0,
+                  machine: Machine | None = None, max_hours: float | None = None, target: str = "") -> Estimate:
+    """Predict a run from its size alone, for a model that is not on this machine."""
+    s = solver.lower()
+    if s in ("calculix", "ccx"):
+        heat = procedure.startswith("heat")
+        cost = calculix_cost(nodes or int(elements * 1.9), elements, dof=1 if heat else 3, solves=solves,
+                             procedure=procedure)
+    elif s in ("openradioss", "radioss", "explicit"):
+        if not end_time:
+            raise ValueError("an explicit run needs its end time, for example --end-time 0.2")
+        cost = explicit_cost(elements or nodes, nodes, end_time, time_step)
+    elif s in ("openfoam", "cfd"):
+        cost = cfd_cost(elements or nodes, iterations or 1000)
+    elif s in ("ngspice", "spice", "circuit"):
+        cost = spice_cost(iterations or 10000, nodes or 10)
+    else:
+        raise ValueError(f"no cost model for '{solver}'. Use calculix, openradioss, openfoam or ngspice")
+    return predict(cost, machine, max_hours, target)
+
