@@ -68,9 +68,9 @@ class OpenFOAM(SolverAdapter):
         return env
 
     def run(self, app: str, case: str | Path, args: tuple[str, ...] = (), timeout: float = 1800,
-            log_name: str = "") -> str:
+            log_name: str = "", check: bool = True) -> str:
         """Run one OpenFOAM program on a case and return its log. A non zero exit or a FOAM FATAL ERROR raises,
-        quoting the error."""
+        quoting the error, unless check is False (checkMesh exits non zero when the grid fails a check)."""
         exe = bin_dir(self.root()) / app if self.root() else None
         if exe is None or not exe.exists():
             self.require()
@@ -86,7 +86,7 @@ class OpenFOAM(SolverAdapter):
                 raise SolverError(f"{app} did not finish within {timeout:.0f} s",
                                   "Use a coarser grid or a shorter run") from None
         log = log_path.read_text(errors="replace")
-        if p.returncode != 0 or "FOAM FATAL" in log:
+        if check and (p.returncode != 0 or "FOAM FATAL" in log):
             m = re.search(r"--> FOAM FATAL.*?(?=\n\n|\Z)", log, re.S)
             msg = " ".join((m.group(0) if m else log[-600:]).split())[:500]
             raise SolverError(f"{app} failed: {msg}", log=log[-4000:])

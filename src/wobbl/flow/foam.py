@@ -75,9 +75,11 @@ class Turbulence:
 @dataclass
 class Patch:
     name: str
-    kind: str                # inlet, outlet, wall, symmetry, empty, freestream, cyclic, wedge
+    kind: str                # inlet, outlet, wall, slip, symmetry, empty, freestream, cyclic, wedge
     faces: list[tuple[int, ...]] = field(default_factory=list)
     neighbour: str = ""
+    flow: float = 0.0        # an inlet with a volumetric flow rate, m3/s, instead of a fixed velocity
+    scalar: float | None = None   # this patch's value of the carried temperature, else the default for its kind
 
 
 class Case:
@@ -95,9 +97,9 @@ class Case:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(HEADER.format(cls=cls, obj=obj) + (entries(body) if isinstance(body, dict) else body))
 
-    def run(self, app: str, *args: str, timeout: float = 1800, log_name: str = "") -> str:
+    def run(self, app: str, *args: str, timeout: float = 1800, log_name: str = "", check: bool = True) -> str:
         from ..solvers.base import get
-        return get("openfoam").run(app, self.root, args, timeout, log_name)
+        return get("openfoam").run(app, self.root, args, timeout, log_name, check)
 
     def clean(self):
         shutil.rmtree(self.root, ignore_errors=True)
@@ -122,8 +124,8 @@ def block_mesh(case: Case, vertices, blocks: list[str], patches: list[Patch], ed
     vs = "\n".join(f"    ({val(x)} {val(y)} {val(z)})" for x, y, z in vertices)
     bounds = []
     for p in patches:
-        kind = {"inlet": "patch", "outlet": "patch", "freestream": "patch", "symmetry": "symmetryPlane"}.get(p.kind,
-                                                                                                           p.kind)
+        kind = {"inlet": "patch", "outlet": "patch", "freestream": "patch", "slip": "patch",
+                "symmetry": "symmetryPlane"}.get(p.kind, p.kind)
         extra = f"\n        neighbourPatch {p.neighbour};" if p.kind == "cyclic" else ""
         faces = "\n".join(f"            ({' '.join(map(str, f))})" for f in p.faces)
         bounds.append(f"    {p.name}\n    {{\n        type {kind};{extra}\n        faces\n        (\n{faces}\n"
@@ -229,18 +231,26 @@ def write_fields(case: Case, u: tuple[float, float, float], turb: Turbulence, sc
     U, P, K, W, NUT, NT, T = {}, {}, {}, {}, {}, {}, {}
     for p in pats:
         n = p.name
+        default = (scalar or {}).get("wall" if p.kind == "wall" else "inlet", 1.0 if p.kind == "wall" else 0.0)
+        sc = default if p.scalar is None else p.scalar
         if p.kind in ("empty", "wedge", "cyclic", "symmetry"):
             t = {"empty": "empty", "wedge": "wedge", "cyclic": "cyclic", "symmetry": "symmetryPlane"}[p.kind]
             for f in (U, P, K, W, NUT, NT, T):
                 f[n] = {"type": t}
+        elif p.kind == "slip":
+            U[n] = {"type": "slip"}
+            for f in (P, K, W, NT, T):
+                f[n] = {"type": "zeroGradient"}
+            NUT[n] = {"type": "calculated", "value": uniform(0)}
         elif p.kind == "inlet":
-            U[n] = {"type": "fixedValue", "value": uniform(u)}
+            U[n] = ({"type": "flowRateInletVelocity", "volumetricFlowRate": p.flow, "extrapolateProfile": "no",
+                     "value": uniform((0, 0, 0))} if p.flow else {"type": "fixedValue", "value": uniform(u)})
             P[n] = {"type": "zeroGradient"}
             K[n] = {"type": "fixedValue", "value": uniform(turb.k)}
             W[n] = {"type": "fixedValue", "value": uniform(turb.omega)}
             NT[n] = {"type": "fixedValue", "value": uniform(turb.nu_tilda)}
             NUT[n] = {"type": "calculated", "value": uniform(0)}
-            T[n] = {"type": "fixedValue", "value": uniform((scalar or {}).get("inlet", 0.0))}
+            T[n] = {"type": "fixedValue", "value": uniform(sc)}
         elif p.kind == "outlet":
             U[n] = {"type": "inletOutlet", "inletValue": uniform((0, 0, 0)), "value": uniform(u)}
             P[n] = {"type": "fixedValue", "value": uniform(p_outlet)}
@@ -263,7 +273,7 @@ def write_fields(case: Case, u: tuple[float, float, float], turb: Turbulence, sc
                       "value": uniform(0)}
             if turb.model == "des":
                 NUT[n] = {"type": "nutUSpaldingWallFunction", "value": uniform(0)}
-            T[n] = {"type": "fixedValue", "value": uniform((scalar or {}).get("wall", 1.0))}
+            T[n] = {"type": "fixedValue", "value": uniform(sc)}
     inside = uniform(u) if u_cells is None else (f"nonuniform List<vector> {len(u_cells)}\n(\n" + "\n".join(
         f"({x:.6g} {y:.6g} {z:.6g})" for x, y, z in u_cells) + "\n)")
     case.write("0/U", "U", f"dimensions [0 1 -1 0 0 0 0];\n\ninternalField {inside};\n\nboundaryField\n{{\n"
