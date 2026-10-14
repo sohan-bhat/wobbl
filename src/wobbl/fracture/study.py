@@ -102,7 +102,9 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None, quick: b
     small = _small_crack(x_prof, sig_prof, s[0], k[0])
     solved = len(s)
     end_fails = res_path.end_fails
-    if res_path.stuck:
+    if res_path.stuck or res_path.dormant:
+        # past the last crack K follows the square root of size: a part whose crack is below threshold there
+        # never fails, and one with a bigger flaw or load grows on this estimate
         s, k, area = _extrapolate(s, k, area, res_path, first, part)
         end_fails = True
     elif len(s) == 1:   # one crack and nothing after it: give the table a second point so it can be read
@@ -130,7 +132,8 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None, quick: b
                ("B1", f"{_counts(p['B1'])} cycles")]
     if st.target_life:
         metrics.append(("fail before target", _pct(mc.pof)))
-    metrics.append(("inspect every", f"{_counts(insp['repeat'])} cycles"))
+    if np.isfinite(insp["repeat"]):
+        metrics.append(("inspect every", f"{_counts(insp['repeat'])} cycles"))
     values = {"nominal_cycles": mc.nominal, "percentiles": p, "b1_band": list(mc.b1_band), "pof": mc.pof,
               "pof_band": list(mc.pof_band), "inspection": insp, "path_end": res_path.end, "origin": first.origin,
               "normal": first.normal, "where": first.where, "crack": spec.describe(), "crack_reason": spec.reason,
@@ -238,7 +241,15 @@ def _checks(st, res_path, first, cpath, inp, mc, unc, x_prof, sig_prof, material
     ran = mc.ran_out
     path_note = (f"{len(res_path.steps)} solved cracks from {fmt(s[0])} to {fmt(s[cpath.solved - 1])} mm, ended by "
                  f"{res_path.end}")
-    if res_path.stuck:
+    if res_path.dormant:
+        grows = float(np.isfinite(mc.lives).mean())
+        status = "pass" if grows <= 0.01 else "warn"
+        checks.append(Check("crack path", status,
+                            path_note + f". The starting crack is below the growth threshold at these loads, so it "
+                            f"does not grow in a typical part. {_pct(grows)} of the parts sampled, those with "
+                            "larger flaws or loads, grow past it, on K carried on as the square root of size",
+                            {"growing_share": grows}))
+    elif res_path.stuck:
         n_solved = float(lives(cpath, inp, a0, 1.0, 1.0, inp.law.kc, n_grid=400)[0][0])
         to_last = _life_to(cpath, inp, a0, float(s[cpath.solved - 1]))
         share = 1.0 - to_last / n_solved if np.isfinite(n_solved) and n_solved > 0 else 1.0
@@ -381,6 +392,8 @@ def _fixes(st, cpath, inp, scatter, mc, law, material, insp, spectrum) -> list[d
                                      f"cycles against {_counts(base)} now. Its stiffness does not change K under the "
                                      "same loads, but check its strength and weight with a strength study.",
                           "auto": False, "material": key})
+    if not np.isfinite(insp["repeat"]):
+        return fixes
     fixes.append({"kind": "inspection", "title": f"Inspect every {_counts(insp['repeat'])} cycles",
                   "summary": f"Damage tolerance practice: the first inspection at half the nominal life from the "
                              f"starting crack ({_counts(insp['first'])} cycles), then every half of the life from a "

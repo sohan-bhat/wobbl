@@ -158,6 +158,7 @@ class PathResult:
     notes: list[str] = field(default_factory=list)
     end_fails: bool = False       # the crack has cut through, so reaching the end of the path is failure
     stuck: bool = False           # a step could not be meshed or solved, so the path stops short of failure
+    dormant: bool = False         # every front point is below the growth threshold, so the crack stopped
 
 
 def front_size(size: float, crack: Crack, h: float, wall: float, quality: str) -> float:
@@ -187,7 +188,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
     size = crack.size
     E, nu = material.E, material.nu
     end = f"the step limit ({max_steps})"
-    end_fails = stuck = False
+    end_fails = stuck = dormant = False
     for j in range(max_steps + 1):
         t0 = time.time()
         hf = front_size(size, crack, h, wall, quality)
@@ -253,6 +254,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
             end = "the crack stopping below threshold"
             notes.append("Every front point is below the growth threshold at this load, so the crack stops "
                          "growing.")
+            dormant = True
             break
         if part is not None and any(_leaves(part, sampled[i]["xyz"], m[0], m[1]) for i, m in moved.items()):
             # the next front would leave the part: the crack has reached the far side of the wall it runs through
@@ -276,7 +278,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
         size += da_max
         if not keep:
             shutil.rmtree(workdir / f"step{j}", ignore_errors=True)
-    return PathResult(steps, crack, end, first, convergence, balance, notes, end_fails, stuck)
+    return PathResult(steps, crack, end, first, convergence, balance, notes, end_fails, stuck, dormant)
 
 
 def _leaves(part, old: np.ndarray, new: np.ndarray, da: np.ndarray) -> bool:

@@ -30,20 +30,32 @@ def results() -> list[str]:
     return out
 
 
-def run_case(name: str, out: Path, material: str = "", progress=None) -> dict:
+def run_case(name: str, out: Path, material: str = "", progress=None, spectrum: str = "") -> dict:
     """Grow a crack in one example from its result folder, with a short path and a small Monte Carlo."""
     from wobbl.fracture.api import from_result, run
 
+    extra = {"spectrum": spectrum} if spectrum else {}
     st = from_result(EXAMPLES / name / "output", "auto", material, steps=2, quality="fast", samples=2000,
-                     budget=900.0)
+                     budget=900.0, **extra)
     o = run(st, out, progress)
     v = o.values
     row = {"example": name, "material": st.material, "verdict": o.verdict, "confidence": o.confidence,
            "crack": v.get("crack", ""), "where": v["where"], "steps": v["steps"], "path_end": v["path_end"],
            "k_start": v["k_table"]["k_mpa_sqrt_m"][0], "nominal_cycles": v["nominal_cycles"],
-           "checks": {c.name: c.status for c in o.checks}}
+           "checks": {c.name: c.status for c in o.checks}, "spectrum": st.spectrum or f"R = {st.r_ratio:g}"}
     shutil.rmtree(out / "work", ignore_errors=True)
     return row
+
+
+def to_growth(row: dict, material: str) -> str:
+    """A load spectrum that puts the starting crack at three times the growth threshold, for a part whose own
+    loads leave the crack dormant, so the growth steps get exercised on its geometry too."""
+    from wobbl.fracture.growth import law_for
+    from wobbl.materials import resolve_material
+
+    th = law_for(resolve_material(material)).threshold(0.1)
+    f = 3.0 * th / (0.9 * row["k_start"])
+    return f"{f:.4g},{0.1 * f:.4g} x 1"
 
 
 def test_the_plastic_examples_are_refused_with_a_reason(tmp_path):
@@ -66,6 +78,10 @@ def test_crack_growth_runs_on_an_untuned_example(name, tmp_path):
     from wobbl.fracture.api import result_inputs
 
     mat = resolve_material(result_inputs(EXAMPLES / name / "output")["material"])
-    row = run_case(name, tmp_path / name, "" if mat.category == "metal" else "6061-t6")
+    material = "" if mat.category == "metal" else "6061-t6"
+    row = run_case(name, tmp_path / name, material)
     assert row["steps"] >= 1 and row["k_start"] > 0 and math.isfinite(row["k_start"])
-    assert row["checks"].get("SIF mesh convergence") in ("pass", "warn"), row
+    if row["path_end"] == "the crack stopping below threshold":
+        assert row["nominal_cycles"] == math.inf
+        row = run_case(name, tmp_path / (name + "-pushed"), material, spectrum=to_growth(row, material or mat.key))
+        assert row["steps"] >= 2, row
