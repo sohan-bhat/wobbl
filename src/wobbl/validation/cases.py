@@ -364,6 +364,119 @@ def chute_descent(out: Path):
     return float(-fl.end.y[3]), math.sqrt(2 * 5.0 * G0 / (1.225 * chute.drag_area)), info
 
 
+# --- uncertainty and calibration ----------------------------------------------------
+# The cantilever of cantilever-tip with a lognormal load (10%) and a lognormal modulus (5%). Tip deflection is
+# F L^3 / (3 E I) + F L / (k G A), both terms F over E, so it is lognormal too and its mean and spread are exact.
+_UQ_RUNS: dict[str, tuple] = {}
+
+
+def _uq_cantilever(out: Path):
+    from ..credibility.uncertainty import run_uncertainty
+
+    key = str(out.parent)
+    if key not in _UQ_RUNS:
+        L, b, h, F = 200.0, 20.0, 10.0, 100.0
+        part = G.box(out / "bar.step", L, b, h)
+        o, _ = _strength(part, STEEL, [f"{F} N -z @ x=max"], ["x=min"], out / "run")
+        r = run_uncertainty(out / "run", ["load lognormal 10%", "E lognormal 5%"], samples=200000, numerical=False)
+        Gm = E_STEEL / (2 * (1 + NU))
+        tip = F * L ** 3 / (3 * E_STEEL * b * h ** 3 / 12) + F * L / (5 / 6 * Gm * b * h)
+        mean = tip * (1 + 0.05 ** 2)      # E[1/E] = (1 + cov^2) / mean for a lognormal modulus
+        sd = mean * math.sqrt((1 + 0.1 ** 2) * (1 + 0.05 ** 2) - 1)
+        _UQ_RUNS[key] = (r["outputs"]["max_deflection_mm"], mean, sd, _info(o), out / "run")
+    return _UQ_RUNS[key]
+
+
+def uq_cantilever_mean(out: Path):
+    s, mean, sd, info, _ = _uq_cantilever(out)
+    return s["mean"], mean, {**info, "sd_mm": round(s["sd"], 6), "closed_form_sd_mm": round(sd, 6)}
+
+
+def uq_cantilever_sd(out: Path):
+    s, mean, sd, info, _ = _uq_cantilever(out)
+    return s["sd"], sd, {**info, "mean_mm": round(s["mean"], 6), "closed_form_mean_mm": round(mean, 6)}
+
+
+def sobol_ishigami(out: Path):
+    """Sobol indices of the Ishigami function, inputs uniform on [-pi, pi], against the analytic values. The number
+    returned is whichever of the five nonzero indices lands farthest from its value, relatively."""
+    from ..credibility import uq
+
+    ins = [uq.Input(f"x{i + 1}", "uniform", 0.0, 2 * math.pi / math.sqrt(12), -math.pi, math.pi) for i in range(3)]
+    got = {r["input"]: r for r in uq.sobol_indices(uq.ishigami, ins, n=2 ** 14, boot=50)}
+    rows = []
+    for name, (s1, st) in uq.ishigami_indices().items():
+        rows += [(f"first order {name}", got[name]["first_order"], s1), (f"total {name}", got[name]["total"], st)]
+    worst = max((r for r in rows if r[2] > 0), key=lambda r: abs(r[1] - r[2]) / r[2])
+    info = {r[0]: round(r[1], 5) for r in rows}
+    info["worst"] = worst[0]
+    info["first_order_x3_abs_error"] = round(abs(got["x3"]["first_order"]), 5)
+    if abs(got["x3"]["first_order"]) > 0.01:
+        raise ValueError(f"first order index of x3 is {got['x3']['first_order']:.4f}, analytic 0")
+    return worst[1], worst[2], info
+
+
+def calibration_twin(out: Path):
+    """A twin experiment on the cantilever: strain gauge and dial gauge readings made from Wobbl's own solution at
+    E = 194 GPa, with 5 microstrain and 0.005 mm of noise, then calibrated from a prior of 200 GPa +- 5% through
+    'wobbl validate-against'. The case fails if the true modulus is outside the stated 95% interval."""
+    from ..credibility.against import run_validation
+    from ..credibility.probes import gauge, load_fields, surface
+
+    run = _uq_cantilever(out)[4]
+    f = load_fields(run)
+    surf = surface(f)
+    true = 194000.0
+    rng = np.random.default_rng(2026)
+    rows = ["# synthetic twin experiment for the calibration case, not a real test",
+            "name,quantity,x,y,z,direction,load,value,uncertainty,unit"]
+    for name, x in (("SG1", 40.0), ("SG2", 100.0), ("SG3", 160.0)):
+        g = gauge(f, (x, 10.0, 10.0), E_STEEL, NU, (1, 0, 0), surf=surf)
+        for load in (50.0, 100.0):
+            eps = g["strain"] * load / 100.0 * E_STEEL / true * 1e6
+            rows.append(f"{name},strain,{x},10,10,x,{load},{eps + 5.0 * rng.standard_normal():.4f},5,microstrain")
+    i = _near(f["X"], (200.0, 10.0, 0.0))
+    for load in (50.0, 100.0):
+        w = -f["U"][i, 2] * load / 100.0 * E_STEEL / true
+        rows.append(f"D1,displacement,200,10,0,-z,{load},{w + 0.005 * rng.standard_normal():.5f},0.005,mm")
+    csv = out / "readings.csv"
+    csv.write_text("\n".join(rows) + "\n")
+    r = run_validation(run, csv, ["E 5%"])
+    c = r["calibration"]["inputs"][0]
+    if not c["ci95"][0] <= true <= c["ci95"][1]:
+        raise ValueError(f"true modulus {true:g} MPa is outside the stated 95% interval {c['ci95']}")
+    return c["mean"], true, {"posterior_sd_MPa": round(c["sd"], 1), "ci95_MPa": [round(v, 1) for v in c["ci95"]],
+                             "narrowed": round(c["narrowed"], 2), "readings": len(rows) - 2}
+
+
+def calibration_cooling(out: Path):
+    """Two parameters at once: the film coefficient and the air temperature of a 20 mm aluminum cube cooling from
+    100 C, T = Ta + (T0 - Ta) exp(-h A t / (rho c V)), recovered from twelve readings with 0.3 C of noise. The case
+    fails if either true value is outside its stated 95% interval."""
+    from ..credibility import uq
+    from ..credibility.calibrate import calibrate
+    from ..materials import get_material
+
+    m = get_material("6061-t6")
+    a = 0.02
+    k = 6 * a * a / (m.density * m.specific_heat * a ** 3)        # h A / (rho c V) per unit h, 1/s
+    t = np.linspace(60.0, 1800.0, 12)
+
+    def model(X):
+        return X[:, 1:2] + (100.0 - X[:, 1:2]) * np.exp(-np.outer(X[:, 0], t) * k)
+    true = np.array([[12.0, 22.0]])
+    data = model(true)[0] + 0.3 * np.random.default_rng(7).standard_normal(len(t))
+    prior = [uq.Input("h", "lognormal", 10.0, 3.0, unit="W/m2K"), uq.Input("ambient", "normal", 25.0, 3.0, unit="C")]
+    r = calibrate(model, prior, data, np.full(len(t), 0.3))
+    h, ta = r["inputs"]
+    for c, v in ((h, 12.0), (ta, 22.0)):
+        if not c["ci95"][0] <= v <= c["ci95"][1]:
+            raise ValueError(f"true {c['input']} {v:g} is outside the stated 95% interval {c['ci95']}")
+    return h["mean"], 12.0, {"h_ci95": [round(x, 3) for x in h["ci95"]], "ambient_mean_C": round(ta["mean"], 3),
+                             "ambient_ci95_C": [round(x, 3) for x in ta["ci95"]],
+                             "acceptance": round(r["acceptance"], 3)}
+
+
 CASES = [
     Case("cantilever-tip", "Cantilever tip deflection", "strength", "Timoshenko beam theory", "tip deflection",
          "mm", 0.03, True, cantilever_tip),
@@ -417,6 +530,20 @@ CASES = [
          "ve tb - ve (m1 / mdot) ln(m0 / m1) - g tb^2 / 2", "burnout altitude", "m", 0.001, True, rocket_height),
     Case("chute-descent", "Payload under a 2 m parachute", "motion", "v = sqrt(2 m g / (rho Cd A))",
          "descent rate at the ground", "m/s", 0.001, True, chute_descent),
+    Case("uq-cantilever-mean", "Cantilever with load and stiffness scatter, mean deflection", "uncertainty",
+         "lognormal propagation of Timoshenko beam theory", "mean tip deflection", "mm", 0.03, True,
+         uq_cantilever_mean),
+    Case("uq-cantilever-sd", "Cantilever with load and stiffness scatter, spread of deflection", "uncertainty",
+         "lognormal propagation of Timoshenko beam theory", "standard deviation of tip deflection", "mm", 0.03, True,
+         uq_cantilever_sd),
+    Case("sobol-ishigami", "Sobol indices of the Ishigami function", "uncertainty",
+         "analytic first order and total indices", "index farthest from its value", "", 0.02, True, sobol_ishigami),
+    Case("calibration-twin", "Modulus calibrated from synthetic cantilever gauges", "uncertainty",
+         "the modulus the readings were made with, 194 GPa", "posterior mean modulus", "MPa", 0.01, True,
+         calibration_twin),
+    Case("calibration-cooling", "Film coefficient and air temperature from a synthetic cooling curve",
+         "uncertainty", "the values the readings were made with, 12 W/m2K and 22 C", "posterior mean film coefficient",
+         "W/m2K", 0.05, True, calibration_cooling),
 ]
 
 
