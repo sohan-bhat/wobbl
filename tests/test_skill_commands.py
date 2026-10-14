@@ -77,6 +77,8 @@ def check_values(name: str, p: dict):
             template(p["target"], dict(s.split("=", 1) for s in p["sets"]))
         else:
             assert p["target"].endswith((".toml", ".json", ".xml", ".urdf")), p["target"]
+    elif name == "crack" and p["part"].startswith("wobbl-out/"):
+        assert not p["loads"] and not p["fixes"], "a result folder brings its own loads and supports"
     elif name == "crack":
         from wobbl.cli.crack import study_from_options
 
