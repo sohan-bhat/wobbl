@@ -428,6 +428,18 @@ def build_server():
         return run(job_id)
 
     @srv.tool()
+    def solve_casting(path: str, alloy: str = "a356", risers: list[str] | None = None,
+                      chills: list[str] | None = None, mold: str = "sand", pour: str = "", mold_temp: str = "",
+                      quality: str = "normal") -> dict:
+        """Sand casting: where the metal freezes last, whether the risers can feed it as it shrinks, and the
+        shrinkage porosity left behind (Niyama criterion). risers like ['d=40 h=60 at 60,30,20'] (mm, the center
+        of the riser's foot on the casting), chills like ['steel 30x30x10 at 10,30,-5']. alloy a356 or pure-al,
+        pour '720 C'. Checks Chvorinov's rule, meshes, time step and energy balance; fixes give a riser size and
+        place to pass back. Takes two to eight minutes."""
+        from ..process.tools import solve_casting_tool
+        return solve_casting_tool(path, alloy, risers, chills, mold, pour, mold_temp, quality)
+
+    @srv.tool()
     def list_materials() -> dict:
         """Built in materials with stiffness, strength limit, density, conductivity and temperature limit."""
         return tools.list_materials()

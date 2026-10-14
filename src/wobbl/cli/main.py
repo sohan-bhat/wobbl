@@ -490,6 +490,10 @@ def _register():
     from .jobs import estimate, jobs, remote
     for c in (estimate, jobs, remote):
         cli.add_command(c)
+    from .process import cast
+    for c in (cast,):
+        c.hidden = True       # the domain router reaches these; the names stay as aliases
+        cli.add_command(c)
 
 
 _register()

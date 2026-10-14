@@ -90,6 +90,8 @@ class GenericOutcome:
                  "combustion": "Combustion report", "motor": "Rocket motor report",
                  "battery": "Cell runaway report"}.get(self.domain, "Report")
         title = FIELD_TITLES.get(self.domain, title)
+        title = {"casting": "Casting report", "molding": "Molding report", "warp": "Print warp report"}.get(
+            self.domain, title)
         html = page(title, Path(self.part).name if self.part else self.domain, self.question, word, cls,
                     self.headline, self.metrics, self.confidence, self.confidence_reasons, sections,
                     f"Solver {self.solver}. Total time {self.t_total:.0f} s.")
