@@ -94,6 +94,7 @@ const STOPS = {
   coolwarm: '3b4cc0 6889ee 9abbff c9d8ef edd1c2 f7a889 e26952 b40426',
   blues: '0b1a33 0f3b6e 1663a6 2f8fd1 6bb8e8 b6e0f7',
   gray: '303338 e6e6e6',
+  heat: '9a9488 c9a05a e8742a f2401f',
 };
 function turbo(x) {
   const r = 0.13572138 + x * (4.6153926 + x * (-42.66032258 + x * (132.13108234 + x * (-152.94239396 + x * 59.28637943))));
