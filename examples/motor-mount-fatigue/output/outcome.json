@@ -3,7 +3,7 @@
  "part": "../../../src/wobbl/validation/parts/cast_motor_mount.step",
  "question": "Does the cast motor mount last ten years of starts and running without a fatigue crack?",
  "verdict": "marginal",
- "headline": "10 runs of the duty cycle use 62.7% of the fatigue life on the 3.99 mm inside fillet (face 65) at (43.9, 8.96, 79.6) (Miner's rule), so it can run about 16 times before cracks start; the stresses could rise 1.03 times before the required 10 runs would start a crack (target 2). Confidence is medium.",
+ "headline": "10 runs of the duty cycle use 62.7% of the fatigue life on the 3.99 mm inside fillet (face 65) at (43.9, 8.96, 79.6) (Miner's rule), so it can run about 16 times before cracks start, and the stresses could rise 1.03 times before the required 10 runs would start a crack (target 2). Confidence is medium.",
  "metrics": [
   [
    "life",
@@ -49,7 +49,7 @@
   {
    "name": "mean stress model",
    "status": "pass",
-   "summary": "safety factor by mean stress model: Goodman 1.03, Gerber 1.29, Soderberg 1.03; the answer uses Goodman, and the verdict is the same with each",
+   "summary": "the mean stress models give safety factors of Goodman 1.03, Gerber 1.29 and Soderberg 1.03. The answer uses Goodman, and the verdict is the same with each",
    "detail": {
     "goodman": 1.029209,
     "gerber": 1.286107,
@@ -64,10 +64,10 @@
   }
  ],
  "assumptions": [
-  "Stress life method for crack initiation (Shigley's approach): an S-N line from f Sut at 1000 cycles to the corrected endurance strength. It does not cover crack growth after a crack starts, which is a separate damage tolerance question.",
-  "S-N data for Custom material (cast): 42.7 MPa at 500 million cycles, smooth specimens, fully reversed (estimate: 0.26 Sut at 5e8 cycles, the ratio of sand cast A356-T6).",
-  "Marin factors: surface as-cast (1.00), size 1.05, load 1.00, reliability 90% (0.897), room temperature.",
-  "Mean stress by Goodman; a compressive mean gets no credit.",
+  "Stress life method for crack initiation, as Shigley sets it out, with an S-N line from f Sut at 1000 cycles to the corrected endurance strength. It does not cover crack growth after a crack starts, which is a separate damage tolerance question.",
+  "S-N data for Custom material (cast) give 42.7 MPa at 500 million cycles, smooth specimens, fully reversed (estimated as 0.26 Sut at 5e8 cycles, the ratio of sand cast A356-T6).",
+  "The Marin factors are surface as-cast (1.00), size 1.05, load 1.00, reliability 90% (0.897), with the part at room temperature.",
+  "Mean stress by Goodman, with no credit for a compressive mean.",
   "Fatigue lives scatter by a factor of three to ten at the same stress, so the life is an estimate and the safety factor on stress is the steadier number.",
   "Each block scales the studied load and cycles it between R times its peak and the peak (or at the study's load ratio when the block gives none), and the stress field keeps its shape, as it does for a linear part."
  ],
@@ -131,7 +131,7 @@
   "kf": null,
   "q": 1.0,
   "notch_radius_mm": 3.986,
-  "data_source": "estimate: 0.26 Sut at 5e8 cycles, the ratio of sand cast A356-T6",
+  "data_source": "estimated as 0.26 Sut at 5e8 cycles, the ratio of sand cast A356-T6",
   "data_estimated": true,
   "where": "on the 3.99 mm inside fillet (face 65) at (43.9, 8.96, 79.6)",
   "xyz": [
@@ -244,6 +244,6 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 7.826592,
+ "t_total": 18.439545,
  "solver": "Wobbl stress life"
 }
