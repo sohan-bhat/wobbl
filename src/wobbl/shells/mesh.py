@@ -88,16 +88,16 @@ def middle_dimension(features: PartFeatures) -> float:
     return float(np.sort(hi - lo)[1])
 
 
-def thin_walled(features: PartFeatures) -> tuple[bool, str]:
+def thin_walled(features: PartFeatures, limit: float = THIN_RATIO) -> tuple[bool, str]:
     """Whether a part's walls are thin next to its size, judged from its typical wall and bounding box. A cheap
     first test: the midsurface itself also checks how much of the surface pairs up into walls."""
     mid = middle_dimension(features)
     t = features.thickness_typical
     ratio = t / max(mid, 1e-9)
-    if ratio <= THIN_RATIO:
+    if ratio <= limit:
         return True, f"walls about {t:.3g} mm on a part {mid:.3g} mm across ({100 * ratio:.2g}%)"
     return False, (f"walls about {t:.3g} mm are {100 * ratio:.2g}% of the part's {mid:.3g} mm middle dimension, "
-                   f"over the {100 * THIN_RATIO:.0f}% a shell model needs")
+                   f"over the {100 * limit:.0f}% a shell model needs")
 
 
 def first_exits(orig, dirs, V0, V1, V2, nrm, reach: float, k: int = 128) -> tuple[np.ndarray, np.ndarray]:

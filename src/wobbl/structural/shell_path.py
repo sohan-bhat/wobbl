@@ -31,6 +31,7 @@ from .spec import SpecError, StructuralStudy
 
 LEVELS = {"fast": (1.0, 0.7), "normal": (1.0, 0.7, 0.5), "fine": (1.0, 0.7, 0.5, 0.35)}
 TOL = {"fast": 0.05, "normal": 0.03, "fine": 0.02}
+AUTO_RATIO = 0.06        # the stress analysis takes the shell path on its own below this wall to size ratio
 CROSS_SIZE = 1.5         # the solid cross check's element size, in typical walls
 
 
@@ -156,7 +157,7 @@ def analyze_auto(study: StructuralStudy, out_dir: str | Path, progress=None, ren
     if pre is None:
         say("geometry", f"reading {Path(study.part).name}")
         pre = describe_part(study.part, out / "work", study.scale, study.body, study.params)
-    thin, why = thin_walled(pre[1])
+    thin, why = thin_walled(pre[1], AUTO_RATIO)
     if not thin:
         return analyze_strength(study, out, progress, render=render, fixes=fixes, pre=pre)
     say("check", f"thin walls, {why}: solving them as shells")
@@ -166,14 +167,33 @@ def analyze_auto(study: StructuralStudy, out_dir: str | Path, progress=None, ren
         reason = f"the shell model could not be built ({str(e).strip()[:160]})"
     else:
         cross = next((c for c in o.checks if c.name == "solid cross check"), None)
-        if cross is not None and cross.status in ("pass", "warn"):
+        raiser = stress_raiser(o.governing_xyz, pre[1])
+        if cross is not None and cross.status in ("pass", "warn") and not raiser:
             shutil.rmtree(out / "work", ignore_errors=True)
             return o
-        reason = cross.summary if cross is not None else "the shell model had no solid to check it against"
+        reason = (f"the peak sits at {raiser}, whose stress a shell model cannot resolve" if raiser else
+                  cross.summary if cross is not None else "the shell model had no solid to check it against")
     say("check", f"solving the solid instead: {reason}")
     o = analyze_strength(study, out, progress, render=render, fixes=fixes, pre=pre)
     o.notes.append(f"Wobbl tried a shell model of the thin walls first and solved the solid instead: {reason}.")
     return write_outputs(o, out)
+
+
+def stress_raiser(xyz, features) -> str:
+    """The inside fillet or sharp inside corner within three walls of a point, which a shell model, made of
+    walls meeting along lines, cannot resolve; empty when there is none."""
+    g = np.asarray(xyz, float)
+    reach = 3.0 * features.thickness_typical
+    for c in features.corners:
+        pts = c.points if c.points is not None and len(c.points) else np.asarray([c.midpoint])
+        if np.linalg.norm(np.asarray(pts) - g, axis=1).min() <= reach:
+            return "a sharp inside corner"
+    for f in features.fillets():
+        if getattr(f, "concave", False):
+            lo, hi = (np.asarray(b, float) for b in f.bbox)
+            if np.linalg.norm(np.maximum(np.maximum(lo - g, g - hi), 0.0)) <= reach:
+                return f"the {f.radius:.3g} mm inside fillet (face {f.id})"
+    return ""
 
 
 def _level(k, h, shell, res, measure, excl, model, material) -> dict:
