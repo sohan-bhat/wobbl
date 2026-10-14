@@ -75,7 +75,8 @@ register(Analysis(
     "part", "contact", "Parts of an assembly that press on each other, slide and open, with friction",
     contact, dry=True, kinds=PART_KINDS, covers=("stress",), legacy="",
     keywords=(r"\bcontact", r"\bpress(?:es|ed|ing)?\s+(?:on|against|into)\b", r"\bslid(?:e|es|ing)\b",
-              r"\bslip(?:s|ping)?\b", r"\bfriction", r"\bclamp(?:s|ed|ing)?\b", r"\bpin\b", r"\binterference",
+              r"\bslip(?:s|ping)?\b", r"\bfriction", r"\bclamps?\b(?!\s+(?:it|the part))", r"\bclamping force",
+              r"\bpin\s+(?:in|press\w*|bear\w*|push\w*)\b", r"\binterference",
               r"press[- ]fit", r"\btouch(?:es|ing)?\b", r"\bhertz", r"\bbearing pressure"),
     aliases=("touching", "friction", "assembly"),
     options=_SHARED + (Option("move", "Prescribed movement of some faces after the loads, as '0.1 mm +x @ body 2 "
@@ -87,8 +88,11 @@ register(Analysis(
 register(Analysis(
     "part", "bolts", "Bolted joints: preload from torque, then the load, checked for separation, slip and strength",
     bolts, dry=True, kinds=PART_KINDS, covers=("stress", "contact"), legacy="",
-    keywords=(r"\bbolt(?:s|ed)?\b", r"\bscrews?\b", r"\bfasten", r"\bpreload", r"\btighten", r"\bnuts?\b",
-              r"\bflange", r"\bseparat", r"\bjoint\s+open", r"\bvdi\s*2230"),
+    # a question about the joint itself, not one that only says how the part is held ('bolted at the base')
+    keywords=(r"\bm\d+(?:x[\d.]+)?\s+(?:\d+\.\d\s+)?(?:bolts?|screws?)\b", r"\bpreload", r"\btighten",
+              r"\btorqu(?:e|ed)\s+(?:to|at)\b", r"\b(?:bolts?|screws?|fasteners?)\b[^.?]*\b(?:loosen|separat|slip|"
+              r"open|stay\s+closed|keep\s+\w+\s+closed|hold\s+the\s+joint|strip|shear\s+off|snap)",
+              r"\bbolted\s+joint", r"\bjoint\s+(?:open|separat|slip)", r"\bvdi\s*2230", r"\bflange\s+(?:bolts?|joint)"),
     aliases=("bolt", "bolted", "fasteners", "joint"),
     options=_SHARED + (Option("bolt", "Bolts, as 'M8 8.8 @ holes d=9 torque 25 N*m'; sized from the holes when left "
                                       "out", multiple=True),
