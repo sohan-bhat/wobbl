@@ -32,7 +32,7 @@ export const RUN_IMAGES: Record<string, Record<string, string>> = {
 const DOMAIN: Record<string, string> = { strength: 'Strength', thermal: 'Heat', circuit: 'Circuits', motion: 'Motion' };
 export const COLOR: Record<string, string> = { holds: 'holds', ok: 'holds', marginal: 'marginal', fails: 'fails', hot: 'fails' };
 
-export interface Check { name: string; status: string; summary: string }
+export interface Check { name: string; status: string; summary: string; detail?: Record<string, unknown> }
 export interface Fix { kind: string; title: string; after?: { governing_MPa: number; safety_factor: number; verdict: string; report: string; params?: Record<string, number> } }
 export interface Outcome {
   domain: string; verdict: string; headline: string; confidence: string; question?: string;

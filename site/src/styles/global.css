@@ -156,23 +156,25 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .fc { margin: 0; min-width: 0; }
 .fc-chart { font: 500 12px/1.2 var(--mono); color: var(--muted); }
 .fc-ytitle { margin: 0 0 14px; color: var(--fg-2); }
-.fc-plot { position: relative; aspect-ratio: 16 / 10; margin: 0 4px 34px calc(var(--y-ch) * 1ch + 12px); touch-action: pan-y; }
+.fc-plot { position: relative; aspect-ratio: 16 / 10; margin: 0 6px 34px calc(var(--y-ch) * 1ch + 12px); touch-action: pan-y; }
 /* the SVG sits 6 px inside a clipping box, so the line's own width is never cut at the edges */
 .fc-draw { position: absolute; inset: -6px; overflow: hidden; }
 .fc-draw svg { position: absolute; left: 6px; top: 6px; width: calc(100% - 12px); height: calc(100% - 12px); overflow: visible; }
 .fc-line { fill: none; stroke: var(--yellow); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .fc-area { fill: var(--yellow); fill-opacity: 0.045; }
+.fc-ghost { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
 .fc-grid { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--line); }
 .fc-ground { border-top-color: var(--muted); }
 .fc-yt { position: absolute; right: 100%; top: 0; padding-right: 12px; transform: translateY(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fc-xt { position: absolute; top: 100%; padding-top: 10px; transform: translateX(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fc-xt[data-edge="start"] { transform: none; }
 .fc-xt[data-edge="end"] { transform: translateX(-100%); }
-.fc-xtitle { margin: 0 4px 0 0; text-align: right; color: var(--fg-2); }
+.fc-xtitle { margin: 0 6px 0 0; text-align: right; color: var(--fg-2); }
 .fc figcaption { margin-top: 10px; }
 /* events: a square on the line, and a name with its time and height beside it */
 .fc-ev { position: absolute; width: 0; height: 0; }
 .fc-ev::before { content: ""; position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; background: var(--yellow); box-shadow: 0 0 0 2px var(--bg); }
+.fc-ev-ghost::before { background: var(--bg); border: 2px solid var(--muted); box-shadow: none; }
 .fc-ev-l {
   position: absolute; display: grid; gap: 3px; padding: 3px 5px; white-space: nowrap;
   background: color-mix(in srgb, var(--bg) 84%, transparent); transform: translate(var(--tx, 0), var(--ty, 0));
@@ -182,8 +184,8 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .fc-ev-l[data-align="right"] { text-align: right; }
 .fc-ev-l[data-align="center"] { text-align: center; }
 .fc-ev-l[data-lead]::after { content: ""; position: absolute; background: var(--muted); }
-.fc-ev-l[data-lead="down"]::after { left: 50%; top: 100%; width: 1px; height: var(--lead); }
-.fc-ev-l[data-lead="up"]::after { left: 50%; bottom: 100%; width: 1px; height: var(--lead); }
+.fc-ev-l[data-lead="down"]::after { left: var(--lx, 50%); top: 100%; width: 1px; height: var(--lead); }
+.fc-ev-l[data-lead="up"]::after { left: var(--lx, 50%); bottom: 100%; width: 1px; height: var(--lead); }
 .fc-ev-l[data-lead="right"]::after { left: 100%; top: 50%; height: 1px; width: var(--lead); }
 .fc-ev-l[data-lead="left"]::after { right: 100%; top: 50%; height: 1px; width: var(--lead); }
 /* the pointer readout: a hairline at the nearest instant and its time, height and speed */

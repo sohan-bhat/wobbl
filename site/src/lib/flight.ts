@@ -21,16 +21,30 @@ const SMALL = { w: 290, h: 290 / ASPECT };
 const csvPath = (run: Run) => resolve(ROOT, 'examples', run.rel, 'trajectory.csv');
 export const hasFlight = (run: Run) => run.outcome.domain === 'motion' && existsSync(csvPath(run));
 
-/** The time, altitude and speed columns of trajectory.csv. */
+/**
+ * The time, altitude and speed columns of trajectory.csv. A row that repeats the time of the one
+ * before it, such as the landed row at rest after the impact, is left out.
+ */
 export function trajectory(run: Run): Sample[] {
   const [head, ...lines] = readFileSync(csvPath(run), 'utf-8').trim().split(/\r?\n/);
   const col = Object.fromEntries(head.split(',').map((h, i) => [h.trim(), i]));
   for (const k of ['t_s', 'alt_m']) if (!(k in col)) throw new Error(`${run.rel}/trajectory.csv has no ${k} column`);
   const num = (cells: string[], k: string) => (k in col ? Number(cells[col[k]]) : NaN);
-  return lines.map((line) => {
+  const rows = lines.map((line) => {
     const c = line.split(',');
     return { t: num(c, 't_s'), alt: num(c, 'alt_m'), speed: num(c, 'speed_mps') };
-  });
+  }).filter((r) => Number.isFinite(r.t) && Number.isFinite(r.alt));
+  return rows.filter((r, i) => i === 0 || r.t > rows[i - 1].t);
+}
+
+/**
+ * For a drop from rest, the same drop without air: Wobbl's vacuum check flies it with gravity held at
+ * its ground value, so it is the parabola from the start height that lands at the check's time.
+ */
+function withoutAir(run: Run, start: Sample): { tv: number; h: number } | null {
+  const check = (run.outcome.checks ?? []).find((c) => c.name === 'vacuum drop');
+  const tv = Number(check?.detail?.time_s);
+  return check && start.speed === 0 && start.alt > 0 && tv > 0 ? { tv, h: start.alt } : null;
 }
 
 /** Ticks at 1, 2, 2.5 or 5 times a power of ten, at most `most` steps from 0 up to `max`. */
@@ -73,35 +87,43 @@ const joinNames = (names: string[]) => {
 export interface Marker {
   left: number; top: number;     // percent of the plot
   name: string; detail: string;
+  ghost?: boolean;               // the end of the drop without air, drawn hollow
   label: string;                 // where the label sits around its marker, as inline CSS
   align: 'left' | 'right' | 'center';
   lead?: 'up' | 'down' | 'left' | 'right';   // a line from the label back to a marker set well away
   at: number;                    // share of the run's time, for the line drawing in
 }
 
-/** A label spot around a marker: to its left, middle or right, above, level or below, and how far off. */
-interface Spot { hx: -1 | 0 | 1; vy: -1 | 0 | 1; gx: number; gy: number }
+/**
+ * A label spot around a marker: to its left, middle or right, above, level or below, and how far off.
+ * A label straight above or below can be centered on its marker or end at it (ax), which lets a
+ * marker on the plot's right edge keep its label inside the plot.
+ */
+interface Spot { hx: -1 | 0 | 1; vy: -1 | 0 | 1; gx: number; gy: number; ax: -1 | 0 | 1 }
 const SPOTS: Spot[] = [];
-for (const gx of [9, 20, 36, 52]) for (const hx of [1, -1] as const) SPOTS.push({ hx, vy: 0, gx, gy: 0 });
-for (const gy of [9, 20, 36, 52]) for (const vy of [-1, 1] as const) SPOTS.push({ hx: 0, vy, gx: 0, gy });
-for (const gx of [6, 20, 36, 52]) for (const gy of [4, 9, 20, 36]) for (const hx of [1, -1] as const) for (const vy of [-1, 1] as const) SPOTS.push({ hx, vy, gx, gy });
+for (const gx of [9, 20, 36, 52]) for (const hx of [1, -1] as const) SPOTS.push({ hx, vy: 0, gx, gy: 0, ax: 0 });
+for (const gy of [9, 20, 36, 52, 68]) for (const vy of [-1, 1] as const) for (const ax of [0, -1, 1] as const) SPOTS.push({ hx: 0, vy, gx: 0, gy, ax });
+for (const gx of [6, 20, 36, 52]) for (const gy of [4, 9, 20, 36]) for (const hx of [1, -1] as const) for (const vy of [-1, 1] as const) SPOTS.push({ hx, vy, gx, gy, ax: 0 });
 /** Plot widths the labels must fit at: a phone, a tablet and a desktop column. */
 const WIDTHS = [290, 420, 560];
 
 export interface Chart {
   line: string; area: string;
+  ghost: string;                 // the same drop without air, dashed, or empty
   yTicks: { v: string; top: number }[];
   xTicks: { v: string; left: number }[];
   yChars: number;                // widest y tick, in characters, for the gutter
   markers: Marker[];
+  dryRun: boolean;               // whether the chart shows the drop without air
   samples: string;               // t, altitude and speed at about 80 instants, for the readout
   tEnd: number; top: number;
   events: FlightEvent[];
 }
 
 export function flightChart(run: Run): Chart {
-  const rows = trajectory(run).filter((r) => Number.isFinite(r.t) && Number.isFinite(r.alt));
+  const rows = trajectory(run);
   const tEnd = rows[rows.length - 1].t;
+  const dry = withoutAir(run, rows[0]);
   const altMax = Math.max(...rows.map((r) => r.alt));
   const ys = step(altMax, 4);
   const top = Math.ceil(altMax / ys - 1e-9) * ys;
@@ -114,6 +136,10 @@ export function flightChart(run: Run): Chart {
   const pts = simplify(rows.map((r) => [X(r.t), Y(r.alt)] as [number, number]), 1.2);
   const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${r1(x)} ${r1(y)}`).join('');
   const area = `${line}L1000 1000L0 1000Z`;
+  const ghostPts: [number, number][] = dry
+    ? Array.from({ length: 25 }, (_, i) => { const t = (dry.tv * i) / 24; return [X(t), Y(dry.h * (1 - (t / dry.tv) ** 2))]; })
+    : [];
+  const ghost = ghostPts.map(([x, y], i) => `${i ? 'L' : 'M'}${r1(x)} ${r1(y)}`).join('');
 
   const yTicks = [];
   for (let i = 0; i * ys <= top + 1e-9; i++) yTicks.push({ v: tick(i * ys), top: (1 - (i * ys) / top) * 100 });
@@ -133,15 +159,17 @@ export function flightChart(run: Run): Chart {
     if (last && near(rel(e), rel(last[0]))) last.push(e);
     else groups.push([e]);
   }
+  if (dry) groups.push([{ name: 'without air', t_s: dry.tv, alt_m: 0 }]);
 
   // the line as points about every 0.2% of the plot along its length, to measure how much of it a label covers
   const trace: number[][] = [];
-  for (let i = 1; i < pts.length; i++) {
-    const [ax, ay] = pts[i - 1], [bx, by] = pts[i];
-    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 2));
-    for (let k = 0; k < n; k++) trace.push([(ax + ((bx - ax) * k) / n) / 1000, (ay + ((by - ay) * k) / n) / 1000]);
+  for (const path of [pts, ghostPts]) {
+    for (let i = 1; i < path.length; i++) {
+      const [ax, ay] = path[i - 1], [bx, by] = path[i];
+      const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 2));
+      for (let k = 0; k <= n; k++) trace.push([(ax + ((bx - ax) * k) / n) / 1000, (ay + ((by - ay) * k) / n) / 1000]);
+    }
   }
-  trace.push([pts[pts.length - 1][0] / 1000, pts[pts.length - 1][1] / 1000]);
 
   // each label takes the spot that keeps it inside the plot, off the line, off the other labels
   // and markers and close to its own marker, at a phone, a tablet and a desktop width at once
@@ -149,7 +177,7 @@ export function flightChart(run: Run): Chart {
   const sizes: number[][] = [];
   const boxAt = (s: Spot, p: number[], w: number, h: number, W: number) => {
     const H = W / ASPECT, px = p[0] * W, py = p[1] * H;
-    const x = s.hx < 0 ? px - s.gx - w : s.hx > 0 ? px + s.gx : px - w / 2;
+    const x = s.hx < 0 ? px - s.gx - w : s.hx > 0 ? px + s.gx : s.ax < 0 ? px + 5 - w : s.ax > 0 ? px - 5 : px - w / 2;
     const y = s.vy < 0 ? py - s.gy - h : s.vy > 0 ? py + s.gy : py - h / 2;
     return [x, y, w, h];
   };
@@ -166,8 +194,9 @@ export function flightChart(run: Run): Chart {
       for (const W of WIDTHS) {
         const H = W / ASPECT;
         const [bx, by, bw, bh] = boxAt(spot, p, w, h, W);
-        // past the sides or below the ground is out; a little above the top is allowed
-        score += 1000 * (Math.max(0, -bx) + Math.max(0, bx + bw - W) + Math.max(0, -14 - by) + Math.max(0, by + bh - H));
+        // past the sides or below the ground is out; a little past the right edge, into the plot's
+        // margin, and a little above the top are allowed
+        score += 1000 * (Math.max(0, -bx) + Math.max(0, bx + bw - W - 6) + Math.max(0, -14 - by) + Math.max(0, by + bh - H));
         const ds = (2 / 1000) * W;
         for (const [lx, ly] of trace) {
           const x = lx * W, y = ly * H;
@@ -188,16 +217,18 @@ export function flightChart(run: Run): Chart {
     const s = best.spot;
     placed.push(s);
     const css = [
-      s.hx > 0 ? `left: ${s.gx}px` : s.hx < 0 ? `right: ${s.gx}px` : 'left: 0; --tx: -50%',
+      s.hx > 0 ? `left: ${s.gx}px` : s.hx < 0 ? `right: ${s.gx}px`
+        : s.ax < 0 ? 'right: -5px' : s.ax > 0 ? 'left: -5px' : 'left: 0; --tx: -50%',
       s.vy > 0 ? `top: ${s.gy}px` : s.vy < 0 ? `bottom: ${s.gy}px` : 'top: 0; --ty: -50%',
     ];
     // a label set well away straight above, below or beside its marker gets a thin line back to it
     const gap = s.hx === 0 ? s.gy : s.vy === 0 ? s.gx : 0;
     const lead = gap > 12 ? (s.hx === 0 ? (s.vy < 0 ? 'down' : 'up') : (s.hx < 0 ? 'right' : 'left')) : undefined;
     if (lead) css.push(`--lead: ${gap - 6}px`);
+    if (lead && s.hx === 0 && s.ax !== 0) css.push(`--lx: ${s.ax < 0 ? 'calc(100% - 5px)' : '5px'}`);
     return {
-      left: p[0] * 100, top: p[1] * 100, name, detail, label: css.join('; '), lead,
-      align: s.hx < 0 ? 'right' : s.hx > 0 ? 'left' : 'center', at: e.t_s / tEnd,
+      left: p[0] * 100, top: p[1] * 100, name, detail, label: css.join('; '), lead, ghost: dry !== null && gi === groups.length - 1,
+      align: s.hx < 0 || s.ax < 0 ? 'right' : s.hx > 0 || s.ax > 0 ? 'left' : 'center', at: e.t_s / tEnd,
     };
   });
 
@@ -214,6 +245,7 @@ export function flightChart(run: Run): Chart {
   const samples = picked.map((r) => [r.t, r.alt, r.speed].map((v) => (Number.isFinite(v) ? Number(v.toPrecision(4)) : '')).join(',')).join(';');
 
   return {
-    line, area, yTicks, xTicks, yChars: Math.max(...yTicks.map((t) => t.v.length)), markers, samples, tEnd, top, events,
+    line, area, ghost, yTicks, xTicks, yChars: Math.max(...yTicks.map((t) => t.v.length)), markers, dryRun: dry !== null,
+    samples, tEnd, top, events,
   };
 }
