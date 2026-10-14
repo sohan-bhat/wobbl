@@ -568,7 +568,8 @@ def advise(est: Estimate, max_hours: float | None = None) -> list[dict]:
     target = est.target or "DECK"
     limit = (max_hours or 24.0) * 3600.0
     opts = []
-    if est.verdict in ("long", "too long") and c.solver == "calculix" \
+    runs_as_job = c.solver == "calculix" or c.solver.startswith(("wobbl ", "simulate "))
+    if est.verdict in ("long", "too long") and runs_as_job and est.target \
             and not any("memory" in p or "free" in p for p in est.problems):
         opts.append({"kind": "background", "command": f"wobbl jobs start {target}",
                      "summary": f"Run it in the background with wobbl jobs start {target}, which keeps going after "
@@ -720,6 +721,22 @@ def estimate_command(argv: list[str], machine: Machine | None = None, max_hours:
     est = predict(WL.cost(w), machine or this_machine(), max_hours, " ".join(argv))
     if est.known and not est.cost.measured and (machine is None or machine.name == "this machine"):
         WL.remember_prediction(w, est.cost.core_seconds, est.cost.peak_bytes)
+    return est
+
+
+def estimate_plan(plan, options: dict | None = None, machine: Machine | None = None,
+                  max_hours: float | None = None) -> Estimate:
+    """Predict a wobbl simulate plan before it runs: each analysis priced on its own, then added up."""
+    from .jobs import workload as WL
+
+    here = machine is None or machine.name == "this machine"
+    target = " ".join(x for x in (plan.thing, f'"{plan.question}"' if plan.question else "") if x)
+    est = predict(WL.plan_cost(plan, options or {}, here), machine or this_machine(), max_hours, target)
+    for o in est.options:           # a plan starts in the background through simulate itself
+        if o.get("kind") == "background":
+            o["command"] = "wobbl simulate ... --background"
+            o["summary"] = ("Run it in the background with --background, which keeps going after the terminal "
+                            "closes and shows progress and an ETA in wobbl jobs status.")
     return est
 
 

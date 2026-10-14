@@ -18,6 +18,7 @@ study again is predicted from its own last run.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -244,15 +245,59 @@ def _peak_rss() -> float:
         return 0.0
 
 
+PLAN_COMMANDS = ("simulate", "jobs run-plan")
+SIZE_OPTIONS = ("quality", "mesh-size", "scale", "budget", "duration", "modes", "shell", "body")
+_pending: list[tuple[dict, Path | None, float, bool]] = []
+
+
 def _record(outcome: dict, out_dir):
+    """Record a run now when its command line says what it was. A simulate run says so in the request.json the
+    runner writes just after the outcome, and a run from the MCP server has no command line at all, so those are
+    kept until the next save or the end of the process."""
+    try:
+        w = parse(sys.argv[1:])
+    except Exception:  # noqa: BLE001
+        w = None
+    if w is None or w.command in PLAN_COMMANDS or "out" not in w.params:
+        if not _pending:
+            import atexit
+            atexit.register(_flush)
+        _flush()
+        _pending.append((outcome, Path(out_dir) if out_dir else None, _peak_rss() if w is not None else 0.0,
+                         w is not None))
+        return
+    _store(f"wobbl {w.command}", w.signature(), outcome, out_dir, _peak_rss())
+
+
+def _flush():
+    """Record the runs kept back, each under its analysis when its request.json is there, else under the command
+    of its outcome's domain."""
+    while _pending:
+        outcome, out_dir, peak, _ = _pending.pop(0)
+        try:
+            req = json.loads((out_dir / "request.json").read_text()) if out_dir else None
+        except (OSError, ValueError):
+            req = None
+        if req:
+            from ..simulate import get
+
+            a = get(req["domain"], req["analysis"])
+            spec = req.get("spec", {})
+            w = analysis_workload(a, str(spec.get("thing", "")), spec.get("options", {}))
+            solver, sig = f"wobbl {w.command}", w.signature()
+        else:
+            dom = outcome.get("domain", "")
+            command = next((c for c, h in REGISTRY.items() if h.domain == dom), f"domain {dom}")
+            solver, sig = f"wobbl {command}", ""
+        try:
+            _store(solver, sig, outcome, out_dir, peak)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _store(solver: str, sig: str, outcome: dict, out_dir, peak: float):
     from .. import estimate as E
 
-    argv = sys.argv[1:]
-    try:
-        w = parse(argv)
-        command, sig = w.command, w.signature()
-    except Exception:  # noqa: BLE001  (an MCP or scripted run has no command line, so its domain stands in)
-        command, sig = outcome.get("domain", ""), ""
     wall = float(outcome.get("t_total") or 0.0)
     if wall <= 0:
         return
@@ -260,11 +305,11 @@ def _record(outcome: dict, out_dir):
     if out_dir:
         disk = float(sum(p.stat().st_size for p in Path(out_dir).rglob("*") if p.is_file()))
     cal = E.load_calibration()
-    if any(r.get("size", {}).get("signature") == sig and r.get("measured_time") == wall
+    if any(r.get("solver") == solver and r.get("size", {}).get("signature") == sig and r.get("measured_time") == wall
            for r in cal.get("runs", [])[-20:]):
         return                                   # the same result saved again, after a fix or a new report
     pred = cal.get("predictions", {}).get(sig, {}) if sig else {}
-    E.record(f"wobbl {command}", pred.get("time", 0.0), wall, pred.get("memory", 0.0), _peak_rss(),
+    E.record(solver, pred.get("time", 0.0), wall, pred.get("memory", 0.0), peak,
              {"domain": outcome.get("domain", ""), "signature": sig, "disk": disk}, "run")
 
 
@@ -330,6 +375,9 @@ def cost(w: Workload):
                    "run, here or as a job, measures it."], known=False)
 
 
+_PART_COSTS: dict = {}
+
+
 def part_cost(w: Workload, h: Hooks):
     """A command that meshes a CAD part, priced from the part's first mesh and its procedure's solves."""
     import tempfile
@@ -338,19 +386,118 @@ def part_cost(w: Workload, h: Hooks):
     from ..structural.run import describe_part
 
     p = w.params
-    with tempfile.TemporaryDirectory() as tmp:
-        prep, feats = describe_part(str(w.part), tmp, float(p.get("scale") or 1.0))
-        domain = "strength" if h.dof == 3 else "heat"
-        mesh = E.first_mesh(prep, feats, domain, str(p.get("quality") or "normal"), p.get("mesh_size"),
-                            bool(p.get("duration")))
-    c = E.study_cost(mesh, domain, str(p.get("quality") or "normal"), bool(p.get("duration")),
-                     float(p.get("budget") or 300.0))
+    domain = "strength" if h.dof == 3 else "heat"
+    st = w.part.stat()
+    key = (str(w.part.resolve()), st.st_size, int(st.st_mtime), domain, p.get("quality"), p.get("mesh_size"),
+           p.get("scale"), bool(p.get("duration")), p.get("budget"))
+    if key not in _PART_COSTS:     # several analyses of one plan mesh the same part the same way
+        with tempfile.TemporaryDirectory() as tmp:
+            prep, feats = describe_part(str(w.part), tmp, float(p.get("scale") or 1.0))
+            mesh = E.first_mesh(prep, feats, domain, str(p.get("quality") or "normal"), p.get("mesh_size"),
+                                bool(p.get("duration")))
+        _PART_COSTS[key] = E.study_cost(mesh, domain, str(p.get("quality") or "normal"), bool(p.get("duration")),
+                                        float(p.get("budget") or 300.0))
+    c = copy.deepcopy(_PART_COSTS[key])
     c.core_seconds *= h.solves
     c.solver, c.procedure = f"wobbl {w.command}", w.domain
     if h.solves != 1.0:
         c.basis.insert(1, f"A {w.domain} study costs about {h.solves:g} static solves of each mesh, which its first "
                           "measured run here corrects.")
     return c
+
+
+# ----------------------------------------------------------------------------------------------- simulate plans
+def analysis_command(a) -> str:
+    """The command an analysis of the simulate registry is priced and remembered under: the command it replaced,
+    so 'wobbl run' and 'part.stress' share one history, or else its own key."""
+    legacy = getattr(a, "legacy", "") or ""
+    return legacy[len("wobbl "):] if legacy.startswith("wobbl ") else f"simulate {a.key}"
+
+
+def analysis_workload(a, thing: str, options: dict) -> Workload:
+    """One analysis of a plan as a workload, from the options that set its size."""
+    params = {}
+    for k in SIZE_OPTIONS:
+        v = options.get(k)
+        if v not in (None, [], ""):
+            params[k.replace("-", "_")] = v[-1] if isinstance(v, (list, tuple)) else v
+    path = Path(thing).expanduser() if thing else None
+    has = path is not None and len(thing) < 1024 and path.exists()
+    if has:
+        params["part"] = str(path)
+    command = analysis_command(a)
+    if command not in REGISTRY and a.key in REGISTRY:
+        command = a.key
+    return Workload([], command, params, [path] if has else [], None, [str(path)] if has else [])
+
+
+def plan_cost(plan, options: dict, here: bool = True):
+    """What a whole simulate plan costs: each analysis priced as its own workload, then added up. This machine's
+    calibration of each analysis is applied here, since a plan mixes several."""
+    from .. import estimate as E
+
+    parts = []
+    for a in plan.analyses:
+        w = analysis_workload(a, plan.thing, options)
+        c = cost(w)
+        if here and c.known and not c.measured:     # so the run that follows is scored against it, analysis by analysis
+            remember_prediction(w, c.core_seconds, c.peak_bytes)
+        parts.append((a, c))
+    known = [(a, c) for a, c in parts if c.known]
+    missing = [a.key for a, c in parts if not c.known]
+    solver = f"simulate {plan.domain}"
+    if not known:
+        return E.Cost(solver, plan.domain, 0.0, 0.0, 0.0, 0.0, {"analyses": [a.key for a, _ in parts]},
+                      [f"Nothing has measured {', '.join(missing)} on this machine yet, so its time is not known. Its "
+                       "first run, here or as a job, measures it."], known=False)
+    secs = par = mem = disk = 0.0
+    basis = []
+    for a, c in known:
+        f = E.factor(c.solver)[0] if here and not c.measured else 1.0
+        secs += c.core_seconds * f
+        par += c.core_seconds * f * c.parallel
+        mem = max(mem, c.peak_bytes)
+        disk += c.disk_bytes
+        basis.append(f"{a.key}: {c.basis[0]}" if c.basis else a.key)
+    if missing:
+        basis.append(f"{', '.join(missing)} {'is' if len(missing) == 1 else 'are'} not counted, since nothing has "
+                     "measured them on this machine yet.")
+    size = {"analyses": [a.key for a, _ in parts]}
+    for _, c in known:
+        size.update({k: v for k, v in c.size.items() if k in ("nodes", "levels", "dof")})
+    return E.Cost(solver, plan.domain, secs, par / max(secs, 1e-9), mem, disk, size, basis, measured=True)
+
+
+def plan_argv(plan, options: dict, out: str | None = None, quick: bool = False) -> list[str]:
+    """The plumbing command line that runs a plan exactly as planned, here or on another machine."""
+    argv = ["jobs", "run-plan", plan.thing or "-", "--question", plan.question or "", "--domain", plan.domain,
+            "--kind", plan.kind]
+    for a in plan.analyses:
+        argv += ["--physics", a.key]
+    for k, vs in options.items():
+        for v in (vs if isinstance(vs, (list, tuple)) else [vs]):
+            argv += ["--opt", k, str(v)]
+    if quick:
+        argv.append("--quick")
+    return argv + (["-o", out] if out else [])
+
+
+def plan_of(w: Workload):
+    """The plan a 'jobs run-plan' workload runs, and its options."""
+    from ..simulate import route
+
+    p = w.params
+    plan = route(p.get("thing") if p.get("thing") != "-" else "", p.get("question") or "", list(p.get("physics") or []),
+                 p.get("domain") or None, p.get("kind") or None)
+    options: dict[str, list[str]] = {}
+    for k, v in p.get("opts") or ():
+        options.setdefault(k, []).append(v)
+    return plan, options
+
+
+def _run_plan_cost(w: Workload):
+    plan, options = plan_of(w)
+    return plan_cost(plan, options)
 
 
 def _builtin():
@@ -361,6 +508,7 @@ def _builtin():
     register("buckling", domain="buckling", solves=2.5)
     register("vibration", domain="vibration", solves=2.0)
     register("plastic", domain="plastic", solves=25.0)
+    register("jobs run-plan", domain="simulate", cost=_run_plan_cost)
 
 
 _builtin()
