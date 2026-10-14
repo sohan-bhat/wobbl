@@ -42,7 +42,7 @@ def test_the_question_reader_picks_the_template_and_says_what_it_guessed():
 def test_help_lists_the_command_and_its_examples():
     r = CliRunner().invoke(cli, ["mechanism", "--help"])
     assert r.exit_code == 0 and "wobbl mechanism arm" in r.output and "fourbar" in r.output
-    assert "mechanism" in CliRunner().invoke(cli, ["--help"]).output
+    assert "mechanism" in cli.commands and cli.commands["mechanism"].hidden   # reached through wobbl simulate
     r = CliRunner().invoke(cli, ["mechanism", "arm", "--set", "payload"])
     assert r.exit_code != 0 and "key=value" in r.output
 

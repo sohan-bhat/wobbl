@@ -16,9 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_help_and_version():
     r = CliRunner().invoke(cli, ["--help"])
     assert r.exit_code == 0
-    for cmd in ("run", "inspect", "check", "report", "fix", "setup", "doctor", "thermal", "circuit", "motion",
-                "mcp"):
-        assert cmd in r.output
+    listed = re.findall(r"^  (\S+)\s", r.output.split("Commands:")[1], re.M)
+    assert listed[0] == "simulate"
+    assert set(listed) == {"simulate", "inspect", "check", "report", "fix", "uncertainty", "credibility", "test-plan",
+                           "estimate", "jobs", "materials", "validate", "setup", "doctor", "mcp"}
+    for alias in ("run", "thermal", "circuit", "motion", "mechanism", "flow", "buckling", "plastic", "magnetic"):
+        assert alias not in listed and cli.commands[alias].hidden
+        assert CliRunner().invoke(cli, [alias, "--help"]).exit_code == 0, alias
     version = re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M).group(1)
     assert CliRunner().invoke(cli, ["--version"]).output.strip().endswith(version)
 

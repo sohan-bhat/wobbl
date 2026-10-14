@@ -1,15 +1,15 @@
 """The wobbl command line.
 
-    wobbl part.step "will it crack under 200 N?"      ask in plain words
-    wobbl run part.step --material pla --fix "holes" --load "200 N down @ top"
-    wobbl inspect part.step                           faces, holes, fillets, thickness
-    wobbl check  wobbl-out/part                       re-read the checks of a finished run
-    wobbl report wobbl-out/part --open                rebuild and open the HTML report
-    wobbl fix    wobbl-out/part --apply               apply suggested fixes and compare
-    wobbl motion rocket.toml                          a drop, a throw or a rocket flight
-    wobbl mechanism arm --set payload=500g            servos, linkages, gears, impacts, tipping
-    wobbl crack lug.step -m 7075-t6 --crack "through 1.27 mm at hole d=8" ...   where a crack goes and when
-    wobbl doctor | setup | uninstall | materials | mcp | validate
+    wobbl simulate part.step "will it hold 200 N and stay under 60 C?"   any thing, any question
+    wobbl part.step "will it crack under 200 N?"                       the same, without the word simulate
+    wobbl simulate "a 9 cm rock dropped from 300 m"                    words, names, formulas and specs too
+    wobbl simulate --list                                              every domain, its physics and options
+    wobbl inspect part.step                                            faces, holes, fillets, thickness
+    wobbl check | report | fix | uncertainty | credibility | test-plan wobbl-out/part
+    wobbl estimate | jobs | materials | validate | setup | doctor | mcp
+
+Every domain and scenario command (run, thermal, circuit, motion, mechanism, flow and the rest) still works
+as a hidden alias, so scripts keep running, but the help shows only simulate and the general verbs.
 """
 from __future__ import annotations
 
@@ -24,15 +24,40 @@ from .. import __version__
 from . import ui
 
 
+# what 'wobbl --help' shows, in this order; every other command is a hidden alias that still works
+VISIBLE = ("simulate", "inspect", "check", "report", "fix", "uncertainty", "credibility", "test-plan", "estimate",
+           "jobs", "materials", "validate", "setup", "doctor", "mcp")
+
+
+def _routable(args) -> bool:
+    """Whether simulate can take a bare 'wobbl thing "question"', which needs an analysis registered for it."""
+    from ..simulate import RouteError, route
+    thing, rest = args[0], [a for a in args[1:] if not a.startswith("-")]
+    try:
+        route(thing, rest[0] if rest else "")
+    except (RouteError, KeyError, OSError):
+        return False
+    return True
+
+
 class AskGroup(click.Group):
-    """Lets 'wobbl part.step "question"' work next to the subcommands."""
+    """Lets 'wobbl part.step "question"' and 'wobbl "question"' work next to the subcommands, through simulate."""
 
     def resolve_command(self, ctx, args):
-        if args and args[0] not in self.commands and " " in args[0].strip():
-            return "ask", self.commands["ask"], ["-", *args]  # a question with no file: circuits
-        if args and args[0] not in self.commands and (os.path.exists(args[0]) or "." in Path(args[0]).name):
+        bare = args and args[0] not in self.commands and not args[0].startswith("-")
+        if bare and (" " in args[0].strip() or os.path.exists(args[0]) or "." in Path(args[0]).name):
+            if _routable(args):
+                return "simulate", self.commands["simulate"], list(args)
+            if " " in args[0].strip():
+                return "ask", self.commands["ask"], ["-", *args]  # a question with no file
             return "ask", self.commands["ask"], args
         return super().resolve_command(ctx, args)
+
+    def format_commands(self, ctx, formatter):
+        rows = [(n, self.commands[n].get_short_help_str(limit=formatter.width - 22)) for n in VISIBLE
+                if n in self.commands]
+        with formatter.section("Commands"):
+            formatter.write_dl(rows)
 
 
 def _out_dir(part: str, out: str | None) -> Path:
@@ -87,7 +112,9 @@ def _strength_options(f):
 def cli():
     """Wobbl: simulate anything before you build it.
 
-    Ask in plain words (wobbl part.step "will it hold 200 N?") or use the subcommands.
+    Give simulate the thing and the question in plain words, as in
+    wobbl simulate part.step "will it hold 200 N and stay under 60 C?", and it
+    works out the physics.
     """
 
 
@@ -499,7 +526,17 @@ def _register():
         cli.add_command(c)
 
 
+def _hide_aliases():
+    """Keep every domain and scenario command working while the help lists only simulate and the general verbs."""
+    from .simulate import simulate
+    cli.add_command(simulate)
+    for name, c in cli.commands.items():
+        if name not in VISIBLE:
+            c.hidden = True
+
+
 _register()
+_hide_aliases()
 
 
 def main():

@@ -9,10 +9,11 @@ from wobbl.mcp import tools
 
 
 def test_commands_are_listed():
-    r = CliRunner().invoke(cli, ["--help"])
+    r = CliRunner().invoke(cli, ["simulate", "--list"])
     assert r.exit_code == 0
     for cmd in ("buckling", "vibration", "fatigue"):
         assert cmd in r.output
+        assert CliRunner().invoke(cli, [cmd, "--help"]).exit_code == 0   # the old command stays as a hidden alias
 
 
 def test_mcp_tools_are_listed():
