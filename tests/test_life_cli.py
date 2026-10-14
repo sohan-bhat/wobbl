@@ -48,6 +48,44 @@ def test_fatigue_tool_and_errors(tmp_path, monkeypatch):
     assert fp["download_bytes"] == 0 and "download nothing" in fp["line"]
 
 
+def test_the_skills_life_commands_read_their_values():
+    """Every buckling, vibration and fatigue command the skill teaches parses, and its loads, supports, masses,
+    speeds, sweeps, PSDs and blocks all read, so an agent that copies one never hits an input error."""
+    import shlex
+
+    from test_skill_commands import dry_parse, skill_commands
+    from wobbl.life import modal
+    from wobbl.life.fatigue import parse_block
+    from wobbl.life.vibspec import parse_mass, parse_rpm, parse_sine
+    from wobbl.materials import resolve_material
+    from wobbl.structural.spec import parse_fixture, parse_load
+
+    seen = set()
+    for cmd in skill_commands():
+        name, ctx = dry_parse(shlex.split(cmd)[1:])
+        p = ctx.params
+        if name not in ("buckling", "vibration", "fatigue"):
+            continue
+        seen.add(name)
+        if p.get("material"):
+            resolve_material(p["material"])
+        for f in p.get("fixes", ()):
+            parse_fixture(f)
+        for ld in p.get("loads", ()):
+            parse_load(ld)
+        for m in p.get("masses", ()):
+            parse_mass(m)
+        for r in p.get("rpm", ()):
+            parse_rpm(r, p["blades"])
+        if p.get("sine"):
+            parse_sine(p["sine"])
+        if p.get("psd"):
+            modal.parse_psd(p["psd"])
+        for b in p.get("blocks", ()):
+            parse_block(b, 1.0, 1.0)
+    assert seen == {"buckling", "vibration", "fatigue"}
+
+
 def test_commands_refuse_missing_inputs(tmp_path):
     part = tmp_path / "p.step"
     part.write_text("x")

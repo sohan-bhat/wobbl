@@ -1,6 +1,6 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice, Cantera or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
+description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice, Cantera or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
 ---
 
 # Wobbl: simulate before you build
@@ -110,6 +110,26 @@ and calibrates the uncertain inputs. `wobbl credibility wobbl-out/part --influen
 (MCP `assess_credibility`) maps all of it to a V&V 40 style assessment, writes `credibility.html` for a
 reviewer and a test plan, which `wobbl test-plan wobbl-out/part` (MCP `plan_tests`) also writes alone.
 
+For buckling, vibration and fatigue, use the life commands instead of hand formulas.
+`wobbl buckling strut.step -m 6061-t6 --fix "z=min" --load "2 kN -z @ z=max" --target-sf 3`
+(MCP `solve_buckling`) finds the factor on the load at which the part buckles and its mode shapes, then
+cuts it by an imperfection knockdown for the shape and by yielding. Struts follow the European column
+curves, thin cylinders NASA SP-8007, flat plates keep their factor and shapes with no published data take
+0.5, which lowers the confidence. Quote the design factor rather than the raw linear one, because linear
+buckling overpredicts real collapse, most of all for thin shells.
+`wobbl vibration arm.py -m pa12 --fix "bolt holes d=3.2 and x<0" --mass "60 g at 150,0,20 @ top and within 15 of 150,0,15" --rpm "4000-9000 rpm" --blades 2`
+(MCP `solve_vibration`) finds the natural frequencies and judges them against the rotor's once per turn
+and blade pass bands, keeping every mode that moves mass 20% clear by default. Give each motor, battery or
+payload as a mass, because it sets the low modes. A shaker sweep and random vibration go in as
+`wobbl vibration bracket.step -m 6061-t6 --fix "bolt holes" --sine "2 g z 10-500 Hz"` and
+`wobbl vibration bracket.step -m 6061-t6 --fix "bolt holes" --psd gevs-qual --axis z`, which give the peak
+and the 3 sigma stress and, for random input, a fatigue estimate over the test.
+`wobbl fatigue wobbl-out/bracket --ratio 0 --cycles 1e6` (MCP `fatigue_life`) turns a finished strength
+result into the cycles before a crack starts and a safety factor on stress, a duty cycle goes in as
+`wobbl fatigue wobbl-out/bracket --block "100% x 2e4" --block "60% x 1e6" --repeats 10`, and stresses you
+already know run as `wobbl fatigue --material 4140 --amplitude "200 MPa" --mean "100 MPa" --kt 2 --radius "1 mm"`.
+It reads a vibration result folder the same way. Crack growth after a crack starts is a separate question.
+
 ## Never skip
 
 - **Never quote a low confidence number as the answer.** Say what failed and rerun with
@@ -123,6 +143,10 @@ reviewer and a test plan, which `wobbl test-plan wobbl-out/part` (MCP `plan_test
   can lift off and sliding faces each have their own type; pick the one that matches the build.
 - **Do not use `--quality fast` for a final answer**; it is for quick looks.
 - **State the assumptions** Wobbl returns, especially guesses it made from a plain question.
+- **Call a fatigue life an estimate.** Lives scatter by a factor of three to ten at the same stress, so
+  lead with the safety factor on stress and say which S-N data and mean stress model were used.
+- **Never quote a raw linear buckling factor as the margin.** Quote the design factor after the knockdown,
+  and say which shape class set it.
 - **Never call a model validated, certified or approved.** Wobbl supplies credibility evidence and
   proposes levels, and the reviewer, customer or regulator decides what it is enough for. Say plainly
   when readings are synthetic, and quote a failure probability with its interval.
