@@ -93,3 +93,26 @@ def test_niyama_porosity_follows_carlson_and_beckermann():
     for edge in (1.43, 18.0):
         lo, hi = C.niyama(a, np.array([edge * (1 - 1e-6), edge * (1 + 1e-6)]) * per, np.ones(2))[1]
         assert lo == pytest.approx(hi, rel=2e-3)
+
+
+def test_a_small_casting_end_to_end(tmp_path):
+    """A block given no riser: Wobbl places one over its hot spot, the block then freezes fed with the riser last,
+    and the outputs are all there."""
+    import json
+
+    from wobbl.validation import geometry as G
+
+    part = G.box(tmp_path / "block.step", 40, 30, 12)
+    st = C.CastingStudy(str(part), auto_risers=True, quality="fast", mesh_size=3.0)
+    o = C.run_casting(st, tmp_path / "out")
+    assert o.domain == "casting" and o.verdict in ("ok", "marginal")
+    assert o.values["risers_placed"] and len(o.values["risers"]) == 1
+    assert not o.values["pockets"]
+    assert o.values["t_riser_s"] > o.values["t_casting_s"]
+    names = {c.name: c.status for c in o.checks}
+    assert names["energy balance"] == "pass" and names["feeding"] == "pass"
+    assert names["mesh convergence"] == "fail"            # fast quality solves one mesh and says so
+    pb = json.loads((tmp_path / "out" / "playback.json").read_text())
+    assert pb["manifest"]["kind"] == "casting" and len(pb["fields"]["t_solidus"]) == pb["manifest"]["vertex_count"]
+    assert (tmp_path / "out" / "playback.json").stat().st_size < 300_000
+    assert not (tmp_path / "out" / "work").exists()

@@ -54,6 +54,8 @@ class CastingStudy:
     quality: str = "normal"
     scale: float = 1.0
     params: dict = field(default_factory=dict)
+    auto_risers: bool = False          # place risers over the hot spots when none are given
+    mesh_size: float | None = None     # metal element size, mm, instead of the automatic one
 
 
 def effective_heat(alloy: Alloy, pour: float) -> tuple[float, float]:
@@ -237,6 +239,47 @@ def mesh_sizes(feats, quality: str) -> tuple[float, float]:
     return max(h, 0.6), max(3.0 * h, 6.0)
 
 
+def riser_for(xyz, t_hot: float, b_eff: float, X: np.ndarray, casting_nodes: np.ndarray) -> Riser:
+    """A blind riser over a hot spot that freezes at t_hot: modulus 1.2x the hot spot's (from Chvorinov's rule with
+    the mold constant b_eff), height 1.5x the diameter, its foot on the casting's top surface above the spot."""
+    m_hot = math.sqrt(t_hot / b_eff)
+    d = 5.0 * math.ceil(1.2 * m_hot / 0.2143 / 5.0)              # height 1.5 d gives modulus 0.2143 d
+    P = X[casting_nodes]
+    near = np.linalg.norm(P[:, :2] - np.asarray(xyz[:2]), axis=1) < max(d / 2, 1e-6)
+    top = float(P[near][:, 2].max()) if near.any() else float(xyz[2])
+    return Riser(d, 1.5 * d, (round(float(xyz[0]), 1), round(float(xyz[1]), 1), round(top, 2)))
+
+
+def place_risers(study, prep, alloy, mold, pour, B, modulus, margin, duration, h, h_mold, alpha, say,
+                 rounds: int = 2) -> list[Riser]:
+    """Risers where the casting needs them. A coarse freeze without risers finds the last spot to freeze and every
+    spot cut off from it; each gets a riser sized by the modulus rule. The casting is frozen again with them, and
+    any region still cut off gets one more."""
+    risers: list[Riser] = []
+    for k in range(rounds):
+        trial = replace(study, risers=list(risers), auto_risers=False)
+        say("risers", f"round {k + 1}: freezing a coarse mesh with {len(risers)} riser(s) to find hot spots")
+        rm = build(prep, trial.risers, trial.chills, margin, 1.4 * h, h_mold,
+                   0.6 * math.sqrt(alpha * B * modulus ** 2))
+        sv = solidify(trial, rm, alloy, mold, pour, duration)
+        fd = feeding(sv)
+        t_cast = fd["t_casting_s"]
+        if not np.isfinite(t_cast):
+            break
+        b_eff = B * (t_cast / (B * modulus ** 2))
+        spots = [(p["hot_xyz"], p["t_s"]) for p in fd["pockets"]]
+        if not risers:
+            spots.insert(0, (fd["last_xyz"], t_cast))
+        if not spots:
+            break
+        for xyz, t_hot in spots:
+            r = riser_for(xyz, t_hot, b_eff, sv.rm.X, sv.casting_nodes)
+            clash = [q for q in risers if np.linalg.norm(np.subtract(q.at[:2], r.at[:2])) < (q.diameter + r.diameter) / 2]
+            if not clash:
+                risers.append(r)
+    return risers
+
+
 def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: bool = False):
     from ..outcome_generic import GenericOutcome
     from ..structural.run import describe_part
@@ -262,6 +305,18 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
     margin = float(np.clip(3.0 * math.sqrt(alpha * 1.5 * t_est), 15.0, 80.0))
     duration = max(10.0 * t_est, 60.0)
     h, h_mold = mesh_sizes(feats, study.quality)
+    if study.mesh_size:
+        h, h_mold = float(study.mesh_size), max(3.0 * float(study.mesh_size), 6.0)
+    placed = []
+    if study.auto_risers and not study.risers:
+        placed = place_risers(study, prep, alloy, mold, pour, B, modulus, margin, duration, h, h_mold, alpha, say)
+        study = replace(study, risers=placed)
+        foot = sum(math.pi * r.diameter ** 2 / 4 for r in study.risers)
+        modulus = feats.volume / max(feats.surface_area - foot, 1e-9)
+        t_chv = B * modulus ** 2
+        t_est = B * max([modulus] + [r.modulus for r in study.risers]) ** 2
+        margin = float(np.clip(3.0 * math.sqrt(alpha * 1.5 * t_est), 15.0, 80.0))
+        duration = max(10.0 * t_est, 60.0)
     factors = [1.0] if study.quality == "fast" else [1.0, 0.72, 0.52]
     runs = []
     for k, f in enumerate(factors):
@@ -409,8 +464,13 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
         "late in freezing, so real freezing times run somewhat longer.",
         "Shrinkage is fed only along paths of metal that freezes later. Gas porosity from hydrogen is not modeled, "
         "which assumes well degassed metal.",
-        "Risers are blind cylinders sitting on the casting and poured at the same temperature.",
+        "Risers are blind cylinders sitting on the casting and poured at the same temperature. The part is cast "
+        "the way it is drawn, with +z up.",
     ]
+    if placed:
+        assumptions.insert(0, f"No risers were given, so Wobbl placed {len(placed)} over the hot spots of a coarse "
+                              f"freeze without them, each sized by the modulus rule: "
+                              f"{'; '.join(r.text() for r in placed)}.")
     if gp is not None:
         assumptions.append("Porosity comes from the dimensionless Niyama criterion of Carlson and Beckermann (2009), "
                            "with the thermal gradient and cooling rate taken 10% of the freezing range above the "
@@ -427,6 +487,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
                ("riser time ratio", f"{t_ratio:.2f}" if t_ratio is not None else "n/a")]
     values = {"process": "casting", "t_casting_s": t_cast, "t_riser_s": fd["t_riser_s"], "chvorinov_s": t_chv,
               "modulus_mm": modulus, "pour_C": pour, "alloy": alloy.key, "mold": mold.key,
+              "risers": [r.text() for r in study.risers], "risers_placed": bool(placed),
               "pockets": [{k: v for k, v in q.items() if k != "nodes"} for q in pockets],
               "porosity_max_pct": por_max, "porosity_xyz": por_xyz, "last_xyz": fd["last_xyz"],
               "levels": [{"nodes": len(r[0].rm.X), "t_casting_s": r[1]["t_casting_s"], "t99_s": r[1]["t99_s"],
@@ -439,7 +500,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
     field_ = gp if gp is not None else ny
     np.savez_compressed(out / "fields.npz", X=rm.X[used].astype(np.float32), t_solidus=t_sol[used].astype(np.float32),
                         porosity=field_[used].astype(np.float32))
-    o = GenericOutcome("manufacturing", str(study.part), study.question, verdict, head, metrics, level, reasons,
+    o = GenericOutcome("casting", str(study.part), study.question, verdict, head, metrics, level, reasons,
                        checks, assumptions, values, imgs, fixes, notes,
                        solver=f"Wobbl enthalpy solver (scipy), {len(rm.X):,} nodes", t_total=time.time() - t0)
     o.write(out)
@@ -462,16 +523,14 @@ def casting_fixes(study, fd, ratio, B, por_max, por_xyz, t_ratio, rm, cn) -> lis
     for p in fd["pockets"][:2]:
         targets.append((p["hot_xyz"], p["t_s"], "the cut off region"))
     for xyz, t_hot, what in targets:
-        m_hot = math.sqrt(t_hot / b_eff)
-        d = 5.0 * math.ceil(1.2 * m_hot / 0.2143 / 5.0)              # height 1.5 d gives modulus 0.2143 d
-        near = np.linalg.norm(rm.X[cn, :2] - np.asarray(xyz[:2]), axis=1) < max(d / 2, 1e-6)
-        top = float(rm.X[cn][near][:, 2].max()) if near.any() else float(xyz[2])
-        fixes.append({"kind": "riser", "title": f"Add a riser d={fmt(d)} h={fmt(1.5 * d)} mm over {what}",
-                      "summary": f"{what.capitalize()} has a modulus of about {fmt(m_hot)} mm, from its freezing time "
-                                 f"through Chvorinov's rule scaled to this solve. A blind riser needs 1.2x that, so "
-                                 f"d={fmt(d)} mm and h={fmt(1.5 * d)} mm on top at ({fmt(xyz[0])}, {fmt(xyz[1])}, "
-                                 f"{fmt(top)}). Check it with --riser \"d={fmt(d)} h={fmt(1.5 * d)} at "
-                                 f"{fmt(xyz[0])},{fmt(xyz[1])},{fmt(top)}\".", "auto": False})
+        r = riser_for(xyz, t_hot, b_eff, rm.X, cn)
+        at = ",".join(fmt(v) for v in r.at)
+        fixes.append({"kind": "riser", "title": f"Add a riser d={fmt(r.diameter)} h={fmt(r.height)} mm over {what}",
+                      "summary": f"{what.capitalize()} has a modulus of about {fmt(math.sqrt(t_hot / b_eff))} mm, from "
+                                 "its freezing time through Chvorinov's rule scaled to this solve. A blind riser "
+                                 f"needs 1.2x that, so d={fmt(r.diameter)} mm and h={fmt(r.height)} mm on top at "
+                                 f"({_xyz(r.at)}). Check it with --riser \"d={fmt(r.diameter)} h={fmt(r.height)} at "
+                                 f"{at}\", or let Wobbl place risers with --risers auto.", "auto": False})
     for p in fd["pockets"][:1]:
         w = max(10.0, float(np.sort(np.ptp(rm.X[p["nodes"]], axis=0))[-2]))
         fixes.append({"kind": "chill", "title": "Or chill the cut off region",
