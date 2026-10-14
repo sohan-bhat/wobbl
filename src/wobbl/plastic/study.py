@@ -160,7 +160,7 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
         say("geometry", f"reading {Path(study.part).name}")
         pre = describe_part(base.part, work, base.scale, base.body, base.params)
     prep, feats = pre
-    loads, fixtures, _ = resolve_selections(base, feats)
+    loads, fixtures, selections = resolve_selections(base, feats)
     target = QUALITY.get(study.quality, QUALITY["normal"])
     s0 = plastic_sizing(prep, feats, target)
     levels, last = [], None
@@ -203,6 +203,11 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
     o.notes = list(prep.notes)
     if study.playback:
         o.images["playback"] = playback(out / "playback.json", study, mesh, lim, service)
+    try:
+        from .scene import write_scene
+        write_scene(out, study, o, mesh, base, selections, lim, service)
+    except Exception as e:  # noqa: BLE001  a view that cannot be built never costs the result
+        o.notes.append(f"The 3D view could not be built ({str(e)[:120]}).")
     o.write(out)
     clean_work(work, study.keep)
     return o

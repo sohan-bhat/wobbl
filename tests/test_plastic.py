@@ -142,6 +142,9 @@ def test_end_moment_collapses_at_the_fully_plastic_moment(tmp_path):
     assert names["force balance"] == "pass" and names["unloading balance"] == "pass"
     assert names["hand calculation"] == "pass" and names["collapse"] == "pass"
     assert not (tmp_path / "out" / "work").exists()      # the solver's scratch is gone unless kept
+    from wobbl.viz.scene import load
+    head = load((tmp_path / "out" / "scene.wobbl").read_bytes())[0]     # the 3D view, every frame solved
+    assert head["domain"] == "plastic" and [e["name"] for e in head["events"]][-1] == "collapse"
 
 
 def test_custom_metal_without_a_tensile_strength_is_perfectly_plastic():
