@@ -208,7 +208,7 @@ def knockdown(shape: str, features, built, loads) -> tuple[float, str]:
         return 0.2, ("spherical caps under external pressure buckle far below the classical load in tests, and 0.2 is "
                      "near the low end of the data in NASA SP-8032")
     if shape == "plate":
-        return 1.0, ("flat plates are not imperfection sensitive: they keep carrying load after they buckle, though "
+        return 1.0, ("flat plates are not imperfection sensitive, since they keep carrying load after they buckle, though "
                      "their deflection grows from the buckling load on")
     if shape == "column":
         return 1.0, "column curve"
@@ -231,7 +231,7 @@ def column_curve(lam: float, col: Column, mat) -> tuple[float, float, str, str]:
     phi = 0.5 * (1 + alpha * (lb - lam0) + lb * lb)
     chi = min(1.0, 1.0 / (phi + math.sqrt(max(phi * phi - lb * lb, 0.0))))
     design = chi * squash
-    why = (f"{src} (imperfection factor {alpha:g}): relative slenderness {lb:.2f}, reduction {chi:.3f} on the "
+    why = (f"{src} (imperfection factor {alpha:g}), whose relative slenderness of {lb:.2f} keeps {chi:.3f} of the "
            f"squash load of {fmt(mat.allowable * col.area)} N")
     return design, design / lam, why, "crookedness, eccentricity and yielding, through the column curve"
 
@@ -257,7 +257,7 @@ def euler_check(lam: float, col: Column | None, mat) -> Check:
     expect = pe / col.load
     err = lam / expect - 1
     s = (f"Euler's column, {col.ends} (K = {col.k:g}), with I = {fmt(col.i_min)} mm4 over {fmt(col.length)} mm gives "
-         f"{fmt(pe)} N, a factor of {fmt(expect)}; the finite element factor is {fmt(lam)} ({100 * err:+.1f}%)")
+         f"{fmt(pe)} N, a factor of {fmt(expect)}, and the finite element factor is {fmt(lam)} ({100 * err:+.1f}%)")
     detail = {"euler_N": pe, "euler_factor": expect, "slenderness": col.slenderness, "k": col.k}
     if abs(err) <= 0.05:
         return Check("hand calculation", "pass", s, detail)
@@ -275,7 +275,7 @@ def separation_check(factors: list[float]) -> Check:
         return Check("mode separation", "skip", "only one buckling mode was found")
     twin = pos[1] <= 1.005 * pos[0]
     nxt = next((f for f in pos[1:] if f > 1.005 * pos[0]), None)
-    s = "the first factor repeats, the same buckle in two directions of a symmetric section; " if twin else ""
+    s = "the first factor repeats, the same buckle in two directions of a symmetric section, and " if twin else ""
     if nxt is None:
         return Check("mode separation", "info", s + "no distinct mode was found among the ones solved",
                      {"factors": factors})

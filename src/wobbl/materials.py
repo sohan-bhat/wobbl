@@ -340,9 +340,9 @@ class FatigueData:
     estimated: bool = False
 
 
-_SHIGLEY = "estimate: S'e = 0.5 Sut for steels up to 1400 MPa (Shigley's Mechanical Engineering Design, 10th ed., Eq. 6-8)"
+_SHIGLEY = "estimated as S'e = 0.5 Sut for steels up to 1400 MPa (Shigley's Mechanical Engineering Design, 10th ed., Eq. 6-8)"
 _RR_MOORE = "R.R. Moore rotating beam, completely reversed, 5e8 cycles"
-_PLASTIC = ("estimate: unfilled thermoplastics reach about 20 to 30% of their tensile strength at 1e7 cycles "
+_PLASTIC = ("estimated, since unfilled thermoplastics reach about 20 to 30% of their tensile strength at 1e7 cycles "
             "(for example Crawford, Plastics Engineering); Wobbl takes 25%")
 
 FATIGUE: dict[str, FatigueData] = {
@@ -367,7 +367,7 @@ FATIGUE: dict[str, FatigueData] = {
     "pc": FatigueData(16.25, 1e7, False, "plastic", _PLASTIC, estimated=True),
     "hdpe": FatigueData(7.5, 1e7, False, "plastic", _PLASTIC, estimated=True),
     "wood": FatigueData(23.8, 3e7, False, "wood",
-                        "USDA Wood Handbook FPL-GTR-282: clear wood in fully reversed bending keeps about 28% of its "
+                        "USDA Wood Handbook FPL-GTR-282, where clear wood in fully reversed bending keeps about 28% of its "
                         "85 MPa modulus of rupture at 3e7 cycles"),
 }
 
@@ -389,10 +389,10 @@ def fatigue_data(mat: Material) -> FatigueData | None:
         if mat.process == "cast":
             a356 = FATIGUE["a356-t6"].strength / LIBRARY["a356-t6"].tensile_strength
             return FatigueData(a356 * mat.tensile_strength, 5e8, False, "aluminum",
-                               f"estimate: {a356:.2f} Sut at 5e8 cycles, the ratio of sand cast A356-T6",
+                               f"estimated as {a356:.2f} Sut at 5e8 cycles, the ratio of sand cast A356-T6",
                                estimated=True)
         return FatigueData(0.3 * mat.tensile_strength, 5e8, False, "aluminum",
-                           "estimate: 0.3 Sut at 5e8 cycles, close to the wrought aluminum alloys in this table",
+                           "estimated as 0.3 Sut at 5e8 cycles, close to the wrought aluminum alloys in this table",
                            estimated=True)
     return None
 

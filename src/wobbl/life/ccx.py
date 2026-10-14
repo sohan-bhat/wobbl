@@ -65,7 +65,7 @@ def make_deck(model: StaticModel, path: Path, attached: list[Attached] = ()) -> 
             continue
         nodes = np.setdiff1d(a.nodes, held)
         if len(nodes) < 3:
-            raise ValueError(f"the faces holding {a.name} are all held by supports; attach it to free faces")
+            raise ValueError(f"the faces holding {a.name} are all held by supports, so attach it to free faces")
         rigid.append(RigidCoupling(a.name, nodes, np.asarray(a.point, float)))
         holder[a.name] = a.name
     path = Path(path)

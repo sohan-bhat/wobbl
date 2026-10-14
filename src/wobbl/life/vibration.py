@@ -101,7 +101,7 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
     mesh, built, deck, modes, resp, sz, wl = last
     if modes.freq[-1] < 1.5 * top and modes.count == n_modes and n_modes < MAX_MODES:
         say("check", f"the {n_modes} modes found reach {fmt(modes.freq[-1])} Hz, short of 1.5 times the "
-                     f"{fmt(top)} Hz input; more modes would cover it (--modes)")
+                     f"{fmt(top)} Hz input, and more modes would cover it (--modes)")
 
     harmonic = None
     if sine is not None and resp is not None:
@@ -142,7 +142,7 @@ def _attach(masses, sel: Selector, mesh) -> list:
         except Exception as e:  # noqa: BLE001
             raise SpecError(f"mass {k + 1} ({m.describe()}): {e}") from None
         if not mask.any():
-            raise SpecError(f"mass {k + 1} ({m.describe()}) sits on no part of the mesh; widen the selection")
+            raise SpecError(f"mass {k + 1} ({m.describe()}) sits on no part of the mesh, so widen the selection")
         w, _ = tri_area_weights(mesh, mask)
         nodes = np.nonzero(w > 0)[0]
         point = np.asarray(m.point, float) if m.point is not None else (mesh.X[nodes] * w[nodes, None]).sum(0) / \

@@ -44,7 +44,7 @@ def surface_factor(surface: str, sut: float, metal: bool) -> tuple[float, str]:
     if s not in SURFACES:
         raise ValueError(f"unknown surface '{surface}' (use {', '.join(SURFACES)})")
     if not metal or SURFACES[s] is None:
-        return 1.0, ("polished, as tested" if metal else "not applied: the data are for parts made the same way")
+        return 1.0, ("polished, as tested" if metal else "not applied, since the data are for parts made the same way")
     a, b = SURFACES[s]
     return min(1.0, a * sut ** b), f"{s} surface (Shigley Table 6-2" + (", as cast taken as hot rolled)"
                                                                         if s == "as-cast" else ")")

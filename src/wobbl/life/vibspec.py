@@ -106,7 +106,7 @@ def parse_mass(text: str) -> MassSpec:
     try:
         q = parse_quantity(low, "mass")
     except UnitError as e:
-        raise SpecError(f"{e} (in mass '{text}'; write it like '45 g' or '0.3 kg')") from None
+        raise SpecError(f"{e} (in mass '{text}', written like '45 g' or '0.3 kg')") from None
     if q.value <= 0:
         raise SpecError(f"mass '{text}' must be positive")
     if rigid and point is None:
@@ -119,7 +119,7 @@ def parse_rpm(text: str, blades: int = 2) -> list[Excitation]:
     t = str(text).strip().lower().replace("rpm", "").strip()
     m = re.match(rf"^({_NUM})\s*(?:-|to|\.\.)\s*({_NUM})$", t) or re.match(rf"^({_NUM})$", t)
     if not m:
-        raise SpecError(f"could not read the speed '{text}'; write it like '9000 rpm' or '4000-9000 rpm'")
+        raise SpecError(f"could not read the speed '{text}'. Write it like '9000 rpm' or '4000-9000 rpm'")
     lo = float(m.group(1))
     hi = float(m.group(2)) if m.lastindex == 2 else lo
     if lo <= 0 or hi < lo:
@@ -138,7 +138,7 @@ def _band(t: str, what: str, text: str) -> tuple[float, float, int]:
     end applies to both numbers. Returns (low, high, where the band starts in t)."""
     m = _BAND.search(t.strip().lower())
     if not m:
-        raise SpecError(f"could not read the {what} in '{text}'; write it like '120 Hz' or '100-150 Hz'")
+        raise SpecError(f"could not read the {what} in '{text}'. Write it like '120 Hz' or '100-150 Hz'")
     last = m.group(4) or m.group(2) or "hz"
     lo = float(m.group(1)) * (1e3 if (m.group(2) or last) == "khz" else 1.0)
     hi = float(m.group(3)) * (1e3 if last == "khz" else 1.0) if m.group(3) else lo
@@ -151,7 +151,7 @@ def parse_frequency(text: str) -> Excitation:
     t = str(text).strip().lower()
     lo, hi, start = _band(t, "frequency", text)
     if t[:start].strip():
-        raise SpecError(f"could not read the frequency '{text}'; write it like '120 Hz' or '100-150 Hz'")
+        raise SpecError(f"could not read the frequency '{text}'. Write it like '120 Hz' or '100-150 Hz'")
     return Excitation(lo, hi, "excitation")
 
 
@@ -160,12 +160,12 @@ def parse_sine(text: str) -> Sine:
     t = str(text).strip().lower()
     m = re.match(rf"^({_NUM})\s*(g|m/s2|m/s\^2|mm/s2)\s+(\S+)\s+(.+)$", t)
     if not m:
-        raise SpecError(f"could not read the sine sweep '{text}'; write it like '2 g z 10-500 Hz'")
+        raise SpecError(f"could not read the sine sweep '{text}'. Write it like '2 g z 10-500 Hz'")
     accel = parse_quantity(f"{m.group(1)} {m.group(2)}", "accel").value
     try:
         d = parse_vector(m.group(3))
     except Exception:  # noqa: BLE001
-        raise SpecError(f"could not read the axis '{m.group(3)}' in '{text}'; use x, y, z or 0,0,1") from None
+        raise SpecError(f"could not read the axis '{m.group(3)}' in '{text}'. Use x, y, z or 0,0,1") from None
     rest = re.sub(r"^from\s+", "", m.group(4).strip())
     lo, hi, start = _band(rest, "band", text)
     if rest[:start].strip() or hi <= lo:
@@ -202,4 +202,4 @@ def unit_vector(text: str) -> np.ndarray:
     try:
         return parse_vector(text)
     except Exception:  # noqa: BLE001
-        raise SpecError(f"could not read the axis '{text}'; use x, y, z or 0,0,1") from None
+        raise SpecError(f"could not read the axis '{text}'. Use x, y, z or 0,0,1") from None

@@ -89,7 +89,7 @@ def modes_doc(mesh, modes, picks: list[int], labels: dict, values: dict) -> dict
                     "shape": quantize(phi, "int8")})
     doc = {"format": "wobbl-playback", "version": 1, "kind": "vibration",
            "about": "Mode shapes of the part as it is held, each scaled to a largest motion of one. Play a mode as "
-                    "x(t) = x + a * shape * sin(2 pi f t), with a about amplitude_mm and f slowed down for the eye; "
+                    "x(t) = x + a * shape * sin(2 pi f t), with a about amplitude_mm and f slowed down for the eye. "
                     "the real motion is far smaller and far faster.",
            "units": {"length": "mm", "frequency": "Hz", "stress": "MPa"},
            "mesh": mesh_block(pts, faces), "amplitude_mm": round(0.06 * float(np.linalg.norm(np.ptp(pts, 0))), 3),
@@ -119,7 +119,7 @@ def buckling_doc(mesh, shape: np.ndarray, factor: float, design: float, yield_fa
             "about": "The first buckling shape, scaled to a largest motion of one, and how far a part that starts "
                      f"crooked by {imperfection:.3g} mm in that shape ({why}) has bowed at each load factor, "
                      "e0 / (1 - P / Pcr). That is the classic estimate for an imperfect part and not a collapse "
-                     "simulation; it grows without bound at the buckling load.",
+                     "simulation, and it grows without bound at the buckling load.",
             "units": {"length": "mm", "load_factor": "times the applied load"},
             "mesh": mesh_block(pts, faces), "shape": quantize(phi, "int8"),
             "frames": {"load_factor": [round(float(x), 5) for x in lam],
@@ -146,7 +146,7 @@ def fatigue_doc(blocks: list, lives: list, repeats: float, single: bool, require
                 label.append(b.label or "load")
     return {"format": "wobbl-playback", "version": 1, "kind": "fatigue",
             "about": "Fatigue damage by Miner's rule as the cycles add up, block after block. A crack is predicted "
-                     "to start where the damage reaches one; lives scatter by a factor of three to ten around it.",
+                     "to start where the damage reaches one, and lives scatter by a factor of three to ten around it.",
             "units": {"cycles": "load cycles", "damage": "fraction of life", "stress": "MPa"},
             "frames": {"cycles": [round(x, 3) for x in t], "damage": [round(x, 8) for x in d], "block": label},
             "blocks": [{"label": b.label or "load", "amplitude_MPa": round(b.amplitude, 4), "mean_MPa": round(b.mean, 4),

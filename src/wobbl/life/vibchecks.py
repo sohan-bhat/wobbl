@@ -138,7 +138,7 @@ def evaluate(study, mat, modes, mesh, built, levels, stopped_by, tol, zeta, exci
                 verdicts.append(verdict_for(fat["sf"], target))
                 if fat["damage"] <= 0:
                     head += (f" Over {fmt(dur / 60)} min even the 3 sigma peaks stay under the endurance limit, so "
-                             f"Steinberg's method finds no fatigue damage; the stress could rise {fat['sf']:.2f} times "
+                             f"Steinberg's method finds no fatigue damage, and the stress could rise {fat['sf']:.2f} times "
                              "before cracks would start.")
                 else:
                     head += (f" Over {fmt(dur / 60)} min Steinberg's method gives fatigue damage {fat['damage']:.2g}, "
@@ -156,7 +156,7 @@ def evaluate(study, mat, modes, mesh, built, levels, stopped_by, tol, zeta, exci
         d = int(np.argmax(frac[0]))
         heads.append(f"First natural frequency {fmt(modes.freq[0])} Hz, where mode 1 moves {100 * frac[0, d]:.0f}% of "
                      f"the mass along {'xyz'[d]}. No excitation was given, so Wobbl lists the modes without a "
-                     "verdict; pass --rpm, --frequency, --sine or --psd to judge them.")
+                     "verdict. Pass --rpm, --frequency, --sine or --psd to judge them.")
     values["sf"] = sf
     return checks, extra, verdict, sf, " ".join(heads), values
 
@@ -176,7 +176,7 @@ def _resonance_head(rows, v, excite, margin) -> str:
                 f"grows about {r['amplification']:.2g} times.")
     near = min(rows, key=lambda r: r["separation"]) if rows else None
     s = f"Every mode that the excitation can drive stays at least {100 * margin:.0f}% clear of it"
-    return s + (f"; the nearest is mode {near['mode']} at {fmt(near['frequency'])} Hz, {100 * near['separation']:.0f}% "
+    return s + (f", and the nearest is mode {near['mode']} at {fmt(near['frequency'])} Hz, {100 * near['separation']:.0f}% "
                 f"from the {near['excitation']}." if near else ".")
 
 
@@ -216,7 +216,7 @@ def _participation(modes, frac, sine, psd, axis, excite) -> Check:
     if cap >= 0.9 or reach >= 1.5 * top:
         return Check("mass participation", "pass", s, {"captured": cap, "highest_Hz": reach})
     return Check("mass participation", "warn", s + f", and the input reaches {fmt(top)} Hz. The rest of the mass moves "
-                                                   "in higher modes, so the response may be low; run with more --modes",
+                                                   "in higher modes, so the response may be low. Run with more --modes",
                  {"captured": cap, "highest_Hz": reach})
 
 
@@ -257,7 +257,7 @@ def _sdof_check(modes, h, sine, zeta) -> Check:
 def _cross_check(harmonic, h) -> Check:
     if harmonic is None or "error" in harmonic:
         why = harmonic["error"] if harmonic else "it was not run"
-        return Check("solver cross-check", "warn", f"CalculiX's steady state dynamics did not run ({why[:120]}); the "
+        return Check("solver cross-check", "warn", f"CalculiX's steady state dynamics did not run ({why[:120]}), so the "
                                                    "peak comes from Wobbl's own modal sum")
     d = abs(harmonic["at_wobbl_node"] - h["peak"]) / max(h["peak"], 1e-30)
     s = (f"CalculiX's steady state dynamics, reading the same modes, gives {fmt(harmonic['at_wobbl_node'])} MPa where "
@@ -284,7 +284,7 @@ def _miles_check(modes, r, psd, axis, zeta, frac) -> Check:
     single = q_rms * s_i
     accel = modal.miles_rms(float(modes.freq[i]), zeta, level)
     ratio = single / r["sigma_rms"] if r["sigma_rms"] > 0 else 0.0
-    s = (f"mode {i + 1} at {fmt(modes.freq[i])} Hz alone, at {level:.3g} g2/Hz (Miles: {fmt(accel)} grms of response), "
+    s = (f"mode {i + 1} at {fmt(modes.freq[i])} Hz alone, at {level:.3g} g2/Hz (by Miles' equation {fmt(accel)} grms of response), "
          f"gives {fmt(single)} MPa rms at the governing point, {100 * ratio:.0f}% of the full sum of "
          f"{fmt(r['sigma_rms'])} MPa")
     detail = {"mode": i + 1, "single_mode_rms_MPa": single, "miles_grms": accel, "ratio": ratio}
@@ -298,7 +298,7 @@ def _singular(raw: float, gov: float, radius: float, what: str) -> Check:
         return Check("singularities", "pass", f"no support or sharp corner peak is above the reported {what}")
     return Check("singularities", "info" if raw <= 1.5 * gov else "warn",
                  f"the highest {what} anywhere is {fmt(raw)} MPa, at a support, a rigid attachment or a sharp corner "
-                 f"where its value depends on the idealization; Wobbl reports it {fmt(radius)} mm or more away from "
+                 f"where its value depends on the idealization, so Wobbl reports it {fmt(radius)} mm or more away from "
                  f"those spots ({fmt(gov)} MPa)", {"raw_max_MPa": raw})
 
 
@@ -306,7 +306,7 @@ def _sanity(modes, total) -> Check:
     f1 = float(modes.freq[0])
     s = f"first mode {fmt(f1)} Hz, mass {fmt(total * 1e6)} g"
     if not 0.1 <= f1 <= 1e6:
-        return Check("units and sanity", "warn", s + "; a first mode this far out usually means a unit slip in the "
+        return Check("units and sanity", "warn", s + ". A first mode this far out usually means a unit slip in the "
                                                      "file or the material")
     return Check("units and sanity", "pass", s + ": plausible")
 
@@ -343,9 +343,9 @@ def metrics(values: dict) -> list[tuple[str, str]]:
 
 
 def assumptions(mat, zeta_why, masses, deck, sine, psd, base) -> list[str]:
-    a = ["Linear elastic, small vibrations about the unloaded shape. Supports are as rigid as modeled; real mounts "
+    a = ["Linear elastic, small vibrations about the unloaded shape. Supports are as rigid as modeled, while real mounts "
          "flex, which lowers every natural frequency.",
-         f"Damping is the same for every mode: {zeta_why}.",
+         f"Damping is the same for every mode, {zeta_why}.",
          f"{mat.name}: E {fmt(mat.E)} MPa, Poisson {mat.nu:g}, density {fmt(mat.density)} kg/m3, {mat.criterion} "
          f"{fmt(mat.allowable)} MPa ({mat.source})."]
     for k, m in enumerate(masses):
@@ -361,7 +361,7 @@ def assumptions(mat, zeta_why, masses, deck, sine, psd, base) -> list[str]:
                  "random response step, so Wobbl sums it from CalculiX's modes, with the mean square von Mises stress "
                  "from Segalman's method. The 3 sigma stress is exceeded 0.27% of the time.")
     if sine is not None or psd is not None:
-        a.append("The response counts the modes found; modes above them add a little that is not counted, and the "
+        a.append("The response counts the modes found. Modes above them add a little that is not counted, and the "
                  "mass participation check says how much mass they carry.")
     made = process_caveat(mat, base.print_direction)
     if made:
@@ -416,7 +416,7 @@ def fixes(values: dict, mat, features) -> list[dict]:
         t = features.thickness_typical
         out.append({"kind": "thicken", "title": "Thicken where the stress peaks, and raise the mode",
                     "summary": f"The response stress has to fall {need:.2g} times. Adding depth where the part bends "
-                               f"lowers the stress and raises the frequency; for a flat input a single mode's random "
+                               f"lowers the stress and raises the frequency, and for a flat input a single mode's random "
                                f"motion falls as f^-1.5. Start with the {fmt(t)} mm walls near the peak.",
                     "auto": False})
     return out

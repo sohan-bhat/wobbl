@@ -82,7 +82,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
         (wl / "buckle.frd").unlink(missing_ok=True)
         pos = [f for f in factors if f > 0]
         if not pos:
-            raise ValueError("these loads do not buckle the part in the modes found: every buckling factor is "
+            raise ValueError("these loads do not buckle the part in the modes found, because every buckling factor is "
                              f"negative ({', '.join(fmt(f) for f in factors)}), so the part would buckle only "
                              "with the loads reversed. Check the load directions")
         levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sz.h, "factor": pos[0], "factors": factors,
@@ -142,7 +142,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
     extra = []
     if shape == "general":
         extra.append(("medium", "no published knockdown fits this shape, so the 0.5 imperfection knockdown is a "
-                                "judgment; pass --shape if the part is a column, plate, cylinder or dome"))
+                                "judgment, so pass --shape if the part is a column, plate, cylinder or dome"))
     level, reasons = confidence(checks, extra)
 
     crit = lam * load
@@ -184,19 +184,19 @@ def _sanity(lam: float, U0: np.ndarray, diag: float) -> Check:
     d = float(np.linalg.norm(U0, axis=1).max())
     s = f"buckling factor {fmt(lam)}, deflection {fmt(d)} mm under the reference load ({100 * d / diag:.2g}% of size)"
     if not 1e-4 < lam < 1e6:
-        return Check("units and sanity", "warn", s + "; a factor this far from one usually means a unit slip in the "
+        return Check("units and sanity", "warn", s + ". A factor this far from one usually means a unit slip in the "
                                                      "load", {"factor": lam})
     if d > 0.1 * diag:
-        return Check("units and sanity", "warn", s + "; the part bends a lot before buckling, so a linear buckling "
+        return Check("units and sanity", "warn", s + ". The part bends a lot before buckling, so a linear buckling "
                                                      "answer is rough", {"factor": lam})
     return Check("units and sanity", "pass", s + ": plausible", {"factor": lam})
 
 
 def _assumptions(mat, shape, why_shape, kd_why, interaction, base) -> list[str]:
-    a = ["Linear eigenvalue buckling: the stiffness the loads take away is found from the stress they cause in the "
+    a = ["Linear eigenvalue buckling, where the stiffness the loads take away is found from the stress they cause in the "
          "perfect, undeformed part, and the loads keep their direction as it deflects. It overpredicts the collapse "
          "load of real parts, most of all for thin shells, which is what the knockdown is for.",
-         f"Shape class: {shape}, {why_shape}. Knockdown: {kd_why}.",
+         f"The shape class is {shape}, {why_shape}, and the knockdown comes from {kd_why}.",
          f"{mat.name}: E {fmt(mat.E)} MPa, Poisson {mat.nu:g}, {mat.criterion} {fmt(mat.allowable)} MPa ({mat.source})."]
     if interaction:
         a.append(f"The design factor also counts {interaction}.")

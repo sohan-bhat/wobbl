@@ -60,7 +60,7 @@ def count(text) -> float:
     try:
         n = float(t) * scale
     except ValueError:
-        raise ValueError(f"could not read the number of cycles '{text}'; write it like 1e7 or '2 million'") from None
+        raise ValueError(f"could not read the number of cycles '{text}'. Write it like 1e7 or '2 million'") from None
     if n <= 0:
         raise ValueError("the number of cycles must be positive")
     return n
@@ -189,7 +189,7 @@ def _source(study: FatigueStudy) -> dict:
                 "part": "", "where": "at the stresses given"}
     d = Path(study.source)
     if not (d / "outcome.json").exists():
-        raise ValueError(f"no Wobbl result in '{study.source}'; pass the folder a strength or vibration run printed")
+        raise ValueError(f"no Wobbl result in '{study.source}'. Pass the folder a strength or vibration run printed")
     o = json.loads((d / "outcome.json").read_text())
     st = json.loads((d / "study.json").read_text()) if (d / "study.json").exists() else {}
     dom = o.get("domain")
@@ -266,7 +266,7 @@ def _from_vibration(o: dict, st: dict, d: Path, study: FatigueStudy) -> dict:
         blocks.append(F.Block(h["peak_MPa"], 0.0, h["frequency_Hz"] * dur, f"sine dwell at {fmt(h['frequency_Hz'])} Hz"))
         where, xyz = where or "at the sine peak", xyz or h["xyz"]
     if not blocks:
-        raise ValueError("this vibration result has no sine or random response to count; run it with --sine or --psd")
+        raise ValueError("this vibration result has no sine or random response to count. Run it with --sine or --psd")
     part = o.get("part", "")
     return {"kind": "vibration result", "material": mat, "spectrum": blocks, "local": True,
             "part": str((d / part).resolve()) if part and not Path(part).is_absolute() else part, "where": where,
@@ -304,7 +304,7 @@ def _checks(src, blocks, curve, data, lives, model, spread, target, kt, kf, q, q
         out.append(Check("first cycle yield", "fail" if short else "warn",
                          f"the highest stress in a cycle, {fmt(peak)} MPa, is {1 / ny:.2f} times the {fmt(curve.sy)} "
                          "MPa yield, so the notch yields a little every cycle. " +
-                         ("Under 1000 cycles this is low cycle fatigue, where stress life does not apply; use strain "
+                         ("Under 1000 cycles this is low cycle fatigue, where stress life does not apply, so use strain "
                           "life data or lower the stress" if short else
                           "The S-N line still covers lives past 1000 cycles, though strain life data would be more "
                           "accurate here")))
@@ -316,13 +316,13 @@ def _checks(src, blocks, curve, data, lives, model, spread, target, kt, kf, q, q
                                               f"{cycles_text(curve.ne)} the data reach, so that life extends the line"))
     else:
         out.append(Check("S-N range", "warn" if data.estimated else "pass",
-                         ("estimated line: " if data.estimated else "") + f"{curve.describe()} ({data.source})"))
+                         ("an estimated line, " if data.estimated else "the line runs ") + f"{curve.describe()} ({data.source})"))
     vals = [v for v in spread.values() if math.isfinite(v)]
     if vals and max(b.mean for b in blocks) > 0:
         flips = len({v >= target for v in vals}) > 1
         s = ", ".join(f"{m.capitalize()} {spread[m]:.2f}" for m in F.MEAN_MODELS)
         out.append(Check("mean stress model", "warn" if flips else "pass",
-                         f"safety factor by mean stress model: {s}; the answer uses {model.capitalize()}"
+                         f"the mean stress models give safety factors of {s}, and the answer uses {model.capitalize()}"
                          + (". The verdict depends on that choice" if flips else ", and the verdict is the same with "
                             "each"), spread))
     if kt:
@@ -355,7 +355,7 @@ def _other_peaks(src, blocks, curve, model) -> list[Check]:
     h = max(worse, key=lambda x: x["values"][-1])
     return [Check("other peaks", "warn", f"the peak of {fmt(h['values'][-1])} MPa "
                                          f"({h.get('detail') or 'elsewhere on the part'}) would start a crack sooner "
-                                         "when counted without notch sensitivity; its notch radius decides which one "
+                                         "when counted without notch sensitivity, and its notch radius decides which one "
                                          "governs", {"xyz": h["xyz"]})]
 
 
@@ -380,25 +380,25 @@ def _headline(single, life, need, sf, target, curve, blocks, src, repeats, D) ->
         return (f"{lead} about {cycles_text(life)} cycles{at}, with {swing}. For the required "
                 f"{cycles_text(need)} cycles the safety factor on stress is {sf:.2f} (target {target:g}).")
     if D <= 0:
-        return (f"No block reaches the endurance limit{at}, so the duty cycle does no fatigue damage; the stresses "
+        return (f"No block reaches the endurance limit{at}, so the duty cycle does no fatigue damage, and the stresses "
                 f"could rise {sf:.2f} times before it would (target {target:g}).")
     run = "test" if src.get("duration") else "duty cycle"
     lead = f"The {run} uses" if repeats == 1 else f"{fmt(repeats)} runs of the {run} use"
     return (f"{lead} {100 * D * repeats:.3g}% of the fatigue life{at} (Miner's rule), so it can run about "
-            f"{cycles_text(life)} times before cracks start; the stresses could rise {sf:.2f} times before the "
+            f"{cycles_text(life)} times before cracks start, and the stresses could rise {sf:.2f} times before the "
             f"required {cycles_text(need)} runs would start a crack (target {target:g}).")
 
 
 def _assumptions(mat, data, curve, model, src, surface, study) -> list[str]:
-    a = ["Stress life method for crack initiation (Shigley's approach): an S-N line from f Sut at 1000 cycles to the "
+    a = ["Stress life method for crack initiation, as Shigley sets it out, with an S-N line from f Sut at 1000 cycles to the "
          "corrected endurance strength. It does not cover crack growth after a crack starts, which is a separate "
          "damage tolerance question.",
-         f"S-N data for {mat.name}: {fmt(data.strength)} MPa at {cycles_text(data.cycles)} cycles, smooth specimens, "
+         f"S-N data for {mat.name} give {fmt(data.strength)} MPa at {cycles_text(data.cycles)} cycles, smooth specimens, "
          f"fully reversed ({data.source}).",
-         f"Marin factors: surface {surface} ({curve.factors['surface ka'][0]:.2f}), size "
+         f"The Marin factors are surface {surface} ({curve.factors['surface ka'][0]:.2f}), size "
          f"{curve.factors['size kb'][0]:.2f}, load {curve.factors['load kc'][0]:.2f}, reliability "
          f"{100 * study.reliability:g}% ({curve.factors['reliability ke'][0]:.3f}), room temperature.",
-         f"Mean stress by {model.capitalize()}; a compressive mean gets no credit.",
+         f"Mean stress by {model.capitalize()}, with no credit for a compressive mean.",
          "Fatigue lives scatter by a factor of three to ten at the same stress, so the life is an estimate and the "
          "safety factor on stress is the steadier number."]
     if src["kind"] == "strength result" and study.blocks:
