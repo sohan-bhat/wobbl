@@ -119,5 +119,6 @@ def _load_builtin():
     if _REGISTRY:
         return
     from . import calculix, ngspice  # noqa: F401  (they register themselves)
+    from . import getdp  # noqa: F401
     register(PlannedAdapter("OpenFOAM", ("cfd",), "0.3"))
     register(PlannedAdapter("Elmer", ("multiphysics",), "0.3"))
