@@ -1,0 +1,96 @@
+"""Mechanism studies end to end: the outcome, the trajectory table, the report and the checks. Skipped when
+MuJoCo is not installed."""
+import csv
+import json
+
+import pytest
+
+from wobbl.mechanism import install
+
+pytestmark = pytest.mark.skipif(not install.available(), reason="MuJoCo is not installed (wobbl setup --only mujoco)")
+
+WEAK_ARM = """
+name = "weak arm"
+question = "Can an SG90 hold this arm out level?"
+hold = "1 s"
+floor = true
+
+[[body]]
+name = "base"
+shape = "box"
+size = [60, 60, 20]
+center = [0, 0, 10]
+mass = 200
+support = true
+
+[[body]]
+name = "link"
+parent = "base"
+pos = [0, 0, 60]
+to = [150, 0, 0]
+mass = 60
+joint = { name = "shoulder", axis = "-y" }
+
+[[mass]]
+name = "load"
+body = "link"
+mass = 300
+pos = [150, 0, 0]
+
+[[drive]]
+joint = "shoulder"
+servo = "sg90"
+
+[[move]]
+t = 0
+shoulder = 20
+"""
+
+
+def _rows(path):
+    with open(path) as fh:
+        return list(csv.DictReader(fh))
+
+
+def test_a_pendulum_writes_every_output_and_passes_its_checks(tmp_path):
+    from wobbl.mechanism.study import MechanismOutcome, run_mechanism
+
+    o = run_mechanism("pendulum", {"periods": 1, "angle": "90 deg"}, tmp_path, "How long is a 90 degree swing?")
+    assert o.verdict == "ok" and o.confidence == "high", o.confidence_reasons
+    assert {c.name for c in o.checks} >= {"hand calculation", "time step convergence", "energy conservation"}
+    for f in ("outcome.json", "summary.txt", "report.html", "trajectory.csv", "model.xml"):
+        assert (tmp_path / f).exists(), f
+    d = json.loads((tmp_path / "outcome.json").read_text())
+    assert d["domain"] == "mechanism" and d["events"][0]["name"] == "release" and d["model"]["degrees_of_freedom"] == 1
+    assert d["values"]["trajectory"] == "trajectory.csv" and d["images"]["swing"] == "images/swing.png"
+    rows = _rows(tmp_path / "trajectory.csv")
+    assert 100 < len(rows) <= 500 and set(rows[0]) >= {"t_s", "pivot_deg", "pivot_rpm", "pivot_Nm", "bob_z_m"}
+    back = MechanismOutcome.load(tmp_path / "outcome.json")
+    assert back.events == o.events and back.runtime_s > 0
+    assert "Events" in (tmp_path / "report.html").read_text()
+
+
+def test_a_spec_with_a_weak_servo_fails_and_names_a_stronger_one(tmp_path):
+    from wobbl.mechanism.study import run_mechanism
+
+    spec = tmp_path / "arm.toml"
+    spec.write_text(WEAK_ARM)
+    o = run_mechanism(str(spec), {}, tmp_path / "out")
+    assert o.verdict == "fails" and "shoulder drive stalls" in o.headline
+    assert o.values["drives"]["shoulder"]["peak_usage"] > 1
+    assert o.fixes and o.fixes[0]["kind"] == "motor"
+    assert any(e["name"] == "shoulder stalls" for e in o.events)
+    assert o.question.startswith("Can an SG90")
+
+
+def test_a_model_file_runs_as_written(tmp_path):
+    from wobbl.mechanism.study import run_mechanism
+
+    xml = tmp_path / "drop.xml"
+    xml.write_text("<mujoco><worldbody><geom type='plane' size='1 1 0.1'/><body pos='0 0 0.2'><freejoint/>"
+                   "<geom type='box' size='0.02 0.02 0.02' mass='0.1'/></body></worldbody></mujoco>")
+    o = run_mechanism(str(xml), {"duration": "0.5 s"}, tmp_path / "out")
+    assert o.model["degrees_of_freedom"] == 6 and o.values["contacts"]       # the box lands on the plane
+    assert not (tmp_path / "out" / "model.xml").exists()
+    with pytest.raises(ValueError, match="duration and timestep"):
+        run_mechanism(str(xml), {"servo": "sg90"}, tmp_path / "bad")
