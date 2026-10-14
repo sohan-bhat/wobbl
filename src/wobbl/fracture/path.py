@@ -114,6 +114,7 @@ class PathResult:
     convergence: list[dict] = field(default_factory=list)
     balance: tuple | None = None
     notes: list[str] = field(default_factory=list)
+    end_fails: bool = False       # the crack has cut through, so reaching the end of the path is failure
 
 
 def front_size(size: float, crack: Crack, h: float, wall: float, quality: str) -> float:
@@ -128,10 +129,10 @@ def front_size(size: float, crack: Crack, h: float, wall: float, quality: str) -
 
 def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Spectrum, adapter, workdir: Path,
          h: float, wall: float, quality: str, max_steps: int, growth_frac: float, stop_k: float,
-         stop_net, budget: float, progress=None, keep: bool = False) -> PathResult:
+         stop_net, budget: float, progress=None, keep: bool = False, inside=None) -> PathResult:
     """Grow the crack step by step until it fails, cuts through the part, stops growing, or the steps or the time
-    budget run out. ``build_model(cm)`` gives the static model on a cracked mesh, and ``stop_net(size, area)``
-    says whether the ligament has yielded."""
+    budget run out. ``build_model(cm)`` gives the static model on a cracked mesh, ``stop_net(size, area)`` says
+    whether the ligament has yielded and ``inside(points)`` whether points are inside the uncracked part."""
     say = progress or (lambda a, b: None)
     t_start = time.time()
     steps: list[Step] = []
@@ -142,6 +143,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
     size = crack.size
     E, nu = material.E, material.nu
     end = f"the step limit ({max_steps})"
+    end_fails = False
     for j in range(max_steps + 1):
         t0 = time.time()
         hf = front_size(size, crack, h, wall, quality)
@@ -158,6 +160,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
                 fks = extract(cm, U, E, nu)
         except PartSeparated:
             end = "the crack cutting through the part"
+            end_fails = True
             break
         except (CrackError, SolverError) as e:
             if j == 0:
@@ -205,6 +208,13 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
             notes.append("Every front point is below the growth threshold at this load, so the crack stops "
                          "growing.")
             break
+        if inside is not None and any((~inside(m[0][2:-2])).any() for m in moved.values()):
+            # the next front would leave the part: the crack has reached the far side of the wall it runs through
+            end = "the crack cutting through the wall it grows across"
+            end_fails = True
+            notes.append(f"After step {j} the crack reaches the far side of the wall it grows across. The few cycles "
+                         "it takes to cut the last of that wall are not counted, which errs short.")
+            break
         lead_i = max(moved, key=lambda i: moved[i][1].max())
         lead = int(np.argmax(moved[lead_i][1]))
         step.advance = da_max
@@ -217,7 +227,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
         size += da_max
         if not keep:
             shutil.rmtree(workdir / f"step{j}", ignore_errors=True)
-    return PathResult(steps, crack, end, first, convergence, balance, notes)
+    return PathResult(steps, crack, end, first, convergence, balance, notes, end_fails)
 
 
 def _keq(s: dict, nu: float) -> np.ndarray:

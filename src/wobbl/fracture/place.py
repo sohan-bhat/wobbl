@@ -138,6 +138,18 @@ def ray_hits(p: np.ndarray, v: np.ndarray, X: np.ndarray, tris: np.ndarray) -> n
     return np.sort(t[hit])
 
 
+def inside_test(mesh: Mesh):
+    """A function telling which points lie inside the part, by the parity of boundary crossings along a ray."""
+    X, tris = mesh.X, mesh.tris[:, :3]
+    v = np.array([0.5773, 0.5779, 0.5769])
+    v /= np.linalg.norm(v)
+
+    def inside(points) -> np.ndarray:
+        return np.array([len(ray_hits(np.asarray(p, float), v, X, tris)) % 2 == 1 for p in np.atleast_2d(points)],
+                        bool)
+    return inside
+
+
 def _first(p, v, mesh, skip: float = 0.0) -> float:
     """Distance to the first boundary crossing along a ray, past ``skip``. A point on a curved face sits a hair
     outside the flat triangles that facet it, so rays from the surface skip that hair."""
