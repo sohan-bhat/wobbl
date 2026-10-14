@@ -128,6 +128,22 @@ It grows the front step by step with a fresh mesh each time and integrates the N
 The crack is the damage tolerance flaw at the most stressed point unless `--crack` gives one, such as
 `"through 1.27 mm at hole d=8"`, and `--r-ratio` or `--spectrum` give the cycles. Quote the nominal life
 with B10, B1 and the inspection interval, never one part's failure cycle.
+A part can also be checked against how it will be made. A 3D print runs as
+`wobbl simulate lid.step "will it warp when I print it in ABS?" --print-direction auto`, with the plastic
+(abs, asa, petg, pla, pc), bed and chamber temperatures, infill and layer height read from the question or a
+slicer file next to the part (Cura, Orca, Bambu, Creality or PrusaSlicer settings, or a .3mf project), or
+given as `--profile`. It solves the shrinkage the layers lock in, with a ramp fitted to 48 measured plates,
+and answers with the flatness against ISO 2768-2 class L or `--flatness`, the corner lift off the bed and
+the fixes (an enclosure, another plastic, a brim, another way down) each solved again. A sand casting runs as
+`wobbl simulate housing.step "will it cast in A356 without shrinkage porosity?"`, and when no riser is given
+Wobbl places them over the hot spots by the modulus rule, or takes yours as
+`--riser "d=40 h=60 at 50,0,30"` and chills as `--chill "steel 30x30x15 at 50,0,-10"`. It freezes the metal
+in its mold, finds where it freezes last, checks each riser feeds its region, and gives the shrinkage
+porosity from the Niyama criterion fitted to A356 plates. An injection molded part runs as
+`wobbl simulate cover.step "will it fill in polystyrene?" --gate "at 60,40,0"`, or with the gate left out
+for Wobbl to place, and gives the fill time, the injection pressure against `--max-pressure`, weld lines,
+air traps and walls too thin to fill. Quote its pressure as the range between a hot melt and one with a
+frozen skin, since the real one lies between them.
 
 **Circuits.** Pass whatever the user has, a SPICE netlist, a KiCad schematic or a description in words,
 as in `wobbl simulate amp.cir "does it work?"`, `wobbl simulate board.kicad_sch "will anything overheat?" --set J2.load=2A`
