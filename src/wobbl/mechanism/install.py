@@ -216,3 +216,20 @@ def check(log: Log = print) -> dict | str:
     size = f" ({tree_size(lib_dir()) / 1e6:.1f} MB)" if mine else ""
     log(f"MuJoCo {mj.__version__}{size} {'works' if ok else 'FAILED ' + err}")
     return {"path": str(where) + size, "version": mj.__version__, "works": ok, "error": err}
+
+
+def footprint() -> dict:
+    """What mechanisms cost on disk: nothing until the first study, then the pruned MuJoCo wheel."""
+    from ..chem.install import tree_size
+
+    d = lib_dir()
+    size = tree_size(d) if d.exists() else 0
+    if size:
+        line = f"mechanisms use MuJoCo {MUJOCO_VERSION}, {size / 1e6:.1f} MB in {d} after pruning"
+    elif available():
+        line = "mechanisms use the MuJoCo already in this Python"
+    else:
+        line = ("mechanisms fetch MuJoCo on their first run, an 8 MB download that takes about 18 MB once pruned, "
+                "or now with wobbl setup --only mujoco")
+    return {"installed": available(), "path": str(d), "installed_bytes": size, "version": MUJOCO_VERSION,
+            "line": line}
