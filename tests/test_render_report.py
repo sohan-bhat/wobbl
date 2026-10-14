@@ -38,6 +38,23 @@ def test_html_page_is_self_contained(tmp_path):
                 [table(["a", "b"], [["<script>", "x"]])])
     assert "<script>" not in html.split("<style>")[1].split("</style>")[1] or "&lt;script&gt;" in html
     assert "http" not in html.replace("https://", "") or "<link" not in html
+
+
+def test_report_embeds_the_brand_fonts_and_never_inter():
+    """Archivo and IBM Plex Mono travel inside the page as small woff2 files, and no stack names Inter or leans on
+    system-ui, which reads like Inter on a Mac."""
+    import base64
+    import re
+
+    html = page("Strength report", "part.step", "", "HOLDS", "holds", "Peak 10 MPa.", [("peak", "10 MPa")], "high",
+                [], [])
+    style = html.split("<style>")[1].split("</style>")[0]
+    fonts = re.findall(r'font-family:"([^"]+)";[^}]*base64,([A-Za-z0-9+/=]+)', style)
+    assert sorted({f for f, _ in fonts}) == ["Archivo", "IBM Plex Mono"] and len(fonts) == 3
+    sizes = [len(base64.b64decode(d)) for _, d in fonts]
+    assert all(base64.b64decode(d)[:4] == b"wOF2" for _, d in fonts) and sum(sizes) < 40_000
+    stacks = re.sub(r"base64,[A-Za-z0-9+/=]+", "", style)
+    assert "Inter" not in stacks and "system-ui" not in stacks and "-apple-system" not in stacks
     assert "HOLDS" in html
 
 

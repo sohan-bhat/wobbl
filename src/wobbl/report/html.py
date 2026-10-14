@@ -1,7 +1,9 @@
 """A single self contained HTML report: verdict, numbers, heatmaps, checks, assumptions.
 
 No external fonts, scripts or images; everything is inlined so the file can be
-emailed, attached to a pull request or opened offline.
+emailed, attached to a pull request or opened offline. Text is set in Archivo and
+numbers in IBM Plex Mono, Wobbl's brand faces, embedded as woff2 cut down to the
+glyphs a report prints (about 27 kB for the pair, see scripts/subset_report_fonts.py).
 """
 from __future__ import annotations
 
@@ -12,14 +14,33 @@ from pathlib import Path
 
 from .. import __version__
 
-CSS = """
+FONTS = Path(__file__).with_name("fonts")
+TEXT_FACE = '"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif'
+MONO_FACE = '"IBM Plex Mono",ui-monospace,Menlo,Consolas,"DejaVu Sans Mono",monospace'
+
+
+def font_faces() -> str:
+    """@font-face rules with the report's fonts inlined; empty if the files are missing, and the fallbacks take over.
+    Archivo is variable and serves every weight; Plex Mono's 600 file serves the bold numbers."""
+    faces = (("Archivo", "archivo.woff2", "400 800"), ("IBM Plex Mono", "plex-mono-400.woff2", "400"),
+             ("IBM Plex Mono", "plex-mono-600.woff2", "500 900"))
+    out = []
+    for family, name, weight in faces:
+        p = FONTS / name
+        if p.exists():
+            data = base64.b64encode(p.read_bytes()).decode()
+            out.append(f'@font-face{{font-family:"{family}";font-style:normal;font-weight:{weight};font-display:swap;'
+                       f'src:url(data:font/woff2;base64,{data}) format("woff2")}}')
+    return "\n".join(out)
+
+
+STYLE = """
 :root{--bg:#0e0f11;--panel:#16181b;--line:#2a2d32;--fg:#f2f2ee;--muted:#a3a7ad;--yellow:#ffd400;
 --pass:#3ccf7a;--warn:#ffb020;--fail:#ff4d4f;--info:#5aa9ff;--skip:#6b7078}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,
-"Helvetica Neue",Arial,sans-serif}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 TEXT_FACE}
 main{max-width:1120px;margin:0 auto;padding:32px 20px 64px}
-.mono,code,td.num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.mono,code,pre,td.num{font-family:MONO_FACE;font-variant-numeric:tabular-nums}
 header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:2px solid var(--yellow);
 padding-bottom:14px;margin-bottom:24px}
 header h1{font-size:26px;margin:0;letter-spacing:.02em}
@@ -34,7 +55,7 @@ letter-spacing:.06em;font-size:13px;vertical-align:middle}
 .headline{margin:12px 0 0;font-size:16px}
 .metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .metric .k{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
-.metric .v{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:22px;font-weight:700}
+.metric .v{font-family:MONO_FACE;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
 .badge{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;
 text-transform:uppercase;letter-spacing:.06em}
 .badge.high,.badge.pass{background:rgba(60,207,122,.15);color:var(--pass)}
@@ -66,7 +87,10 @@ pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;paddi
 .verdict{grid-template-columns:1fr}.word{font-size:32px}header{flex-direction:column;
 align-items:flex-start}header .meta{text-align:left}}
 @media print{body{background:#fff;color:#111}.card,.fix,pre{background:#f6f6f6;border-color:#ddd}}
-"""
+""".replace("TEXT_FACE", TEXT_FACE).replace("MONO_FACE", MONO_FACE)
+
+# the whole stylesheet, fonts included, for every page that embeds it
+CSS = font_faces() + STYLE
 
 
 def esc(x) -> str:
