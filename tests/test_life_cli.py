@@ -63,10 +63,11 @@ def test_the_skills_life_commands_read_their_values():
 
     seen = set()
     for cmd in skill_commands():
-        name, ctx = dry_parse(shlex.split(cmd)[1:])
-        p = ctx.params
-        if name not in ("buckling", "vibration", "fatigue"):
+        words = shlex.split(cmd)
+        if len(words) < 2 or words[1] not in ("buckling", "vibration", "fatigue"):
             continue
+        name, ctx = dry_parse(words[1:])
+        p = ctx.params
         seen.add(name)
         if p.get("material"):
             resolve_material(p["material"])
