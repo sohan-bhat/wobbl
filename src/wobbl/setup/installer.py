@@ -62,6 +62,9 @@ class Recipe:
     env: str = "env"
     missing: str = ""                     # what to say on a platform without a build
     check: Callable[[Log], dict | str] | None = None
+    # a solver that is not a conda package (Cantera is a Python wheel) brings its own install and presence test
+    installer: Callable[[Log, bool], dict] | None = None
+    present: Callable[[], bool] | None = None
 
     def package_names(self) -> list[str]:
         return [re.split(r"[\s=<>!~]", p, maxsplit=1)[0] for p in self.packages]
@@ -91,6 +94,8 @@ def target(recipe: Recipe, plat: str | None = None) -> tuple[str, str | None] | 
 
 
 def installed(recipe: Recipe) -> bool:
+    if recipe.present is not None:
+        return recipe.present()
     t = target(recipe)
     meta = env_prefix(t[0]) / "conda-meta" if t else None
     if meta is None or not meta.is_dir():
@@ -190,9 +195,12 @@ def _chosen(names: list[str] | None) -> list[Recipe]:
 def plan(plat: str | None = None, names: list[str] | None = None) -> dict:
     """What an install puts where: each environment with the packages it gets, and what this platform lacks."""
     plat = plat or platform_tag()
-    out = {"platform": plat, "env": [], "env_x86": [], "unavailable": {}, "groups": []}
+    out = {"platform": plat, "env": [], "env_x86": [], "unavailable": {}, "groups": [], "custom": []}
     groups: dict[tuple, dict] = {}
     for r in _chosen(names):
+        if r.installer is not None:
+            out["custom"].append(r.name)
+            continue
         t = target(r, plat)
         if t is None:
             out["unavailable"][r.name] = r.missing or f"conda-forge has no {r.name} build for {plat}."
@@ -227,6 +235,12 @@ def install(log: Log = print, force: bool = False, only: list[str] | None = None
         else:
             log(f"installing {names} into {env}")
             _mm(mm, [verb, *base, "-p", str(env), *g["specs"]], log, logfile)
+    for name in p["custom"]:
+        log(f"installing {name}")
+        try:
+            RECIPES[name].installer(log, force)
+        except SetupError as e:
+            unavailable[name] = str(e)
     status = verify(log)
     status["platform"] = p["platform"]
     status["unavailable"] = {**status.get("unavailable", {}), **unavailable}
@@ -342,6 +356,18 @@ register(Recipe("ngspice", ("circuit",), ("ngspice>=37",), keep=("ngspice*",), c
                 missing="conda-forge has no ngspice build for this platform. Install ngspice with your package "
                         "manager (for example 'apt install ngspice') and Wobbl will find it on PATH, or set "
                         "WOBBL_NGSPICE."))
+
+
+def _chem(name: str):
+    """A function of wobbl.chem.install, imported only when the registry calls it."""
+    def call(*args):
+        from ..chem import install as chem_install
+        return getattr(chem_install, name)(*args)
+    return call
+
+
+register(Recipe("cantera", ("combustion", "motor"), (), check=_chem("check"), installer=_chem("install"),
+                present=_chem("available")))
 
 
 def remove_all(log: Log = print) -> None:
