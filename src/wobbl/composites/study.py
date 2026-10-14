@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..geometry.select import Selector, parse_vector
+from ..geometry.select import parse_vector
 from ..shells.build import build_shell, excluded_nodes
 from ..shells.ccx import Layer, solve_shell
 from ..shells.checks import beam_hand_check, force_balance
