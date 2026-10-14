@@ -1,0 +1,213 @@
+{
+ "domain": "mechanism",
+ "part": "fourbar",
+ "question": "Does this wiper linkage sweep 95 degrees, and can a 45 rpm wiper motor drive it over dry glass?",
+ "verdict": "marginal",
+ "headline": "The rocker swings 94.3 degrees, from 50.1 to 144, as the crank turns, and the transmission angle stays between 35.5 and 130 degrees. Outside 40 to 140 degrees it drives stiffly and wears its pins. The motor turns the crank at 39 rpm on average and peaks at 5.41 N m.",
+ "metrics": [
+  [
+   "sweep",
+   "94.3 deg"
+  ],
+  [
+   "transmission",
+   "35.5 to 130 deg"
+  ],
+  [
+   "worst advantage",
+   "1.1x"
+  ],
+  [
+   "peak torque",
+   "5.41 N m"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed hand calculation, virtual work, time step convergence, energy account, constraint drift"
+ ],
+ "checks": [
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "Freudenstein's equation puts the rocker within 6.62e-04 degrees of MuJoCo's at every crank angle through the turn",
+   "detail": {
+    "max_error_deg": 0.000662
+   }
+  },
+  {
+   "name": "virtual work",
+   "status": "pass",
+   "summary": "against a steady 6 N m on the rocker, the torque MuJoCo needs at the crank matches load times rocker speed over crank speed to 0.24% of its peak",
+   "detail": {
+    "error": 0.0024
+   }
+  },
+  {
+   "name": "time step convergence",
+   "status": "pass",
+   "summary": "peak crank torque 5.41 N m with the normal step and 5.41 N m with half the step (0.0052% apart)",
+   "detail": {
+    "normal": 5.412827,
+    "half": 5.412548,
+    "change": 5.2e-05
+   }
+  },
+  {
+   "name": "energy account",
+   "status": "pass",
+   "summary": "the work of the forces (drives 49.7 J, loads -48.7 J, constraints -0.00142 J) matches the change in kinetic and potential energy, 0.931 J, to 6.9e-05% of the largest energy flow",
+   "detail": {
+    "scale_J": 49.667773,
+    "drives": 49.667773,
+    "loads": -48.734889,
+    "gear losses": 0.0,
+    "damping": 0.0,
+    "constraints": -0.00142,
+    "delta_E_J": 0.931441,
+    "worst": 1e-06,
+    "end": 0.0
+   }
+  },
+  {
+   "name": "constraint drift",
+   "status": "pass",
+   "summary": "the linkage loop held together to 0.00211 mm at worst (0.0026% of 80 mm)",
+   "detail": {
+    "max": 2e-06,
+    "relative": 2.6e-05
+   }
+  }
+ ],
+ "assumptions": [
+  "Links 300 mm ground, 80 mm crank, 300 mm coupler and 110 mm rocker, a crank rocker linkage, flat and stacked so the links never touch.",
+  "The rocker's load is a drag of 6 N m against its motion, as from a wiper blade or a door.",
+  "The motor, which stalls at 25 N m and turns 45 rpm with no load, drives the crank at full voltage, with its rotor felt through the gearbox as 1061 kg cm2, a 20 ms mechanical time constant.",
+  "Pins are frictionless and have no play.",
+  "Bodies are rigid, so links do not bend. A long or thin printed link flexes and rings more than this shows.",
+  "Contacts are stiff springs that let parts sink into each other by the depth the contact check reports.",
+  "Joints and gears have no backlash, and friction acts only where the inputs give it."
+ ],
+ "values": {
+  "sweep_deg": 94.311636,
+  "rocker_range_deg": [
+   50.140909,
+   144.452545
+  ],
+  "toggle_crank_deg": [
+   12.922739,
+   196.92
+  ],
+  "transmission_deg": [
+   35.547249,
+   129.85931
+  ],
+  "min_mechanical_advantage": 1.101558,
+  "grashof": "crank rocker",
+  "full_turn": true,
+  "freudenstein_error_deg": 0.000662,
+  "peak_torque_Nm": 5.412827,
+  "rms_torque_Nm": 3.597311,
+  "mean_crank_rpm": 39.008321,
+  "stalled": false,
+  "_figures": [
+   [
+    "angles",
+    "Rocker swing (from its low end) and transmission angle through the crank's turn"
+   ],
+   [
+    "torque",
+    "Torque at the crank through the run at full speed"
+   ],
+   [
+    "frames",
+    "The linkage at several crank angles, from above"
+   ]
+  ],
+  "trajectory": "trajectory.csv",
+  "model_file": "model.xml",
+  "playback": "playback.json"
+ },
+ "images": {
+  "angles": "images/angles.png",
+  "frames": "images/frames.png",
+  "torque": "images/torque.png"
+ },
+ "fixes": [
+  {
+   "kind": "lengths",
+   "title": "Make the crank 82 mm, the coupler 290 mm and the rocker 112 mm",
+   "summary": "With the ground at 300 mm, the toggle positions where crank and coupler line up give a 94.3 degree sweep with the transmission angle between 40.8 and 139 degrees, and the crank still turns fully. Running it again with these lengths, the crank peaks at 5.18 N m against 5.41 N m today.",
+   "auto": false,
+   "after": {
+    "crank_mm": 82.0,
+    "coupler_mm": 290.0,
+    "rocker_mm": 111.833333,
+    "sweep_deg": 94.316875,
+    "transmission_deg": [
+     40.825041,
+     139.492982
+    ],
+    "peak_torque_Nm": 5.181153
+   }
+  }
+ ],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 20.752,
+ "solver": "MuJoCo 3.10.0",
+ "events": [
+  {
+   "name": "motor on",
+   "t_s": 0.0,
+   "detail": ""
+  },
+  {
+   "name": "rocker at an end",
+   "t_s": 0.0699,
+   "detail": "50.1 deg"
+  },
+  {
+   "name": "rocker at an end",
+   "t_s": 0.8505,
+   "detail": "144 deg"
+  },
+  {
+   "name": "crank turn 1",
+   "t_s": 1.5525,
+   "detail": ""
+  },
+  {
+   "name": "rocker at an end",
+   "t_s": 1.6019,
+   "detail": "50.1 deg"
+  },
+  {
+   "name": "rocker at an end",
+   "t_s": 2.3821,
+   "detail": "144 deg"
+  },
+  {
+   "name": "crank turn 2",
+   "t_s": 3.0825,
+   "detail": ""
+  },
+  {
+   "name": "rocker at an end",
+   "t_s": 3.1335,
+   "detail": "50.1 deg"
+  }
+ ],
+ "runtime_s": 20.752,
+ "model": {
+  "bodies": 3,
+  "joints": 3,
+  "degrees_of_freedom": 3,
+  "constraints": 1,
+  "timestep_s": 0.0005,
+  "steps": 7533,
+  "integrator": "semi implicit Euler",
+  "contact": "stiff contact settling in 5 ms"
+ }
+}

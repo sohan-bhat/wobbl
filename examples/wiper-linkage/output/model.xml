@@ -1,0 +1,29 @@
+<mujoco model="four_bar_linkage">
+ <compiler angle="radian" eulerseq="XYZ" autolimits="true" boundmass="1e-6" boundinertia="1e-10" />
+ <option timestep="0.0005" gravity="0 0 -9.80665" integrator="Euler">
+  <flag energy="enable" />
+ </option>
+ <default>
+  <geom solref="0.005 1" solimp="0.95 0.99 0.001 0.5 2" friction="0.8 0.005 0.0001" condim="3" />
+ </default>
+ <worldbody>
+  <body name="crank" pos="0 0 0">
+   <joint name="crank" type="hinge" axis="0 0 1" pos="0 0 0" armature="0.106103295" />
+   <geom name="crank" type="capsule" mass="0.08" rgba="0.98 0.83 0.0 1" fromto="0 0 0 0.08 0 0" size="0.004" contype="0" conaffinity="0" />
+   <body name="coupler" pos="0.08 0 0" euler="0 0 0.294944827">
+    <joint name="coupler" type="hinge" axis="0 0 1" pos="0 0 0" />
+    <geom name="coupler" type="capsule" mass="0.25" rgba="0.29 0.56 0.85 1" fromto="0 0 0 0.3 0 0" size="0.003" contype="0" conaffinity="0" />
+   </body>
+  </body>
+  <body name="rocker" pos="0.3 0 0" euler="0 0 -5.36782394">
+   <joint name="rocker" type="hinge" axis="0 0 1" pos="0 0 0" />
+   <geom name="rocker" type="capsule" mass="0.3" rgba="0.24 0.81 0.48 1" fromto="0 0 0 0.11 0 0" size="0.004" contype="0" conaffinity="0" />
+  </body>
+ </worldbody>
+ <equality>
+  <connect body1="coupler" body2="rocker" anchor="0.3 0 0" solref="0.002 1" solimp="0.9999 0.9999 0.001 0.5 2" />
+ </equality>
+ <contact>
+  <exclude body1="coupler" body2="rocker" />
+ </contact>
+</mujoco>
