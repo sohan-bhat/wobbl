@@ -117,16 +117,24 @@ def _build(prep: PreparedGeometry, crack: Crack, sizing: Sizing, alg3d: int, cur
         inside = [d for d in inside if d[0] == 2]
         if not inside:
             raise CrackError("the crack does not cut into the part", "Check where the crack starts and its normal")
-        # a crack plane can also cross other walls far from the crack; keep only the pieces the crack is made of
-        ref = np.asarray(crack.sections[0 if crack.live[0] else -1], float)
-        ref = ref[len(ref) // 2]
+        # a crack's surface can also reach across a gap into another wall; keep the piece at the front and every
+        # piece joined to it edge to edge, which is the crack itself
         if len(inside) > 1:
-            gap = _nearest(gmsh, 2, [t for _, t in inside], [ref])
-            near = min(gap)
-            drop = [d for d, g in zip(inside, gap) if g > near + 0.05 * crack.size + 1e-9]
+            ref = np.asarray(crack.sections[-1 if crack.live[1] else 0], float)
+            pieces = [t for _, t in inside]
+            edges = {t: {abs(int(c)) for c in gmsh.model.getAdjacencies(2, t)[1]} for t in pieces}
+            keep = {pieces[int(np.argmin(_nearest(gmsh, 2, pieces, [ref[len(ref) // 2]])))]}
+            grew = True
+            while grew:
+                grew = False
+                for t in pieces:
+                    if t not in keep and any(edges[t] & edges[k] for k in keep):
+                        keep.add(t)
+                        grew = True
+            drop = [(2, t) for t in pieces if t not in keep]
             if drop:
                 occ.remove(drop, recursive=True)
-                inside = [d for d in inside if d not in drop]
+                inside = [(2, t) for t in pieces if t in keep]
         _, omap = occ.fragment(vols, inside)
         occ.synchronize()
         vols_after = gmsh.model.getEntities(3)
