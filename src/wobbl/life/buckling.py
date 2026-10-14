@@ -74,17 +74,21 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
         mesh = build_mesh(p.prep, sz)
         built = build_static(mesh, p.loads, p.fixtures, mat, p.features.faces)
         wl = work / f"level{k}"
+        if built.walls:
+            say("solve", f"level {k}: finding where the part presses on its walls")
+            contact_state(adapter, built, wl / "contact")
         deck = ccx.make_deck(built.model, wl / "static.inp")
         say("solve", f"level {k}: buckling of {mesh.n_nodes:,} nodes with {adapter.name}")
-        ccx.run(exe, wl, "buckle", ccx.buckle_inp(deck, n_modes))
-        factors = ccx.read_buckling_factors(wl / "buckle.dat")
-        blocks = ccx.read_blocks(wl / "buckle.frd", mesh.n_nodes + 2 * len(deck.extra), ("DISP", "STRESS", "FORC"))
-        (wl / "buckle.frd").unlink(missing_ok=True)
+        factors, blocks = _buckle(exe, wl, deck, mesh, n_modes)
+        if not any(f > 0 for f in factors) and n_modes < 12:
+            # the lowest factors can all be negative while a positive one lies further out
+            n_modes = 12
+            factors, blocks = _buckle(exe, wl, deck, mesh, n_modes)
         pos = [f for f in factors if f > 0]
         if not pos:
-            raise ValueError("these loads do not buckle the part in the modes found, because every buckling factor is "
-                             f"negative ({', '.join(fmt(f) for f in factors)}), so the part would buckle only "
-                             "with the loads reversed. Check the load directions")
+            o = _no_buckling(study, out, p, mesh, built, factors, blocks, adapter, t0)
+            clean_work(work, study.keep)
+            return o
         levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sz.h, "factor": pos[0], "factors": factors,
                        "t_solve": 0.0})
         last = (mesh, built, deck, factors, blocks, sz)
@@ -142,7 +146,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
     extra = []
     if shape == "general":
         extra.append(("medium", "no published knockdown fits this shape, so the 0.5 imperfection knockdown is a "
-                                "judgment, so pass --shape if the part is a column, plate, cylinder or dome"))
+                                "judgment. Pass --shape if the part is a column, plate, cylinder or dome"))
     level, reasons = confidence(checks, extra)
 
     crit = lam * load
@@ -177,6 +181,56 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
     o.write(out)
     save_study(study, out)
     clean_work(work, study.keep)
+    return o
+
+
+def _buckle(exe, wl: Path, deck, mesh, n_modes: int):
+    ccx.run(exe, wl, "buckle", ccx.buckle_inp(deck, n_modes))
+    factors = ccx.read_buckling_factors(wl / "buckle.dat")
+    blocks = ccx.read_blocks(wl / "buckle.frd", mesh.n_nodes + 2 * len(deck.extra), ("DISP", "STRESS", "FORC"))
+    (wl / "buckle.frd").unlink(missing_ok=True)
+    return factors, blocks
+
+
+def contact_state(adapter, built, workdir: Path) -> None:
+    """Solve the part on its walls the way the strength study does, which leaves the contact patch on the model as
+    supports that hold the faces against each wall. Buckling and vibration then work about that loaded state."""
+    from ..structural.run import _solve
+
+    workdir.mkdir(parents=True, exist_ok=True)
+    _solve(adapter, built, workdir, None)
+
+
+def _no_buckling(study, out: Path, p, mesh, built, factors, blocks, adapter, t0) -> LifeOutcome:
+    """The answer when every buckling factor found is negative: these loads stretch the part where it could buckle,
+    so only loads turned around would buckle it."""
+    n = mesh.n_nodes
+    res0 = StaticResult(blocks["DISP"][0][1][:n, :3], blocks["STRESS"][0][1][:n, :6],
+                        blocks["FORC"][0][1][:n, :3] if "FORC" in blocks else np.zeros((n, 3)))
+    F, M = built.model.applied_total()
+    rf, rm = support_reactions(built, res0, mesh)
+    rev = min(abs(f) for f in factors)
+    checks = [balance_check(F, rf, M, rm, p.prep.diag),
+              Check("buckling factors", "pass", f"the {len(factors)} lowest buckling factors are all negative, from "
+                                                f"{fmt(-rev)} to {fmt(min(factors))}", {"factors": factors})]
+    level, reasons = confidence(checks, [("medium", "only one mesh was solved, which is enough to show the "
+                                                    "factors' sign but not to quote the reversed load")])
+    head = (f"Does not buckle under these loads. The {len(factors)} lowest buckling factors are all negative, so the "
+            f"loads stretch the part where it could buckle, and only the same loads turned around, at about "
+            f"{fmt(rev)} times their size, would buckle it. Whether it is strong enough under them is a strength "
+            "question.")
+    mat = p.material
+    said = [f"Linear eigenvalue buckling. A negative factor means the part buckles only when every load is turned "
+            f"around, and Wobbl looked at the {len(factors)} factors closest to zero.",
+            f"{mat.name}: E {fmt(mat.E)} MPa, Poisson {mat.nu:g} ({mat.source})."] + list(study.base.assumptions)
+    o = LifeOutcome("buckling", str(study.base.part), study.base.question, "holds", head,
+                    [("buckling factor", "none positive"), ("reversed loads", f"{fmt(rev)} times")], level, reasons,
+                    checks, said,
+                    {"analysis": "buckling", "load_factor": None, "load_factors": factors, "reversed_factor": rev,
+                     "design_factor": None, "target_sf": study.target_sf or mat.recommended_sf},
+                    {}, [], p.prep.notes, solver=f"CalculiX {adapter.version()}", t_total=time.time() - t0)
+    o.write(out)
+    save_study(study, out)
     return o
 
 
