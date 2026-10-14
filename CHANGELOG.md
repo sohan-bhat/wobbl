@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+**One command for any thing**
+- `wobbl simulate THING "question"` takes a CAD part, a netlist or KiCad
+  schematic, a mechanism, rocket or motor spec, a fluid case, a result folder, a
+  molecule, material or reaction, or a sentence, works out the domain and the
+  physics from the question or `--physics`, and runs several physics in one go
+  when the question asks several things, each with its own load case.
+- Every guess prints with the option that overrides it, `--plan` shows them all
+  without solving, and each run ends with the explicit command that repeats it
+  with nothing guessed, `request.json` beside every result and a 3D view.
+- Physics plug in through a `domain.py` in their package that registers what they
+  read and which question words ask for them, with no new command or tool. A
+  routing test sends over a hundred things and questions through every domain.
+- The help lists `simulate` and the general verbs only. `run`, `thermal`,
+  `circuit`, `motion`, `mechanism`, `flow` and the other domain commands still
+  work as hidden aliases. The MCP server leads with `simulate` and `physics`, and
+  its `solve_*` tools stay as deprecated aliases. The skill teaches the one flow.
+
 **Lighter install**
 - Wobbl no longer needs pyvista or VTK. Heatmaps, mode shapes, shell and crack
   pictures come from a small numpy rasterizer with matplotlib labels, so a server
