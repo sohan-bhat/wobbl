@@ -80,7 +80,6 @@ const data = JSON.stringify({
             );
           })}
         </div>
-        <p class="lrun-tag" hidden>{p.tag}</p>
         <button type="button" class="btn-outline btn-sm lrun-replay" hidden>Replay</button>
         <p class="viewer-status lrun-status" role="status"></p>
       </div>
@@ -92,7 +91,7 @@ const data = JSON.stringify({
         </div>
       )}
       <div class="lrun-read">
-        <p class="lrun-clock"><span class="lrun-k">{label}</span> <span class="lrun-now" data-now>{total}</span><span class="lrun-of" data-of hidden> of {total}</span></p>
+        <p class="lrun-clock"><span><span class="lrun-k">{label}</span> <span class="lrun-now" data-now>{total}</span><span class="lrun-of" data-of hidden> of {total}</span></span><span class="lrun-tag" hidden>{p.tag}</span></p>
         {shown.map((pane, i) => {
           const q = pane.play;
           const v = q.kind === 'strength' ? q.governing_MPa : q.t_max_C;
