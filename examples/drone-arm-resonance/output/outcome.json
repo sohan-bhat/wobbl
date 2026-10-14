@@ -3,7 +3,7 @@
  "part": "../../drone-arm/arm.py",
  "question": "Will this printed arm resonate with its propeller anywhere from hover to full throttle?",
  "verdict": "fails",
- "headline": "Mode 3 at 197 Hz sits inside the once per turn from 83.3 to 200 Hz, where the response grows about 17 times.",
+ "headline": "Mode 3 at 196 Hz sits inside the once per turn from 83.3 to 200 Hz, where the response grows about 17 times.",
  "metrics": [
   [
    "first mode",
@@ -26,13 +26,13 @@
   {
    "name": "mesh convergence",
    "status": "pass",
-   "summary": "frequency of mode 4 settled: 221 -> 219 Hz over 2 meshes, last change 1.2%",
+   "summary": "frequency of mode 4 settled: 221 -> 219 Hz over 2 meshes, last change 1.0%",
    "detail": {
     "values": [
      221.4467,
-     218.7802
+     219.2643
     ],
-    "last_change": 0.012188,
+    "last_change": 0.009953,
     "tolerance": 0.02,
     "stopped_by": "converged"
    }
@@ -42,13 +42,13 @@
    "status": "pass",
    "summary": "the part weighs 120 g with its attached masses, and Wobbl's own mass matrix gives the first 6 modes a modal mass of one to 0.00032%, as CalculiX scaled them",
    "detail": {
-    "wobbl_kg": 0.120368,
+    "wobbl_kg": 0.120416,
     "modal_mass": [
      1.0,
      1.0,
+     1.000002,
      1.0,
-     1.0,
-     1.0,
+     1.000003,
      1.000003
     ]
    }
@@ -59,23 +59,23 @@
    "summary": "the modes found move 88% of the mass along x, 94% of the mass along y, 93% of the mass along z",
    "detail": {
     "captured": [
-     0.880645,
-     0.936611,
-     0.927833
+     0.880735,
+     0.936754,
+     0.927727
     ]
    }
   },
   {
    "name": "hand calculation",
    "status": "pass",
-   "summary": "Rayleigh's quotient with the static sag under 1 g along y (0.292 mm) gives 30.4 Hz, +0.0% from mode 1 at 30.4 Hz",
+   "summary": "Rayleigh's quotient with the static sag under 1 g along y (0.291 mm) gives 30.4 Hz, +0.0% from mode 1 at 30.4 Hz",
    "detail": {
-    "frequency": 30.379759,
+    "frequency": 30.400865,
     "direction": "y",
     "mode": 1,
-    "mode_frequency": 30.36998,
-    "first": 30.36998,
-    "sag_mm": 0.291894
+    "mode_frequency": 30.39107,
+    "first": 30.39107,
+    "sag_mm": 0.291437
    }
   },
   {
@@ -95,42 +95,42 @@
  "values": {
   "analysis": "vibration",
   "frequencies": [
-   30.36998,
-   43.64228,
-   196.6622,
-   218.7802,
-   597.0751,
-   645.2575,
-   1253.267,
-   1614.527,
-   1615.55,
-   1894.952,
-   2952.46,
-   3576.509,
-   3587.994,
-   3784.811,
-   4375.618
+   30.39107,
+   43.67932,
+   196.2913,
+   219.2643,
+   596.8747,
+   646.9329,
+   1253.717,
+   1613.51,
+   1615.399,
+   1896.786,
+   2951.57,
+   3606.222,
+   3617.15,
+   3789.174,
+   4377.861
   ],
   "mass_fraction": [
    [
     0.0,
-    0.8219,
+    0.8221,
     0.0
    ],
    [
     0.0251,
     0.0,
-    0.805
+    0.8052
    ],
    [
-    0.0001,
+    0.0,
     0.0168,
     0.0
    ],
    [
-    0.5692,
+    0.5688,
     0.0,
-    0.0598
+    0.0599
    ],
    [
     0.0,
@@ -138,24 +138,24 @@
     0.0
    ],
    [
-    0.1115,
+    0.1121,
     0.0,
     0.0213
    ],
    [
-    0.1031,
+    0.104,
     0.0,
     0.0016
    ],
    [
-    0.059,
-    0.0024,
-    0.0005
+    0.0656,
+    0.0,
+    0.0006
    ],
    [
-    0.0073,
-    0.0197,
-    0.0001
+    0.0,
+    0.0221,
+    0.0
    ],
    [
     0.0,
@@ -164,18 +164,18 @@
    ],
    [
     0.0,
-    0.0149,
+    0.015,
     0.0
    ],
    [
-    0.0002,
+    0.0003,
     0.0,
-    0.0379
+    0.0363
    ],
    [
-    0.0051,
+    0.0049,
     0.0,
-    0.0016
+    0.0029
    ],
    [
     0.0,
@@ -184,11 +184,11 @@
    ],
    [
     0.0,
-    0.0114,
+    0.0116,
     0.0
    ]
   ],
-  "total_mass_kg": 0.120368,
+  "total_mass_kg": 0.120416,
   "target_sf": 2.0,
   "modes": 15,
   "masses_g": [
@@ -219,69 +219,69 @@
   "resonance": [
    {
     "mode": 2,
-    "frequency": 43.64228,
+    "frequency": 43.67932,
     "excitation": "once per turn from 83.3 to 200 Hz",
     "lo": 83.333333,
     "hi": 200.0,
-    "separation": 0.476293,
+    "separation": 0.475848,
     "status": "clear",
-    "amplification": 0.12899,
-    "mass_share": 0.805016
+    "amplification": 0.129237,
+    "mass_share": 0.805182
    },
    {
     "mode": 3,
-    "frequency": 196.6622,
+    "frequency": 196.2913,
     "excitation": "once per turn from 83.3 to 200 Hz",
     "lo": 83.333333,
     "hi": 200.0,
     "separation": 0.0,
     "status": "resonant",
     "amplification": 16.666667,
-    "mass_share": 0.016839
+    "mass_share": 0.016751
    },
    {
     "mode": 4,
-    "frequency": 218.7802,
+    "frequency": 219.2643,
     "excitation": "once per turn from 83.3 to 200 Hz",
     "lo": 83.333333,
     "hi": 200.0,
-    "separation": 0.093901,
+    "separation": 0.096321,
     "status": "resonant",
-    "amplification": 1.531962,
-    "mass_share": 0.569152
+    "amplification": 1.528381,
+    "mass_share": 0.568753
    },
    {
     "mode": 3,
-    "frequency": 196.6622,
+    "frequency": 196.2913,
     "excitation": "blade pass (2 blades) from 167 to 400 Hz",
     "lo": 166.666667,
     "hi": 400.0,
     "separation": 0.0,
     "status": "resonant",
     "amplification": 16.666667,
-    "mass_share": 0.016839
+    "mass_share": 0.016751
    },
    {
     "mode": 4,
-    "frequency": 218.7802,
+    "frequency": 219.2643,
     "excitation": "blade pass (2 blades) from 167 to 400 Hz",
     "lo": 166.666667,
     "hi": 400.0,
     "separation": 0.0,
     "status": "resonant",
     "amplification": 16.666667,
-    "mass_share": 0.569152
+    "mass_share": 0.568753
    },
    {
     "mode": 5,
-    "frequency": 597.0751,
+    "frequency": 596.8747,
     "excitation": "blade pass (2 blades) from 167 to 400 Hz",
     "lo": 166.666667,
     "hi": 400.0,
-    "separation": 0.492688,
+    "separation": 0.492187,
     "status": "clear",
-    "amplification": 1.229392,
-    "mass_share": 0.049344
+    "amplification": 1.229582,
+    "mass_share": 0.04929
    }
   ],
   "excitations": [
@@ -303,7 +303,7 @@
     [
      [
       2,
-      "43.6",
+      "43.7",
       "once per turn from 83.3 to 200 Hz",
       "48%",
       "0.13x",
@@ -311,7 +311,7 @@
      ],
      [
       3,
-      "197",
+      "196",
       "once per turn from 83.3 to 200 Hz",
       "0%",
       "17x",
@@ -321,13 +321,13 @@
       4,
       "219",
       "once per turn from 83.3 to 200 Hz",
-      "9%",
+      "10%",
       "1.5x",
       "resonant"
      ],
      [
       3,
-      "197",
+      "196",
       "blade pass (2 blades) from 167 to 400 Hz",
       "0%",
       "17x",
@@ -379,24 +379,25 @@
    },
    {
     "level": 1,
-    "n_nodes": 12659,
+    "n_nodes": 17877,
     "h": 6.425481,
     "freq": [
-     30.36998,
-     43.64228,
-     196.6622,
-     218.7802,
-     597.0751,
-     645.2575,
-     1253.267,
-     1614.527
+     30.39107,
+     43.67932,
+     196.2913,
+     219.2643,
+     596.8747,
+     646.9329,
+     1253.717,
+     1613.51
     ],
     "watch_mode": 4,
-    "watch_Hz": 218.7802,
+    "watch_Hz": 219.2643,
     "stress": null
    }
   ],
-  "playback": "playback.json"
+  "playback": "playback.json",
+  "scene": "scene.wobbl"
  },
  "images": {
   "modes": "images/modes.jpg",
@@ -406,9 +407,9 @@
   {
    "kind": "stiffen",
    "title": "Stiffen to move mode 3 above 480 Hz",
-   "summary": "A natural frequency grows with the square root of stiffness, so mode 3 at 197 Hz needs about 6 times the stiffness to clear the blade pass (2 blades) and the once per turn by 20%. For a beam carrying a heavy end mass that is a section about 1.8 times as deep in the bending direction, and when the beam's own mass dominates about 2.4 times as deep.",
+   "summary": "A natural frequency grows with the square root of stiffness, so mode 3 at 196 Hz needs about 6 times the stiffness to clear the blade pass (2 blades) and the once per turn by 20%. For a beam carrying a heavy end mass that is a section about 1.8 times as deep in the bending direction, and when the beam's own mass dominates about 2.4 times as deep.",
    "params": {
-    "stiffness_factor": 5.95718,
+    "stiffness_factor": 5.979713,
     "target_Hz": 480.0
    },
    "auto": false
@@ -416,9 +417,9 @@
   {
    "kind": "soften",
    "title": "Or move mode 3 below 69.4 Hz",
-   "summary": "Softer mounts or isolators that bring it to 0.12 times the stiffness put the mode under the excitation, which works when the speed only passes through it on the way up.",
+   "summary": "Softer mounts or isolators that bring it to 0.13 times the stiffness put the mode under the excitation, which works when the speed only passes through it on the way up.",
    "params": {
-    "stiffness_factor": 0.12469
+    "stiffness_factor": 0.125162
    },
    "auto": false
   },
@@ -440,6 +441,7 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 76.482495,
- "solver": "CalculiX 2.23"
+ "t_total": 236.64324,
+ "solver": "CalculiX 2.23",
+ "criteria": []
 }

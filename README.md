@@ -364,7 +364,7 @@ strength study does, and run through `wobbl simulate` as well as their own comma
 
 | Run | Answer | Checked against |
 |---|---|---|
-| [Drone arm resonance](examples/drone-arm-resonance) | modes at 197 and 219 Hz sit inside the propeller's once per turn and blade pass bands, so it fails | Rayleigh's quotient within 0.1% of the first mode, the mass to 0.0003% and two meshes 1.2% apart |
+| [Drone arm resonance](examples/drone-arm-resonance) | modes at 196 and 219 Hz sit inside the propeller's once per turn and blade pass bands, so it fails | Rayleigh's quotient within 0.1% of the first mode, the mass to 0.0003% and two meshes 1.0% apart |
 | [Strut buckling](examples/strut-buckling) | buckles at 3.25 times 7 kN, a design factor of 2.65 against 3 after the column curve | Euler's column within 0.5% |
 | [Motor mount fatigue](examples/motor-mount-fatigue) | ten years of starts and running use 63% of the fatigue life, a factor of 1.03 on stress | the same verdict under Goodman, Gerber and Soderberg |
 

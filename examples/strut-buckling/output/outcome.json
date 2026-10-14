@@ -213,7 +213,8 @@
     "Negative factors buckle the part only with every load reversed."
    ]
   ],
-  "playback": "playback.json"
+  "playback": "playback.json",
+  "scene": "scene.wobbl"
  },
  "images": {
   "mode1": "images/mode1.jpg",
@@ -254,6 +255,7 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 142.393132,
- "solver": "CalculiX 2.23"
+ "t_total": 316.949267,
+ "solver": "CalculiX 2.23",
+ "criteria": []
 }

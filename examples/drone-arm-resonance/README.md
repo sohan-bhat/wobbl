@@ -16,10 +16,10 @@ passes, from 167 to 400 Hz. The usual rule keeps every natural frequency at leas
 |---|---|
 | Verdict | fails, because two modes sit inside the excitation bands |
 | Mode 1, side to side bending | 30.4 Hz, below hover |
-| Mode 2, up and down bending | 43.6 Hz, below hover |
-| Mode 3, the arm twisting under the motor | 197 Hz, inside both bands |
-| Mode 4, the motor rocking along the arm | 219 Hz, inside the blade pass band and 9% above once per turn, moving 57% of the mass |
-| Mesh convergence | 221 then 219 Hz for mode 4, a change of 1.2% |
+| Mode 2, up and down bending | 43.7 Hz, below hover |
+| Mode 3, the arm twisting under the motor | 196 Hz, inside both bands |
+| Mode 4, the motor rocking along the arm | 219 Hz, inside the blade pass band and 10% above once per turn, moving 57% of the mass |
+| Mesh convergence | 221 then 219 Hz for mode 4, a change of 1.0% |
 | Mass balance | 120 g of arm and motor, with every mode at unit modal mass to 0.0003% |
 | Hand calculation | Rayleigh's quotient from the sag under 1 g gives 30.4 Hz, the same as mode 1 |
 
@@ -30,5 +30,6 @@ suggests stiffening the tip enough to lift mode 3 above 480 Hz, which takes abou
 stiffness, or mounting it softly enough to drop under hover. A wider and deeper pad with the motor
 sitting lower is usually the cheaper way to stiffen that tip.
 
-The run also writes `output/playback.json` with the arm's surface and the four mode shapes nearest
-the excitation, for the website to play back.
+The report opens with a 3D view of the four mode shapes nearest the excitation, each oscillating in
+turn with its frequency beside it, saved as `output/scene.wobbl`. The run also writes
+`output/playback.json` with the arm's surface and those mode shapes, for the website to play back.
