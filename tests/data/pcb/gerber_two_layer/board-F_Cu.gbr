@@ -1,0 +1,121 @@
+%TF.GenerationSoftware,KiCad,Pcbnew,8.0.0*%
+%TF.CreationDate,2026-01-01T00:00:00+00:00*%
+%TF.ProjectId,board,00000000-0000-0000-0000-000000000000,rev?*%
+%TF.SameCoordinates,Original*%
+%TF.FileFunction,Copper,L1,Top*%
+%TF.FilePolarity,Positive*%
+%FSLAX46Y46*%
+G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
+G04 Hand written test board for the Wobbl reader*
+%MOMM*%
+%LPD*%
+G01*
+G04 APERTURE LIST*
+%AMRoundRect*
+0 Rectangle with rounded corners*
+0 $1 Rounding radius*
+0 $2 $3 $4 $5 $6 $7 $8 $9 X,Y pos of 4 corners*
+0 Add a 4 corners polygon primitive as pad body*
+4,1,4,$2,$3,$4,$5,$6,$7,$8,$9,$2,$3,0*
+0 Add four circle primitives for the rounded corners*
+1,1,$1+$1,$2,$3*
+1,1,$1+$1,$4,$5*
+1,1,$1+$1,$6,$7*
+1,1,$1+$1,$8,$9*
+0 Add four rect primitives between the rounded corners*
+20,1,$1+$1,$2,$3,$4,$5,0*
+20,1,$1+$1,$4,$5,$6,$7,0*
+20,1,$1+$1,$6,$7,$8,$9,0*
+20,1,$1+$1,$8,$9,$2,$3,0*%
+%AMTestPad*
+0 Center line rectangle with an octagon inside it*
+$3=$2x0.5*
+21,1,$1,$2,0,0,0*
+5,1,8,0,0,$3+$3,22.5*%
+%TA.AperFunction,ComponentPad*%
+%ADD10R,1.700000X1.700000*%
+%TD*%
+%TA.AperFunction,ComponentPad*%
+%ADD11O,1.700000X1.700000*%
+%TD*%
+%TA.AperFunction,SMDPad,CuDef*%
+%ADD12RoundRect,0.200000X0.275000X-0.200000X0.275000X0.200000X-0.275000X0.200000X-0.275000X-0.200000X0*%
+%TD*%
+%TA.AperFunction,SMDPad,CuDef*%
+%ADD13RoundRect,0.200000X-0.250000X-0.275000X0.250000X-0.275000X0.250000X0.275000X-0.250000X0.275000X0*%
+%TD*%
+%TA.AperFunction,SMDPad,CuDef*%
+%ADD14TestPad,2.000000X1.000000*%
+%TD*%
+%TA.AperFunction,ViaPad*%
+%ADD15C,0.800000*%
+%TD*%
+%TA.AperFunction,Conductor*%
+%ADD16C,0.250000*%
+%TD*%
+%TA.AperFunction,Conductor*%
+%ADD17C,0.300000*%
+%TD*%
+%TA.AperFunction,NonConductor*%
+%ADD18C,0.150000*%
+%TD*%
+G04 APERTURE END LIST*
+D16*
+%TO.N,SIG*%
+X100000000Y-100000000D02*
+X104000000Y-100000000D01*
+G75*
+G02*
+X107000000Y-100000000I1500000J0D01*
+G01*
+X110000000Y-100000000D01*
+%TD*%
+D17*
+%TO.N,VCC*%
+X110000000Y-98350000D02*
+X113000000Y-98350000D01*
+X116000000Y-98350000D02*
+X119225000Y-98350000D01*
+%TO.N,GND*%
+X120775000Y-98350000D02*
+X122000000Y-98350000D01*
+%TD*%
+D18*
+G04 a bit of copper text that is not a conductor*
+X104000000Y-104000000D02*
+X105000000Y-104000000D01*
+D10*
+%TO.P,J1,1*%
+%TO.N,SIG*%
+X100000000Y-100000000D03*
+D11*
+%TO.P,J1,2*%
+%TO.N,GND*%
+X97460000Y-100000000D03*
+D12*
+%TO.P,R1,1*%
+%TO.N,SIG*%
+X110000000Y-100000000D03*
+%TO.P,R1,2*%
+%TO.N,VCC*%
+X110000000Y-98350000D03*
+D13*
+%TO.P,C1,1*%
+%TO.N,VCC*%
+X119225000Y-98350000D03*
+%TO.P,C1,2*%
+%TO.N,GND*%
+X120775000Y-98350000D03*
+D14*
+%TO.P,TP1,1*%
+%TO.N,TEST*%
+X115000000Y-103000000D03*
+%TD*%
+D15*
+%TO.N,VCC*%
+X113000000Y-98350000D03*
+X116000000Y-98350000D03*
+%TO.N,GND*%
+X122000000Y-98350000D03*
+%TD*%
+M02*
