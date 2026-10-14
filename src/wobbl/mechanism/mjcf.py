@@ -49,6 +49,11 @@ def to_mjcf(m: Mechanism) -> str:
     dflt = ET.SubElement(root, "default")
     ET.SubElement(dflt, "geom", solref=solref, solimp=solimp, friction=f"{m.floor_friction:g} 0.005 0.0001",
                   condim=str(int(m.contact.get("condim", 3))))
+    meshed = [b for b in m.bodies if b.shape == "mesh"]
+    if meshed:     # parts from CAD, in mm, with their mass from their volume unless given
+        asset = ET.SubElement(root, "asset")
+        for b in meshed:
+            ET.SubElement(asset, "mesh", name=f"{b.name}_mesh", file=b.mesh, scale="0.001 0.001 0.001")
     world = ET.SubElement(root, "worldbody")
     if m.floor:
         ET.SubElement(world, "geom", name="floor", type="plane", size="0 0 0.05", rgba="0.2 0.21 0.23 1")
@@ -77,7 +82,13 @@ def to_mjcf(m: Mechanism) -> str:
                 g = ET.SubElement(e, "geom", name=b.name, type=b.shape, mass=f"{b.mass:.9g}",
                                   rgba=b.color or PALETTE[color % len(PALETTE)])
                 color += 1
-                if b.shape in ("capsule", "cylinder"):
+                if b.shape == "mesh":
+                    g.set("mesh", f"{b.name}_mesh")
+                    g.set("pos", _f(b.mesh_offset))
+                    if not b.mass:
+                        del g.attrib["mass"]
+                        g.set("density", f"{b.density:.9g}")
+                elif b.shape in ("capsule", "cylinder"):
                     g.set("fromto", _f(b.fromto))
                     g.set("size", f"{b.radius:.9g}")
                 elif b.shape == "box":

@@ -6,7 +6,10 @@ the template that fits it, whose own analysis covers that physics in depth.
 """
 from __future__ import annotations
 
+import dataclasses
+
 from ..simulate import Analysis, Option, register
+from ..simulate.registry import domain
 from .general import KEYWORDS
 
 FILES = ("urdf", "mjcf", "spec")
@@ -20,6 +23,19 @@ GENERAL = (Option("payload", "A load it carries, e.g. '500 g', held at its end e
            Option("set", "A value of a ready made mechanism, e.g. 'payload=500g' or 'crank=30'", multiple=True))
 OBJECTS = {"arm": ["table", "payload"], "tip": ["floor", "payload"], "impact": ["floor"], "fourbar": [],
            "gears": [], "pendulum": []}
+
+
+def _sniff(path):
+    """The router's own recognizer, plus a spec that assembles its parts from CAD with [[part]] tables."""
+    from ..simulate.things import _tables, sniff_mechanism
+
+    kind = sniff_mechanism(path)
+    if kind is None and path.suffix.lower() in (".toml", ".json") and _tables(path) & {"part", "cad"}:
+        return "spec"
+    return kind
+
+
+register(dataclasses.replace(domain("mechanism"), sniff=_sniff))
 
 
 def _params(job, path) -> dict:

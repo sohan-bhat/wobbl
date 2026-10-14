@@ -25,7 +25,7 @@ class Body:
     parent: str = "world"
     pos: tuple = (0.0, 0.0, 0.0)          # body frame origin in the parent's frame
     euler: tuple = (0.0, 0.0, 0.0)        # rad, rotations about x, y, z of the parent frame
-    shape: str = "capsule"                # capsule, cylinder, box, sphere, none
+    shape: str = "capsule"                # capsule, cylinder, box, sphere, mesh, none
     fromto: tuple | None = None           # capsule or cylinder axis, two points in this body's frame
     radius: float = 0.01
     size: tuple = ()                      # box full lengths
@@ -34,6 +34,9 @@ class Body:
     collide: bool = True
     support: bool = False                 # meant to rest on the floor, so touching it is not interference
     color: str = ""
+    mesh: str = ""                        # an STL in mm, for a part from CAD
+    mesh_offset: tuple = (0.0, 0.0, 0.0)  # where the mesh's origin sits in this body's frame
+    density: float = 0.0                  # kg/m3, for a mesh part whose mass comes from its volume
 
 
 @dataclass
@@ -227,7 +230,7 @@ def _parse_text(text: str, suffix: str = "") -> dict:
 def from_dict(d: dict, base: Path = Path(".")) -> Mechanism:
     d = dict(d)
     top = {"name", "question", "gravity", "floor", "floor_friction", "duration", "timestep", "hold", "model",
-           "body", "joint", "mass", "drive", "coupling", "loop", "load", "move", "spin", "contact"}
+           "body", "joint", "mass", "drive", "coupling", "loop", "load", "move", "spin", "contact", "cad", "part"}
     _take(d, "the spec", top)
     m = Mechanism(name=str(d.get("name", "mechanism")), question=str(d.get("question", "")))
     if "gravity" in d:
@@ -258,6 +261,8 @@ def from_dict(d: dict, base: Path = Path(".")) -> Mechanism:
         if "joint" in b:   # a joint written inline on its body
             j = b["joint"] if isinstance(b["joint"], dict) else {"name": b["joint"]}
             m.joints.append(_joint({**j, "body": body.name}))
+    if d.get("part"):
+        _parts(m, d, base)
     m.joints += [_joint(j) for j in d.get("joint", [])]
     for pm in d.get("mass", []):
         _take(pm, "a mass", {"name", "body", "mass", "pos", "radius", "collide"})
@@ -296,6 +301,60 @@ def from_dict(d: dict, base: Path = Path(".")) -> Mechanism:
         m.contact = {k: float(v) for k, v in dict(d["contact"]).items()}
     m.check()
     return m
+
+
+def _parts(m: Mechanism, d: dict, base: Path) -> None:
+    """Parts from CAD, each a solid of the assembly file named by ``cad`` or a file of its own, placed where the
+    assembly puts it. A part turns or slides on a joint at a point given in the assembly's own coordinates, is
+    welded to its parent when it has no joint, and sits fixed in the world when it has neither, unless it is free.
+    Its mass comes from its volume and its material or density, or from a mass given outright."""
+    from ..materials import get_material
+    from ..solvers.locate import wobbl_home
+    from .cad import part_mesh
+
+    anchors: dict[str, tuple] = {"world": (0.0, 0.0, 0.0)}
+    pending = list(d["part"])
+    while pending:
+        progressed = False
+        for pt in list(pending):
+            parent = str(pt.get("parent", "world"))
+            if parent not in anchors:
+                continue
+            pending.remove(pt)
+            progressed = True
+            _take(pt, f"part {pt.get('name', '')}", {"name", "file", "solid", "parent", "material", "density", "mass",
+                                                     "joint", "free", "color", "support", "collide"})
+            name = str(pt["name"])
+            src = pt.get("file") or d.get("cad")
+            if not src:
+                raise SpecError(f"part {name} needs a file, or the spec a cad = \"assembly.step\" for every part")
+            path = Path(str(src)) if Path(str(src)).is_absolute() else (base / str(src)).resolve()
+            if not path.exists():
+                raise SpecError(f"part {name}'s file {path.name} is not there")
+            stl = part_mesh(path, int(pt["solid"]) if "solid" in pt else None, wobbl_home() / "cache" / "parts")
+            j = pt.get("joint")
+            j = ({"name": j} if isinstance(j, str) else dict(j)) if j else None
+            at = _vec(j.pop("at", None)) if j else anchors[parent]
+            anchors[name] = at
+            rel = tuple(a - b for a, b in zip(at, anchors[parent]))
+            density = 0.0
+            if "density" in pt:
+                density = Q.number(str(pt["density"]).lower().replace("kg/m3", ""))
+            elif "material" in pt:
+                density = get_material(str(pt["material"])).density
+            elif "mass" not in pt:
+                raise SpecError(f"part {name} needs a material, a density or a mass")
+            m.bodies.append(Body(name, parent, rel, shape="mesh", mass=Q.mass(pt.get("mass", 0)),
+                                 collide=bool(pt.get("collide", True)), support=bool(pt.get("support", False)),
+                                 color=str(pt.get("color", "")), mesh=str(stl),
+                                 mesh_offset=tuple(-a for a in at), density=density))
+            if j:
+                m.joints.append(_joint({**j, "body": name}))
+            elif pt.get("free"):
+                m.joints.append(Joint(f"{name}_free", name, kind="free"))
+        if not progressed:
+            raise SpecError("parts " + ", ".join(str(p.get("name")) for p in pending) + " name a parent that is not "
+                            "a part")
 
 
 def _joint(j: dict) -> Joint:
