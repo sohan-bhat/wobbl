@@ -1,0 +1,99 @@
+{
+ "kind": "credibility",
+ "domain": "strength",
+ "wobbl": "0.1.1",
+ "created": "2026-10-13 22:17",
+ "question": "How far can simulation stand in for testing this cast motor mount under a 2 kN belt pull?",
+ "context_of_use": "A linear elastic static model of cast_motor_mount.step in Custom material (cast), under 2000 N -0.8660254,0,-0.5 at 0,-30,66 @ holes d=6.6, held by fixed z=min, used to judge the von Mises stress against 165 MPa with a target safety factor of 2.",
+ "influence": "high",
+ "consequence": "medium",
+ "risk": 4,
+ "goal": "high",
+ "factors": [
+  {
+   "factor": "code verification",
+   "group": "verification",
+   "level": "high",
+   "goal": "high",
+   "meets": true,
+   "evidence": "13 of 13 strength cases with known answers pass their tolerance, run through the same pipeline, the largest error 4.3% (PLA shelf bracket, 6 mm fillet)",
+   "gap": ""
+  },
+  {
+   "factor": "solution verification",
+   "group": "verification",
+   "level": "high",
+   "goal": "high",
+   "meets": true,
+   "evidence": "The mesh convergence check passes, von Mises stress settled: 122 -> 124 -> 124 MPa over 3 meshes, last change 0.1%. The force balance check passes, reactions balance the loads to 1e-05% (forces) and 1.2e-06% (moments)",
+   "gap": ""
+  },
+  {
+   "factor": "inputs as intended",
+   "group": "verification",
+   "level": "high",
+   "goal": "high",
+   "meets": true,
+   "evidence": "every load, support and material was stated explicitly",
+   "gap": ""
+  },
+  {
+   "factor": "model form",
+   "group": "validation",
+   "level": "low",
+   "goal": "high",
+   "meets": false,
+   "evidence": "The load introduction check reports the off part loads enter through a distributing coupling (the attached part adds no stiffness). The readings favour a distributed attachment over the other idealization by a likelihood ratio of more than 1,000, but the readings are synthetic, so this shows how a real test would settle it",
+   "gap": "measure where the idealizations differ most, so a test decides between them"
+  },
+  {
+   "factor": "model inputs",
+   "group": "validation",
+   "level": "high",
+   "goal": "high",
+   "meets": true,
+   "evidence": "4 inputs propagated with 200,000 samples by exact scaling of the converged solution: stress follows the load and not the modulus, deflection follows the load over the modulus. Of these, load drives most of the spread, total Sobol index 0.61",
+   "gap": ""
+  },
+  {
+   "factor": "comparator",
+   "group": "validation",
+   "level": "low",
+   "goal": "high",
+   "meets": false,
+   "evidence": "16 readings from readings.csv, synthetic and not from a real test, 16 with a stated uncertainty",
+   "gap": "test real parts with calibrated gauges (see the test plan)"
+  },
+  {
+   "factor": "output comparison",
+   "group": "validation",
+   "level": "low",
+   "goal": "high",
+   "meets": false,
+   "evidence": "16 of 16 readings within twice the validation uncertainty (ASME V&V 20), pooled area metric 0.121 against 0.145, but the readings are synthetic",
+   "gap": "compare with real readings, and agreement within the validation uncertainty sets this high"
+  },
+  {
+   "factor": "applicability",
+   "group": "applicability",
+   "level": "low",
+   "goal": "high",
+   "meets": false,
+   "evidence": "4 readings within 5 mm of the governing point, test loads reach 100% of the design load, the readings are synthetic",
+   "gap": "put a gauge at the governing point and test up to the design load"
+  },
+  {
+   "factor": "uncertainty in the answer",
+   "group": "applicability",
+   "level": "low",
+   "goal": "high",
+   "meets": false,
+   "evidence": "probability of failure about 1 in 77 (1.3%, 95% interval 1.25% to 1.35%), and up to 0.013 across the idealizations Wobbl solved",
+   "gap": "the failure probability or the margin leaves too little room, so narrow the dominant input"
+  }
+ ],
+ "met": 4,
+ "suite": "../../../docs/validation-results.json",
+ "disclaimer": "Wobbl supplies credibility evidence and proposes levels. It does not certify the model, and the reviewer decides whether the evidence is enough for the decision.",
+ "headline": "Model risk 4 of 5 (high influence, medium consequence), so Wobbl proposes a high goal for each factor. The evidence meets it on 4 of 9 factors. Short on model form, comparator, output comparison, applicability, uncertainty in the answer."
+}

@@ -1,0 +1,408 @@
+{
+ "kind": "uncertainty",
+ "domain": "strength",
+ "wobbl": "0.1.1",
+ "created": "2026-10-13 22:16",
+ "inputs": [
+  {
+   "name": "load",
+   "dist": "lognormal",
+   "mean": 2000.0,
+   "sd": 200.0,
+   "low": null,
+   "high": null,
+   "unit": "N",
+   "nominal": 2000.0,
+   "role": "load",
+   "label": "the 2000 N load",
+   "text": "load lognormal 10%"
+  },
+  {
+   "name": "yield",
+   "dist": "normal",
+   "mean": 165.0,
+   "sd": 13.2,
+   "low": null,
+   "high": null,
+   "unit": "MPa",
+   "nominal": 165.0,
+   "role": "strength",
+   "label": "yield strength",
+   "text": "yield 8%"
+  },
+  {
+   "name": "E",
+   "dist": "normal",
+   "mean": 72400.0,
+   "sd": 2172.0,
+   "low": null,
+   "high": null,
+   "unit": "MPa",
+   "nominal": 72400.0,
+   "role": "stiffness",
+   "label": "Young's modulus",
+   "text": "E 3%"
+  },
+  {
+   "name": "mesh",
+   "dist": "normal",
+   "mean": 1.0,
+   "sd": 0.000994,
+   "low": null,
+   "high": null,
+   "unit": "x",
+   "nominal": 1.0,
+   "role": "numerical",
+   "label": "discretization error, the last change over the mesh levels",
+   "text": "mesh 0.099%"
+  }
+ ],
+ "model": {
+  "kind": "exact",
+  "method": "exact scaling of the converged solution: stress follows the load and not the modulus, deflection follows the load over the modulus"
+ },
+ "samples": 200000,
+ "sampling": "Latin hypercube",
+ "seed": 1,
+ "decision": "safety_factor",
+ "outputs": {
+  "safety_factor": {
+   "mean": 1.3472148,
+   "sd": 0.17253377,
+   "p01": 0.98693885,
+   "p05": 1.0804276,
+   "p50": 1.3380161,
+   "p95": 1.6465104,
+   "p99": 1.7903777,
+   "min": 0.74205901,
+   "max": 2.310178,
+   "unit": ""
+  },
+  "governing_MPa": {
+   "mean": 123.69543,
+   "sd": 12.369979,
+   "p01": 97.596026,
+   "p05": 104.44744,
+   "p50": 123.0805,
+   "p95": 145.03157,
+   "p99": 155.25413,
+   "min": 78.06829,
+   "max": 194.41829,
+   "unit": "MPa"
+  },
+  "max_deflection_mm": {
+   "mean": 0.26510735,
+   "sd": 0.027687979,
+   "p01": 0.20681333,
+   "p05": 0.22226362,
+   "p50": 0.26371769,
+   "p95": 0.31295067,
+   "p99": 0.33598357,
+   "min": 0.16277804,
+   "max": 0.43195927,
+   "unit": "mm"
+  }
+ },
+ "probability": {
+  "failure": {
+   "value": 0.01296,
+   "ci95": [
+    0.012468887,
+    0.013465304
+   ],
+   "failures": 2592,
+   "samples": 200000,
+   "reliability_index": 2.2274083,
+   "against": "the yield strength"
+  },
+  "below target": {
+   "value": 0.99932,
+   "ci95": [
+    0.99919569,
+    0.99942945
+   ],
+   "failures": 199864,
+   "samples": 200000,
+   "reliability_index": -3.2030084,
+   "against": "the target safety factor 2"
+  }
+ },
+ "alternatives": [
+  {
+   "label": "loads entering through a rigid attachment",
+   "assumed": "a distributed attachment",
+   "governing_MPa": 54.950013,
+   "settled": true,
+   "probability": {
+    "value": 0.0,
+    "ci95": [
+     0.0,
+     1.8444227e-05
+    ],
+    "failures": 0,
+    "samples": 200000,
+    "reliability_index": null
+   },
+   "below_target": {
+    "value": 0.00098,
+    "ci95": [
+     0.00084765191,
+     0.0011271369
+    ],
+    "failures": 196,
+    "samples": 200000,
+    "reliability_index": 3.0962274
+   },
+   "safety_factor": {
+    "mean": 3.0326533,
+    "sd": 0.38838285,
+    "p01": 2.2216527,
+    "p05": 2.432101,
+    "p50": 3.0119467,
+    "p95": 3.7063838,
+    "p99": 4.030237,
+    "min": 1.6704149,
+    "max": 5.2003355
+   }
+  }
+ ],
+ "sensitivity": {
+  "output": "safety_factor",
+  "base_samples": 8192,
+  "indices": [
+   {
+    "input": "load",
+    "label": "the 2000 N load",
+    "role": "load",
+    "first_order": 0.60773618,
+    "total": 0.61148655,
+    "first_order_ci": [
+     0.43666629,
+     0.78057734
+    ],
+    "total_ci": [
+     0.59313842,
+     0.62725862
+    ]
+   },
+   {
+    "input": "yield",
+    "label": "yield strength",
+    "role": "strength",
+    "first_order": 0.38840003,
+    "total": 0.39262681,
+    "first_order_ci": [
+     0.22102159,
+     0.53903399
+    ],
+    "total_ci": [
+     0.37881139,
+     0.40506463
+    ]
+   },
+   {
+    "input": "mesh",
+    "label": "discretization error, the last change over the mesh levels",
+    "role": "numerical",
+    "first_order": 6.0099017e-05,
+    "total": 6.1102829e-05,
+    "first_order_ci": [
+     -0.0021242399,
+     0.0014826305
+    ],
+    "total_ci": [
+     5.9058647e-05,
+     6.3218586e-05
+    ]
+   },
+   {
+    "input": "E",
+    "label": "Young's modulus",
+    "role": "stiffness",
+    "first_order": 0.0,
+    "total": 0.0,
+    "first_order_ci": [
+     0.0,
+     0.0
+    ],
+    "total_ci": [
+     0.0,
+     0.0
+    ]
+   }
+  ]
+ },
+ "histogram": {
+  "edges": [
+   0.86004268,
+   0.88907817,
+   0.91811366,
+   0.94714915,
+   0.97618463,
+   1.0052201,
+   1.0342556,
+   1.0632911,
+   1.0923266,
+   1.1213621,
+   1.1503976,
+   1.1794331,
+   1.2084686,
+   1.237504,
+   1.2665395,
+   1.295575,
+   1.3246105,
+   1.353646,
+   1.3826815,
+   1.411717,
+   1.4407525,
+   1.469788,
+   1.4988235,
+   1.5278589,
+   1.5568944,
+   1.5859299,
+   1.6149654,
+   1.6440009,
+   1.6730364,
+   1.7020719,
+   1.7311074,
+   1.7601429,
+   1.7891783,
+   1.8182138,
+   1.8472493,
+   1.8762848,
+   1.9053203,
+   1.9343558,
+   1.9633913,
+   1.9924268,
+   2.0214623
+  ],
+  "counts": [
+   199,
+   195,
+   442,
+   806,
+   1240,
+   1967,
+   2897,
+   4123,
+   5457,
+   6976,
+   8543,
+   10166,
+   11388,
+   12631,
+   13201,
+   13542,
+   13432,
+   13143,
+   12288,
+   11414,
+   10068,
+   8891,
+   7744,
+   6323,
+   5133,
+   4270,
+   3289,
+   2562,
+   2100,
+   1555,
+   1161,
+   820,
+   637,
+   413,
+   313,
+   202,
+   140,
+   99,
+   75,
+   155
+  ]
+ },
+ "probes": [
+  {
+   "kind": "peak",
+   "why": "the governing point, where the answer is decided",
+   "node": 43533,
+   "xyz": [
+    43.840563,
+    8.9140099,
+    79.387924
+   ],
+   "normal": [
+    -0.96226016,
+    0.27212134,
+    -0.0023141619
+   ],
+   "direction": [
+    -0.17916403,
+    -0.62710316,
+    0.75805137
+   ],
+   "strain": 0.0014855846,
+   "strain_at_centre": 0.0016702365,
+   "strain_range": [
+    0.001255453,
+    0.0016796377
+   ],
+   "measure_range": [
+    90.218541,
+    121.47944
+   ],
+   "excluded": false
+  },
+  {
+   "kind": "far field",
+   "why": "a calm spot on the main load path, where a gauge checks the overall stiffness without fighting a steep gradient",
+   "node": 15675,
+   "xyz": [
+    12.154648,
+    0.0,
+    100.95667
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "direction": [
+    -0.95020285,
+    0.0,
+    0.31163207
+   ],
+   "strain": 0.00081801691,
+   "strain_at_centre": 0.00081801691,
+   "strain_range": [
+    0.00081801691,
+    0.00081801691
+   ],
+   "measure_range": [
+    59.201773,
+    59.201773
+   ],
+   "excluded": false
+  },
+  {
+   "kind": "deflection",
+   "why": "the point that moves most, for a dial gauge or a displacement sensor",
+   "node": 968,
+   "xyz": [
+    24.231974,
+    0.0,
+    112.0
+   ],
+   "direction": [
+    -0.18981619,
+    -0.9721905,
+    -0.13716938
+   ],
+   "displacement": 0.26486887
+  }
+ ],
+ "study_load": {
+  "nominal": 2000.0,
+  "unit": "N",
+  "label": "the 2000 N load"
+ },
+ "headline": "The chance of failing against the yield strength is about 1 in 77 (1.3%, 95% interval 1.25% to 1.35%). The safety factor averages 1.35 with a standard deviation of 0.173, and 90% of samples fall between 1.08 and 1.65. By total Sobol index the spread comes from load (0.61) and yield (0.39). With loads entering through a rigid attachment instead of a distributed attachment, the chance of failing is below 1 in 54,000 (no failures in 200,000 samples, 95% upper bound 1.8e-05), so that choice bounds the answer too."
+}

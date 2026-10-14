@@ -1,0 +1,232 @@
+{
+ "kind": "test plan",
+ "domain": "strength",
+ "wobbl": "0.1.1",
+ "created": "2026-10-13 22:17",
+ "tests": [
+  {
+   "kind": "validation",
+   "what": "A static load test with strain gauges and a dial gauge, loaded in steps of 500 N, 1000 N, 1500 N and 2000 N",
+   "gauges": [
+    {
+     "kind": "peak",
+     "xyz": [
+      43.840563,
+      8.9140099,
+      79.387924
+     ],
+     "direction": [
+      -0.17916403,
+      -0.62710316,
+      0.75805137
+     ],
+     "why": "the governing point, where the answer is decided",
+     "quantity": "strain",
+     "predicted": [
+      {
+       "load": 500.0,
+       "microstrain": 371.39615,
+       "band_95": 22.283769
+      },
+      {
+       "load": 1000.0,
+       "microstrain": 742.7923,
+       "band_95": 44.567538
+      },
+      {
+       "load": 1500.0,
+       "microstrain": 1114.1885,
+       "band_95": 66.851307
+      },
+      {
+       "load": 2000.0,
+       "microstrain": 1485.5846,
+       "band_95": 89.135076
+      }
+     ],
+     "note": "the stress changes 26% under a 3 mm grid here, so use a 1 mm grid or read the gauge as an average over its length"
+    },
+    {
+     "kind": "far field",
+     "xyz": [
+      12.154648,
+      0.0,
+      100.95667
+     ],
+     "direction": [
+      -0.95020285,
+      0.0,
+      0.31163207
+     ],
+     "why": "a calm spot on the main load path, where a gauge checks the overall stiffness without fighting a steep gradient",
+     "quantity": "strain",
+     "predicted": [
+      {
+       "load": 500.0,
+       "microstrain": 204.50423,
+       "band_95": 12.270254
+      },
+      {
+       "load": 1000.0,
+       "microstrain": 409.00846,
+       "band_95": 24.540507
+      },
+      {
+       "load": 1500.0,
+       "microstrain": 613.51268,
+       "band_95": 36.810761
+      },
+      {
+       "load": 2000.0,
+       "microstrain": 818.01691,
+       "band_95": 49.081015
+      }
+     ]
+    },
+    {
+     "kind": "deflection",
+     "xyz": [
+      24.231974,
+      0.0,
+      112.0
+     ],
+     "direction": [
+      -0.18981619,
+      -0.9721905,
+      -0.13716938
+     ],
+     "why": "the point that moves most, for a dial gauge or a displacement sensor",
+     "quantity": "displacement",
+     "predicted": [
+      {
+       "load": 500.0,
+       "mm": 0.066217217,
+       "band_95": 0.003973033
+      },
+      {
+       "load": 1000.0,
+       "mm": 0.13243443,
+       "band_95": 0.0079460661
+      },
+      {
+       "load": 1500.0,
+       "mm": 0.19865165,
+       "band_95": 0.011919099
+      },
+      {
+       "load": 2000.0,
+       "mm": 0.26486887,
+       "band_95": 0.015892132
+      }
+     ]
+    }
+   ],
+   "steps": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "why": "It supplies the comparison with tests that V&V 20 needs, at the point the decision rests on and up to the design load.",
+   "addresses": [
+    "comparator",
+    "output comparison",
+    "applicability"
+   ],
+   "score": 1.0,
+   "order": 1
+  },
+  {
+   "kind": "model form",
+   "what": "A strain gauge at (-34, 0, 29.5), where the rigid attachment puts its peak",
+   "gauges": [
+    {
+     "kind": "discriminating",
+     "xyz": [
+      -34.011536,
+      0.0,
+      29.479845
+     ]
+    }
+   ],
+   "why": "With a rigid attachment the peak sits here at 55 MPa, and with the distributed one Wobbl predicts 18.1 MPa at the same spot. A reading here tells which idealization the real assembly is closer to, a choice that moves the answer more than any input scatter.",
+   "addresses": [
+    "model form"
+   ],
+   "predicted_alternative_MPa": 54.950013,
+   "predicted_primary_MPa": 18.122708,
+   "score": 1.0,
+   "order": 2
+  },
+  {
+   "kind": "service load",
+   "test": [
+    "Measure the 2000 N load in service, with a load cell or a strain gauged link"
+   ],
+   "inputs": [
+    "load"
+   ],
+   "share": 0.60773618,
+   "score": 0.60773618,
+   "addresses": [
+    "the scatter of load"
+   ],
+   "what": "Measure the 2000 N load in service, with a load cell or a strain gauged link.",
+   "why": "Knowing the load exactly removes about 61% of the variance of the safety factor, taking its standard deviation from 0.173 to about 0.108.",
+   "order": 3
+  },
+  {
+   "kind": "material coupons",
+   "test": [
+    "Tensile test coupons from the same lot, casting or print settings, measuring the yield strength (yield)"
+   ],
+   "inputs": [
+    "yield"
+   ],
+   "share": 0.38840003,
+   "score": 0.38840003,
+   "addresses": [
+    "the scatter of yield"
+   ],
+   "what": "Tensile test coupons from the same lot, casting or print settings, measuring the yield strength (yield).",
+   "why": "Knowing the yield exactly removes about 39% of the variance of the safety factor, taking its standard deviation from 0.173 to about 0.135.",
+   "how_many": "At least 10 coupons, since the uncertainty in the lot mean falls with the square root of their number, to a third of the scatter at 9.",
+   "order": 4
+  }
+ ],
+ "considered": [
+  "service load",
+  "material coupons",
+  "validation",
+  "model form"
+ ],
+ "replace": [
+  {
+   "test": "a static proof test at the design load",
+   "verdict": "not yet",
+   "why": "the readings are synthetic, the failure probability is not small enough to stand on the model alone, credibility factors are short of their goals"
+  },
+  {
+   "test": "strain surveys of later design variants",
+   "verdict": "not yet",
+   "why": "no validated survey exists to carry over"
+  },
+  {
+   "test": "a test to failure",
+   "verdict": "cannot",
+   "why": "Wobbl's strength model is linear elastic and stops at the first yield, so it says nothing about how the part fails after that"
+  },
+  {
+   "test": "material coupons",
+   "verdict": "cannot",
+   "why": "they measure the inputs the model rests on"
+  },
+  {
+   "test": "fatigue, impact and vibration tests",
+   "verdict": "cannot",
+   "why": "this run is a static strength study and does not model them"
+  }
+ ],
+ "rule": "the validation test whenever a validation factor is short of its goal, the discriminating gauge whenever the model form is, and input measurements by first order Sobol index until they cover 80% of the variance measuring could remove",
+ "headline": "4 tests would most reduce the risk, in this order, a validation test, a gauge where the idealizations differ, a service load measurement and material coupons."
+}
