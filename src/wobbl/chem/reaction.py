@@ -121,7 +121,9 @@ def equation(reactants: list[Term], products: list[Term], phases: bool = True) -
 
 def display(sp: Species) -> str:
     """How the formula reads in an equation: the conventional order for salts and acids, Hill order otherwise."""
-    from .substances import CONVENTIONAL
+    from .substances import CONDENSED, CONVENTIONAL
+    if sp.text.strip() in CONDENSED:
+        return sp.text.strip()
     if sp.formula in CONVENTIONAL:
         return CONVENTIONAL[sp.formula]
     ions = sp.ions or (ions_of(sp) if sp.kind in ("salt", "oxide") else None)

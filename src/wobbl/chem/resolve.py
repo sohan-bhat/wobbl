@@ -309,6 +309,15 @@ def _from_smiles(smi: str, allow_online: bool) -> Species:
 
 
 def _from_formula(text: str, allow_online: bool) -> Species:
+    from .substances import CONDENSED, by_smiles
+    if text.strip() in CONDENSED:
+        name, smi = CONDENSED[text.strip()]
+        known = by_smiles(smi) or lookup(name)
+        if known and known.smiles == smi:
+            return _from_substance(known, text, "Wobbl's table of common substances")
+        counts, charge = F.parse(text)
+        return Species(text, name, F.hill(counts, charge), dict(counts), charge, smi,
+                       _classify(dict(counts), charge, smi), "", "its condensed formula")
     counts, charge = F.parse(text)
     hill = F.hill(counts, charge)
     known = COMMON_FORMULAS.get(hill)

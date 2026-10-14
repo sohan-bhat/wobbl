@@ -222,3 +222,19 @@ CONVENTIONAL = {_key(k): v for k, v in {
     "C2H4O2": "CH3COOH", "C2H6O": "C2H5OH", "CH4O": "CH3OH", "H2SO4": "H2SO4", "HCl": "HCl", "NH3": "NH3",
     "H2CO3": "H2CO3", "HNO3": "HNO3", "H3PO4": "H3PO4", "CH2O2": "HCOOH", "H2O2": "H2O2", "NH4+": "NH4+",
     "C6H12O6": "C6H12O6", "C3H8O3": "C3H5(OH)3", "H2S": "H2S", "HF": "HF", "HCN": "HCN"}.items()}
+
+# condensed formulas that name one isomer, which their Hill formula would lose (HNC is not HCN)
+CONDENSED = {
+    "HCN": ("hydrogen cyanide", "C#N"), "HNC": ("hydrogen isocyanide", "[C-]#[NH+]"),
+    "CH3OH": ("methanol", "CO"), "C2H5OH": ("ethanol", "CCO"), "CH3CH2OH": ("ethanol", "CCO"),
+    "CH3OCH3": ("dimethyl ether", "COC"), "CH3COOH": ("acetic acid", "CC(=O)O"), "HCOOH": ("formic acid", "OC=O"),
+    "CH3CHO": ("acetaldehyde", "CC=O"), "CH3CN": ("acetonitrile", "CC#N"), "CH3NC": ("methyl isocyanide",
+                                                                                     "C[N+]#[C-]"),
+    "HOCN": ("cyanic acid", "OC#N"), "HNCO": ("isocyanic acid", "N=C=O"), "CH3COCH3": ("acetone", "CC(C)=O"),
+    "C6H5OH": ("phenol", "Oc1ccccc1"), "C6H5COOH": ("benzoic acid", "OC(=O)c1ccccc1"),
+    "CH3CH2CH2OH": ("1-propanol", "CCCO"), "(CH3)2CHOH": ("2-propanol", "CC(C)O"), "H2NCONH2": ("urea", "NC(N)=O"),
+    "CH2CHCH3": ("propene", "C=CC"), "CH3CH3": ("ethane", "CC"), "CH2CH2": ("ethylene", "C=C"),
+    "NH2CH2COOH": ("glycine", "NCC(=O)O"), "CH3COONa": ("sodium acetate", "CC(=O)[O-].[Na+]"),
+    "NaCH3COO": ("sodium acetate", "CC(=O)[O-].[Na+]"),
+}
+
