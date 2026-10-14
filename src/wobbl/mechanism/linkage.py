@@ -156,7 +156,7 @@ def answer(b, img: Path, say) -> Answer:
                      f"{fmt_torque(peak)}.")
         elif peak is not None:
             head += f" Driving it at {fmt(info['speed'] * 60 / (2 * math.pi))} rpm takes up to {fmt_torque(peak)}."
-    fixes = _fixes(info, sweep, mu_lo, mu_hi, peak, stalled, hot, full, m) if verdict != "ok" else []
+    fixes = _fixes(info, sweep, mu_lo, mu_hi, peak, stalled, hot, full, m, b.params) if verdict != "ok" else []
 
     metrics = [("sweep", f"{fmt(sweep)} deg"), ("transmission", f"{fmt(mu_lo)} to {fmt(mu_hi)} deg"),
                ("worst advantage", f"{fmt(float(ma[k_ma]))}x")]
@@ -211,7 +211,7 @@ def _reach(d, a, b, c, t2s) -> tuple[float, float]:
     return float(back[max(down - 4, 0)]), float(grid[max(up - 4, 0)])
 
 
-def _fixes(info, sweep, mu_lo, mu_hi, peak, stalled, hot, full, m) -> list[dict]:
+def _fixes(info, sweep, mu_lo, mu_hi, peak, stalled, hot, full, m, params) -> list[dict]:
     d, a, b, c = info["lengths"]
     out = []
     target = math.degrees(info["sweep"]) if info["sweep"] is not None else sweep
@@ -221,13 +221,25 @@ def _fixes(info, sweep, mu_lo, mu_hi, peak, stalled, hot, full, m) -> list[dict]
             aa, bb, cc, sw, lo, hi = best
             what = [f"{name} {fmt(new * 1000)} mm" for name, new, old in
                     (("crank", aa, a), ("coupler", bb, b), ("rocker", cc, c)) if abs(new - old) > 5e-4]
-            out.append({"kind": "lengths", "title": "Make the " + " and the ".join(what),
+            names = ", the ".join(what[:-1]) + (" and the " if len(what) > 1 else "") + what[-1]
+            # run the new linkage at full speed too, so the fix comes with the torque it takes
+            from .templates import fourbar as build
+
+            new = build({**params, "crank": f"{aa * 1000:.4g} mm", "coupler": f"{bb * 1000:.4g} mm",
+                         "rocker": f"{cc * 1000:.4g} mm", "start": "0 deg"})
+            r = simulate(new.mech, frames=0, poses=0)
+            live = r.t > 0.3
+            pk = float(np.max(np.abs(r.tau[live, r.col("crank")])))
+            torque = (f" Running it again with these lengths, the crank peaks at {fmt(pk)} N m against "
+                      f"{fmt(peak)} N m today." if peak is not None else
+                      f" Running it again with these lengths, the crank peaks at {fmt(pk)} N m.")
+            out.append({"kind": "lengths", "title": "Make the " + names,
                         "summary": f"With the ground at {fmt(d * 1000)} mm, the toggle positions where crank and "
                                    f"coupler line up give a {fmt(sw)} degree sweep with the transmission angle between "
-                                   f"{fmt(lo)} and {fmt(hi)} degrees, and the crank still turns fully. Run it again "
-                                   "with these lengths to check the torque.", "auto": False,
+                                   f"{fmt(lo)} and {fmt(hi)} degrees, and the crank still turns fully." + torque,
+                        "auto": False,
                         "after": {"crank_mm": aa * 1000, "coupler_mm": bb * 1000, "rocker_mm": cc * 1000,
-                                  "sweep_deg": sw, "transmission_deg": [lo, hi]}})
+                                  "sweep_deg": sw, "transmission_deg": [lo, hi], "peak_torque_Nm": pk}})
     motor = info["motor"]
     if (stalled or hot) and motor is not None:
         w = 0.7 * motor.no_load_speed
