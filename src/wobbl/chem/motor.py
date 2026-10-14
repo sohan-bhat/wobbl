@@ -30,14 +30,14 @@ import numpy as np
 from ..outcome_generic import GenericOutcome
 from ..units import fmt
 from ..verify.checks import Check, confidence
-from .ballistics import Burn, Motor, converge, simulate, steady_pressure
+from .ballistics import Burn, Motor, converge, kn_for_pressure, simulate, steady_pressure
 from .curves import write_curves
 from .grains import Bates, MapGrain
 from .spec import Casing, MotorSpec
 
 MASS_FLUX_LIMIT = 1406.0         # kg/(m2 s), 2 lb/(in2 s), openMotor's default erosive burning alert
 PORT_THROAT_MIN = 2.0            # openMotor's default alert for the port to throat area ratio
-DESIGN_CHECKS = {"casing", "nozzle"}
+DESIGN_CHECKS = {"casing", "Kn", "nozzle"}
 
 
 def _mpa(p: float) -> str:
@@ -63,13 +63,14 @@ def run_motor(spec: MotorSpec, out_dir: str | Path, cb=None, render: bool = True
     checks.append(ero)
     case, case_vals = _casing_check(spec.casing, b.peak_pressure)
     checks.append(case)
+    checks.append(_kn_check(m, case_vals))
     noz, noz_vals = _nozzle_check(m, b)
     checks.append(noz)
     level, reasons = confidence([c for c in checks if c.name not in DESIGN_CHECKS])
     status = {c.name: c.status for c in checks}
     if status["casing"] == "fail" or ero_vals["port_throat"] < 1.0:
         verdict = "fails"
-    elif "warn" in (status["casing"], status["nozzle"], status["erosive burning"]):
+    elif "warn" in (status["casing"], status["Kn"], status["nozzle"], status["erosive burning"]):
         verdict = "marginal"
     else:
         verdict = "ok"
@@ -245,6 +246,23 @@ def _erosive_check(m: Motor, b: Burn) -> tuple[Check, dict]:
                                                    "out, so the real pressure early in the burn can differ from this "
                                                    "prediction", vals), vals
     return Check("erosive burning", "pass", s, vals), vals
+
+
+def _kn_check(m: Motor, case_vals: dict) -> Check:
+    """Kn over the web, and the Kn at which this propellant would reach the casing's allowable pressure."""
+    kns = [m.kn(x) for x in np.linspace(0, m.web * 0.98, 200)]
+    lo, hi = min(kns), max(kns)
+    swing = 100 * (hi / lo - 1)
+    s = (f"Kn runs from {fmt(kns[0])} at ignition to {fmt(hi)} at its peak and {fmt(kns[-1])} near burnout, "
+         + (f"swinging {swing:.0f}% over the burn" if swing > 30 else f"staying within {swing:.0f}% over the burn"))
+    vals = {"kn_initial": kns[0], "kn_max": hi, "kn_min": lo}
+    if not case_vals:
+        return Check("Kn", "info", s, vals)
+    allow = kn_for_pressure(m, case_vals["allowable_Pa"])
+    vals["kn_allowable"] = allow
+    s += (f". This propellant reaches the casing's allowable {_mpa(case_vals['allowable_Pa'])} at a Kn of "
+          f"{fmt(allow)}")
+    return Check("Kn", "pass" if hi <= allow else "warn", s, vals)
 
 
 def _flux(m: Motor, b: Burn) -> tuple[float, float]:

@@ -15,6 +15,7 @@ Checks:
   [pass] burn rate data: the burn runs from 1.26 MPa to 4.14 MPa, inside the 0.103 MPa to 10.7 MPa the burn rate was measured over
   [warn] erosive burning: the narrowest port is 1.59 times the throat area at ignition and the peak mass flux down the cores is 2336 kg/(m2 s), against the usual limits of 2 and 1406. Fast core flow changes the burn rate, which this model leaves out, so the real pressure early in the burn can differ from this prediction
   [pass] casing: peak 4.14 MPa puts 67.8 MPa of hoop stress on the bore of the 54 mm Aluminum 6061-T6 casing with a 1.6 mm wall (65.7 MPa by the thin wall hand calculation P r / t), a safety factor of 4.07 on its 276 MPa yield against a target of 2. It yields at 16.8 MPa and bursts near 18.4 MPa by Barlow's formula on the tensile strength
+  [pass] Kn: Kn runs from 276 at ignition to 314 at its peak and 260 near burnout, staying within 21% over the burn. This propellant reaches the casing's allowable 8.42 MPa at a Kn of 486
   [pass] nozzle: area ratio 6.35 expands the gas to 99.7 kPa at the average chamber pressure, against 101 kPa outside (an area ratio of 6.27 would match it)
 
 Assumptions:

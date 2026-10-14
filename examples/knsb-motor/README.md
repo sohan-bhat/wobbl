@@ -14,7 +14,7 @@ across with a 1.6 mm wall. The nozzle has a 12.7 mm throat and a 32 mm exit. The
 | Result | Value |
 |---|---|
 | Motor | J602, 1238 N s over 2.06 s at 120 s delivered Isp |
-| Peak chamber pressure | 4.14 MPa, at a Kn of 314 |
+| Peak chamber pressure | 4.14 MPa, at a Kn of 314, where a Kn of 486 would reach the casing's allowable 8.42 MPa |
 | Casing | 67.8 MPa of hoop stress at the bore, a safety factor of 4.07 on yield against a target of 2, yielding at 16.8 MPa and bursting near 18.4 MPa |
 | Erosive burning | the ports are 1.59 times the throat area and the core mass flux peaks at 2336 kg/(m2 s), past the usual limits of 2 and 1406 |
 | Chemistry | Cantera's equilibrium for KNSB gives c* 907 m/s against the 908 m/s of the published data, and the motor delivers 84% of the ideal frozen Isp |

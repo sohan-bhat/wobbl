@@ -38,8 +38,11 @@ def _check(o, name):
 
 def test_the_example_runs_verified_and_flags_its_narrow_ports(tmp_path):
     o = run_motor(read_spec(EXAMPLE), tmp_path, render=False)
-    for name in ("time step convergence", "mass balance", "closed form", "geometry", "burn rate data", "casing"):
+    for name in ("time step convergence", "mass balance", "closed form", "geometry", "burn rate data", "casing",
+                 "Kn"):
         assert _check(o, name).status == "pass", (name, _check(o, name).summary)
+    kn = _check(o, "Kn").detail
+    assert kn["kn_initial"] < kn["kn_max"] < kn["kn_allowable"]
     assert _check(o, "erosive burning").status == "warn" and o.verdict == "marginal"
     assert o.values["port_throat"] == pytest.approx((16 / 12.7) ** 2, rel=1e-6)
     assert o.values["designation"].startswith("J") and 1100 < o.values["impulse_Ns"] < 1400
@@ -53,7 +56,7 @@ def test_the_example_runs_verified_and_flags_its_narrow_ports(tmp_path):
 
 def test_a_thin_casing_fails_and_the_throat_fix_is_simulated(tmp_path):
     o = run_motor(read_spec(DESIGN.format(wall="0.3 mm")), tmp_path, render=False)
-    assert o.verdict == "fails" and _check(o, "casing").status == "fail"
+    assert o.verdict == "fails" and _check(o, "casing").status == "fail" and _check(o, "Kn").status == "warn"
     assert o.values["safety_factor"] < 1
     throat = next(f for f in o.fixes if f["kind"] == "throat")
     assert throat["after"]["safety_factor"] == pytest.approx(2.0, rel=0.03)

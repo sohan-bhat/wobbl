@@ -4,7 +4,8 @@ import math
 import numpy as np
 import pytest
 
-from wobbl.chem.ballistics import Motor, Nozzle, converge, motor_class, simulate, steady_pressure, thrust_coefficient
+from wobbl.chem.ballistics import (Motor, Nozzle, converge, kn_for_pressure, motor_class, simulate, steady_pressure,
+                                   thrust_coefficient)
 from wobbl.chem.grains import make_grain
 from wobbl.chem.propellants import PROPELLANTS
 
@@ -34,6 +35,7 @@ def test_end_burner_holds_the_closed_form_pressure():
     mid = (b.t > 0.3 * b.t[-1]) & (b.t < 0.7 * b.t[-1])
     assert np.median(b.P[mid]) == pytest.approx(P_cf, rel=0.002)
     assert steady_pressure(m, 0.05) == pytest.approx(P_cf, rel=1e-6)
+    assert kn_for_pressure(m, P_cf) == pytest.approx(150, rel=1e-6)          # the inverse of the closed form
     assert b.burn_time == pytest.approx(0.10 / KNSU.burn_rate.rate(P_cf), rel=0.02)
     assert abs(b.expelled + b.gas_end - b.gas_start - b.mass) / b.mass < 1e-3
     assert len(runs) >= 2 and runs[-1]["change"] < 0.003

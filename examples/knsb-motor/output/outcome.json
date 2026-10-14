@@ -135,6 +135,17 @@
    }
   },
   {
+   "name": "Kn",
+   "status": "pass",
+   "summary": "Kn runs from 276 at ignition to 314 at its peak and 260 near burnout, staying within 21% over the burn. This propellant reaches the casing's allowable 8.42 MPa at a Kn of 486",
+   "detail": {
+    "kn_initial": 275.776552,
+    "kn_max": 313.989285,
+    "kn_min": 260.066415,
+    "kn_allowable": 485.88183
+   }
+  },
+  {
    "name": "nozzle",
    "status": "pass",
    "summary": "area ratio 6.35 expands the gas to 99.7 kPa at the average chamber pressure, against 101 kPa outside (an area ratio of 6.27 would match it)",
@@ -245,6 +256,6 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 14.221192,
+ "t_total": 17.93381,
  "solver": "Wobbl internal ballistics (Runge-Kutta, scipy) and Cantera 3.2.0"
 }

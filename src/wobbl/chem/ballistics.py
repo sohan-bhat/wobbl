@@ -265,6 +265,16 @@ def _steady_pressure(m: Motor, x: float, P_guess: float | None = None) -> float:
     return P
 
 
+def kn_for_pressure(m: Motor, P: float) -> float:
+    """The Kn whose closed form chamber pressure is P, in the burn rate band P falls in."""
+    prop = m.propellant
+    a, n = prop.burn_rate.band(P)
+    k = prop.k
+    gam = math.sqrt(k) * (2 / (k + 1)) ** ((k + 1) / (2 * (k - 1)))
+    rho_g = P / (m.cstar * gam) ** 2
+    return P ** (1 - n) / (a / 1000.0 * (1e-6) ** n * (prop.density - rho_g) * m.cstar)
+
+
 def steady_pressure(m: Motor, x: float, classic: bool = False) -> float:
     """Closed form pressure at regression x, or the textbook form without the gas density when classic."""
     if not classic:
