@@ -52,6 +52,8 @@ point marked and fixes with numbers.
   flame temperatures and CEA style propellant performance, and solid rocket motors
   from their grains, propellant and nozzle to a thrust curve, with the casing
   checked against the peak chamber pressure.
+- Mechanisms with [MuJoCo](https://mujoco.org), for robot arms against their servos'
+  torque speed lines, four bar linkages, gear trains, impacts and things that tip.
 
 `wobbl fix --apply` edits the part, adding fillets and gussets to any STEP file,
 and runs the whole study again. The same tools work from your terminal and from
@@ -241,6 +243,49 @@ burn rate law rather than resolved flame chemistry, and erosive burning, ignitio
 delay and throat erosion are flagged rather than modeled. Wobbl models given
 designs only and gives no guidance on making or handling propellants.
 
+## Mechanisms
+
+`wobbl mechanism` runs linkages, gear trains, robot arms and parts that collide in
+MuJoCo, with each motor held to its torque speed line. The arm template answers the
+question every desktop arm build starts with, whether its hobby servos can carry
+the payload through the move.
+
+```console
+$ wobbl mechanism arm --set servo=mg996r --set wrist_servo=mg90s --set payload=500g
+FAILS. The shoulder servo stalls. Carrying 500 g through this move needs 1.35 N m (13.7 kg cm) almost at rest, where the TowerPro MG996R at 6 V gives 1.07 N m (11 kg cm). The hand hits the table at 0.241 s.
+```
+
+The torque and speed each servo needs come from MuJoCo's inverse dynamics along
+the move, set against the servo's line for a stall and its RMS over the repeating
+cycle against what it can carry continuously for heat. A second run with every
+servo held to its line shows what really happens, here the arm sagging onto the
+table. Each fix, a belt or gear stage, a stronger servo, a spring or counterweight,
+a lighter payload or ballast for a base that tips, is solved again before it is
+suggested. The four bar template gives a linkage's swing, toggle positions,
+transmission angle and mechanical advantage and whether its motor keeps up, the
+gear template gives output speed and torque with mesh losses, and the impact and
+tip templates give peak contact force and tipping. Anything else is a TOML spec of
+bodies, joints, drives, gear and belt couplings, loops, loads and a move, or an
+MJCF or URDF model.
+
+| Run | Answer | Checked against |
+|---|---|---|
+| [Desktop arm](examples/desktop-arm) | the shoulder stalls lifting 500 g, needing 1.35 N m where its MG996R gives 1.07 N m | the moments of the weights about each joint, a run with the servos' limits, half the time step and an energy account |
+| [Wiper linkage](examples/wiper-linkage) | sweeps 94.3 degrees with a 45 rpm motor peaking at 5.41 N m, but its transmission angle falls to 35.5 degrees | Freudenstein's equation at every crank angle, virtual work, half the time step and an energy account |
+
+![Torque and speed each of the desktop arm's servos needs against its torque speed line, the shoulder well past it](examples/desktop-arm/output/images/torque_speed.png)
+
+Every run writes `trajectory.csv` and `playback.json`, which holds the bodies as
+simple shapes with their poses through the run and each joint's torque beside its
+motor's limit, so the run can be played back as it happened. Bodies are rigid, so a
+long printed link that flexes is not modeled, and contacts are stiff springs whose
+depth is checked. An impact's bounce and momentum do not depend on that stiffness
+but its peak force does, so Wobbl tunes the contact to Hertz theory for the two
+materials and reports the force at medium confidence. Agents get `solve_mechanism`.
+MuJoCo installs itself the first time a mechanism study runs, a 7.8 MB download
+that takes 18.3 MB once Wobbl leaves out its headers, plugins, viewer and renderers,
+or straight away with `wobbl setup --only mujoco`.
+
 ## An agent on its own versus Wobbl
 
 Given a CAD file, a strength question and 15 minutes, a capable coding agent
@@ -275,13 +320,13 @@ exactly what it added.
 | Cursor | `mcpServers.wobbl` in `~/.cursor/mcp.json` | `~/.cursor/skills/wobbl/SKILL.md` |
 | Gemini CLI | extension at `~/.gemini/extensions/wobbl/` | `WOBBL.md` in the same extension |
 
-The agent gets 26 tools, `inspect_geometry`, `mesh`, `new_study`,
+The agent gets 27 tools, `inspect_geometry`, `mesh`, `new_study`,
 `set_material`, `apply_load`, `add_fixture`, `solve_structural`, `verify`,
 `render`, `suggest_fix`, `quantify_uncertainty`, `validate_against_tests`,
 `assess_credibility`, `plan_tests`, `solve_thermal`, `solve_circuit`,
 `solve_motion`, `solve_motor`, `solve_flame`, `solve_propellant`, `solve_flow`,
-`solve_buckling`, `solve_vibration`, `fatigue_life`, `solve_plastic` and
-`list_materials`.
+`solve_buckling`, `solve_vibration`, `fatigue_life`, `solve_plastic`,
+`solve_mechanism` and `list_materials`.
 Results are compact JSON with image and report paths. The skill teaches the
 workflow and what never to skip, which means reading the checks before the number,
 never quoting an excluded peak and making the supports match the real build.
@@ -369,7 +414,7 @@ where the two servo idealizations disagree, a load cell in service and coupons.
 
 ## Validation
 
-Thirty eight cases with known answers run through the same pipeline you get. Every
+Forty four cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
@@ -383,6 +428,7 @@ modeled setup lands within 2%.
 | Combustion (methane flame against Turns, LOX and LH2 c* and Isp against NASA CEA, KNSU c* against PROPEP) | 4 | 0.05%, the LOX and LH2 c* |
 | Solid motors (steady Kn against the closed form, a neutral grain's web time, two MIT static fires) | 4 | 9.26%, the impulse of the O3800 static fire, whose peak pressure came out 7% low |
 | Uncertainty and calibration (a cantilever's mean and spread of deflection against lognormal propagation, Ishigami Sobol indices, two calibrations from synthetic data) | 5 | 0.97%, a film coefficient from a cooling curve |
+| Mechanisms (a pendulum's large swing, a four bar's sweep, a two link arm's holding torque, a gear train's output speed, an elastic and a half elastic collision) | 6 | 0.05%, the struck ball's speed after the half elastic hit |
 
 The full table is [on the website](https://sohan-bhat.github.io/wobbl/validation/). Run it yourself with
 `wobbl validate`, which takes about 30 minutes.
@@ -406,6 +452,8 @@ reports, heatmaps and summaries, and each has a page [on the website](https://so
 | [rocket-launch](examples/rocket-launch) | Will an L class rocket fly straight, reach 11,000 ft and land softly? | motion, rocketry |
 | [knsb-motor](examples/knsb-motor) | Will a 54 mm KNSB motor hold its casing, and what thrust curve does it give? | solid motors |
 | [propane-flame](examples/propane-flame) | How hot does a propane flame get, and how much CO and NO does it make? | combustion |
+| [desktop-arm](examples/desktop-arm) | Can hobby servos lift 500 g through a desktop arm's pick and place? | mechanisms |
+| [wiper-linkage](examples/wiper-linkage) | Does a wiper linkage sweep 95 degrees, and can its motor drive it over dry glass? | mechanisms |
 | [circuits](examples/circuits) | Will this LED fry? What is the ripple? How hot is the MOSFET? | circuits |
 
 Each folder has a `run.sh` that regenerates its outputs.
@@ -445,9 +493,13 @@ Each folder has a `run.sh` that regenerates its outputs.
 - In a strength study's uncertainty the supports stay rigid, with the rigid and
   distributed load attachments as the bounds on how the load gets in, because a
   strength support has no stiffness of its own to vary.
+- Mechanisms are rigid bodies with stiff spring contacts, joints without backlash,
+  servos that follow their move as a well tuned controller would and motors on a
+  straight torque speed line, with a rotor inertia assumed where datasheets give none.
+  A hobby servo's continuous rating is taken as a third of its stall torque.
 
 Shell elements, fatigue estimates and bolt preload come next in 0.2, then CFD with
-OpenFOAM in 0.3 and multibody mechanisms with MuJoCo in 0.4.
+OpenFOAM in 0.3.
 
 ## Contributing
 

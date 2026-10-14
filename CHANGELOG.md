@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+**Mechanisms**
+- `wobbl mechanism` runs robot arms, four bar linkages, gear trains, impacts and
+  things that tip in MuJoCo, from a template with `--set` values, a TOML spec of
+  bodies, joints, drives, couplings, loops, loads and a move, or an MJCF or URDF
+  model. Motors follow a straight torque speed line, and servos follow their move
+  by computed torque up to it.
+- An arm's servos are judged for a stall against their line and for heat by their
+  RMS torque over the cycle, a linkage gets its sweep, toggle positions,
+  transmission angle and mechanical advantage, a gear train its output speed and
+  torque with mesh losses, an impact its peak force and a stand its tipping point.
+  Every fix is solved again before it is suggested.
+- Each run is checked against a closed form wherever one applies, at half the time
+  step and with an energy account over every force, and its contact depth and
+  constraint drift are inspected. Runs write `trajectory.csv` and `playback.json`
+  for replaying the run.
+- MuJoCo installs itself on first use from its PyPI wheel, 7.8 MB to fetch and
+  18.3 MB on disk after pruning, or with `wobbl setup --only mujoco`. Agents get
+  `solve_mechanism`, and plain questions about servos, linkages, gearboxes and
+  tipping reach the new domain.
+- Six validation cases against exact answers, all within 0.05%, and two examples,
+  a desktop arm on hobby servos and a windshield wiper linkage.
+
 **Rocket motors and combustion**
 - `wobbl motor` burns a solid motor design back to its thrust curve, from
   BATES, tube, end burner, star, finocyl, moon and X core grains, KNSB, KNDX,
