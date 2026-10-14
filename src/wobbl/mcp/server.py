@@ -23,7 +23,10 @@ Odds of failure under scatter, comparison with test readings, credibility eviden
 finished study: quantify_uncertainty, validate_against_tests, assess_credibility and plan_tests. Wobbl
 supplies evidence and never certifies a model.
 Metal parts loaded past yield (permanent set, collapse load): solve_plastic.
-Robot arms and servos, linkages, gear trains, impacts and tipping: solve_mechanism."""
+Robot arms and servos, linkages, gear trains, impacts and tipping: solve_mechanism.
+Solenoids, electromagnets and magnets: solve_magnetic. Capacitance and breakdown: solve_electric. Trace
+impedance, crosstalk and board parasitics: solve_board. Antennas and wireless range: solve_antenna. Room modes,
+mufflers and panel noise: solve_sound."""
 
 
 def _protect_stdout():
@@ -300,6 +303,59 @@ def build_server():
         metals). Takes one to five minutes."""
         from ..plastic.tools import solve_plastic_tool
         return solve_plastic_tool(path, material, loads, fixtures, target, quality, curve)
+
+    @srv.tool()
+    def solve_magnetic(template: str, params: dict | None = None) -> dict:
+        """Magnetostatics with nonlinear steel (GetDP). template='solenoid' (turns, current, coil_id, coil_od, length,
+        plunger_d, frame, clearance, stroke, material, need in N) gives the pull force over the stroke;
+        'electromagnet' (diameter, height, pole_d, wall, base, turns, current, plate, stroke, need) the holding
+        force on a plate; 'magnet' (diameter, height, grade n35/n42/n52/ferrite, cup, plate, stroke, need) a
+        permanent magnet's pull. Returns force, inductance, saturation and demagnetization, checked by virtual
+        work against the stress tensor, energy balance and three meshes. Values take units, e.g. '6 mm'."""
+        from ..fields.tools import solve_field_tool
+        return solve_field_tool("magnetic", template, params)
+
+    @srv.tool()
+    def solve_electric(template: str, params: dict | None = None) -> dict:
+        """Electrostatics (GetDP): capacitance, peak field and breakdown margin. template='plates' (diameter, gap,
+        thickness, voltage, dielectric, edge round or square), 'coax' (inner_d, outer_d, offset, voltage,
+        dielectric) or 'sphere' (diameter, gap to a grounded plane, voltage). margin sets the wanted factor
+        below breakdown (default 2). Checked by charge balance, charge against energy and a closed form."""
+        from ..fields.tools import solve_field_tool
+        return solve_field_tool("electric", template, params)
+
+    @srv.tool()
+    def solve_board(template: str, params: dict | None = None) -> dict:
+        """PCB trace cross sections (GetDP): impedance, effective permittivity, inductance and capacitance per
+        length, and with length= the totals to feed solve_circuit (buck params loop_inductance and
+        switch_capacitance). template='microstrip', 'stripline', 'coplanar' (gap, ground_width), 'coupled' (spacing,
+        length, rise, swing, max_crosstalk for near and far end crosstalk) or 'coax' (inner_d, outer_d). Common:
+        width, height (dielectric thickness), thickness (copper), dielectric (fr4, ro4350b, ...) or er, target
+        impedance and tolerance. Checked against Hammerstad and Jensen, Cohn and conformal mapping formulas."""
+        from ..fields.tools import solve_field_tool
+        return solve_field_tool("board", template, params)
+
+    @srv.tool()
+    def solve_antenna(template: str, params: dict | None = None) -> dict:
+        """Antennas and range. template='dipole' or 'monopole' (frequency, length, diameter, gap, impedance) runs an
+        axisymmetric full wave sweep (GetDP) for resonance, impedance, S11, pattern and gain; 'patch' (frequency,
+        height, dielectric or er, width, length) sizes a patch with the transmission line model; 'link'
+        (frequency, tx_power, sensitivity, tx_gain, rx_gain, losses, environment office/home/factory/free/
+        outdoor/urban/suburban, distance, reliability) is a link budget with Friis and ITU-R P.1238 or log
+        distance path loss and shadowing. Add tx_power and sensitivity to any antenna for its range."""
+        from ..fields.tools import solve_field_tool
+        return solve_field_tool("antenna", template, params)
+
+    @srv.tool()
+    def solve_sound(template: str, params: dict | None = None) -> dict:
+        """Acoustics (GetDP). template='room' (size '5x4x2.7' in m, fmax, t60) or 'enclosure' (size in mm) finds
+        the standing wave modes and judges their spread; 'muffler' (pipe_d, chamber_d, chamber_length, fmin, fmax,
+        target in dB over band '100-400') gives the transmission loss of an expansion chamber; 'panel' (diameter,
+        velocity in m/s or acceleration or displacement, distance, limit in dB) the sound pressure level of a
+        vibrating panel as a baffled piston. Checked against exact box modes, plane wave theory, an energy
+        balance and the exact piston."""
+        from ..fields.tools import solve_field_tool
+        return solve_field_tool("sound", template, params)
 
     @srv.tool()
     def list_materials() -> dict:

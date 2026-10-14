@@ -89,6 +89,11 @@ def check_values(name: str, p: dict):
         else:
             assert all("=" in s for s in p["sets"]), p["sets"]
             TEMPLATES[p["target"]](dict(s.split("=", 1) for s in p["sets"]))
+    elif name in ("magnetic", "electric", "board", "antenna", "sound"):
+        from wobbl.fields.tools import check_params
+
+        assert all("=" in s for s in p["sets"]), p["sets"]
+        check_params(name, p["template"], dict(s.split("=", 1) for s in p["sets"]))
 
 
 def test_the_skill_names_every_kind_of_command():

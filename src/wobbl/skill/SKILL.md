@@ -1,6 +1,6 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, asks whether servos can lift a load or a robot arm can make a move, how far a linkage swings and where it binds, what a gear train gives, how hard two parts hit or whether something tips over, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed. Wobbl meshes the CAD, runs CalculiX, ngspice, Cantera, MuJoCo or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
+description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, asks whether servos can lift a load or a robot arm can make a move, how far a linkage swings and where it binds, what a gear train gives, how hard two parts hit or whether something tips over, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed, or asks about solenoid, electromagnet or magnet force, capacitance and breakdown, PCB trace impedance, crosstalk and switch node ringing, antenna tuning and wireless range, room modes, muffler loss or panel noise. Wobbl meshes the CAD, runs CalculiX, ngspice, GetDP, Cantera, MuJoCo or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
 ---
 
 # Wobbl: simulate before you build
@@ -159,6 +159,33 @@ as `wobbl mechanism robot.toml`. Bare numbers are mm, g, degrees, N m, rpm and s
 read as written, like `11 kg*cm` or `0.14 s/60deg`. Read the stall and heat numbers joint by joint, since
 a servo that clears a single move can still cook when the move repeats.
 
+For magnetic, electric, radio and sound questions, use the field commands, which solve with GetDP. It is
+fetched the first time one of them runs (an 11 MB download). Each takes a template and its values with units,
+one `--set` per value. `wobbl magnetic solenoid --set turns=800 --set current=0.6A --set stroke=6mm --set need=8N`
+(MCP `solve_magnetic`) gives a plunger's pull over its whole stroke with nonlinear steel, its inductance and
+whether the steel saturates, and `electromagnet` and `magnet` do the same for a pot core lifting a plate and a
+permanent magnet holding one. The force comes from the Maxwell stress tensor and is checked by virtual work,
+so read that check before quoting it.
+`wobbl electric plates --set diameter=100mm --set gap=2mm --set voltage=3kV` (MCP `solve_electric`) gives the
+capacitance and the peak field against the dielectric strength, and `coax` and `sphere` cover cables and high
+voltage gaps.
+`wobbl board microstrip --set width=0.3mm --set height=0.17mm --set length=20mm` (MCP `solve_board`) gives a
+trace's impedance from a field solve of its cross section, with its inductance and capacitance per length, and
+`coupled` gives the near and far end crosstalk between two traces. To see what the board does to a converter,
+pass those parasitics into the circuit run, as in
+`wobbl circuit buck --set vin=12 --set vout=5 --set current=2 --set loop_inductance=6n --set switch_capacitance=300p`,
+or point `board=` at the board result folder. Wobbl then simulates the switch node with and without them and
+tries a snubber.
+`wobbl antenna dipole --set frequency=2.4GHz --set length=58mm` (MCP `solve_antenna`) sweeps a dipole or a
+monopole with a full wave solve for its resonance, impedance, S11 and gain. Adding
+`--set tx_power=10dBm --set sensitivity=-90dBm --set environment=office` gives the range with its spread, and
+`wobbl antenna link` does the link budget alone. `patch` sizes a patch antenna with the transmission line model
+rather than a full wave solve, so say that when you quote it.
+`wobbl sound room --set size=5x4x2.7` (MCP `solve_sound`) finds a room's modes and flags the ones that crowd
+together, `enclosure` does the same for a box measured in millimeters, `muffler` gives an expansion chamber's
+transmission loss and `panel` gives the sound pressure level of a vibrating panel treated as a baffled piston,
+which is an upper estimate.
+
 ## Never skip
 
 - **Never quote a low confidence number as the answer.** Say what failed and rerun with
@@ -179,6 +206,8 @@ a servo that clears a single move can still cook when the move repeats.
 - **Quote an impact's peak force as an estimate.** Rigid parts meet through a contact spring that Wobbl
   sets from Hertz theory, so the bounce and the momentum hold whatever the stiffness while the force
   follows it, as the contact softness check shows.
+- **Quote a wireless range as a spread.** It comes from an empirical path loss model, so give the median and
+  the 90% figure together with the environment it assumed.
 - **Never call a model validated, certified or approved.** Wobbl supplies credibility evidence and
   proposes levels, and the reviewer, customer or regulator decides what it is enough for. Say plainly
   when readings are synthetic, and quote a failure probability with its interval.

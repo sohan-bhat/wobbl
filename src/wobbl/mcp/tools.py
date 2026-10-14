@@ -244,6 +244,9 @@ _RERUN_TOOL.update({"plastic": "solve_plastic"})
 _DOMAIN_WORD.update({"plastic": "plasticity"})
 _RERUN_TOOL.update({"mechanism": "solve_mechanism"})
 _DOMAIN_WORD.update({"mechanism": "mechanism"})
+_RERUN_TOOL.update({d: f"solve_{d}" for d in ("magnetic", "electric", "board", "antenna", "sound")})
+_DOMAIN_WORD.update({"magnetic": "magnetic", "electric": "electric field", "board": "board", "antenna": "antenna",
+                     "sound": "sound"})
 
 
 def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = None) -> dict:

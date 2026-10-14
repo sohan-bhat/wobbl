@@ -446,6 +446,9 @@ def _register():
         cli.add_command(c)
     for c in (plastic,):
         cli.add_command(c)
+    from .fields import antenna, board, electric, magnetic, sound
+    for c in (magnetic, electric, board, antenna, sound):
+        cli.add_command(c)
 
 
 _register()
