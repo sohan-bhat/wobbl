@@ -2,7 +2,7 @@
  "kind": "uncertainty",
  "domain": "strength",
  "wobbl": "0.1.1",
- "created": "2026-10-13 22:16",
+ "created": "2026-10-14 01:24",
  "inputs": [
   {
    "name": "load",
@@ -59,7 +59,7 @@
  ],
  "model": {
   "kind": "exact",
-  "method": "exact scaling of the converged solution: stress follows the load and not the modulus, deflection follows the load over the modulus"
+  "method": "exact scaling of the converged solution, where stress follows the load and not the modulus and deflection follows the load over the modulus"
  },
  "samples": 200000,
  "sampling": "Latin hypercube",

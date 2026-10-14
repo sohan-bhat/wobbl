@@ -2,7 +2,7 @@
  "kind": "validation",
  "domain": "strength",
  "wobbl": "0.1.1",
- "created": "2026-10-13 22:17",
+ "created": "2026-10-14 01:24",
  "tests": {
   "file": "readings.csv",
   "notes": [

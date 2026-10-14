@@ -2,7 +2,7 @@
  "kind": "credibility",
  "domain": "strength",
  "wobbl": "0.1.1",
- "created": "2026-10-13 22:17",
+ "created": "2026-10-14 01:24",
  "question": "How far can simulation stand in for testing this cast motor mount under a 2 kN belt pull?",
  "context_of_use": "A linear elastic static model of cast_motor_mount.step in Custom material (cast), under 2000 N -0.8660254,0,-0.5 at 0,-30,66 @ holes d=6.6, held by fixed z=min, used to judge the von Mises stress against 165 MPa with a target safety factor of 2.",
  "influence": "high",
@@ -16,7 +16,7 @@
    "level": "high",
    "goal": "high",
    "meets": true,
-   "evidence": "13 of 13 strength cases with known answers pass their tolerance, run through the same pipeline, the largest error 4.3% (PLA shelf bracket, 6 mm fillet)",
+   "evidence": "14 of 14 strength cases with known answers pass their tolerance, run through the same pipeline, the largest error 4.3% (PLA shelf bracket, 6 mm fillet)",
    "gap": ""
   },
   {
@@ -52,7 +52,7 @@
    "level": "high",
    "goal": "high",
    "meets": true,
-   "evidence": "4 inputs propagated with 200,000 samples by exact scaling of the converged solution: stress follows the load and not the modulus, deflection follows the load over the modulus. Of these, load drives most of the spread, total Sobol index 0.61",
+   "evidence": "4 inputs propagated with 200,000 samples by exact scaling of the converged solution, where stress follows the load and not the modulus and deflection follows the load over the modulus. Of these, load drives most of the spread, total Sobol index 0.61",
    "gap": ""
   },
   {
