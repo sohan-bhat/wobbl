@@ -147,15 +147,20 @@ def test_playback_is_a_small_decimated_surface_with_quantized_frames(parts, tmp_
     frames = [{"t": k / 2, "label": "loading", "U": U * k / 2, "plastic_strain": mesh.X[:, 0] * k / 400,
                "values": {"load": k / 2}} for k in range(3)]
     path = write_playback(tmp_path / "p.json", mesh, frames, {"kind": "test"},
-                          {"plastic_strain": {"unit": "%", "min": 0.0, "max": 0.5}})
+                          {"plastic_strain": {"unit": "%", "min": 0.0, "max": 1.0}})
     text = open(path).read()
     d = json.loads(text)
-    pos = np.frombuffer(base64.b64decode(d["mesh"]["positions"]), np.float32).reshape(-1, 3)
-    idx = np.frombuffer(base64.b64decode(d["mesh"]["indices"]), np.uint32).reshape(-1, 3)
-    assert len(pos) <= 2000 < len(np.unique(mesh.tris[:, :3])) and idx.max() < len(pos)
-    assert pos.min(0) == pytest.approx([0, 0, 0], abs=1.5) and pos.max(0) == pytest.approx([200, 20, 10], abs=1.5)
-    u = np.frombuffer(base64.b64decode(d["frames"][2]["u"]), np.int16).reshape(-1, 3) * d["u_scale"]
-    assert np.abs(u[:, 2]).max() == pytest.approx(2.0, rel=0.05)
-    pe = np.frombuffer(base64.b64decode(d["frames"][2]["plastic_strain"]), np.uint8)
-    assert pe.max() == 255 and d["frames"][1]["values"] == {"load": 0.5}
+
+    def decode(a):
+        v = np.frombuffer(base64.b64decode(a["data"]), a["dtype"]).reshape(a["shape"]).astype(float)
+        return a.get("offset", 0) + a.get("scale", 1) * v
+
+    assert d["format"] == "wobbl-playback" and d["version"] == 1
+    pos, idx = decode(d["mesh"]["vertices"]), decode(d["mesh"]["triangles"]).astype(int)
+    assert len(pos) <= 2600 < len(np.unique(mesh.tris[:, :3])) and idx.max() < len(pos)
+    assert pos.min(0) == pytest.approx([0, 0, 0], abs=0.01) and pos.max(0) == pytest.approx([200, 20, 10], abs=0.01)
+    u = decode(d["frames"][2]["displacement"])
+    assert u[:, 2] == pytest.approx(-0.01 * pos[:, 0], abs=1e-3)
+    pe = decode(d["frames"][2]["plastic_strain"])
+    assert pe == pytest.approx(pos[:, 0] / 200, abs=0.5 / 255) and d["frames"][1]["values"] == {"load": 0.5}
     assert len(text) < 300_000

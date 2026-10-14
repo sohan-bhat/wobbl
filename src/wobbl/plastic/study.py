@@ -475,7 +475,7 @@ def playback(path: Path, study, mesh, lim, service) -> str:
         {"kind": "plastic", "title": Path(study.part).name, "question": study.question,
          "units": {"length": "mm", "load": "multiple of the load asked about", "plastic_strain": "%"},
          "phases": ["loading", "unloading", "collapse ramp"],
-         "note": "Frames play in order of t. The load goes on (t 0 to 1) and comes off (t 1 to 2) with the true "
+         "about": "Frames play in order of t. The load goes on (t 0 to 1) and comes off (t 1 to 2) with the true "
                  "stress strain curve and large deflection theory, then an elastic perfectly plastic copy on the "
                  "same mesh is ramped to collapse (t from 2 on). values.load is the load multiple at each frame; "
                  "the last frame is the mechanism, which moves much further than the frames before it."},

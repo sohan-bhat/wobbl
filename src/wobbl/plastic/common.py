@@ -88,75 +88,38 @@ def where(mesh, faces: dict, xyz) -> str:
     return f"on face {f.id} at {at}"
 
 
-PLAYBACK_VERTICES = 1500    # surface points kept for a playback file, enough to see the shape move
-
-
-def write_playback(path: str | Path, mesh, frames: list[dict], manifest: dict, fields: dict[str, dict],
+def write_playback(path: str | Path, mesh, frames: list[dict], head: dict, fields: dict[str, dict],
                    series: dict | None = None, body: np.ndarray | None = None) -> str:
-    """A compact record of a run for a player to animate: a decimated surface, then for each saved frame its
-    displacement and fields, quantized and base64 coded.
+    """playback.json for a player, in the encoding the other studies use (see life/playback.py): the decimated
+    surface, whose vertices are original mesh nodes, then each saved frame of the run.
 
-    Each frame holds ``u`` (the displacement, int16 scaled by ``u_scale`` mm) and one uint8 array per field named in
-    ``fields``, scaled 0..255 between the field's ``min`` and ``max``. ``frames`` come in as dicts with ``t``, a
-    ``label``, ``U`` (n, 3) on the mesh nodes and any of the field arrays (n,); ``series`` holds whole run curves.
+    ``frames`` come in as dicts with ``t`` (playback order), ``label``, ``values`` (numbers to show beside the
+    picture), ``U`` (n, 3) on the mesh nodes and any field named in ``fields`` (n,). Each frame goes out with its
+    displacement as int16 and each field as uint8 between the field's ``min`` and ``max``; every array carries the
+    dtype, shape, scale and offset that turn the stored integers back into values. ``body`` (n,) numbers the bodies
+    of an assembly.
     """
-    import base64
-    import json
+    from ..life.playback import encode, mesh_block, quantize, surface, write
 
-    tris = mesh.tris[:, :3]
-    used = np.unique(tris)
-    X = mesh.X[used]
-    # vertex clustering on a grid sized to keep about PLAYBACK_VERTICES points
-    span = np.ptp(X, axis=0) + 1e-9
-    cell = float((np.prod(span[span > 1e-6]) / PLAYBACK_VERTICES) ** (1.0 / max(1, int((span > 1e-6).sum())))) \
-        if len(used) > PLAYBACK_VERTICES else 0.0
-    if cell > 0:
-        key = np.floor((X - X.min(0)) / cell).astype(np.int64)
-        _, cluster = np.unique(key, axis=0, return_inverse=True)
-        cluster = cluster.ravel()
-    else:
-        cluster = np.arange(len(used))
-    k = int(cluster.max()) + 1
-    lut = np.full(mesh.n_nodes, -1, np.int64)
-    lut[used] = cluster
-    t = lut[tris]
-    t = t[(t[:, 0] != t[:, 1]) & (t[:, 1] != t[:, 2]) & (t[:, 0] != t[:, 2])]   # triangles a cluster swallowed
-    _, first = np.unique(np.sort(t, axis=1), axis=0, return_index=True)
-    t = t[np.sort(first)]
-    count = np.bincount(cluster, minlength=k).astype(float)
-
-    def mean(v):
-        v = np.asarray(v, float)[used]
-        out = np.zeros((k,) + v.shape[1:])
-        np.add.at(out, cluster, v)
-        return out / count.reshape((-1,) + (1,) * (v.ndim - 1))
-
-    def b64(a) -> str:
-        return base64.b64encode(np.ascontiguousarray(a).tobytes()).decode()
-
-    pos = mean(mesh.X).astype(np.float32)
-    umax = max(float(np.abs(fr["U"]).max()) for fr in frames) if frames else 0.0
-    u_scale = umax / 32767.0 if umax > 0 else 1.0
-    out_frames = []
+    pts, faces, nodes = surface(mesh)
+    out = []
     for fr in frames:
         f = {"t": round(float(fr["t"]), 6), "label": fr.get("label", ""),
-             "u": b64(np.round(mean(fr["U"]) / u_scale).astype(np.int16))}
+             "values": {k: (round(float(v), 6) if isinstance(v, (int, float, np.floating)) else v)
+                        for k, v in fr.get("values", {}).items()},
+             "displacement": quantize(np.asarray(fr["U"], float)[nodes], "int16")}
         for name, spec in fields.items():
             if name in fr:
-                lo, hi = spec["min"], spec["max"]
-                v = np.clip((mean(fr[name]) - lo) / max(hi - lo, 1e-30), 0, 1)
-                f[name] = b64(np.round(255 * v).astype(np.uint8))
-        f.update({k2: v2 for k2, v2 in fr.items() if k2 in ("values",)})
-        out_frames.append(f)
-    doc = {"format": "wobbl-playback-1", **manifest,
-           "mesh": {"vertices": int(k), "triangles": int(len(t)), "positions": b64(pos),
-                    "indices": b64(t.astype(np.uint32)), "dtype": {"positions": "float32 x3", "indices": "uint32 x3",
-                                                                   "u": "int16 x3 times u_scale", "fields": "uint8"}},
-           "u_scale": u_scale, "fields": fields, "frames": out_frames, "series": series or {}}
+                lo, hi = float(spec["min"]), float(spec["max"])
+                span = max(hi - lo, 1e-30)
+                q = np.round(np.clip((np.asarray(fr[name], float)[nodes] - lo) / span, 0, 1) * 255)
+                f[name] = encode(q.astype("uint8"), "uint8", scale=span / 255, offset=lo)
+        out.append(f)
+    doc = {"format": "wobbl-playback", "version": 1, **head, "mesh": mesh_block(pts, faces),
+           "fields": fields, "frames": out, "series": series or {}}
     if body is not None:
-        doc["mesh"]["body"] = b64(np.round(mean(body)).astype(np.uint8))
-    Path(path).write_text(json.dumps(doc, separators=(",", ":")))
-    return str(path)
+        doc["mesh"]["body"] = encode(np.asarray(body)[nodes].astype("uint8"), "uint8")
+    return write(Path(path), doc)
 
 
 def load_size(loads, factor: float) -> str:
