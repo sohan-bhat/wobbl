@@ -126,6 +126,7 @@ def _checks(st, g, p, s, levels, fl, op):
         checks.append(yplus_check(fine.get("yplus", {}), "wall functions"))
         from .verify import model_reason
         extra.append(model_reason("rans", "separated" if s.mode == "external" else "internal"))
+    checks.append(_regime(s))
     checks.append(_hand(g, p, s, fine))
     if s.mode == "external":
         checks.append(_blockage(s, fine))
@@ -137,6 +138,29 @@ def _checks(st, g, p, s, levels, fl, op):
                             f"needs {fmt_pressure(mine)} there ({100 * err:.2g}% apart)" +
                             ("" if err < 0.1 else ", so the coarse grid's fit set the flow a little off"), op))
     return checks, [e for e in extra if e]
+
+
+def _regime(s) -> Check:
+    """Whether the Reynolds number sits where the chosen flow model is trustworthy."""
+    re_ = s.speed * s.ref_length / s.nu
+    if s.mode == "external":
+        if s.turb.model == "laminar":
+            return Check("flow regime", "pass", f"Re {fmt(re_)} on the part's length, low enough for steady laminar "
+                                                "flow")
+        if re_ < 3e5:
+            return Check("flow regime", "warn",
+                         f"Re {fmt(re_)} on the part's length, where a smooth body's boundary layer is laminar when "
+                         "it separates. The turbulence model treats it as turbulent from the start, which holds for "
+                         "sharp edged parts, whose edges fix where the flow separates, but can halve the drag of a "
+                         "rounded one", {"re": re_})
+        return Check("flow regime", "pass", f"Re {fmt(re_)}, turbulent", {"re": re_})
+    if C.LAMINAR_RE <= re_ <= 4000:
+        return Check("flow regime", "warn",
+                     f"Re {fmt(re_)} on the inlet's hydraulic diameter is in transition, where the flow may stay "
+                     "laminar. The turbulence model treats it as fully turbulent, so the pressure drop and the heat "
+                     "transfer may be overstated up to several times", {"re": re_})
+    return Check("flow regime", "pass", f"Re {fmt(re_)} on the inlet's hydraulic diameter, " +
+                 ("laminar" if s.turb.model == "laminar" else "turbulent"), {"re": re_})
 
 
 def _blockage(s, fine) -> Check:
