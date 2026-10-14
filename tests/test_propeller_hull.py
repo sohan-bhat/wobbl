@@ -1,0 +1,51 @@
+"""Blade element momentum theory against UIUC propeller measurements. No solver is needed."""
+from __future__ import annotations
+
+import math
+
+import pytest
+
+from wobbl.flow import bem
+
+
+def test_bundled_props_carry_geometry_and_measurements():
+    names = bem.prop_names()
+    assert "apcsf_10x4.7" in names and len(names) >= 5
+    p = bem.load_prop("apcsf_10x4.7")
+    assert p.diameter == pytest.approx(0.254) and p.blades == 2
+    assert len(p.r_R) == len(p.c_R) == len(p.beta_deg) == 18
+    assert "Brandt and M. S. Selig" in bem.uiuc_source()
+    assert bem.load_prop("APC 10x4.7 Slow Flyer").key == "apcsf_10x4.7"
+    q = bem.load_prop("12x6x3")
+    assert q.blades == 3 and q.diameter == pytest.approx(12 * 0.0254)
+    # a constant geometric pitch: tan(beta) 2 pi r = pitch at every station
+    r = q.r_R[10] * q.radius
+    assert math.tan(math.radians(q.beta_deg[10])) * 2 * math.pi * r == pytest.approx(6 * 0.0254)
+    with pytest.raises(ValueError):
+        bem.load_prop("banana")
+
+
+def test_static_thrust_and_power_against_uiuc():
+    """APC 10x4.7 Slow Flyer at 4319 rpm, near a 1.2 kg quadcopter's hover, measured CT 0.1177 and CP 0.0474
+    (Brandt and Selig 2011). The generic section lands about 7% low on thrust and 10% low on power there."""
+    p = bem.load_prop("apcsf_10x4.7")
+    r = bem.solve(p, 4319)
+    ct, cp = bem.measured_static(p, 4319)
+    assert (ct, cp) == pytest.approx((0.1177, 0.0474))
+    assert r.CT == pytest.approx(ct, rel=0.10)
+    assert r.CP == pytest.approx(cp, rel=0.15)
+    assert 0.5 < r.figure_of_merit < 0.8
+    assert r.tip_mach == pytest.approx(4319 / 60 * 2 * math.pi * 0.127 / 343, rel=1e-6)
+    assert bem.measured_static(p, 20000) is None
+
+
+def test_bem_settles_with_stations_and_finds_hover_speed():
+    p = bem.load_prop("apcsf_10x4.7")
+    cts = [bem.solve(p, 5000, stations=n).CT for n in (20, 40, 80)]
+    assert abs(cts[2] - cts[1]) / cts[2] < 0.01
+    h = bem.rpm_for_thrust(p, 2.94)
+    assert h.thrust == pytest.approx(2.94, rel=1e-3)
+    assert 3500 < h.rpm < 5500 and 10 < h.power < 40
+    # forward flight: thrust falls with speed, and the efficiency is a fraction
+    fwd = bem.solve(p, 6000, 8.0)
+    assert fwd.thrust < bem.solve(p, 6000).thrust and 0 < fwd.eta < 1
