@@ -121,12 +121,6 @@ def doctor(as_json):
         add("gmsh", True, gmsh.__version__)
     except Exception as e:  # noqa: BLE001
         add("gmsh", False, f"not importable: {e}")
-    try:
-        import pyvista
-        import vtk
-        add("pyvista", True, f"{pyvista.__version__} (VTK {vtk.vtkVersion.GetVTKVersion()})")
-    except Exception as e:  # noqa: BLE001
-        add("pyvista", False, f"not importable: {e}")
     add("rendering", *_render_test())
     from ..setup import installer
     from ..solvers import base
@@ -182,17 +176,18 @@ def doctor(as_json):
 
 
 def _render_test():
+    """Draw a tetrahedron with the renderer the reports use."""
     try:
         import tempfile
         from pathlib import Path
 
-        import pyvista as pv
-        pv.OFF_SCREEN = True
+        import numpy as np
+
+        from ..report.render import render_scalar
+        X = np.array([[0.0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        tris = np.array([[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2]])
         with tempfile.TemporaryDirectory() as tmp:
-            p = pv.Plotter(off_screen=True, window_size=(64, 64))
-            p.add_mesh(pv.Sphere())
-            p.screenshot(str(Path(tmp) / "t.png"))
-            p.close()
-        return True, "off screen VTK rendering works"
+            render_scalar(Path(tmp) / "t.png", X, np.array([[0, 1, 2, 3]]), tris, X[:, 0], "x", "mm")
+        return True, "heatmaps draw with numpy and matplotlib, no OpenGL needed"
     except Exception as e:  # noqa: BLE001
-        return True, f"VTK cannot render here ({str(e)[:60]}); Wobbl will use its matplotlib fallback"
+        return False, f"heatmaps cannot be drawn ({str(e)[:60]})"

@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -8,7 +9,9 @@ from wobbl.report.html import page, table
 from wobbl.report.render import convergence_plot, line_plot, render_structural
 
 
-def test_heatmaps_render(parts, tmp_path):
+def test_heatmaps_render(parts, tmp_path, monkeypatch):
+    for mod in ("pyvista", "vtk", "vtkmodules"):   # the pictures need neither VTK nor OpenGL
+        monkeypatch.setitem(sys.modules, mod, None)
     prep = prepare(parts["plate_hole"], tmp_path / "g")
     m = build_mesh(prep, Sizing(h=6.0))
     measure = np.linalg.norm(m.X - m.X.mean(0), axis=1)
@@ -16,8 +19,14 @@ def test_heatmaps_render(parts, tmp_path):
     U[:, 2] = m.X[:, 0] / 1000.0
     files = render_structural(tmp_path / "img", m.X, m.tets, m.tris, measure, U, m.X[np.argmax(measure)].tolist(),
                               float(measure.max()), "von Mises", 100.0, 2.0, [])
-    for key in ("stress", "safety", "deformed"):
+    for key in ("stress", "zoom", "safety", "deformed"):
         assert Path(files[key]).exists() and Path(files[key]).stat().st_size > 1000
+    from PIL import Image
+
+    img = np.asarray(Image.open(files["stress"]).convert("RGB")).astype(int)
+    assert img.shape == (1000, 1600, 3)
+    part = np.abs(img - [14, 15, 17]).sum(2) > 30            # pixels that are not background
+    assert 0.05 < part[:, :1300].mean() < 0.9                  # the plate fills a good share of the frame
     levels = [{"n_nodes": n, "governing": g} for n, g in ((1000, 10.0), (2000, 11.0), (4000, 11.2))]
     assert Path(convergence_plot(tmp_path / "c.png", levels, [])).exists()
     assert Path(line_plot(tmp_path / "sub" / "l.png", [0, 1, 2], {"a": [1, 2, 3]}, "s", "V", 2.5, "limit")).exists()

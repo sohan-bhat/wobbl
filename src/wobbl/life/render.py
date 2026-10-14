@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..report.render import BG, FG, MARK, _bar, _camera, _grid, _surface
+from ..report.render import BG, FG, MARK
 
 SIZE = (1200, 750)
 JPEG_QUALITY = 82
@@ -64,28 +64,24 @@ def render_modes(path: str | Path, X, tets, shapes: list[np.ndarray], labels: li
     k = len(shapes)
     size = size or ((SIZE[0], SIZE[1]) if k == 1 else (520 * k, 520))
     try:
-        import pyvista as pv
+        from ..mesh.mesher import _boundary
+        from ..report.render import OVERVIEW, Lines, Look, Panel, camera, compose, draw, feature_edges, surface
 
-        grid = _grid(X, tets)
-        rest = _surface(grid)
-        p = pv.Plotter(off_screen=True, window_size=size, shape=(1, k), border=False, lighting="three lights")
-        p.set_background(BG)
-        for j, (U, label) in enumerate(zip(shapes, labels)):
-            p.subplot(0, j)
-            g = _grid(X, tets)
+        tris = _boundary(tets, X, 2 if tets.shape[1] == 10 else 1)[0]
+        edges = Lines(feature_edges(X, tris), alpha=0.5, width=1.2)
+        look = Look("viridis", (0.0, 1.0))
+        each = (size[0] // k, size[1])
+        panels = []
+        for U, label in zip(shapes, labels):
             mag = np.linalg.norm(U, axis=1)
-            g.point_data["U"] = U
-            g.point_data["m"] = mag / max(float(mag.max()), 1e-30)
-            surf = _surface(g)
-            warped = surf.warp_by_vector("U", factor=_exaggerated(X, U)[1])
-            p.add_mesh(rest.extract_feature_edges(35), color="#6b7078", line_width=1.2, opacity=0.5)
-            p.add_mesh(warped, scalars="m", cmap="viridis", clim=[0, 1], smooth_shading=True, ambient=0.3,
-                       diffuse=0.8, show_scalar_bar=k == 1, scalar_bar_args=_bar("relative\nmotion"))
-            p.add_text(label, position="upper_left", font_size=11 if k > 1 else 13, color=FG, font="courier")
-            _camera(p, X, _across(X, U), zoom=1.15 if k == 1 else 0.85)
-        p.screenshot(str(path))
-        p.close()
-    except Exception:  # noqa: BLE001  no OpenGL: a flat matplotlib drawing of the deflected surface
+            surf = surface(_exaggerated(X, U)[0], tris, {"m": mag / max(float(mag.max()), 1e-30)})
+            box = OVERVIEW if k == 1 else (0.05, 0.12, 0.95, 0.95)
+            cam = camera(_across(X, U), np.vstack([surf.P, X]), each, box=box)
+            panels.append(Panel(draw(each, cam, surf, surf.fields["m"], look, edges), cam,
+                                (look.cmap, look.clim, "relative\nmotion") if k == 1 else None, text=label,
+                                text_size=11 if k > 1 else 13))
+        compose(path, panels)
+    except Exception:  # noqa: BLE001  a flat matplotlib drawing of the deflected surface
         if os.environ.get("WOBBL_DEBUG"):
             raise
         _modes_mpl(path, X, tets, shapes, labels)
