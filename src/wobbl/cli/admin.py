@@ -11,8 +11,8 @@ from . import ui
 
 # what setup suggests last: check the install, then the no file question the first run guide starts with
 NEXT_STEP = ("Next, run [bold]wobbl doctor[/bold] to check every piece, then ask a first question that needs no "
-             "files with [bold]wobbl \"will a blue LED on 5V with a 47 ohm resistor fry?\"[/bold], or point it at "
-             "a part of your own with [bold]wobbl part.step \"will it hold 200 N?\"[/bold]")
+             "files with [bold]wobbl simulate \"will a blue LED on 5V with a 47 ohm resistor fry?\"[/bold], or "
+             "point it at a part of your own with [bold]wobbl simulate part.step \"will it hold 200 N?\"[/bold]")
 
 
 @click.command()

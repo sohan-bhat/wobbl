@@ -131,7 +131,7 @@ PART_OPTS = (Option("keep", "Keep the solver's work files", flag=True),)
 register(Analysis(
     "part", "vibration", "Natural frequencies against rotors and tones, and the stress of a sine sweep of the base "
     "or of the loads, or of random input", vibration, dry=True, kinds=PART_KINDS, legacy="wobbl vibration",
-    keywords=(r"vibrat", r"resonan", r"natural frequenc", r"\bmodes?\b", r"\bmodal\b", r"\brpm\b", r"\bshaker\b",
+    keywords=(r"vibrat", r"resona", r"natural frequenc", r"\bmodes?\b", r"\bmodal\b", r"\brpm\b", r"\bshaker\b",
               r"sine sweep", r"random vibration", r"\bpsd\b", r"gevs", r"blade pass", r"\bhz\b", r"\bharmonic\b",
               r"forced response", r"\b(?:un|im)balance"),
     aliases=("modal", "resonance", "frequencies", "harmonic"),

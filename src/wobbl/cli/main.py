@@ -530,8 +530,11 @@ def _register():
 
 def _hide_aliases():
     """Keep every domain and scenario command working while the help lists only simulate and the general verbs."""
+    from .jobs import jobs, remote
     from .simulate import simulate
     cli.add_command(simulate)
+    if "remote" not in jobs.commands:
+        jobs.add_command(remote)       # wobbl jobs remote add, next to the jobs it serves
     for name, c in cli.commands.items():
         if name not in VISIBLE:
             c.hidden = True

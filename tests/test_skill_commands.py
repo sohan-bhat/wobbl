@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import shlex
+from pathlib import Path
 from importlib import resources
 
 import click
@@ -44,12 +45,63 @@ def dry_parse(args: list[str]) -> tuple[str, click.Context]:
     return name, ctx
 
 
+ROOT = Path(__file__).resolve().parents[1]
+STAND_IN = {".step": ROOT / "src" / "wobbl" / "validation" / "parts" / "shelf_bracket_fillet.step",
+            ".py": ROOT / "examples" / "shelf-bracket" / "bracket.py",
+            ".toml": ROOT / "examples" / "rocket-launch" / "rocket.toml"}
+
+
+def stand_in(thing: str, tmp: Path) -> str:
+    """A real file of the same kind for a placeholder the skill names, such as bracket.step or board.cir."""
+    p = Path(thing)
+    if not thing or p.exists():
+        return thing
+    if thing.startswith("wobbl-out/"):
+        return str(ROOT / "examples" / "shelf-bracket" / "output")
+    if p.suffix == ".toml" and "motor" in p.stem:
+        return str(ROOT / "examples" / "knsb-motor" / "motor.toml")
+    if p.suffix in STAND_IN:
+        return str(STAND_IN[p.suffix])
+    texts = {".cir": "* divider\nV1 in 0 12\nR1 in out 1k\nR2 out 0 1k\n.op\n.end\n",
+             ".urdf": '<?xml version="1.0"?>\n<robot name="arm"><link name="base"/></robot>\n'}
+    if p.suffix in texts:
+        (tmp / p.name).write_text(texts[p.suffix])
+        return str(tmp / p.name)
+    return thing
+
+
+def check_simulate(p: dict):
+    """Route a simulate command the way the command would, with a real file standing in for each placeholder,
+    and check that every option it passes is one an analysis of the plan reads."""
+    import tempfile
+
+    from wobbl.cli.simulate import check_options, options_from, split_args
+    from wobbl.simulate import route
+
+    thing, question, extra = split_args(p["args"])
+    if p["show_list"] or not (thing or question):
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        plan = route(stand_in(thing, Path(tmp)), question, list(p["physics"]), p["domain"], p["kind"])
+    check_options(plan, options_from(p["material"], p["loads"], p["fixes"], p["sets"], extra))
+    from wobbl.structural.spec import parse_fixture, parse_load
+    for x in p["loads"]:
+        parse_load(x)
+    for x in p["fixes"]:
+        parse_fixture(x)
+    if p["material"]:
+        from wobbl.materials import resolve_material
+        resolve_material(p["material"])
+
+
 def check_values(name: str, p: dict):
     """Read the option values the way the command would, so a load or a template value that cannot be read
     fails here instead of in front of the agent."""
     from wobbl.materials import resolve_material
 
-    if name in ("run", "ask"):
+    if name == "simulate":
+        check_simulate(p)
+    elif name in ("run", "ask"):
         from wobbl.cli.main import _study_from
 
         _study_from(p["part"], "", p)
@@ -97,10 +149,26 @@ def check_values(name: str, p: dict):
         check_params(name, p["template"], dict(s.split("=", 1) for s in p["sets"]))
 
 
-def test_the_skill_names_every_kind_of_command():
-    names = {dry_parse(shlex.split(c)[1:])[0] for c in skill_commands()}
-    assert {"inspect", "run", "materials", "fix", "thermal", "circuit", "motion", "motor", "flame", "runaway",
-            "propellant", "mechanism"} <= names, names
+def test_the_skill_teaches_simulate_for_every_kind_of_thing():
+    """The skill teaches one command for all physics, plus the general verbs, and no hidden alias."""
+    import tempfile
+
+    from wobbl.cli.main import VISIBLE
+    from wobbl.cli.simulate import split_args
+    from wobbl.simulate import route
+
+    parsed = [dry_parse(shlex.split(c)[1:]) for c in skill_commands()]
+    names = {n.split()[0] for n, _ in parsed}
+    assert {"simulate", "inspect", "fix", "uncertainty", "credibility", "test-plan"} <= names, names
+    assert names <= set(VISIBLE), names - set(VISIBLE)
+    domains = set()
+    with tempfile.TemporaryDirectory() as tmp:
+        for n, ctx in parsed:
+            if n == "simulate" and ctx.params["args"]:
+                thing, question, _ = split_args(ctx.params["args"])
+                domains.add(route(stand_in(thing, Path(tmp)), question, list(ctx.params["physics"]),
+                                  ctx.params["domain"], ctx.params["kind"]).domain)
+    assert domains >= {"part", "circuit", "mechanism", "flight", "fluid", "field", "chemistry"}, domains
 
 
 @pytest.mark.parametrize("command", skill_commands())
@@ -120,12 +188,18 @@ def test_flags_named_alone_exist():
              "circuit": ["circuit", "led"], "motion": ["motion", "--diameter", "9 cm", "--mass", "1 kg"],
              "crack": ["crack", "part.step", "-m", "7075-t6", "-l", "1 kN +x @ x=max", "-f", "x=min", "-c",
                        "through 1 mm"]}
+    from wobbl.simulate import analyses
+
     spans = [s for s in _spans(SKILL) if s.startswith("--")]
     assert spans
+    declared = {f"--{o.name}" for a in analyses() for o in a.all_options()}
+    simulate_flags = {o for p in cli.commands["simulate"].params for o in p.opts}
     for s in spans:
         toks = shlex.split(s)
+        if toks[0] in declared or toks[0] in simulate_flags:
+            continue
         owner = next((n for n in bases if any(toks[0] in p.opts for p in cli.commands[n].params)), None)
-        assert owner, f"no command has {toks[0]}"
+        assert owner, f"no command or physics has {toks[0]}"
         if len(toks) > 1:
             dry_parse([*bases[owner], *toks])
 

@@ -1,22 +1,45 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks whether a circuit works or whether anything on a board burns (any SPICE netlist, KiCad schematic or circuit in words, from LED arrays and 555 timers to op amp stages, regulators, chargers and microcontroller boards), asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, asks whether a lithium ion cell can run away on its own, asks whether servos can lift a load or a robot arm can make a move, how far a linkage swings and where it binds, what a gear train gives, how hard two parts hit or whether something tips over, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed, or asks about solenoid, electromagnet or magnet force, capacitance and breakdown, PCB trace impedance, crosstalk and switch node ringing, antenna tuning and wireless range, room modes, muffler loss or panel noise. Also use it when someone asks where a fatigue crack will go and how many cycles until it fails a part (B10 and B1 lives, inspection intervals). Wobbl meshes the CAD, runs CalculiX, ngspice, GetDP, Cantera, MuJoCo or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
+description: Simulate anything before it is built, with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat, buckle, resonate, survive a drop or a shaker test, or how many cycles it lasts (brackets, mounts, enclosures, drone arms, heat sinks, battery packs, composite layups), wants stress, deflection, safety factor or temperature numbers, asks whether a metal part bends for good, where a fatigue crack goes and when it fails the part, asks whether a circuit works or whether anything on a board burns (any SPICE netlist, KiCad schematic or circuit in words, from LED arrays and 555 timers to op amp stages, regulators, chargers and microcontroller boards, LED current, regulator ripple or MOSFET heating), asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin and landing speed), designs a solid rocket motor, asks for a flame temperature, a propellant's Isp or what a reaction makes, asks whether a lithium ion cell can run away, whether servos can lift a load, how a linkage swings, what a gear train gives or whether something tips over, asks about pipe pressure drop, drag, propellers, drones or boat hulls, solenoid or magnet force, capacitance and breakdown, trace impedance and crosstalk, antenna range, room modes or muffler loss, or how likely a design is to fail and which tests are still needed. Wobbl reads the thing, works out the physics, runs real solvers (CalculiX, ngspice, GetDP, Cantera, MuJoCo, OpenFOAM and scipy), checks its own answer and shows the user their scenario playing out in 3D with a confidence level and fixes.
 ---
 
-# Wobbl: simulate before you build
+# Simulate it with Wobbl before it is built
 
-Wobbl wraps real solvers (gmsh, CalculiX, ngspice, MuJoCo, and scipy for motion) behind
-one CLI and an MCP server. It refines the mesh until the answer stops moving, checks equilibrium,
-compares against beam theory, flags stress singularities and reports a
-confidence level. Use it instead of hand calculations for real geometry, and
-never write your own finite element code.
+Wobbl has one command for everything, `wobbl simulate` (MCP `simulate`). Hand it the thing and the
+question in plain words, and it works out what the thing is, which physics the question needs and how to
+set them up, runs each one on a real solver with its own checks, and says what it assumed and how to
+override every guess. Use it instead of hand calculations, and never write your own finite element code,
+circuit solver or physics loop.
 
-## Workflow
+## The flow
 
-1. **Look at the part first.** `wobbl inspect part.step --json` (MCP: `inspect_geometry`).
-   Note the bounding box (units are mm), holes with diameters, fillets, sharp inside corners
-   and wall thickness. Use these to write selectors.
-2. **Decide loads and supports explicitly.** Ask the user if they are unclear. Write them as:
+1. **Hand Wobbl the thing and the question.**
+   `wobbl simulate bracket.step "will it hold 200 N and stay under 60 C at 12 W?"`
+   (MCP `simulate` with `thing` and `question`). The thing can be a CAD file (STEP, STL or a parametric
+   Python part), a SPICE netlist or KiCad schematic, a mechanism spec, URDF or MJCF model, a rocket or motor
+   spec, a finished result folder, a solver case folder, a molecule, element, material or reaction as a name,
+   formula, SMILES or equation, or a sentence that describes it, as in
+   `wobbl simulate "a 9 cm rock dropped from 300 m"`. A question that asks several things runs several
+   physics in one go, each with its own load case, so "will it survive a 1 m drop and hold a 10 kg shelf"
+   runs a drop and a strength study side by side.
+2. **Open the 3D view for the user straight away.** Every run ends with an interactive view of the user's
+   own scenario playing out with the result on it, the wall and the shelf, the floor for a drop, the
+   breadboard for a circuit. The CLI opens it in the browser and prints its path, and every MCP result says
+   where it is as `view` (simulation.html for a simulate run). From an agent, open it at once with
+   `open <path>` on macOS, `xdg-open <path>` on Linux or `start "" <path>` on Windows, or run
+   `wobbl view wobbl-out/bracket` on a result folder. Then tell the user what they are seeing, which props
+   stand for the supports and loads, what plays out (the load coming on, the flight, the heat building) and
+   where the failure shows if there is one.
+3. **Check what Wobbl read and what it guessed.** The run prints the route it took, the values it read
+   from the question and every guess, each with the option that replaces it, and ends with the explicit
+   command that repeats the run with nothing guessed (MCP `decisions`, `assumptions` and `explicit`). When a
+   guess does not match what the user said or built, run again with that option. Before a long run, add
+   `--plan` (MCP `plan_only=true`) to see the route and every guess without solving, and `--estimate` to
+   see the time, memory and disk it needs.
+4. **Give Wobbl what you know.** Pass the material, loads and supports the user gave rather than leaving
+   them to guesses. For a part, look first with `wobbl inspect bracket.step --json` (MCP
+   `inspect_geometry`) for the bounding box (mm), holes, fillets, sharp inside corners, wall thickness and
+   face ids, then write
    - loads: `"200 N down @ top"`, `"50 lbf -z @ x=max"`, `"0.2 MPa @ top"`, `"3 g down"`,
      `"300 N -x bearing @ hole d=6.6"` (a bolt or pin pressing on one side of the hole, where the
      same load without `bearing` spreads evenly over the hole faces),
@@ -26,170 +49,70 @@ never write your own finite element code.
      `"wall x=min"` (can push, can lift off), `"roller y=0"`, `"fixed-z faces 7"` (only some directions),
      `"elastic 50 N/mm3 @ z=min"` (a bed of springs, for a mount that gives a little).
    - selectors: `top`, `bottom`, `x=min`, `z>10`, `normal -z`, `holes d<6`, `hole near 55,0,10`,
-     `fillets`, `face 12`, `within 15 of 50,-25,35` (a circular patch), combined with `and` / `or`.
-   Parts can also be parametric Python files (`PARAMS` plus `build(occ, **params)`). Pass
-   `--param thickness=6` to change them, and `wobbl fix --apply` changes their thickness and
-   fillet parameters directly.
-3. **Run the study.**
-   `wobbl run part.step -m 6061-t6 --fix "bolt holes d=6.6" --load "200 N down @ top" --target-sf 2 --json`
-   (MCP: `solve_structural`). Materials: `wobbl materials` (pla, petg, abs, asa, nylon, pa12, pc,
-   6061-t6, 7075-t6, mild-steel, ss304, ti-6al-4v, wood, and more; or `custom:E=3000,nu=0.35,yield=40`).
-4. **Read the verification before the number.** Every result has `confidence` (high, medium, low),
-   `confidence_reasons` and `checks`. Look at the `stress` image (`images.stress`) to confirm the
-   peak is where you expect.
-5. **If it fails or is marginal,** read `fixes` and run `wobbl fix wobbl-out/part --apply` with the
-   result folder the run printed (MCP: `suggest_fix` with `apply=true`) to re-run with fillets,
+     `fillets`, `face 12`, `within 15 of 50,-25,35` (a circular patch), combined with `and` or `or`.
+
+   They go in as `-m`, `--load` and `--fix`, as in
+   `wobbl simulate bracket.step --physics stress -m 6061-t6 --fix "bolt holes d=6.6" --load "200 N down @ top" --target-sf 2 --json`
+   (MCP `material`, `loads`, `fixtures`). Any other value a physics reads is a flag of its own, such as
+   `--power "12 W"`, `--rpm "4000-9000 rpm"` or `--height "1.2 m"` (MCP `options`), and
+   `wobbl simulate --list` (MCP `physics`) lists every domain, its physics and their options. Materials come
+   from `wobbl materials` (pla, petg, abs, asa, nylon, pa12, pc, 6061-t6, 7075-t6, mild-steel, ss304,
+   ti-6al-4v, wood and more, or `custom:E=3000,nu=0.35,yield=40`). Parametric Python parts (`PARAMS` plus
+   `build(occ, **params)`) take `--param thickness=6`.
+5. **Read the verification before the number.** Every result has `confidence` (high, medium, low),
+   `confidence_reasons` and `checks`. Look at the images to confirm the peak is where you expect.
+6. **If it fails or is marginal,** read the fixes and run `wobbl fix wobbl-out/bracket --apply` on the
+   result folder the run printed (MCP `suggest_fix` with `apply=true`) to solve the part again with fillets,
    gussets, thicker walls or another material and show before and after.
-6. **Report** to the user: the verdict, the governing number with units and location, the safety
-   factor against the target, the confidence and its reasons, the key assumptions, the image path and
-   the HTML report path.
-7. **Show the simulation.** Every run writes an interactive 3D view of what happened, set in the situation the
-   question describes, and its result says where it is as `view` (the run's report.html, or simulation.html
-   for `wobbl simulate`). Open it for the user right away with `open <path>` on macOS, `xdg-open <path>` on
-   Linux or `start "" <path>` on Windows, or run `wobbl view <result folder>`. Then tell them what they are
-   seeing, which props stand for the supports and loads, what plays out (the load coming on, the flight, the
-   heat building) and where the failure shows if there is one.
+7. **Report** the verdict, the governing number with units and location, the margin against the target,
+   the confidence and its reasons, the key assumptions, and the view and report paths.
 
-For heat, run `wobbl thermal part.step -m 6061-t6 --power "12 W" --film "5 W/m2K @ all" --ambient "25 C"`
-(MCP `solve_thermal`). The material is required, and adding `--duration "30 min"` makes the run transient.
-For circuits, pass whatever the user has: a SPICE netlist (`wobbl circuit amp.cir`), a KiCad
-schematic (`wobbl circuit board.kicad_sch --set J2.load=2A`) or a description in words
-(`wobbl circuit "three red LEDs in parallel from a 9 V battery, each with 330 ohm"`), and Wobbl
-judges every part against its voltage, current, power and temperature ratings, says whether the
-circuit works, and solves its fixes again before offering them. Parts named in a netlist (1N4148,
-2N3904, IRLZ44N, LM358, NE555, AMS1117-3.3 and many more) get their library models and ratings,
-and a note after a part's `;` gives its package or rating, as in `R1 a b 220 ; 0805` or
-`C1 out 0 10u ; 16V X5R`. Set part values and ratings with `--set`, as in `--set R1.power=1W` or
-`--set ambient=40C`, read a signal with `--probe "v(out)"`, and lead with another analysis with
-`--physics transient`, `ac` or `tolerance`. When a description would take more than a sentence,
-write the netlist yourself and pass it. The templates stay as shortcuts, as in
-`wobbl circuit led --set supply=5V --set resistor=150 --set led=red` (MCP `simulate`).
+## What each kind of thing gets, and how to quote it
 
-For a drop test of a part, run
-`wobbl simulate phone.step "will it survive a 1.2 m drop onto tile?" -m pc --mass "45 g @ 0,0,5"`.
+**Parts.** A CAD file gets static strength (the default), heat, vibration, buckling, fatigue, plasticity,
+drops, composite layups, crack growth, contact between bodies and bolted joints, read from the question or
+named with `--physics`. A thin walled part goes to a shell model on its own inside the strength study,
+checked against a coarse solid.
+Heat runs as `wobbl simulate pack.step "does it stay under 60 C at 12 W in a sealed box?"`, with the
+cooling read from words like sealed box, a small fan or water cooling, or given as
+`--film "5 W/m2K @ all"`, and `--duration "30 min"` makes it transient.
+A drop runs as `wobbl simulate phone.step "will it survive a 1.2 m drop onto tile?" -m pc --mass "45 g @ 0,0,5"`.
 Its options are height (a bare number is meters), floor (concrete, steel, tile, stone, wood, vinyl, carpet,
 foam, grass, or layer:E=5,t=10 in MPa and mm), orientation (worst by default, which tries every face and corner
-landing; or all, corners, edges, flat, or a direction such as -z), mass for a battery or board, and watch for
+landing, or all, corners, edges, flat, or a direction such as -z), mass for a battery or board, and watch for
 where the accelerometer sits. It answers with the peak stress away from the contact patch, the safety factor,
-the g at the accelerometer filtered at 10 kHz and the worst landing, checked by momentum and energy. For a
-composite part, run
+the g at the accelerometer filtered at 10 kHz and the worst landing, checked by momentum and energy.
+A composite part runs as
 `wobbl simulate arm.step "is it strong enough?" --physics composite --layup "[0/±45/90]s" --fix "x=min" --load "40 N +z @ x=max"`
 with plies listed from the inner face out and a ply material of t300-5208, im7-8552, as4-3501-6 or
 e-glass-epoxy. It gives the load factor at first ply failure by Tsai-Wu and Hashin, the ply and mode that go
-first, and layup changes checked with lamination theory. A thin walled part goes to a shell model on its own
-inside the strength study, checked against a coarse solid; the solid option keeps the solid.
-
-For anything that falls, flies or launches, use motion (MCP `solve_motion`) instead of writing your own
-integrator. It flies the body through gravity that falls off with altitude, the 1976 standard
-atmosphere, drag, wind, thrust and parachutes, and checks the flight against closed forms, an energy
-balance and a delta v budget. A dropped or thrown body is one line, as in
-`wobbl motion --name rock --diameter "9 cm" --density "2700 kg/m3" --cd 0.6 --height "300 m"` or
-`wobbl motion --name ball --mass "145 g" --diameter "7.4 cm" --speed "40 m/s" --angle 35`.
-A rocket is a TOML spec with its motor's thrust curve, nose, fins, balance point, rail and
-parachutes, run with `wobbl motion rocket.toml`, and the MCP tool also takes the TOML as text. For a
-rocket the verdict comes from the stability margin, the speed off the rail, apogee against its target
-and the landing speed, and the fixes give the nose weight, fin span, rail length or main parachute that
-would pass. Every run writes `trajectory.csv` with one row at every event.
-
-For air and water flow, use the flow commands (MCP `solve_flow`) instead of guessing a thrust, a drag
-coefficient or a resistance. A drone or propeller question is one line, as in
-`wobbl flow prop apcsf_10x4.7 --mass "1.2 kg" --rotors 4`, which finds the hover speed and shaft power
-from the prop's measured UIUC curves, checks them with blade element momentum theory and judges the
-thrust to weight ratio at the prop's rated top speed. Give the size in inches for a prop outside the
-bundled set, as in `wobbl flow prop 10x4.7 --rpm 6000`. A displacement boat's calm water resistance
-and engine power come from Holtrop and Mennen with
-`wobbl flow hull --length "12 m" --beam "3.6 m" --draft "0.9 m" --displacement "16 t" --speed "8 kn" --power "60 kW"`.
-Pressure drop through a pipe or duct with its fittings comes from Darcy Weisbach on the Moody chart, as in
-`wobbl flow pipe --length "40 m" --diameter "25 mm" --flow "30 L/min" --fittings "3 elbow90, gate-valve" --max-dp "50 kPa"`,
-and drag on a sphere, cylinder, plate or cube from published drag curves, as in
-`wobbl flow drag sphere --size "22 cm" --speed "20 m/s"`. A drag result near the drag crisis comes back
-with low confidence, because roughness and turbulence decide it there.
-
-For a solid rocket motor design, run `wobbl motor motor.toml` (MCP `solve_motor`) instead of working the
-ballistics by hand. The spec lists the propellant (knsb, kndx, knsu, ocean-water or cherry-limeade, or its
-own burn rate and combustion data), the grains from the forward end (bates, tube, endburner, star, finocyl,
-moon or xcore), the nozzle and the casing, as in examples/knsb-motor/motor.toml, and the same design also
-runs as flags, as in
-`wobbl motor --propellant knsb --grain "bates d=48 core=18 L=80 x4" --throat 13 --exit 33 --casing "6061-t6 od=54 wall=1.6 L=400"`.
-Wobbl burns the grains back, integrates chamber pressure and thrust, and checks the time step, the mass
-balance, the closed form pressure at the peak and the propellant's c* against Cantera's equilibrium. The
-verdict comes from the casing's hoop stress at peak pressure against its yield, the port to throat ratio
-and core mass flux for erosive burning, and nozzle separation, and each fix is simulated with its new peak
-pressure and impulse. The run writes `thrust.csv` and a RASP `motor.eng`, and a rocket spec for motion can
-fly the design directly with `design = "motor.toml"` under `[motor]`. For a flame, run
-`wobbl flame methane --phi 1` or `wobbl flame propane --phi 0.9 --limit "1800 C"` (MCP `solve_flame`) for
-the adiabatic flame temperature and the equilibrium CO and NO. For propellant performance, run
-`wobbl propellant knsb --pressure "5 MPa" --area-ratio 8` or give a composition, as in
-`wobbl propellant "ap:70,al:16,htpb:14" --pressure "6.9 MPa" --area-ratio 10` (MCP `solve_propellant`),
-for c* and Isp in shifting and frozen flow the way NASA's CEA reports them. Cantera installs itself the
-first time (about 6 MB). The burning in a motor comes from the propellant's burn rate law rather than
-resolved flame chemistry, so say so when quoting a pressure, and keep the casing's safety factor margin.
-Wobbl models given designs only and gives no guidance on making or handling propellants.
-
-For whether a lithium ion cell can run away on its own, run `wobbl runaway --cell 18650 --ambient "60 C"`
-(MCP `solve_runaway`). It finds the surrounding temperature at which a charged cell's decomposition heat
-outruns its cooling, by Semenov's criterion and by a transient with the reactants used up, and gives the
-margin and the cooling that would restore it. Give the cooling as a film coefficient or in the heat
-domain's words, and take the surroundings from a finished heat study, as in
-`wobbl runaway --cell 21700 --film "sealed box" --from wobbl-out/pack`. The kinetics are for a fully
-charged LiCoO2 cell, so say the answer is indicative for other chemistries.
-
-When someone asks how likely a design is to fail, which input matters most, whether the model matches
-their tests, or which physical tests they can skip, build the evidence on a finished run's folder, from
-any domain. `wobbl uncertainty wobbl-out/part --vary "load lognormal 10%" --vary "yield 8%"`
-(MCP `quantify_uncertainty`) gives the probability of failure with its 95% interval, the spread of the
-answer and Sobol indices that rank the inputs. Any number the run was made from can scatter, by the
-name request.json gives it (`load1`, `thickness`, `rocket.cd`, `film`, `ambient`), and a wrong name
-gets the list back. Scatter is written as a percentage, an `sd`, a `tol` band or a range, as in
-`"thickness tol 0.2"` or `"film uniform 3..8"`. The run is solved again at a design of values through
-its own analysis and fitted with polynomial chaos, whose leave one out error comes back with the
-answer. A strength run scales exactly instead and takes seconds, and its several loads scatter one at a
-time on the final mesh. `wobbl validate-against wobbl-out/part readings.csv` (MCP
-`validate_against_tests`) compares the run with readings of any value it reports (`apogee_m`, `dp_Pa`,
-`t_max_C`, a gauge on a part) as ASME V&V 20 does, adds the area metric and calibrates the uncertain
-inputs. `wobbl credibility wobbl-out/part --influence high --consequence medium` (MCP
-`assess_credibility`) maps all of it to a V&V 40 style assessment, writes `credibility.html` for a
-reviewer and a test plan, which `wobbl test-plan wobbl-out/part` (MCP `plan_tests`) also writes alone.
-
-For buckling, vibration and fatigue, use the life commands instead of hand formulas.
-`wobbl buckling strut.step -m 6061-t6 --fix "z=min" --load "2 kN -z @ z=max" --target-sf 3`
-(MCP `solve_buckling`) finds the factor on the load at which the part buckles and its mode shapes, then
-cuts it by an imperfection knockdown for the shape and by yielding. Struts follow the European column
-curves, thin cylinders NASA SP-8007, flat plates keep their factor and shapes with no published data take
-0.5, which lowers the confidence. Quote the design factor rather than the raw linear one, because linear
-buckling overpredicts real collapse, most of all for thin shells.
-`wobbl vibration arm.py -m pa12 --fix "bolt holes d=3.2 and x<0" --mass "60 g at 150,0,20 @ top and within 15 of 150,0,15" --rpm "4000-9000 rpm" --blades 2`
-(MCP `solve_vibration`) finds the natural frequencies and judges them against the rotor's once per turn
-and blade pass bands, keeping every mode that moves mass 20% clear by default. Give each motor, battery or
-payload as a mass, because it sets the low modes. A shaker sweep and random vibration go in as
-`wobbl vibration bracket.step -m 6061-t6 --fix "bolt holes" --sine "2 g z 10-500 Hz"` and
-`wobbl vibration bracket.step -m 6061-t6 --fix "bolt holes" --psd gevs-qual --axis z`, which give the peak
-and the 3 sigma stress and, for random input, a fatigue estimate over the test. Any loads, such as an
-unbalanced motor pushing on a pad, sweep as harmonic forces when the band is given alone, as in
-`wobbl vibration bracket.step -m 6061-t6 --fix "bolt holes" --load "5 N z @ top" --sine "10-500 Hz"`.
-Supports, loads and walls work the same way as in a strength study, on any part.
-`wobbl fatigue wobbl-out/bracket --ratio 0 --cycles 1e6` (MCP `fatigue_life`) turns a finished strength
-result into the cycles before a crack starts and a safety factor on stress, a duty cycle goes in as
-`wobbl fatigue wobbl-out/bracket --block "100% x 2e4" --block "60% x 1e6" --repeats 10`, a measured load
-history as `wobbl fatigue wobbl-out/bracket --history loads.csv --repeats 1000`, counted by rainflow with
-each value a multiple of the studied load, and a part with no strength run yet as
-`wobbl fatigue bracket.step -m 6061-t6 --fix "bolt holes" --load "300 N down @ top" --ratio -1`, which
-solves it first. Stresses you already know run as
-`wobbl fatigue --material 4140 --amplitude "200 MPa" --mean "100 MPa" --kt 2 --radius "1 mm"`.
-It reads a vibration result folder the same way. Crack growth after a crack starts is a separate question.
-
-When a part reaches yield in a strength run, or someone asks whether it will bend for good or what
-load would collapse it, ask for plasticity with the same loads and supports, as in
-`wobbl simulate hook.py "will 3 kN bend it for good?" --physics plastic -m mild-steel --fix "bolt holes d=8.5" --load "3 kN -z @ within 5 of 22,0,-16"`.
-It finds the load multiple at first yield, applies and removes the load with the material's true
-stress strain curve to measure the permanent set and peak plastic strain, and ramps an elastic
-perfectly plastic copy until it collapses. A measured curve goes in the curve option, as a tensile test
-like `engineering 250@0.00125, 400@0.2`, as true stress at plastic strain, or as a CSV file. The
-verdict separates `holds` (stays elastic), `yields` (yields locally but carries the load), `marginal`
-(collapse below the target margin, 1.5 by default) and `collapses`. Quote the collapse load and the
-permanent set, not the elastic peak, and check the ductility line. Ductile plastics run with a caveat
-that lowers the confidence, and brittle materials are refused because they have no plastic reserve.
-
+first, and layup changes checked with lamination theory.
+Buckling runs as `wobbl simulate strut.step "will it buckle under 2 kN?" -m 6061-t6 --fix "z=min" --load "2 kN -z @ z=max" --target-sf 3`.
+It cuts the linear factor by an imperfection knockdown for the shape and by yielding. Struts follow the
+European column curves, thin cylinders NASA SP-8007, flat plates keep their factor and shapes with no
+published data take 0.5, which lowers the confidence. Quote the design factor rather than the raw linear one.
+Vibration runs as
+`wobbl simulate arm.py "does it resonate with the props?" -m pa12 --fix "bolt holes d=3.2 and x<0" --mass "60 g at 150,0,20 @ top and within 15 of 150,0,15" --rpm "4000-9000 rpm" --blades 2`
+and judges the natural frequencies against the rotor's once per turn and blade pass bands, keeping every mode
+that moves mass 20% clear by default. Give each motor, battery or payload as a mass, because it sets the low
+modes. A shaker sweep and random vibration go in as `--sine "2 g z 10-500 Hz"` and
+`--psd gevs-qual --axis z`, and loads with a band alone, as in `--sine "10-500 Hz"`, sweep as harmonic forces.
+Fatigue runs on a part with its loads, as in
+`wobbl simulate bracket.step "will it last a million cycles at 300 N?" -m 6061-t6 --fix "bolt holes" --ratio -1`,
+or on a finished strength or vibration result, as in
+`wobbl simulate wobbl-out/bracket "how many cycles at R=0?" --physics fatigue --ratio 0 --cycles 1e6`.
+A duty cycle goes in as `--block "100% x 2e4" --block "60% x 1e6" --repeats 10`, and a measured load
+history as `--history loads.csv`, counted by rainflow with each value a multiple of the studied load.
+When a part reaches yield, or someone asks whether it bends for good or what load collapses it,
+`wobbl simulate hook.py "will 3 kN bend it for good?" --physics plastic -m mild-steel --fix "bolt holes d=8.5" --load "3 kN -z @ within 5 of 22,0,-16"`
+runs the plastic study. It finds the load multiple at first yield, applies and removes the load with the
+material's true stress strain curve to measure the permanent set and peak plastic strain, and ramps an
+elastic perfectly plastic copy until it collapses. A measured curve goes in `--curve`, as a tensile test
+like `engineering 250@0.00125, 400@0.2`, as true stress at plastic strain, or as a CSV file. Its verdict
+separates `holds`, `yields` (yields locally but carries the load), `marginal` and `collapses`. Quote the
+collapse load and the permanent set, not the elastic peak, and check the ductility line. Ductile plastics
+run with a caveat that lowers the confidence, and brittle materials are refused because they have no
+plastic reserve.
 For an assembly whose bodies touch, slide or are bolted, ask about contact or bolts and Wobbl keeps the
 bodies apart where they meet, pairing every face that lies on another, as in
 `wobbl simulate clamp.step "does the jaw slip on the rod under 2 kN?" --physics contact -m mild-steel --fix "body 1 and bottom" --load "2 kN +x @ body 2 and top"`.
@@ -198,81 +121,99 @@ sized from the hole and tightened to 70% of their proof load unless told otherwi
 `wobbl simulate flange.step "does it stay closed under 30 kN?" --physics bolts -m mild-steel --fix "body 1 and bottom" --load "30 kN +z @ body 2 and top" --bolt "M8 8.8 torque 20 N*m"`,
 and a hole narrower than its bolt is read as tapped. Each bolt is checked as VDI 2230 does, for proof
 stress, opening, slip, head pressure and thread stripping, beside the hand calculation.
+A fatigue crack runs as
+`wobbl simulate lug.step "how long until a crack from the pin hole grows critical?" -m 7075-t6 --fix "bolt holes d=6.6" --load "4 kN 0.866,0.5,0 bearing @ hole d=8" --target-life 100000`,
+or on a finished result, as in `wobbl simulate wobbl-out/bracket "how long until a crack grows critical?"`.
+It grows the front step by step with a fresh mesh each time and integrates the NASGRO equation along it.
+The crack is the damage tolerance flaw at the most stressed point unless `--crack` gives one, such as
+`"through 1.27 mm at hole d=8"`, and `--r-ratio` or `--spectrum` give the cycles. Quote the nominal life
+with B10, B1 and the inspection interval, never one part's failure cycle.
 
-For mechanisms, use the mechanism command (MCP `solve_mechanism`) instead of working torques by hand or
-writing a physics loop. It runs MuJoCo with each motor's torque speed line, compares the answer with a
-closed form wherever one exists, runs it again at half the time step, closes an energy account and solves
-every fix again before suggesting it. Whether hobby servos lift a load through a pick and place is
-`wobbl mechanism arm --set servo=mg996r --set payload=500g`, with `shoulder_servo`, `links`, `pick`,
-`place` and `move_time` set to match the build, and `--set mount=free` also checks whether the base tips.
-A four bar linkage such as a wiper is
-`wobbl mechanism fourbar --set ground=120 --set crank=30 --set coupler=125 --set rocker=45 --set load=2`,
-which gives the sweep, the transmission angle, the dead points and the torque at the crank. A gear train is
-`wobbl mechanism gears --set teeth=12:36,10:40 --set motor=fa-130 --set load=0.005`, and impacts and
-tipping are `wobbl mechanism impact --set mass=200g --set drop=500mm --set material=pla --set limit=300`
-and `wobbl mechanism tip --set payload=500g --set reach=120 --set force=3`. Anything else goes in a TOML
-spec with bodies, joints, drives, couplings, loops, loads and a move, or in an MJCF or URDF model, and runs
-as `wobbl mechanism robot.toml`. Bare numbers are mm, g, degrees, N m, rpm and seconds, and servo ratings
-read as written, like `11 kg*cm` or `0.14 s/60deg`. Read the stall and heat numbers joint by joint, since
-a servo that clears a single move can still cook when the move repeats.
+**Circuits.** Pass whatever the user has, a SPICE netlist, a KiCad schematic or a description in words,
+as in `wobbl simulate amp.cir "does it work?"`, `wobbl simulate board.kicad_sch "will anything overheat?" --set J2.load=2A`
+or `wobbl simulate "three red LEDs in parallel from a 9 V battery, each with 330 ohm"`. Wobbl judges every
+part against its voltage, current, power and temperature ratings, says whether the circuit works, and solves
+its fixes again before offering them. Parts named in a netlist (1N4148, 2N3904, IRLZ44N, LM358, NE555,
+AMS1117-3.3 and many more) get their library models and ratings, and a note after a part's `;` gives its
+package or rating, as in `R1 a b 220 ; 0805` or `C1 out 0 10u ; 16V X5R`. Set part values and ratings with
+`--set`, as in `--set R1.power=1W` or `--set ambient=40C`, read a signal with `--probe "v(out)"`, and ask
+for the operating point, the waveform over time (ripple, inrush, timing), the frequency response and
+stability, or the spread across part tolerances and the supply range in the question or with `--physics`
+(operating-point, transient, ac or tolerance). When a description would take more than a sentence, write
+the netlist yourself and pass it. A board's trace parasitics come from the field physics below and feed
+back into a converter run.
 
-For magnetic, electric, radio and sound questions, use the field commands, which solve with GetDP. It is
-fetched the first time one of them runs (an 11 MB download). Each takes a template and its values with units,
-one `--set` per value. `wobbl magnetic solenoid --set turns=800 --set current=0.6A --set stroke=6mm --set need=8N`
-(MCP `solve_magnetic`) gives a plunger's pull over its whole stroke with nonlinear steel, its inductance and
-whether the steel saturates, and `electromagnet` and `magnet` do the same for a pot core lifting a plate and a
-permanent magnet holding one. The force comes from the Maxwell stress tensor and is checked by virtual work,
-so read that check before quoting it.
-`wobbl electric plates --set diameter=100mm --set gap=2mm --set voltage=3kV` (MCP `solve_electric`) gives the
-capacitance and the peak field against the dielectric strength, and `coax` and `sphere` cover cables and high
-voltage gaps.
-`wobbl board microstrip --set width=0.3mm --set height=0.17mm --set length=20mm` (MCP `solve_board`) gives a
-trace's impedance from a field solve of its cross section, with its inductance and capacitance per length, and
-`coupled` gives the near and far end crosstalk between two traces. To see what the board does to a converter,
-pass those parasitics into the circuit run, as in
-`wobbl circuit buck --set vin=12 --set vout=5 --set current=2 --set loop_inductance=6n --set switch_capacitance=300p`,
-or point `board=` at the board result folder. Wobbl then simulates the switch node with and without them and
-tries a snubber.
-`wobbl antenna dipole --set frequency=2.4GHz --set length=58mm` (MCP `solve_antenna`) sweeps a dipole or a
-monopole with a full wave solve for its resonance, impedance, S11 and gain. Adding
-`--set tx_power=10dBm --set sensitivity=-90dBm --set environment=office` gives the range with its spread, and
-`wobbl antenna link` does the link budget alone. `patch` sizes a patch antenna with the transmission line model
-rather than a full wave solve, so say that when you quote it.
-`wobbl sound room --set size=5x4x2.7` (MCP `solve_sound`) finds a room's modes and flags the ones that crowd
-together, `enclosure` does the same for a box measured in millimeters, `muffler` gives an expansion chamber's
-transmission loss and `panel` gives the sound pressure level of a vibrating panel treated as a baffled piston,
-which is an upper estimate.
+**Mechanisms.** A spec, a URDF or MJCF model, or words, as in
+`wobbl simulate "can two mg996r servos lift 500 g with a robot arm?"` or
+`wobbl simulate robot.urdf "can the shoulder hold the arm out level?"`, run in MuJoCo with each motor's
+torque speed line, checked against a closed form wherever one exists, again at half the time step and with an
+energy account. Read the stall and heat numbers joint by joint, since a servo that clears a single move can
+still cook when the move repeats.
 
-For a fatigue crack, ask `wobbl simulate` (MCP `simulate`) instead of working a Paris law by hand. It
-cuts the crack into the part, reads K_I, K_II and K_III along its front, turns and grows the front step by
-step with a fresh mesh each time, so the path comes from the geometry, and integrates the NASGRO equation
-along it, as in
-`wobbl simulate lug.step "how long until a crack from the pin hole grows critical?" -m 7075-t6 --fix "bolt holes d=6.6" --load "4 kN 0.866,0.5,0 bearing @ hole d=8" --set target-life=100000`.
-A finished strength or fatigue result works as the thing, as in
-`wobbl simulate wobbl-out/bracket "how long until a crack grows critical?"`, and brings its part,
-material, loads, supports and governing point, and from a fatigue result its duty cycle and required life.
-The crack is the damage tolerance flaw at the most stressed point unless `--set crack=...` gives one, such
-as `"through 1.27 mm at hole d=8"`, `"corner 1 mm at hole d=8"`, `"surface a=1 c=2 at hottest"` or
-`"auto at 30,0,5"`. The loads are the peak of each cycle, with `--set r-ratio=0.1`, or
-`--set spectrum=...` holding a file of `max,min` factors or blocks such as `"100% x 3650 R=0; 70% x 1e8 R=0.7"`.
-Metals without growth data get constants estimated from their stiffness, which the checks flag, and
-plastics need measured constants through `--set growth=...`. The result gives the nominal life, B10 and
-B1 from a Monte Carlo over thousands of parts, the chance of failing before the target and an inspection
-interval. Quote the spread, never one part's failure cycle, which nothing can predict.
+**Flights.** A body in words, a rocket spec or a solid motor spec, as in
+`wobbl simulate "a 9 cm rock dropped from 300 m"`, `wobbl simulate rocket.toml "what is the apogee?"` and
+`wobbl simulate motor.toml "does the casing hold the chamber pressure?"`. A flight goes through gravity that
+falls off with altitude, the 1976 standard atmosphere, drag, wind, thrust and parachutes, checked against
+closed forms, an energy balance and a delta v budget. A rocket's verdict comes from the stability margin,
+the speed off the rail, apogee against its target and the landing speed, and every run writes
+`trajectory.csv`. A motor design also runs from flags, as in
+`wobbl simulate "solid motor" --physics motor --propellant knsb --grain "bates d=48 core=18 L=80 x4" --throat "13 mm" --exit "33 mm" --casing "6061-t6 od=54 wall=1.6 L=400"`,
+and is judged on the casing's hoop stress at peak pressure, erosive burning and nozzle separation. The burning
+comes from the propellant's burn rate law rather than resolved flame chemistry, so say so when quoting a
+pressure. Wobbl models given designs only and gives no guidance on making or handling propellants.
+
+**Fluids.** A pipe or duct, a body in a stream, a propeller or a hull, as in
+`wobbl simulate "40 m of 25 mm pipe carrying 30 L/min of water, what is the pressure drop?"` or
+`wobbl simulate apcsf_10x4.7 "can a 1.2 kg quad with 4 rotors hover?"`. Pipes follow Darcy Weisbach on the
+Moody chart, drag comes from published curves (a result near the drag crisis comes back with low
+confidence), props from their measured UIUC curves checked with blade element momentum theory, and hulls
+from Holtrop and Mennen.
+
+**Fields.** A solenoid, electromagnet or magnet, capacitor plates, a coax or a PCB trace, an antenna, a room
+or a muffler, as in `wobbl simulate solenoid "does it pull 8 N over its stroke?" --turns 800 --current 0.6A --stroke 6mm --need 8N`
+or `wobbl simulate "2.4 GHz dipole" "where does it resonate?" --frequency 2.4GHz --length 58mm`, solve with
+GetDP, fetched the first time (an 11 MB download). A magnetic force comes from the Maxwell stress tensor and is
+checked by virtual work, so read that check before quoting it. A patch antenna is sized with the transmission
+line model rather than a full wave solve, so say so when you quote it.
+
+**Chemistry.** A fuel, a reaction, a propellant or a cell, as in
+`wobbl simulate "CH4 + 2 O2 -> CO2 + 2 H2O" "how hot is the flame?"`,
+`wobbl simulate knsb "what Isp at 5 MPa?" --area-ratio 8` or `wobbl simulate 18650 "can it run away at 60 C?"`,
+runs on NASA's thermodynamic data with Cantera, which installs itself the first time (about 6 MB). Runaway
+kinetics are for a fully charged LiCoO2 cell, so say the answer is indicative for other chemistries.
+
+**Evidence on any result.** When someone asks how likely a design is to fail, which input matters most,
+whether the model matches their tests or which physical tests they can skip, build the evidence on a
+finished result folder from any domain. `wobbl uncertainty wobbl-out/part --vary "load lognormal 10%" --vary "yield 8%"`
+(MCP `quantify_uncertainty`) gives the probability of failure with its 95% interval, the spread of the
+answer and Sobol indices that rank the inputs. Any number the run was made from can scatter, by the name
+request.json gives it, written as a percentage, an `sd`, a `tol` band or a range, as in
+`"thickness tol 0.2"` or `"film uniform 3..8"`. `wobbl credibility wobbl-out/part --influence high --consequence medium`
+(MCP `assess_credibility`) maps the evidence to a V&V 40 style assessment and writes `credibility.html` for a
+reviewer, MCP `validate_against_tests` compares the run with test readings as ASME V&V 20 does, and
+`wobbl test-plan wobbl-out/part` (MCP `plan_tests`) writes the smallest set of tests that would most reduce
+the risk.
+
+**Big problems.** `--estimate` predicts a run's time, memory and disk before it starts, and
+`--background` or `--remote NAME` run it as a job here or on a machine added with
+`wobbl jobs remote add box me@box.local`. `wobbl jobs status` follows it, and `wobbl jobs cancel` and
+`wobbl jobs resume` stop it and carry it on from its last checkpoint.
 
 ## Never skip
 
+- **Open the view for the user.** They asked to see what happens, so show them their scenario.
 - **Never quote a low confidence number as the answer.** Say what failed and rerun with
   `--quality fine` or a longer `--budget`, or fix the setup.
 - **Never quote an excluded peak.** Peaks at sharp inside corners, at the edge of fixed faces and at
-  rigid couplings are idealization artifacts; Wobbl lists them under `singularities`. The real
+  rigid couplings are idealization artifacts, and Wobbl lists them under `singularities`. The real
   answer is the governing value. If the material is brittle and a sharp corner is flagged, recommend
-  a fillet and re-run.
+  a fillet and run again.
 - **Check units.** Files are read in mm. If the bounding box looks 25.4x or 1000x off, pass `--scale`.
 - **Check the supports match reality.** A fixed face is perfectly rigid. Bolted holes, walls that
-  can lift off and sliding faces each have their own type; pick the one that matches the build.
-- **Do not use `--quality fast` for a final answer**; it is for quick looks.
-- **State the assumptions** Wobbl returns, especially guesses it made from a plain question.
+  can lift off and sliding faces each have their own type, so pick the one that matches the build.
+- **Do not use `--quality fast` for a final answer**, since it is for quick looks.
+- **State the assumptions** Wobbl returns, especially guesses it made from a plain question, and run
+  again with the override whenever one is wrong.
 - **Call a fatigue life an estimate.** Lives scatter by a factor of three to ten at the same stress, so
   lead with the safety factor on stress and say which S-N data and mean stress model were used.
 - **Never quote a raw linear buckling factor as the margin.** Quote the design factor after the knockdown,
