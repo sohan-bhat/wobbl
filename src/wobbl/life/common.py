@@ -63,6 +63,9 @@ def resolve_fixtures(base: StructuralStudy, features) -> tuple[list, dict]:
     return fixtures, info
 
 
+CURVATURE = 8      # elements around a full circle: enough for the stiffness and mass a hole takes away
+
+
 def level_sizes(p: Prepared, quality: str, mesh_size: float | None = None) -> list[Sizing]:
     """Global element sizes for each level. The first level is sized so the last one stays under the node cap,
     but never with elements much thicker than the walls."""
@@ -70,7 +73,19 @@ def level_sizes(p: Prepared, quality: str, mesh_size: float | None = None) -> li
     first = max(8000, int(q["nodes"] / (1 / REFINE ** 3) ** (q["levels"] - 1)))
     s = auto_sizing(p.prep, thickness=p.features.thickness_typical, max_nodes=first)
     h = float(mesh_size) if mesh_size else min(s.h, 1.5 * p.features.thickness_typical)
-    return [Sizing(h=h * REFINE ** k) for k in range(q["levels"])]
+    return [Sizing(h=h * REFINE ** k, curvature=CURVATURE) for k in range(q["levels"])]
+
+
+def next_sizing(planned: Sizing, prev: Sizing, n_prev: int, cap: int) -> Sizing | None:
+    """The size for the next level: the planned one when its mesh fits under the node cap, else a smaller step that
+    lands near the cap. None when even that step would add too few nodes to say anything about convergence (a
+    thin walled part whose first mesh is already large)."""
+    if n_prev * (prev.h / planned.h) ** 3 <= cap:
+        return planned
+    f = (cap / n_prev) ** (1 / 3)
+    if f > 0.9:
+        return None
+    return Sizing(h=prev.h * f, curvature=prev.curvature)
 
 
 def excluded_nodes(mesh, built, features, sizing: Sizing, measure: np.ndarray) -> tuple[np.ndarray, float]:

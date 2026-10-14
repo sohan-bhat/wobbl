@@ -29,6 +29,16 @@ def test_euler_column_buckles_where_euler_says(tmp_path):
     # the column curve cuts a slender steel column by about a tenth
     assert 0.85 < o.values["knockdown"] < 0.95
     assert (tmp_path / "out" / "report.html").exists() and not (tmp_path / "out" / "work").exists()
+    _playback_ok(tmp_path / "out", "buckling")
+
+
+def _playback_ok(out, kind):
+    import json
+
+    p = out / "playback.json"
+    assert p.exists() and p.stat().st_size < 300_000
+    d = json.loads(p.read_text())
+    assert d["kind"] == kind and d["format"] == "wobbl-playback" and d["mesh"]["vertices"]["data"]
 
 
 @needs_ccx
@@ -56,3 +66,4 @@ def test_tip_mass_beam_resonates_and_every_check_agrees(tmp_path):
     assert o.verdict == "fails" and o.values["resonance"][0]["status"] == "resonant"
     assert o.values["harmonic"]["frequency_Hz"] == pytest.approx(f_sdof, rel=0.01)
     assert not (tmp_path / "out" / "work").exists()
+    _playback_ok(tmp_path / "out", "vibration")

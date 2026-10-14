@@ -43,6 +43,7 @@ class Modes:
     n: int                              # mesh nodes; shapes may carry rigid attachment nodes after them
     mass_nodes: dict = field(default_factory=dict)    # attached mass -> nodes (indices into shapes)
     mass_values: dict = field(default_factory=dict)   # attached mass -> mass at each, t
+    solver_total_mass: np.ndarray | None = None       # CalculiX's own totals, kept for comparison
 
     @property
     def count(self) -> int:
@@ -99,6 +100,39 @@ def modal_masses(mesh, density: float, modes: Modes) -> np.ndarray:
     return np.array([float(np.sum(s * mass_times(mesh, density, s.astype(float), modes.mass_nodes,
                                                   modes.mass_values)))
                      for s in modes.shapes])
+
+
+def participation(mesh, density: float, modes: Modes, X_all: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Participation factors phi^T M r for unit translations along x, y and z and unit rotations about the mass
+    center, (m, 6), and the totals r^T M r, (6,).
+
+    Only mesh nodes and the nodes that carry an attached mass move with r. The rotation node of a rigid attachment
+    holds its rotations, not a position, so it stays out; X_all gives every node's position, the attachment point
+    for the extra ones.
+    """
+    n_all = modes.shapes.shape[1]
+    carry = np.zeros(n_all, bool)
+    carry[:mesh.n_nodes] = True
+    for nodes in modes.mass_nodes.values():
+        carry[nodes] = True
+    total = part_mass(mesh, density, modes.mass_values)
+    ones = np.zeros((n_all, 3))
+    ones[carry] = 1.0
+    w = mass_times(mesh, density, ones, modes.mass_nodes, modes.mass_values)[:, 0]   # each node's mass share
+    c = (X_all[carry] * w[carry, None]).sum(0) / w[carry].sum()
+    fields = []
+    for k in range(3):
+        r = np.zeros((n_all, 3))
+        r[carry, k] = 1.0
+        fields.append(r)
+    for k in range(3):
+        r = np.zeros((n_all, 3))
+        r[carry] = np.cross(np.eye(3)[k], X_all[carry] - c)
+        fields.append(r)
+    Mr = [mass_times(mesh, density, r, modes.mass_nodes, modes.mass_values) for r in fields]
+    gamma = np.array([[float(np.sum(s * m)) for m in Mr] for s in modes.shapes.astype(float)])
+    tot = np.array([total] * 3 + [float(np.sum(r * m)) for r, m in zip(fields[3:], Mr[3:])])
+    return gamma, tot
 
 
 def rayleigh_frequency(mesh, density: float, u: np.ndarray, direction, accel: float = G0,

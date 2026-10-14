@@ -25,7 +25,7 @@ from ..structural.spec import StructuralStudy
 from ..units import fmt
 from ..verify.checks import Check, balance_check, confidence, convergence_check
 from . import ccx
-from .common import QUALITY, REFINE, change, excluded_nodes, governing, level_sizes, prepare
+from .common import QUALITY, change, excluded_nodes, governing, level_sizes, next_sizing, prepare
 from .knockdown import (Column, classify, column_curve, column_info, euler_check, johnson, knockdown,
                         separation_check)
 from .outcome import LifeOutcome, clean_work, save_study, verdict_for
@@ -65,8 +65,9 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
     sizes = level_sizes(p, base.quality, base.mesh_size)
     n_modes = max(2, int(study.modes))
     levels, last, stopped_by = [], None, "level limit"
-    for k, sz in enumerate(sizes):
-        if levels and levels[-1]["n_nodes"] / REFINE ** 3 > q["nodes"]:
+    for k, planned in enumerate(sizes):
+        sz = planned if last is None else next_sizing(planned, last[5], levels[-1]["n_nodes"], q["nodes"])
+        if sz is None:
             stopped_by = "node limit"
             break
         say("mesh", f"level {k}: element size {sz.h:.3g} mm")
@@ -171,6 +172,8 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
                       "Negative factors buckle the part only with every load reversed."]]},
         images, fixes(shape, design, target, col, mat, p.features), deck.notes + p.prep.notes,
         solver=f"CalculiX {adapter.version()}", t_total=time.time() - t0)
+    if _playback(out / "playback.json", mesh, mode1, lam, design, yield_factor, col, p):
+        o.values["playback"] = "playback.json"
     o.write(out)
     save_study(study, out)
     clean_work(work, study.keep)
@@ -237,6 +240,21 @@ def fixes(shape: str, design: float, target: float, col: Column | None, mat, fea
                                f"{need:.2g} times as stiff reaches the target if it is also strong enough not to "
                                "yield first.", "params": {"E": mat.E * need}, "auto": False})
     return out
+
+
+def _playback(path: Path, mesh, mode1, lam, design, yield_factor, col, p) -> str | None:
+    """The first buckling shape growing with load, from a column's straightness tolerance of L/1000 or, for other
+    shapes, a dent half a wall deep."""
+    from .playback import buckling_doc, write
+
+    try:
+        if col is not None:
+            e0, why, length = col.length / 1000, "a straightness tolerance of L/1000", col.length
+        else:
+            e0, why, length = 0.5 * p.features.thickness_typical, "half the typical wall", p.prep.diag
+        return write(path, buckling_doc(mesh, mode1, lam, design, yield_factor, length, e0, why))
+    except Exception:  # noqa: BLE001  the playback file is a convenience, never a reason to fail
+        return None
 
 
 def _images(img: Path, mesh, shapes, factors, levels) -> dict:

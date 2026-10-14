@@ -181,20 +181,25 @@ def _resonance_head(rows, v, excite, margin) -> str:
 
 
 def _mass_check(mesh, built, modes, total) -> Check:
+    """CalculiX scales every mode to unit modal mass with its own mass matrix, so Wobbl's mass matrix has to give
+    one too. Without rigid attachments CalculiX's total mass must also match the volume times the density."""
     pm = modal.part_mass(mesh, built.model.density, modes.mass_values)
-    err = abs(total - pm) / pm if pm > 0 else 1.0
     k = min(6, modes.count)
     mm = modal.modal_masses(mesh, built.model.density, modal.Modes(
         modes.freq[:k], modes.shapes[:k], None, modes.participation[:k], modes.effective_mass[:k], modes.total_mass,
         modes.n, modes.mass_nodes, modes.mass_values))
     norm = float(np.abs(mm - 1).max())
-    s = (f"CalculiX counts {fmt(total * 1e6)} g against {fmt(pm * 1e6)} g from the volume, the density and the "
-         f"attached masses ({100 * err:.2g}% apart), and Wobbl's own mass matrix gives the first {k} modes a modal "
-         f"mass of one to {100 * norm:.2g}%")
-    worst = max(err, norm)
+    s = (f"the part weighs {fmt(pm * 1e6)} g with its attached masses, and Wobbl's own mass matrix gives the first "
+         f"{k} modes a modal mass of one to {100 * norm:.2g}%, as CalculiX scaled them")
+    worst, detail = norm, {"wobbl_kg": pm * 1000, "modal_mass": mm.tolist()}
+    rigid = any(np.any(np.asarray(nodes) >= modes.n) for nodes in modes.mass_nodes.values())
+    if modes.solver_total_mass is not None and not rigid:
+        ccx_total = float(np.mean(modes.solver_total_mass[:3]))
+        err = abs(ccx_total - pm) / pm if pm > 0 else 1.0
+        s += f". CalculiX's total, {fmt(ccx_total * 1e6)} g, is {100 * err:.2g}% from it"
+        worst, detail["calculix_kg"] = max(worst, err), ccx_total * 1000
     status = "pass" if worst <= 0.01 else ("warn" if worst <= 0.03 else "fail")
-    return Check("mass balance", status, s, {"calculix_kg": total * 1000, "wobbl_kg": pm * 1000,
-                                             "modal_mass": mm.tolist()})
+    return Check("mass balance", status, s, detail)
 
 
 def _participation(modes, frac, sine, psd, axis, excite) -> Check:
@@ -370,7 +375,11 @@ def fixes(values: dict, mat, features) -> list[dict]:
     bad = [r for r in values.get("resonance", []) if r["status"] in ("resonant", "close")]
     if bad:
         r = min(bad, key=lambda r: r["separation"])
-        f, excite, lo, hi = r["frequency"], r["excitation"], r["lo"], r["hi"]
+        # every excitation this mode sits in or near: moving it has to clear them all
+        same = [x for x in bad if x["mode"] == r["mode"]]
+        f, lo, hi = r["frequency"], min(x["lo"] for x in same), max(x["hi"] for x in same)
+        names = sorted({x["excitation"].split(" from ")[0].split(" at ")[0] for x in same})
+        excite = names[0] if len(names) == 1 else " and the ".join([", ".join(names[:-1]), names[-1]])
         up = hi * (1 + margin) / f
         down = lo / (1 + margin) / f
         out.append({"kind": "stiffen", "title": f"Stiffen to move mode {r['mode']} above {fmt(hi * (1 + margin))} Hz",
@@ -413,6 +422,42 @@ def fixes(values: dict, mat, features) -> list[dict]:
     return out
 
 
+def pick_modes(modes, frac, excite, k: int) -> list[int]:
+    """The modes worth showing: the driven ones nearest an excitation when there is one, else the lowest driven
+    ones, in order of frequency."""
+    rel = np.nonzero(relevant_modes(modes, frac))[0]
+    if excite and len(rel):
+        rel = np.array(sorted(sorted(rel, key=lambda i: min(separation(float(modes.freq[i]), e.lo, e.hi)
+                                                            for e in excite))[:k]))
+    rel = list(rel[:k])
+    return [int(i) for i in rel] if rel else list(range(min(k, modes.count)))
+
+
+def playback(path: Path, mesh, modes, excite, resp, values: dict) -> str | None:
+    from .playback import modes_doc, write
+
+    try:
+        total = float(modes.total_mass[:3].mean())
+        frac = modes.effective_mass[:, :3] / max(total, 1e-300)
+        picks = pick_modes(modes, frac, excite, 4)
+        rank = {"resonant": 3, "close": 2, "barely excited": 1, "clear": 0}
+        labels: dict[int, str] = {}
+        for r in values.get("resonance", []):   # each mode's worst status against any excitation
+            i = r["mode"] - 1
+            if rank[r["status"]] >= rank.get(labels.get(i, "clear"), 0):
+                labels[i] = r["status"]
+        extra = dict(values, resonance_bands=[{"label": e.label, "lo_Hz": round(e.lo, 4), "hi_Hz": round(e.hi, 4)}
+                                              for e in excite])
+        if resp is not None and "harmonic" in resp:
+            h = resp["harmonic"]
+            idx = np.unique(np.linspace(0, len(h["curve_f"]) - 1, 150).astype(int))
+            extra["curve"] = {"f": [round(float(x), 4) for x in h["curve_f"][idx]],
+                              "stress": [round(float(x), 5) for x in h["curve"][idx]]}
+        return write(path, modes_doc(mesh, modes, picks, labels, extra))
+    except Exception:  # noqa: BLE001  the playback file is a convenience, never a reason to fail
+        return None
+
+
 def images(img: Path, mesh, modes, excite, sine, psd, axis, resp, harmonic, margin) -> dict:
     from .render import frequency_map, render_field, render_modes, response_curve
 
@@ -420,8 +465,7 @@ def images(img: Path, mesh, modes, excite, sine, psd, axis, resp, harmonic, marg
     try:
         total = float(modes.total_mass[:3].mean())
         frac = modes.effective_mass[:, :3] / max(total, 1e-300)
-        rel = np.nonzero(relevant_modes(modes, frac))[0][:3]
-        pick = list(rel) if len(rel) else list(range(min(3, modes.count)))
+        pick = pick_modes(modes, frac, excite, 3)
         out["modes"] = render_modes(img / "modes.png", mesh.X, mesh.tets,
                                     [modes.shapes[i, :mesh.n_nodes].astype(float) for i in pick],
                                     [f"mode {i + 1}, {fmt(modes.freq[i])} Hz" for i in pick])

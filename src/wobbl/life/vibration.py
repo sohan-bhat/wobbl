@@ -29,7 +29,7 @@ from ..structural.build import build_static, tri_area_weights
 from ..structural.spec import SpecError
 from ..units import fmt
 from . import ccx, modal
-from .common import QUALITY, REFINE, change, excluded_nodes, governing, level_sizes, prepare
+from .common import QUALITY, change, excluded_nodes, governing, level_sizes, next_sizing, prepare
 from .outcome import LifeOutcome, clean_work, save_study
 from .vibspec import (VibrationStudy, default_damping, default_duration, parse_mass, parse_sine, seconds,
                       unit_vector)
@@ -65,8 +65,9 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
     sizes = level_sizes(p, base.quality, base.mesh_size)
     sel = Selector(p.features.faces, p.features.bbox)
     levels, last, stopped_by = [], None, "level limit"
-    for k, sz in enumerate(sizes):
-        if levels and levels[-1]["n_nodes"] / REFINE ** 3 > q["nodes"]:
+    for k, planned in enumerate(sizes):
+        sz = planned if last is None else next_sizing(planned, last[5], levels[-1]["n_nodes"], q["nodes"])
+        if sz is None:
             stopped_by = "node limit"
             break
         say("mesh", f"level {k}: element size {sz.h:.3g} mm")
@@ -77,7 +78,7 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
         deck = ccx.make_deck(built.model, wl / "static.inp", attached)
         say("solve", f"level {k}: {n_modes} modes of {mesh.n_nodes:,} nodes with {adapter.name}")
         ccx.run(exe, wl, "modes", ccx.frequency_inp(deck, n_modes))
-        modes = _read(wl, mesh.X, deck)
+        modes = _read(wl, mesh, built.model.density, deck)
         if modes.count == 0 or modes.freq[0] <= 1e-3 * max(modes.freq[-1], 1e-9):
             raise SpecError("the supports leave the part free to move as a rigid body (a natural frequency of zero). "
                             "Hold it the way it is mounted, for example --fix 'bolt holes d=3.2'")
@@ -121,6 +122,8 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
         headline += f" Confidence is {level}."
     values.update({"damping": zeta, "damping_reason": zeta_why, "duration_s": dur, "duration_reason": dur_why,
                    "levels": levels})
+    if vc.playback(out / "playback.json", mesh, modes, excite, resp, values):
+        values["playback"] = "playback.json"
     o = LifeOutcome("vibration", str(base.part), base.question, verdict, headline, vc.metrics(values), level,
                     reasons, checks, vc.assumptions(mat, zeta_why, masses, deck, sine, psd, base), values, images,
                     vc.fixes(values, mat, p.features), deck.notes + p.prep.notes,
@@ -148,14 +151,25 @@ def _attach(masses, sel: Selector, mesh) -> list:
     return out
 
 
-def _read(wl: Path, X: np.ndarray, deck: ccx.Deck) -> modal.Modes:
-    n = len(X)
+def _read(wl: Path, mesh, density: float, deck: ccx.Deck) -> modal.Modes:
+    """The modes of one mesh. Participation factors and effective masses are Wobbl's own, from its mass matrix:
+    CalculiX's sums count the rotation node of a rigid attachment as if it moved along x, y and z, which inflates
+    them whenever an attached mass sits off its faces."""
+    X, n = mesh.X, mesh.n_nodes
     e = ccx.read_eigen(wl / "modes.dat")
     _, U, S = ccx.read_modes(wl / "modes.frd", n, 2 * len(deck.extra))
     U = ccx.fill_rigid(U, X, deck).astype(np.float32) if deck.rigid_sets and len(U) else U
     m = min(len(e["freq"]), len(U))
-    return modal.Modes(e["freq"][:m], U[:m], None if S is None else S[:m], e["participation"][:m],
-                       e["effective_mass"][:m], e["total_mass"], n, deck.mass_nodes, deck.mass_values)
+    modes = modal.Modes(e["freq"][:m], U[:m], None if S is None else S[:m], e["participation"][:m],
+                        e["effective_mass"][:m], e["total_mass"], n, deck.mass_nodes, deck.mass_values)
+    modes.solver_total_mass = e["total_mass"]
+    X_all = np.zeros((U.shape[1], 3))
+    X_all[:n] = X
+    for ref, (_, point) in deck.rigid_sets.items():
+        X_all[ref] = X_all[ref + 1] = point
+    modes.participation, modes.total_mass = modal.participation(mesh, density, modes, X_all)
+    modes.effective_mass = modes.participation ** 2
+    return modes
 
 
 def _watched(modes: modal.Modes, excite, axis) -> int:
