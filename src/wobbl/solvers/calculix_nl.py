@@ -69,6 +69,7 @@ class BoltSpring:
     bending: float = 0.0         # N mm/rad
     torsion: float = 0.0         # N mm/rad
     preload: float = 0.0         # N
+    grounded: tuple[bool, bool] = (False, False)   # head, nut: an end on a face that is already held is held too
 
     @property
     def axis(self) -> np.ndarray:
@@ -120,6 +121,7 @@ class NonlinearResult:
     bolt_force: dict[str, np.ndarray] = field(default_factory=dict)        # name -> force at each frame, N
     last_attempt: float = float("nan")       # increment of the last attempt, as a fraction of its step
     contact_totals: dict[str, list[dict]] = field(default_factory=dict)   # pair -> totals at each saved time
+    bolt_ids: dict[str, dict] = field(default_factory=dict)  # bolt -> its extra nodes (H, HR, N, NR, Q, P)
 
 
 def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
@@ -156,9 +158,16 @@ def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
             n_el += 1
             f.write(f"*ELEMENT, TYPE=SPRINGA, ELSET=EBA{k + 1}\n{n_el},{ids['H'] + 1},{ids['Q'] + 1}\n")
             spring_sets.append((f"EBA{k + 1}", "", b.axial))
+            # CalculiX drops a node that belongs to no element, equations or not, so the turnbuckle node gets a
+            # spring to ground a billionth as stiff as the bolt, which carries nothing measurable
+            n_el += 1
+            f.write(f"*ELEMENT, TYPE=SPRING1, ELSET=EBP{k + 1}\n{n_el},{ids['P'] + 1}\n")
+            spring_sets.append((f"EBP{k + 1}", "1", 1e-9 * b.axial))
             ax = int(np.argmax(np.abs(b.axis)))
             for d in range(3):
-                for kind, (i, j), kk in (("L", ("H", "Q"), b.lateral),
+                # shear between head and nut, which also makes the nut a node of an element: CalculiX leaves a
+                # node that belongs to no element out of its results
+                for kind, (i, j), kk in (("L", ("H", "N"), b.lateral),
                                          ("R", ("HR", "NR"), b.torsion if d == ax else b.bending)):
                     if (kind == "L" and d == ax) or kk <= 0:
                         continue
@@ -210,6 +219,11 @@ def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
         f.write("*TIME POINTS, NAME=TEND\n1.\n")
         f.write("*BOUNDARY\n")
         _write_boundaries(f, sm)
+        for b in model.bolts:
+            f.write(f"{bolts[b.name]['P'] + 1},2,3\n")      # the turnbuckle moves along its first direction only
+            for end, ground in zip((("H", "HR"), ("N", "NR")), b.grounded):
+                if ground:
+                    f.write("".join(f"{bolts[b.name][k] + 1},1,3\n" for k in end))
         prev = 0.0
         for s in model.steps:
             _write_step(f, model, s, prev, rigid, bolts, info["sets"])
@@ -252,7 +266,10 @@ def _bolt_equations(f, mesh, bolts: list[BoltSpring], ids: dict):
     rows = []
     for b in bolts:
         i = ids[b.name]
-        for nodes, ref, rot, at in ((b.head, i["H"], i["HR"], b.head_point), (b.nut, i["N"], i["NR"], b.nut_point)):
+        for nodes, ref, rot, at, ground in ((b.head, i["H"], i["HR"], b.head_point, b.grounded[0]),
+                                            (b.nut, i["N"], i["NR"], b.nut_point, b.grounded[1])):
+            if ground:
+                continue
             rr = mesh.X[nodes] - np.asarray(at, float)
             for node, (x, y, z) in zip(nodes, rr):
                 for d, terms in ((1, ((rot, 2, -z), (rot, 3, y))), (2, ((rot, 3, -x), (rot, 1, z))),
@@ -269,13 +286,19 @@ def _bolt_equations(f, mesh, bolts: list[BoltSpring], ids: dict):
 
 
 def bolt_forces(bolts: list[BoltSpring], ids: dict, U_extra: np.ndarray, n: int) -> dict[str, float]:
-    """Tension in each bolt from its spring's stretch: (u_N - u_H) along the axis plus the turnbuckle's travel."""
+    """Tension in each bolt from its spring's stretch, (u_Q - u_H) along the axis. The spring's far end Q is the nut
+    moved by the turnbuckle, and unlike the turnbuckle node it is in CalculiX's results."""
     out = {}
     for b in bolts:
         i = ids[b.name]
-        uh, un, up = U_extra[i["H"] - n], U_extra[i["N"] - n], U_extra[i["P"] - n, 0]
-        out[b.name] = float(b.axial * ((un - uh) @ b.axis + up))
+        out[b.name] = float(b.axial * ((U_extra[i["Q"] - n] - U_extra[i["H"] - n]) @ b.axis))
     return out
+
+
+def turnbuckle_travel(b: BoltSpring, ids: dict, U_extra: np.ndarray, n: int) -> float:
+    """How far the turnbuckle has pulled: u_Q = u_N + a u_P, so u_P = (u_Q - u_N) . a."""
+    i = ids[b.name]
+    return float((U_extra[i["Q"] - n] - U_extra[i["N"] - n]) @ b.axis)
 
 
 def _write_equations(f, sm: StaticModel):
@@ -457,7 +480,7 @@ def solve_nonlinear(model: NonlinearModel, workdir: str | Path, job: str = "nonl
                                 else np.nan for fr in frames]) for b in model.bolts}
     return NonlinearResult(times, reactions, monitor, frames, finished, log, t, f"CalculiX {_version()}",
                            incs, iters, forces, last_attempt(work / f"{job}.sta"),
-                           read_contact_totals(work / f"{job}.dat"))
+                           read_contact_totals(work / f"{job}.dat"), info["bolts"])
 
 
 def read_sta(path: Path) -> tuple[int, int, int]:
@@ -565,7 +588,7 @@ def read_frames(path: Path, n_all: int, n: int) -> list[dict]:
             if blk == "DISP":
                 fr["U"], fr["U_extra"] = arr[:n, :3], arr[n:, :3]
             elif blk == "FORC":
-                fr["RF"] = arr[:n, :3]
+                fr["RF"], fr["RF_extra"] = arr[:n, :3], arr[n:, :3]
             elif blk == "STRESS":
                 fr["S"] = arr[:n, :6]
             elif blk == "PE":

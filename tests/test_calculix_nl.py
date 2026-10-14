@@ -64,13 +64,15 @@ def test_contact_springs_and_bolts_are_written(bar, tmp_path):
     deck = (tmp_path / "c.inp").read_text()
     assert "*CONTACT PAIR, INTERACTION=C1I, TYPE=SURFACE TO SURFACE\nC1S,C1M\n" in deck
     assert "*FRICTION\n0.2,500\n" in deck and "*CLEARANCE, MASTER=C1M, SLAVE=C1S, VALUE=0\n" in deck
-    assert deck.count("TYPE=SPRING1") == 3 and "*SPRING, ELSET=ESPR1_3\n3\n0.5\n" in deck
+    assert deck.count("TYPE=SPRING1") == 4 and "*SPRING, ELSET=ESPR1_3\n3\n0.5\n" in deck
     ids = {k: v + 1 for k, v in info["bolts"]["bolt1"].items()}
     # the shank runs from the head to the turnbuckle's far end, which follows the nut shifted along -z
     assert f"TYPE=SPRINGA, ELSET=EBA1\n" in deck and f",{ids['H']},{ids['Q']}\n" in deck
     assert "*SPRING, ELSET=EBA1\n\n250000\n" in deck
     assert f"3\n{ids['Q']},3,1,{ids['N']},3,-1,{ids['P']},1,1\n" in deck
     assert deck.count("TYPE=SPRING2") == 5          # shear in x and y, bending about x and y, twist about z
+    # the turnbuckle keeps a vanishing spring so CalculiX does not drop it, and moves along one direction only
+    assert f"ELSET=EBP1\n" in deck and f"\n{ids['P']},2,3\n" in deck
     preload, lock = deck.split("*END STEP\n")[:2]
     assert f"{ids['P']},1,1.2000000000e+04\n" in preload
     assert f"*BOUNDARY, FIXED\n{ids['P']},1,1\n" in lock and f"{ids['P']},1,0.\n" in lock

@@ -148,7 +148,8 @@ class JointCheck:
 
 def check(b: Bolt, clamp: float, outer: float, E_parts: float, preload: float, axial: float = 0.0,
           shear: float = 0.0, mu: float = 0.15, interfaces: int = 1, n: float = 1.0,
-          mu_thread: float = 0.12) -> JointCheck:
+          mu_thread: float = 0.12, engagement: float | None = None,
+          thread_strength: float | None = None) -> JointCheck:
     """VDI 2230 for one bolt: load factor, bolt force, residual clamp force, separation and slip, the bolt stress
     against its proof stress, the stress while tightening, the pressure under the head and thread stripping."""
     ds = bolt_compliance(b, clamp)
@@ -167,8 +168,9 @@ def check(b: Bolt, clamp: float, outer: float, E_parts: float, preload: float, a
     sig = preload / b.stress_area
     red = math.sqrt(sig ** 2 + 3 * (0.5 * tau) ** 2)
     head = fs / (math.pi / 4 * (b.dw ** 2 - b.hole ** 2))
-    # a standard nut's threads shear over about 0.75 pi d m at 0.6 times the nut's strength, against the bolt's
-    # breaking load; nuts of the matching class are made so the bolt breaks first
-    strip = 0.6 * b.tensile * 0.75 * math.pi * b.d * b.nut_height / (b.stress_area * b.tensile)
+    # the internal thread shears over about 0.75 pi d m at 0.6 times its strength, against the bolt's breaking
+    # load: a nut of the matching class is made so the bolt breaks first, a tapped hole in a softer part may not be
+    m = engagement or b.nut_height
+    strip = 0.6 * (thread_strength or b.tensile) * 0.75 * math.pi * b.d * m / (b.stress_area * b.tensile)
     return JointCheck(b.name, clamp, outer, ds, dp, t, phi, preload, fa, shear, fs, fkr, sep, cap, slip, stress,
                       stress / b.proof, red / b.yield_strength, head, strip)
