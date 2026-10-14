@@ -108,7 +108,11 @@
   a standalone `credibility.html`, and `wobbl test-plan` names the fewest
   physical tests that most reduce the risk. Wobbl supplies the evidence and
   certifies nothing.
-- Four new agent tools and a skill section, five validation cases,
+- Elastic supports, as in `--fix "elastic 50 N/mm3 @ z=min"`, hold a face on
+  a bed of springs, so a mount that gives a little can be modeled and its
+  stiffness can scatter. A cantilever on an elastic root matches beam theory
+  on a Winkler bed to 0.01%.
+- Four new agent tools and a skill section, six validation cases,
   and the cast mount credibility example with clearly synthetic readings.
 
 ## 0.1.1 (2026-10-13)

@@ -23,7 +23,8 @@ never write your own finite element code.
      `"2000 N -0.87,0,-0.5 at 0,-30,66 @ holes d=6.6 rigid"` (force at a point off the part, carried
      by the faces), `"0.8 N*m +z at 210,0,25 @ top and within 14 of 210,0,25"`.
    - supports: `"holes d=4.5"` (fixed), `"bolt holes d=6.6"` (hole plus washer ring), `"x=min"`,
-     `"wall x=min"` (can push, can lift off), `"roller y=0"`, `"fixed-z faces 7"` (only some directions).
+     `"wall x=min"` (can push, can lift off), `"roller y=0"`, `"fixed-z faces 7"` (only some directions),
+     `"elastic 50 N/mm3 @ z=min"` (a bed of springs, for a mount that gives a little).
    - selectors: `top`, `bottom`, `x=min`, `z>10`, `normal -z`, `holes d<6`, `hole near 55,0,10`,
      `fillets`, `face 12`, `within 15 of 50,-25,35` (a circular patch), combined with `and` / `or`.
    Parts can also be parametric Python files (`PARAMS` plus `build(occ, **params)`). Pass
@@ -111,8 +112,8 @@ their tests, or which physical tests they can skip, build the evidence on a fini
 answer and Sobol indices that rank the inputs. Scatter is written as a percentage, an `sd`, a `tol`
 band or a range, as in `"thickness tol 0.2"` or `"film uniform 3..8"`. Load, stiffness and strength
 scatter on a strength run scale the solution exactly and take seconds. With several loads, `load1`,
-`load2` and so on scatter on their own through one solve per load on the final mesh, and `nu` takes a
-few solves there. Geometry, heat and circuit inputs need new solves and a polynomial chaos surrogate
+`load2` and so on scatter on their own through one solve per load on the final mesh, and `nu` or the
+stiffness of an elastic support (`support`) takes a few solves there. Geometry, heat and circuit inputs need new solves and a polynomial chaos surrogate
 whose leave one out error comes back with the answer. `wobbl validate-against wobbl-out/part readings.csv` (MCP `validate_against_tests`) compares the
 run with strain, displacement, temperature or circuit readings as ASME V&V 20 does, adds the area metric
 and calibrates the uncertain inputs. `wobbl credibility wobbl-out/part --influence high --consequence medium`

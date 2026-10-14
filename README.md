@@ -451,7 +451,8 @@ wobbl credibility wobbl-out/mount --influence high --consequence medium
 ```
 
 - `wobbl uncertainty` carries load, material, geometry and boundary condition
-  scatter through the run with Latin hypercube sampling. It returns the probability
+  scatter through the run with Latin hypercube sampling, where a support's
+  stiffness comes from an elastic support such as `--fix "elastic 50 N/mm3 @ z=min"`. It returns the probability
   of failure with its 95% interval, the spread of the answer and Sobol indices that
   rank the inputs. A strength run scales exactly with load, stiffness and strength,
   so those take seconds and need no new solve. Geometry, heat and circuit inputs get
@@ -477,13 +478,13 @@ where the two servo idealizations disagree, a load cell in service and coupons.
 
 ## Validation
 
-Fifty cases with known answers run through the same pipeline you get. Every
+Fifty one cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
 | Group | Cases | Largest error |
 |---|---|---|
-| Textbook and benchmark strength (Timoshenko, Kirsch, Lame, NAFEMS LE1 and LE10, torsion, self weight) | 8 | 1.54%, plate with a hole |
+| Textbook and benchmark strength (Timoshenko, Kirsch, Lame, NAFEMS LE1 and LE10, torsion, self weight, a cantilever on an elastic root) | 9 | 1.54%, plate with a hole |
 | Real parts against converged reference models | 5 | 4.26%, PLA bracket with a 6 mm fillet |
 | Heat (slab conduction, lumped cooling, a bar whose end jumps to 120 C) | 3 | 0.85%, the bar against the erfc solution |
 | Circuits (LED, RC, buck ripple) | 3 | 7.70%, buck ripple against an ideal formula that ignores switch and diode drops |
@@ -561,9 +562,8 @@ Each folder has a `run.sh` that regenerates its outputs.
   once, and erosive burning, throat erosion and slag are flagged but not modeled.
   Against two MIT static fires the predicted peak pressure was 7% low on one and
   12% high on the other.
-- In a strength study's uncertainty the supports stay rigid, with the rigid and
-  distributed load attachments as the bounds on how the load gets in, because a
-  strength support has no stiffness of its own to vary.
+- Elastic supports are linear springs with the same stiffness in every direction,
+  so they pull on the part as readily as they push.
 - Mechanisms are rigid bodies with stiff spring contacts, joints without backlash,
   servos that follow their move as a well tuned controller would and motors on a
   straight torque speed line, with a rotor inertia assumed where datasheets give none.
