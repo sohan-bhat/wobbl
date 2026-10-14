@@ -125,6 +125,8 @@ def _diode_chains(c: Circuit, w: Wave) -> list[Check]:
                 break
             i = i2
         sim = _mean(w, _Pins(d, w).i("a"))
+        if abs(sim) < 1e-5:
+            continue        # a chain that carries next to nothing (an open pin at its end) has nothing to check
         err = abs(sim - i) / max(i, 1e-12)
         out.append(Check("hand calculation", _status(err, 0.01),
                          f"{r.ref} into {d.ref}: the diode equation solved by hand gives {fmt(i * 1000)} mA, ngspice "

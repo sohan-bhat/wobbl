@@ -35,7 +35,8 @@ def kcl(c: Circuit, w: Wave) -> Check:
         scale = max(scale, mags[n])
         if r > worst:
             worst, where = r, n
-    tol = max(1e-8, 1e-6 * scale)
+    vmax = max((float(np.max(np.abs(v))) for v in w.v.values()), default=0.0)
+    tol = max(1e-8, 1e-6 * scale, 2e-10 * vmax)      # ngspice's 1e10 ohm shunt on every node is not on a pin
     st = "pass" if worst <= tol else "warn" if worst <= 100 * tol else "fail"
     return Check("KCL", st, f"currents into every node sum to zero within {fmt(worst)} A (largest at "
                             f"{c.label(where) or 'none'}, against {fmt(scale)} A flowing)",

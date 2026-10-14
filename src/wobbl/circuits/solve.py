@@ -264,6 +264,25 @@ def settled(w: Wave, period: float | None = None, frac: float = 0.15, tol: float
     return worst <= tol, worst
 
 
+def measured_period(w: Wave) -> float | None:
+    """The period the run actually settled into, from the node that swings most crossing its middle in the last
+    half of the run, or None when nothing repeats."""
+    if len(w.t) < 20:
+        return None
+    half = w.t >= w.t[-1] / 2
+    best = max(w.v.values(), key=lambda v: float(np.ptp(v[half])), default=None)
+    if best is None or np.ptp(best[half]) < 1e-3:
+        return None
+    x, t = best[half], w.t[half]
+    mid = 0.5 * (x.max() + x.min())
+    up = np.nonzero((x[:-1] < mid) & (x[1:] >= mid))[0]
+    if len(up) < 3:
+        return None
+    ts = t[up] + (mid - x[up]) * (t[up + 1] - t[up]) / (x[up + 1] - x[up])
+    d = np.diff(ts)
+    return float(np.mean(d)) if np.std(d) < 0.05 * np.mean(d) else None
+
+
 def run_tran(c: Circuit, work: Path, tag: str = "tran", step: float | None = None, stop: float | None = None,
              tries: int = 3, factor: float = 1.0, extra: list[str] | None = None) -> Wave:
     """Power on transient, extended until the last two windows agree (up to tries runs)."""
@@ -283,7 +302,7 @@ def run_tran(c: Circuit, work: Path, tag: str = "tran", step: float | None = Non
             w.notes.append("outputs switch on at power up and off at 60% of the run, so both states and the "
                            "switch off are seen")
             return w
-        T = max(time_scales(c)[0] or [0]) or None
+        T = measured_period(w) or max(time_scales(c)[0] or [0]) or None
         ok, chg = settled(w, T)
         span = max(3, math.floor(0.3 * stop / T)) * T if T and T < stop / 6 else 0.2 * stop
         w.window = w.t >= stop - span

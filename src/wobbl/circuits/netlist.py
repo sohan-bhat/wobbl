@@ -55,7 +55,9 @@ class Element:
 
     @property
     def ref(self) -> str:
-        """The name people use: XU1 is U1."""
+        """The name people use: XU1 is U1, and a schematic's own reference when it had to be renamed."""
+        if self.meta.get("ref"):
+            return self.meta["ref"]
         return self.name[1:] if self.letter == "x" and len(self.name) > 1 and self.name[1].isalpha() else self.name
 
     @property

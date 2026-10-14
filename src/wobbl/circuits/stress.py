@@ -67,7 +67,10 @@ class Stress:
 
     @property
     def worst(self) -> Item | None:
-        rated = [it for it in self.items if it.use is not None]
+        """The most used rating. An IC's supply voltage counts only once it is near its limit, since running at
+        the voltage it is made for is not stress."""
+        rated = [it for it in self.items if it.use is not None and (it.status != "ok" or it.what not in (
+            "supply voltage", "input voltage") or self.kind in ("capacitor", "resistor"))]
         return max(rated, key=lambda it: it.use) if rated else None
 
     def to_dict(self) -> dict:
@@ -78,11 +81,11 @@ class Stress:
         return d
 
 
-def _rated(what: str, value: float, limit, unit: str, note: str = "") -> Item:
+def _rated(what: str, value: float, limit, unit: str, note: str = "", near: float = NEAR) -> Item:
     if limit is None or limit <= 0:
         return Item(what, value, None, unit, None, "unknown", note)
     use = abs(value) / limit
-    return Item(what, value, limit, unit, use, "over" if use > 1.0 else "near" if use >= NEAR else "ok", note)
+    return Item(what, value, limit, unit, use, "over" if use > 1.0 else "near" if use >= near else "ok", note)
 
 
 class _Pins:
@@ -258,9 +261,14 @@ def _one(e: Element, w: Wave, ta: float, more: list[Wave]) -> Stress | None:
                                 "fails", f"below the {fmt(prm['vin_min'])} V it needs to charge"))
         t = _temp(e, s.p, ta)
         if t:
-            if t.value > prm.get("t_reg", 999):
-                t.note += f"; above {prm['t_reg']} C its thermal regulation cuts the charge current"
-                t.status = "warn" if t.status == "ok" else t.status
+            treg = prm.get("t_reg", 999)
+            if t.value > treg:
+                vdrop = max(w.mean(P.v("vin") - P.v("bat")), 1e-3)
+                cut = max((treg - ta) / max(_theta(e) or 1, 1e-9) / vdrop, 0.0)
+                t.note += (f"; its thermal regulation holds the junction near {treg} C by cutting the charge current "
+                           f"to about {fmt(min(cut, ich))} A, so it charges slower than set")
+                t.status = "warn"
+                t.value, t.use = float(treg), (treg - ta) / max(t.limit - ta, 1e-9)
             s.items.append(t)
             s.tj = t.value
     elif k == "reference":
@@ -344,7 +352,7 @@ def _regulator(e, P, w, every, s, r, prm, ta):
         s.items.append(_rated("input to output voltage", vin, r["vdiff_V"], "V"))
     else:
         vin = _peak(e, every, lambda q: float(np.max(q.v("in") - q.v(third))))
-        s.items.append(_rated("input voltage", vin, r.get("vin_V"), "V"))
+        s.items.append(_rated("input voltage", vin, r.get("vin_V"), "V", near=0.95))
     iout = -w.mean(P.i("out"))
     s.v, s.i = vin, iout
     s.items.append(_rated("output current", iout, r.get("iout_A"), "A"))
@@ -373,8 +381,8 @@ def _amp(e, P, w, every, s, r, prm, ta):
     vs_avg = w.mean(P.v(pos) - P.v(neg))
     iout = _peak(e, every, lambda q: float(np.max(np.abs(q.i("out")))))
     s.v, s.i = vs, w.rms(P.i("out"))
-    s.items += [_rated("supply voltage", vs, r.get("vsupply_V"), "V"), _rated("output current", iout, r.get("iout_A"),
-                                                                              "A")]
+    s.items += [_rated("supply voltage", vs, r.get("vsupply_V"), "V", near=0.95),
+                _rated("output current", iout, r.get("iout_A"), "A")]
     if vs_avg < prm.get("vs_min", 0):
         s.items.append(Item("supply voltage", vs_avg, prm["vs_min"], "V", None, "fails",
                             f"below the {fmt(prm['vs_min'])} V it needs"))
@@ -411,9 +419,11 @@ def _mcu(e, P, w, every, s, r, prm, ta):
     vdd = max(_peak(e, every, lambda q, p=p: float(np.max(q.v(p) - q.v(gnd)))) for p in sup)
     vavg = min(w.mean(P.v(p) - P.v(gnd)) for p in sup)
     s.v = vdd
-    it = _rated("supply voltage", vdd, r.get("vdd_V"), "V")
-    if it.status in ("ok", "near") and vdd > r.get("vdd_op_V", 99):
+    it = _rated("supply voltage", vdd, r.get("vdd_V"), "V", near=2.0)
+    if it.status == "ok" and vdd > r.get("vdd_op_V", 99) * 1.001:
         it.status, it.note = "warn", f"above the {fmt(r['vdd_op_V'])} V it is meant to run at"
+    elif it.status == "ok" and vdd > 0.97 * r.get("vdd_V", 99):
+        it.status = "near"
     s.items.append(it)
     if vavg < prm.get("vmin", 0):
         s.items.append(Item("supply voltage", vavg, prm["vmin"], "V", None, "fails",

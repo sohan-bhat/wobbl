@@ -426,6 +426,8 @@ def lookup(name: str) -> Part | None:
         if p is not None:
             return p
     u = raw.upper()
+    if re.search(r"\s", u):
+        return None
     for cut in range(len(u) - 1, 2, -1):      # longest known prefix: LM358DR -> LM358
         for fn in _BUILDERS:
             p = fn(u[:cut])

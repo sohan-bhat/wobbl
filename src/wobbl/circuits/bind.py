@@ -161,6 +161,9 @@ def _as_dict(p: Part) -> dict:
 
 def _bind_one(c: Circuit, e: Element, n: dict, part_name: str) -> None:
     L = e.letter
+    if e.meta.get("as") and L != "r":     # a battery, motor or input a schematic already identified
+        e.part, e.kind = dict(e.meta["as"]), e.meta["as"]["kind"]
+        return
     if L == "r":
         e.part, e.kind = _as_dict(resistor(n.get("pkg", ""), n.get("power"), None, n.get("tol", 0.05))), "resistor"
         if e.meta.get("as"):            # a fuse, a pot half or a coil that a schematic turned into a resistor

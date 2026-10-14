@@ -55,7 +55,7 @@ def load(source: str, params: dict, assume=None) -> Circuit:
     if kind in ("kicad", "kicad-netlist"):
         from . import kicad
         text = p.read_text(errors="replace") if p else str(source)
-        c = kicad.parse_schematic(text, p) if kind == "kicad" else kicad.parse_netlist_export(text)
+        c = kicad.parse_schematic(text, p, params) if kind == "kicad" else kicad.parse_netlist_export(text, params)
         c.source = "kicad"
         return c
     from . import describe

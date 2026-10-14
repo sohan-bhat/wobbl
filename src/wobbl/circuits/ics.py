@@ -18,7 +18,8 @@ from .parts import Part, _g, builder
 
 # port aliases: how symbol pin names map onto subcircuit ports
 ALIASES = {
-    "in": ("vi", "vin", "in", "input", "vin+", "ip"), "out": ("vo", "vout", "out", "output", "~", "o", "op"),
+    "in": ("vi", "vin", "in", "input", "vin+", "ip"), "out": ("vo", "vout", "out", "output", "~", "o", "op", "q"),
+    "vin": ("vin", "vcc", "vdd", "in", "v_in", "vi"),
     "gnd": ("gnd", "com", "adj/gnd", "gnd/adj", "0v", "vss", "gnd_pad", "ep", "pad"), "adj": ("adj", "fb"),
     "inp": ("+", "in+", "+in", "non-inv", "noninv", "v_in+", "inp", "vin+"),
     "inn": ("-", "in-", "-in", "inv", "v_in-", "inn", "vin-"),
@@ -26,7 +27,7 @@ ALIASES = {
     "trig": ("tr", "trig", "trigger", "~{tr}"), "reset": ("r", "reset", "~{r}", "~{reset}", "rst"),
     "ctrl": ("cv", "ctrl", "cont", "control", "co"), "thres": ("thr", "thres", "threshold", "th"),
     "disch": ("dis", "disch", "discharge"), "bat": ("bat", "vbat", "batt", "bat+"),
-    "prog": ("prog", "iset", "rprog"), "k": ("k", "cathode", "c"), "a": ("a", "anode"), "ref": ("ref", "r", "vref"),
+    "prog": ("prog", "iset", "rprog"), "stat": ("stat", "chrg", "~{chrg}", "status"), "k": ("k", "cathode", "c"), "a": ("a", "anode"), "ref": ("ref", "r", "vref"),
     "c": ("c", "collector"), "e": ("e", "emitter"),
 }
 
@@ -239,11 +240,13 @@ def charger(name: str) -> Part | None:
     k, vfloat, imax, vinmin, vabs, iq, thja, treg, pkg = CHARGERS[key]
     m = f"U_{key}"
     # PROG is held at 1 V, and the charge current is k times the current out of it, tapering at the float voltage
-    text = (f".subckt {m} vin gnd bat prog\nVp pi gnd 1\nVs pi prog 0\n"
+    # STAT (CHRG on a TP4056) sinks to ground through about 30 ohm while it charges, so a status LED lights
+    text = (f".subckt {m} vin gnd bat prog stat\nVp pi gnd 1\nVs pi prog 0\n"
             f"B1 vin bat I = min({imax}, {k}*max(0, I(Vs))) * max(0, min(1, ({vfloat}-V(bat,gnd))/0.02)) * "
-            f"max(0, min(1, (V(vin,bat)-0.05)/0.05))\nIq vin gnd {_g(iq)}\n.ends")
+            f"max(0, min(1, (V(vin,bat)-0.05)/0.05))\nIq vin gnd {_g(iq)}\n"
+            f"Bst stat gnd I = max(0, min(0.025, V(stat,gnd)/30)) * max(0, min(1, ({vfloat}-V(bat,gnd))/0.02))\n.ends")
     return Part(name, "charger", {"vin_V": vabs, "iout_A": imax, "theta_ja": thja, "tj_max_C": 150}, "x", m, text,
-                ("vin", "gnd", "bat", "prog"),
+                ("vin", "gnd", "bat", "prog", "stat"),
                 source=f"{key} datasheet: charge current {k} V over the PROG resistor, {vfloat} V float, up to "
                        f"{imax:g} A, thermal regulation at {treg} C, {pkg}",
                 params={"k": k, "vfloat": vfloat, "vin_min": vinmin, "t_reg": treg})
