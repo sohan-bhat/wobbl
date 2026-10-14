@@ -50,7 +50,8 @@ async function mount(host, opt = {}) {
     for (const [i, r] of S.readouts.entries()) {
       const v = series(r.values, a, b, k), e = ui.ro[i];
       e.v.textContent = fmt(v, r.digits);
-      e.box.classList.toggle('over', r.limit !== undefined && v > r.limit);
+      const lim = r.limits ? series(r.limits, a, b, k) : r.limit;
+      e.box.classList.toggle('over', lim !== undefined && v > lim + 1e-12);
       ui.vals[r.name] = `${fmt(v, r.digits)}${r.unit ? ' ' + r.unit : ''}`;
     }
     ui.time.textContent = `${tl.label || 'frame'} ${fmt(t, 4)}${tl.unit ? ' ' + tl.unit : ''}`;

@@ -49,6 +49,8 @@ class NonlinearOutcome(GenericOutcome):
         Path(self.report).write_text(html, encoding="utf-8")
         (out / "summary.txt").write_text(self.text() + "\n", encoding="utf-8")
         self.save(out / "outcome.json")
+        from ..viz.embed import after_report
+        after_report(out)
         return self
 
 

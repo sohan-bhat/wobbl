@@ -171,12 +171,15 @@ class Scene:
         return self
 
     def readout(self, name: str, values, *, unit: str = "", digits: int = 3, limit=None) -> "Scene":
-        """A named number per frame that ticks with playback, such as load, peak stress or chamber pressure."""
+        """A named number per frame that ticks with playback, such as load, peak stress or chamber pressure. Above
+        limit (one number, or one per frame such as a motor's torque at its speed) it shows in red."""
         v = np.asarray(values, float).ravel()
         if len(v) != self.n:
             raise ValueError(f"readout {name!r}: {len(v)} values for {self.n} frames")
         d = {"name": name, "unit": unit, "digits": digits, "v": v}
-        if limit is not None:
+        if limit is not None and np.ndim(limit):
+            d["lim"] = np.asarray(limit, float).ravel()
+        elif limit is not None:
             d["limit"] = _f(limit)
         self.readouts.append(d)
         return self
@@ -235,8 +238,8 @@ class Scene:
         h = {"format": "wobbl-scene", "version": VERSION, **self.head,
              "timeline": {"frames": int(len(keep)), "t": _fl(self.t[keep], 7), **self.tl},
              "camera": self.cam, "fields": fields, "objects": objs,
-             "readouts": [{**{k: v for k, v in r.items() if k != "v"}, "values": _fl(r["v"][keep], 5)}
-                          for r in self.readouts],
+             "readouts": [{**{k: v for k, v in r.items() if k not in ("v", "lim")}, "values": _fl(r["v"][keep], 5),
+                           **({"limits": _fl(r["lim"][keep], 5)} if "lim" in r else {})} for r in self.readouts],
              "events": sorted(self.events, key=lambda e: e["t"] if e["t"] is not None else 0),
              "labels": self.labels, "notes": self.notes, "buffers": enc.bufs}
         if self.result:

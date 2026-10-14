@@ -108,4 +108,6 @@ class GenericOutcome:
         (out / "summary.txt").write_text(self.text() + evidence_text(out) + "\n", encoding="utf-8")
         self.workdir = str(out)
         self.save(out / "outcome.json")
+        from .viz.embed import after_report
+        after_report(out)
         return self
