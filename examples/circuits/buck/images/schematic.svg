@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480" role="img" aria-label="Schematic of Buck converter power stage, open loop at the steady state duty cycle, drawn from the netlist." font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+<title>Schematic of Buck converter power stage, open loop at the steady state duty cycle, drawn from the netlist.</title>
+<defs>
+</defs>
+<rect width="640" height="480" fill="#0e1011"/>
+<text x="24" y="32" font-size="10.5" fill="#9ca099" font-weight="500" letter-spacing="1.3">SCHEMATIC</text>
+<text x="110.4" y="32" font-size="12" fill="#c9ccc5">Buck converter power stage, open loop at the steady state </text>
+<g transform="translate(75.9 187.1) scale(0.948)">
+<path d="M0 0H510M0 220H510" stroke="#b9bdb6" stroke-width="2" fill="none"/>
+<path d="M255 220v8M243 228h24M248 233h14M252.5 238h5" stroke="#b9bdb6" stroke-width="2" fill="none" stroke-linecap="round"/>
+<g transform="translate(0 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H93M127 0H220" stroke="#b9bdb6"/>
+<circle cx="110" r="17"/>
+<path d="M97 0h8M101 -4v8M119 -4v8" stroke-width="1.6"/>
+</g>
+<g transform="translate(0 0) rotate(0)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H69M101 0H170" stroke="#b9bdb6"/>
+<circle cx="69" r="2.6" fill="#f2f2ee"/>
+<circle cx="101" r="2.6" fill="#f2f2ee"/>
+<path d="M69 0L99 -11"/>
+<path d="M85 -6V-26" stroke-dasharray="3 3" stroke-width="1.4"/>
+</g>
+<g transform="translate(170 0) rotate(0)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H61M109 0H170" stroke="#b9bdb6"/>
+<path d="M61 0a6 6 0 0 1 12 0a6 6 0 0 1 12 0a6 6 0 0 1 12 0a6 6 0 0 1 12 0"/>
+</g>
+<g transform="translate(170 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H101M119 0H220" stroke="#b9bdb6"/>
+<path d="M119 -10L101 0L119 10Z" fill="#f2f2ee"/>
+<path d="M101 -10V10"/>
+</g>
+<circle cx="170" cy="0" r="3.6" fill="#b9bdb6"/>
+<circle cx="170" cy="220" r="3.6" fill="#b9bdb6"/>
+<g transform="translate(340 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H50M60 0H110" stroke="#b9bdb6"/>
+<path d="M50 -14V14M60 -14V14"/>
+</g>
+<g transform="translate(340 110) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H31M79 0H110" stroke="#b9bdb6"/>
+<path d="M31 0L35 -7L39 7L43 -7L47 7L51 -7L55 7L59 -7L63 7L67 -7L71 7L75 -7L79 0"/>
+</g>
+<circle cx="340" cy="0" r="3.6" fill="#b9bdb6"/>
+<circle cx="340" cy="220" r="3.6" fill="#b9bdb6"/>
+<g transform="translate(510 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H86M134 0H220" stroke="#b9bdb6"/>
+<path d="M86 0L90 -7L94 7L98 -7L102 7L106 -7L110 7L114 -7L118 7L122 -7L126 7L130 -7L134 0"/>
+</g>
+<path d="M85 -26L85 -66L55 -66" stroke="#b9bdb6" stroke-width="2" fill="none"/>
+<g transform="translate(55 -66) rotate(180)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H18M52 0H70" stroke="#b9bdb6"/>
+<circle cx="35" r="17"/>
+<path d="M26 5H31V-5H38V5H44" stroke-width="1.6" transform="rotate(-180 35 0)"/>
+</g>
+<path d="M-15 -66v10" stroke="#b9bdb6" stroke-width="2"/>
+<path d="M-15 -56v8M-27 -48h24M-22 -43h14M-17.5 -38h5" stroke="#b9bdb6" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="-26" y="102" font-size="13" fill="#f2f2ee" text-anchor="end" font-weight="600">V1</text>
+<text x="-26" y="118" font-size="12" fill="#ffd400" text-anchor="end">12 V</text>
+<text x="85" y="30" font-size="13" fill="#f2f2ee" text-anchor="middle" font-weight="600">S1</text>
+<text x="85" y="46" font-size="12" fill="#ffd400" text-anchor="middle">on 50 mΩ</text>
+<text x="255" y="30" font-size="13" fill="#f2f2ee" text-anchor="middle" font-weight="600">L1</text>
+<text x="255" y="46" font-size="12" fill="#ffd400" text-anchor="middle">10 µH</text>
+<text x="194" y="102" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">D1</text>
+<text x="194" y="118" font-size="12" fill="#ffd400" text-anchor="start">SCHOTTKY</text>
+<text x="364" y="47" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">C1</text>
+<text x="364" y="63" font-size="12" fill="#ffd400" text-anchor="start">22 µF</text>
+<text x="364" y="157" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">R2</text>
+<text x="364" y="173" font-size="12" fill="#ffd400" text-anchor="start">10 mΩ</text>
+<text x="534" y="102" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">R1</text>
+<text x="534" y="118" font-size="12" fill="#ffd400" text-anchor="start">2.5 Ω</text>
+<text x="99" y="-72" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">VG</text>
+<text x="99" y="-56" font-size="12" fill="#ffd400" text-anchor="start">pulse 0 to 5 V</text>
+<text x="99" y="-41" font-size="12" fill="#c9ccc5" text-anchor="start">500 kHz, 44% on</text>
+<text x="8" y="-14" font-size="11" fill="#c9ccc5">vin 12 V</text>
+<text x="178" y="-14" font-size="11" fill="#9ca099">sw</text>
+<text x="348" y="-14" font-size="11" fill="#c9ccc5">out 5.07 V</text>
+</g>
+</svg>

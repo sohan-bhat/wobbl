@@ -16,5 +16,5 @@ Assumptions:
   - Switch on resistance 0.05 ohm, Schottky catch diode.
   - Capacitor ESR 10 mohm, no ESL.
 
-Images: waveform: images/waveform.png
+Images: waveform: images/waveform.png, setup: images/setup.svg, schematic: images/schematic.svg
 Report: report.html
