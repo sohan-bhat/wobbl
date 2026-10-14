@@ -162,9 +162,12 @@ def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
             f.write(f"*SOLID SECTION, ELSET={elset}, MATERIAL=MAT{k + 1}\n")
         for name, dof, kk in spring_sets:
             f.write(f"*SPRING, ELSET={name}\n{dof}\n{kk:.10g}\n")
-        for k, r in enumerate(sm.rigid):
-            ref, rot = rigid[r.name]
-            f.write(f"*RIGID BODY, NSET=RB{k + 1}, REF NODE={ref + 1}, ROT NODE={rot + 1}\n")
+        if any(s.nlgeom for s in model.steps):
+            for k, r in enumerate(sm.rigid):
+                ref, rot = rigid[r.name]
+                f.write(f"*RIGID BODY, NSET=RB{k + 1}, REF NODE={ref + 1}, ROT NODE={rot + 1}\n")
+        else:
+            _rigid_equations(f, sm, rigid)
         for k, p in enumerate(model.pretension):
             nv = np.asarray(p.normal, float) / np.linalg.norm(p.normal)
             f.write(f"*PRE-TENSION SECTION, SURFACE=PT{k + 1}, NODE={pre_nodes[p.name] + 1}\n"
@@ -192,6 +195,29 @@ def _surface(f, name: str, mesh, mask: np.ndarray):
     f.write(f"*SURFACE, NAME={name}, TYPE=ELEMENT\n")
     for e, fc in zip(mesh.tri_elem[mask], mesh.tri_face[mask]):
         f.write(f"{int(e) + 1},S{int(fc)}\n")
+
+
+def _rigid_equations(f, sm: StaticModel, rigid: dict):
+    """Rigid attachments with small rotations, u = u_ref + theta x r for every attached node.
+
+    CalculiX's *RIGID BODY turns with finite rotations in any nonlinear run, plasticity included. Under small
+    deflection theory that is inconsistent with the part it holds: on a bent bar the reactions fell 3.5% short of the
+    load by collapse. Linear equations keep the attachment as small as the rest of the model, as in a linear solve.
+    """
+    rows = []
+    for r in sm.rigid:
+        ref, rot = rigid[r.name]
+        rr = sm.mesh.X[r.nodes] - np.asarray(r.ref_point, float)
+        for i, (x, y, z) in zip(r.nodes, rr):
+            # (theta x r) = (ty z - tz y, tz x - tx z, tx y - ty x)
+            for d, terms in ((1, ((rot, 2, -z), (rot, 3, y))), (2, ((rot, 3, -x), (rot, 1, z))),
+                             (3, ((rot, 1, -y), (rot, 2, x)))):
+                t = [(int(i), d, 1.0), (ref, d, -1.0)] + [(n, dd, c) for n, dd, c in terms if abs(c) > 1e-12]
+                rows.append(t)
+    if rows:
+        f.write("*EQUATION\n")
+        for t in rows:
+            f.write(f"{len(t)}\n" + ",".join(f"{n + 1},{d},{c:.10g}" for n, d, c in t) + "\n")
 
 
 def _write_equations(f, sm: StaticModel):
@@ -253,22 +279,15 @@ def _write_step(f, model: NonlinearModel, s: Step, prev: float, rigid: dict, pre
             f.write(f"{name},{dof},{dof},{val:.10g}\n")
     if s.lock:
         f.write("*BOUNDARY, FIXED\n" + "".join(f"{i + 1},1,1\n" for i in pre_nodes.values()))
-    F = sm.nodal_forces()
+    F = sm.nodal_forces() + rigid_as_nodal(sm)
     rows = np.nonzero(np.abs(F).max(1) > 0)[0]
-    loaded = len(rows) or sm.rigid or (s.preload and model.pretension) or (s.lock and model.pretension)
+    loaded = len(rows) or (s.preload and model.pretension) or (s.lock and model.pretension)
     if loaded:
         f.write("*CLOAD\n")
         for i in rows:
             for d in range(3):
                 if F[i, d] != 0.0:
                     f.write(f"{i + 1},{d + 1},{s.factor * F[i, d]:.10e}\n")
-        for r in sm.rigid:
-            ref, rot = rigid[r.name]
-            for d in range(3):
-                if r.force[d] != 0:
-                    f.write(f"{ref + 1},{d + 1},{s.factor * r.force[d]:.10e}\n")
-                if r.moment[d] != 0:
-                    f.write(f"{rot + 1},{d + 1},{s.factor * r.moment[d]:.10e}\n")
         for p in model.pretension:
             # the preload pulls the section in its own step; once locked, the section keeps its length and the
             # force on its node is released
@@ -304,6 +323,25 @@ def _write_step(f, model: NonlinearModel, s: Step, prev: float, rigid: dict, pre
 
 
 _PRE_SET = "NPRETENSION"
+
+
+def rigid_as_nodal(sm: StaticModel) -> np.ndarray:
+    """The force and moment on each rigid attachment as forces on the nodes it holds.
+
+    In a large deflection run the rotation node of a *RIGID BODY carries finite rotations, so a moment put on it
+    stops being the physical moment once the attachment turns. Forces on the attached nodes keep the resultant force
+    and moment exactly whichever way the attachment is modeled.
+    """
+    F = np.zeros((sm.mesh.n_nodes, 3))
+    for r in sm.rigid:
+        x = sm.mesh.X[r.nodes]
+        c = x.mean(0)
+        rr = x - c
+        M = np.asarray(r.moment, float) + np.cross(np.asarray(r.ref_point, float) - c, r.force)
+        J = (np.einsum("ij,ij->i", rr, rr)[:, None, None] * np.eye(3)[None] - np.einsum("ij,ik->ijk", rr, rr)).sum(0)
+        theta = np.linalg.lstsq(J, M, rcond=None)[0]
+        F[r.nodes] += np.asarray(r.force, float) / len(r.nodes) + np.cross(theta, rr)
+    return F
 
 
 # ---------------------------------------------------------------------------------------------------- running

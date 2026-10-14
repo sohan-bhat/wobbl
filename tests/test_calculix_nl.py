@@ -70,6 +70,29 @@ def test_contact_springs_and_pretension_are_written(bar, tmp_path):
     assert f"*BOUNDARY, FIXED\n{node},1,1\n" in lock and f"{node},1,0.\n" in lock
 
 
+def test_rigid_attachments_stay_small_unless_a_step_is_large_deflection(bar, tmp_path):
+    from wobbl.fe import RigidCoupling
+
+    tip = np.nonzero(np.abs(bar.X[:, 0] - 200) < 1e-6)[0]
+    for nlgeom in (False, True):
+        m = _model(bar, [nl.Step(1.0, nlgeom=nlgeom)])
+        m.static.forces = None
+        m.static.rigid = [RigidCoupling("load1", tip, np.array([200.0, 10, 5]), np.zeros(3), np.array([0, 5e4, 0]))]
+        nl.write_nonlinear_inp(tmp_path / "r.inp", m)
+        deck = (tmp_path / "r.inp").read_text()
+        assert ("*RIGID BODY" in deck) == nlgeom
+        assert (deck.count("*EQUATION") == 1) != nlgeom
+        # the moment reaches the part as forces on the attached nodes, whose moment is exactly the one asked for
+        cload = deck.split("*CLOAD\n")[1].split("*")[0].strip().splitlines()
+        F = np.zeros((bar.n_nodes, 3))
+        for ln in cload:
+            i, d, v = ln.split(",")
+            F[int(i) - 1, int(d) - 1] = float(v)
+        c = bar.X[tip].mean(0)
+        assert np.allclose(F.sum(0), 0, atol=1e-6)
+        assert np.allclose(np.cross(bar.X - c, F).sum(0), [0, 5e4, 0], rtol=1e-6)
+
+
 def test_read_sta_counts_finished_increments_and_every_iteration(tmp_path):
     (tmp_path / "j.sta").write_text(
         "SUMMARY OF JOB INFORMATION\n  STEP      INC     ATT  ITRS     TOT TIME     STEP TIME      INC TIME\n"
