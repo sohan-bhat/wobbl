@@ -47,9 +47,29 @@ def test_registry_probes_and_keeps_no_secrets(tmp_path, monkeypatch):
     m = remote.machines()["box"]
     assert m.name == "box" and m.cores == entry["cores"] and m.ram == entry["ram"]
     saved = json.loads((tmp_path / "home" / "remotes.json").read_text())
-    assert set(saved["box"]) <= {"host", "root", "port", "os", "cores", "ram", "free", "ccx", "python"}
+    assert set(saved["box"]) <= {"host", "root", "port", "os", "cores", "ram", "free", "ccx", "python", "wobbl"}
     with pytest.raises(remote.RemoteError, match="wobbl remote add"):
         remote.get("other")
     assert remote.remove("box") and not remote.remove("box")
     with pytest.raises(remote.RemoteError):
         remote.add("bad name!", "local:/tmp")
+
+
+@posix
+def test_a_result_folder_comes_back_without_its_work_files(tmp_path):
+    class TarOverShell(remote.LocalTransport):
+        """Runs the same tar stream an SSH remote uses, in a local folder."""
+        get_dir = remote.Transport.get_dir
+
+        def argv(self, command):
+            return ["sh", "-c", f"cd {self.root} && {command}"]
+
+    for t in (remote.LocalTransport(tmp_path / "far"), TarOverShell(tmp_path / "far")):
+        t.check("mkdir -p j/result/work j/result/images && echo 1 > j/result/outcome.json && "
+                "echo big > j/result/work/static.frd && echo png > j/result/images/a.png")
+        dest = tmp_path / f"back_{type(t).__name__}"
+        t.get_dir("j/result", dest, exclude=("work",))
+        assert (dest / "outcome.json").read_text() == "1\n" and (dest / "images" / "a.png").exists()
+        assert not (dest / "work").exists()
+        with pytest.raises(remote.RemoteError):
+            t.get_dir("j/none", tmp_path / "x")

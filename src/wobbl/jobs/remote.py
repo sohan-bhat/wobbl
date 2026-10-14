@@ -4,10 +4,10 @@ Wobbl keeps a name, a host as ssh understands it and a folder for jobs in ~/.wob
 else. Keys, passwords and agents stay with ssh itself, so Wobbl never sees or stores a credential, and every
 command runs with BatchMode so ssh fails rather than prompting.
 
-A job on a remote needs only a POSIX shell and the solver there. Wobbl sends the deck and its includes, starts
-the solver under nohup so it outlives the connection and the laptop's sleep, reads the small status files back
-when asked and fetches the compact results at the end, leaving the full result file on the remote until it is
-wanted.
+A job on a remote needs only a POSIX shell and what it runs there, CalculiX for a deck or Wobbl itself for any
+Wobbl command of any domain. Wobbl sends the input files, starts the run under nohup so it outlives the
+connection and the laptop's sleep, reads the small status files back when asked and fetches the compact results
+at the end, leaving the large solver files on the remote until they are wanted.
 
 LocalTransport runs every command in a folder on this machine the way ssh runs it on the remote, with the same
 shell, paths and copies. The tests drive the whole remote flow through it, and 'wobbl remote add NAME
@@ -19,6 +19,7 @@ import json
 import shlex
 import shutil
 import subprocess
+import tarfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -30,6 +31,7 @@ PROBE = ("echo os=$(uname -s); "
          "2>/dev/null || echo 0); "
          "echo ccx=$(command -v ccx || command -v ccx_2.23 || ls $HOME/.wobbl/env/bin/ccx 2>/dev/null); "
          "echo python=$(command -v python3); "
+         "echo wobbl=$(command -v wobbl || ls $HOME/.local/bin/wobbl 2>/dev/null); "
          "echo free=$(df -Pk . | awk 'NR==2 {print $4*1024}')")
 
 
@@ -49,6 +51,30 @@ class Transport(ABC):
 
     @abstractmethod
     def get(self, remote: str, local: Path): ...
+
+    def get_dir(self, remote: str, local: Path, exclude: tuple[str, ...] = ()):
+        """A whole folder, leaving out the named entries at its top, streamed as one tar archive."""
+        ex = " ".join(f"--exclude={shlex.quote('./' + e)}" for e in exclude)
+        p = subprocess.Popen(self.argv(f"tar cf - {ex} -C {shlex.quote(remote)} ."), stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        Path(local).mkdir(parents=True, exist_ok=True)
+        try:
+            with tarfile.open(fileobj=p.stdout, mode="r|") as tf:
+                try:
+                    tf.extractall(local, filter="data")
+                except TypeError:  # Python before 3.12 has no extraction filter, so check each member by hand
+                    for m in tf:
+                        if m.name.startswith(("/", "..")) or ".." in Path(m.name).parts or m.issym() or m.islnk():
+                            continue
+                        tf.extract(m, local)
+        except tarfile.ReadError:
+            pass
+        err = p.stderr.read().decode(errors="replace") if p.stderr else ""
+        if p.wait() != 0:
+            raise RemoteError(f"copying {remote} from {self.name} failed ({err.strip()[:300]})")
+
+    def argv(self, command: str) -> list[str]:
+        return ["sh", "-c", command]
 
     def read(self, remote: str, tail: int = 0) -> str:
         """A small text file, or its last ``tail`` bytes. Empty when it does not exist yet."""
@@ -71,8 +97,17 @@ class LocalTransport(Transport):
         self.name = f"local:{self.root}"
 
     def run(self, command: str, timeout: float = 60.0) -> subprocess.CompletedProcess:
+        # a session of its own, as an SSH connection has, so a job's process group never holds this process
         self.root.mkdir(parents=True, exist_ok=True)
-        return subprocess.run(["sh", "-c", command], cwd=self.root, capture_output=True, text=True, timeout=timeout)
+        return subprocess.run(["sh", "-c", command], cwd=self.root, capture_output=True, text=True, timeout=timeout,
+                              start_new_session=True)
+
+    def get_dir(self, remote: str, local: Path, exclude: tuple[str, ...] = ()):
+        src = self.root / remote
+        if not src.is_dir():
+            raise RemoteError(f"{remote} is not a folder on {self.name}")
+        shutil.copytree(src, local, dirs_exist_ok=True,
+                        ignore=lambda d, names: [n for n in names if Path(d) == src and n in exclude])
 
     def put(self, local: Path, remote: str):
         dest = self.root / remote
@@ -101,6 +136,9 @@ class SSHTransport(Transport):
 
     def _opts(self) -> list[str]:
         return ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-o", "ServerAliveInterval=30"]
+
+    def argv(self, command: str) -> list[str]:
+        return self.ssh_argv(command)
 
     def ssh_argv(self, command: str) -> list[str]:
         root = shlex.quote(self.root)
@@ -178,11 +216,11 @@ def probe(t: Transport) -> dict:
         except ValueError:
             return 0.0
     return {"os": out.get("os", ""), "cores": max(1, int(num("cores"))), "ram": num("ram"), "free": num("free"),
-            "ccx": out.get("ccx", ""), "python": out.get("python", "")}
+            "ccx": out.get("ccx", ""), "python": out.get("python", ""), "wobbl": out.get("wobbl", "")}
 
 
 def add(name: str, host: str, root: str = "wobbl-jobs", port: int | None = None, ccx: str = "",
-        check: bool = True) -> dict:
+        check: bool = True, wobbl: str = "") -> dict:
     """Register a remote, probing it so estimates know its cores and memory."""
     if not name.replace("-", "").replace("_", "").isalnum():
         raise RemoteError("a remote name is letters, digits, - and _")
@@ -191,6 +229,8 @@ def add(name: str, host: str, root: str = "wobbl-jobs", port: int | None = None,
         entry.update(probe(transport(entry)))
     if ccx:
         entry["ccx"] = ccx
+    if wobbl:
+        entry["wobbl"] = wobbl
     cfg = load()
     cfg[name] = entry
     save(cfg)
