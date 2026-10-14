@@ -101,3 +101,36 @@ def test_fatigue_data_for_custom_and_modified_materials():
     assert fatigue_data(resolve_material("pla:yield=40")).strength == pytest.approx(12.5 * 40 / 50)
     assert fatigue_data(get_material("copper")) is None
     assert all(f.source for f in FATIGUE.values())
+
+
+def test_rainflow_matches_the_astm_e1049_example():
+    """ASTM E1049-85 Fig. 6 and Table 4: the history -2, 1, -3, 5, -1, 3, -4, 4, -2 counts to ranges 3 (half a
+    cycle), 4 (one and a half), 6 (half), 8 (one) and 9 (half)."""
+    from collections import Counter
+
+    from wobbl.life.fatigue import rainflow
+
+    c = Counter()
+    for rng, _, n in rainflow([-2, 1, -3, 5, -1, 3, -4, 4, -2]):
+        c[rng] += n
+    assert dict(c) == {3.0: 0.5, 4.0: 1.5, 6.0: 0.5, 8.0: 1.0, 9.0: 0.5}
+
+
+def test_history_blocks_keep_every_cycle_and_the_worst_range(tmp_path):
+    import numpy as np
+
+    from wobbl.life.fatigue import history_blocks, read_history, reversals
+
+    x = 1.0 + np.sin(np.linspace(0, 20 * np.pi, 4001)) + 0.3 * np.sin(np.linspace(0, 140 * np.pi, 4001))
+    blocks = history_blocks(x, 50.0)
+    from wobbl.life.fatigue import rainflow
+    cyc = rainflow(x)
+    assert sum(b.cycles for b in blocks) == pytest.approx(sum(n for r, _, n in cyc if r > 0))
+    assert max(b.amplitude for b in blocks) == pytest.approx(50.0 * max(r for r, _, _ in cyc) / 2)
+    assert len(reversals([0, 1, 1, 2, 1, 1, 0])) == 3
+    f = tmp_path / "loads.csv"
+    f.write_text("time,load\n0,0\n0.1,1.2\n0.2,-0.4\n0.3,0.9\n")
+    assert list(read_history(str(f))) == [0, 1.2, -0.4, 0.9]
+    assert list(read_history("0, 1, -0.5 0.8")) == [0, 1, -0.5, 0.8]
+    with pytest.raises(ValueError):
+        read_history("nothing here")

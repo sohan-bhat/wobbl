@@ -44,6 +44,8 @@ class FatigueStudy:
     mean_model: str = "goodman"
     target_sf: float | None = None
     question: str = ""
+    history: str = ""             # a load history to rainflow count, a file or inline numbers: multiples of the
+    #                               studied load for a strength result, nominal MPa for stresses given directly
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -108,13 +110,15 @@ def run_fatigue(study: FatigueStudy, out_dir: str | Path, progress=None) -> Life
     # the stress the part sees at the notch: a finite element peak already holds Kt, so it is scaled by Kf / Kt;
     # nominal stresses given directly are multiplied by Kf
     notch = (kf / kt if src["local"] else kf) if kt else 1.0
+    src["notch"] = notch
     blocks = _blocks(study, src, notch)
     target = study.target_sf or mat.recommended_sf
     n_req = count(study.cycles)
     model = study.mean_model
     D, lives = F.damage(blocks, curve, model)
-    repeats = study.repeats if study.blocks else 1.0
-    single = len(blocks) == 1 and not study.blocks and not src.get("spectrum")
+    duty = bool(study.blocks or study.history)
+    repeats = study.repeats if duty else 1.0
+    single = len(blocks) == 1 and not duty and not src.get("spectrum")
     if single:
         b = blocks[0]
         life = lives[0]
@@ -179,11 +183,11 @@ def run_fatigue(study: FatigueStudy, out_dir: str | Path, progress=None) -> Life
 # --------------------------------------------------------------------------------------------- sources
 def _source(study: FatigueStudy) -> dict:
     if not study.source:
-        if not study.material or not study.amplitude:
+        if not study.material or not (study.amplitude or study.history):
             raise ValueError("give a strength or vibration result folder, or --material with --amplitude (and "
-                             "--mean) for stresses you already know")
+                             "--mean) or a --history in MPa for stresses you already know")
         mat = resolve_material(study.material)
-        amp = parse_quantity(study.amplitude, "stress").value
+        amp = parse_quantity(study.amplitude, "stress").value if study.amplitude else 1.0
         mean = parse_quantity(study.mean, "stress").value if study.mean else 0.0
         return {"kind": "stresses given", "material": mat, "amplitude": amp, "mean": mean, "local": False,
                 "part": "", "where": "at the stresses given"}
@@ -276,7 +280,18 @@ def _from_vibration(o: dict, st: dict, d: Path, study: FatigueStudy) -> dict:
 
 def _blocks(study: FatigueStudy, src: dict, notch: float) -> list[F.Block]:
     if src.get("spectrum"):
+        if study.history:
+            raise ValueError("a vibration result brings its own cycles, so a load history does not apply to it")
         return [F.Block(b.amplitude * notch, b.mean * notch, b.cycles, b.label) for b in src["spectrum"]]
+    if study.history:
+        if study.blocks:
+            raise ValueError("give either load blocks or a load history, not both")
+        # a strength result's peak stress scales with the load, and stresses given directly are already in MPa
+        scale = (src["peak"] if src["local"] else 1.0) * notch
+        blocks = F.history_blocks(F.read_history(study.history), scale)
+        if not blocks:
+            raise ValueError("the load history never changes, so it makes no fatigue cycles")
+        return blocks
     amp, mean = src["amplitude"] * notch, src["mean"] * notch
     if study.blocks:
         return [F.parse_block(t, amp, mean) for t in study.blocks]
@@ -362,9 +377,7 @@ def _other_peaks(src, blocks, curve, model) -> list[Check]:
 
 def _notch_of(blocks, src) -> float:
     """The factor the notch sensitivity put on the judged peak's stresses (one when there was none)."""
-    if not blocks or not src.get("amplitude"):
-        return 1.0
-    return blocks[0].amplitude / src["amplitude"] if src["amplitude"] > 0 else 1.0
+    return float(src.get("notch", 1.0))
 
 
 def _headline(single, life, need, sf, target, curve, blocks, src, repeats, D) -> str:
@@ -383,7 +396,8 @@ def _headline(single, life, need, sf, target, curve, blocks, src, repeats, D) ->
     if D <= 0:
         return (f"No block reaches the endurance limit{at}, so the duty cycle does no fatigue damage, and the stresses "
                 f"could rise {sf:.2f} times before it would (target {target:g}).")
-    run = "test" if src.get("duration") else "duty cycle"
+    run = "test" if src.get("duration") else "load history" if blocks and blocks[0].label.startswith("history") \
+        else "duty cycle"
     lead = f"The {run} uses" if repeats == 1 else f"{fmt(repeats)} runs of the {run} use"
     return (f"{lead} {100 * D * repeats:.3g}% of the fatigue life{at} (Miner's rule), so it can run about "
             f"{cycles_text(life)} times before cracks start, and the stresses could rise {sf:.2f} times before the "
@@ -403,7 +417,13 @@ def _assumptions(mat, data, curve, model, src, surface, study) -> list[str]:
          f"Mean stress by {model.capitalize()}, with no credit for a compressive mean.",
          "Fatigue lives scatter by a factor of three to ten at the same stress, so the life is an estimate and the "
          "safety factor on stress is the steadier number."]
-    if src["kind"] == "strength result" and study.blocks:
+    if study.history:
+        a.append("The load history is counted by rainflow (ASTM E1049), with each value a multiple of the studied "
+                 "load" if src["kind"] == "strength result" else "The load history is counted by rainflow (ASTM "
+                 "E1049), with each value a nominal stress in MPa")
+        a[-1] += (". Cycles are grouped into a rainflow matrix, each group at its largest range, and the stress field "
+                  "keeps its shape as the load changes, as it does for a linear part.")
+    elif src["kind"] == "strength result" and study.blocks:
         a.append("Each block scales the studied load and cycles it between R times its peak and the peak (or at the "
                  "study's load ratio when the block gives none), and the stress field keeps its shape, as it does "
                  "for a linear part.")

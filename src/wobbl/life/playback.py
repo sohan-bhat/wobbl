@@ -133,17 +133,23 @@ def fatigue_doc(blocks: list, lives: list, repeats: float, single: bool, require
     """Damage over the duty cycle: each block adds n / N in turn, repeated, until the duty is done or D = 1."""
     t, d, label = [0.0], [0.0], []
     total, cycles = 0.0, 0.0
-    runs = int(min(max(1, round(repeats)), 200)) if not single else 1
+    steps = 5 if len(blocks) <= 20 else 1
+    want = max(1, round(repeats)) if not single else 1
+    runs = int(min(want, max(1, 2000 // (len(blocks) * steps))))   # at most about 2000 frames
+    per = [b.cycles / n if n > 0 and np.isfinite(n) else 0.0 for b, n in zip(blocks, lives)]
     for r in range(runs):
-        for b, n in zip(blocks, lives):
-            steps = 5
+        for b, n, dd in zip(blocks, lives, per):
             for k in range(1, steps + 1):
-                dn = b.cycles / steps
-                cycles += dn
-                total += dn / n if n > 0 and np.isfinite(n) else 0.0
+                cycles += b.cycles / steps
+                total += dd / steps
                 t.append(cycles)
                 d.append(total)
                 label.append(b.label or "load")
+    if runs < want:   # the frames stop early, so the last one jumps to the end of the whole duty
+        cycles, total = want * sum(b.cycles for b in blocks), want * sum(per)
+        t.append(cycles)
+        d.append(total)
+        label.append("end of the duty")
     return {"format": "wobbl-playback", "version": 1, "kind": "fatigue",
             "about": "Fatigue damage by Miner's rule as the cycles add up, block after block. A crack is predicted "
                      "to start where the damage reaches one, and lives scatter by a factor of three to ten around it.",

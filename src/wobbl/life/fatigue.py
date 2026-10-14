@@ -20,6 +20,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+import numpy as np
+
 from ..materials import FatigueData, Material
 
 KPSI = 6.894757
@@ -260,3 +262,82 @@ def cycle_stresses(peak: float, ratio: float) -> tuple[float, float]:
     if ratio > 1:
         raise ValueError("the load ratio R = min / max is at most 1 (0 for on and off, -1 for fully reversed)")
     return peak * (1 - ratio) / 2, peak * (1 + ratio) / 2
+
+
+def reversals(series) -> np.ndarray:
+    """The turning points of a load history: plateaus merged and every point that does not change direction dropped."""
+    x = np.asarray(series, float)
+    x = x[np.isfinite(x)]
+    if len(x) < 2:
+        return x
+    x = x[np.concatenate([[True], np.diff(x) != 0])]
+    if len(x) < 3:
+        return x
+    d = np.diff(x)
+    keep = np.concatenate([[True], d[1:] * d[:-1] < 0, [True]])
+    return x[keep]
+
+
+def rainflow(series) -> list[tuple[float, float, float]]:
+    """Rainflow counting by ASTM E1049-85 (5.4.4): (range, mean, count) for each cycle, a count of 0.5 for the half
+    cycles left over at the end."""
+    out, stack = [], []
+    for v in reversals(series):
+        stack.append(float(v))
+        while len(stack) >= 3:
+            x = abs(stack[-1] - stack[-2])
+            y = abs(stack[-2] - stack[-3])
+            if x < y:
+                break
+            if len(stack) == 3:
+                out.append((y, 0.5 * (stack[0] + stack[1]), 0.5))
+                stack.pop(0)
+            else:
+                out.append((y, 0.5 * (stack[-2] + stack[-3]), 1.0))
+                del stack[-3:-1]
+    for a, b in zip(stack, stack[1:]):
+        out.append((abs(b - a), 0.5 * (a + b), 0.5))
+    return out
+
+
+def history_blocks(series, scale: float, bins: int = 32, label: str = "history") -> list[Block]:
+    """A load history counted into blocks: rainflow cycles binned by range and mean (a rainflow matrix), each bin
+    taking its largest range and its mean of means, which keeps the count conservative. ``scale`` turns a history
+    value into MPa."""
+    cyc = [(r, m, c) for r, m, c in rainflow(series) if r > 0]
+    if not cyc:
+        return []
+    r = np.array([c[0] for c in cyc]) * abs(scale)
+    m = np.array([c[1] for c in cyc]) * scale
+    n = np.array([c[2] for c in cyc])
+    ri = np.minimum((r / r.max() * bins).astype(int), bins - 1)
+    span = np.ptp(m)
+    mi = np.minimum(((m - m.min()) / span * bins).astype(int), bins - 1) if span > 0 else np.zeros(len(m), int)
+    out = []
+    for key in sorted(set(zip(ri.tolist(), mi.tolist())), reverse=True):
+        sel = (ri == key[0]) & (mi == key[1])
+        out.append(Block(float(r[sel].max()) / 2, float(m[sel].mean()), float(n[sel].sum()),
+                         f"{label} cycles of {r[sel].max():.3g} MPa range"))
+    return out
+
+
+def read_history(text: str) -> np.ndarray:
+    """A load history from a file (CSV or plain text, the last numeric column of each row) or written inline as
+    numbers separated by commas or spaces."""
+    import re
+    from pathlib import Path
+
+    p = Path(str(text)).expanduser()
+    lines = p.read_text().splitlines() if p.is_file() else [str(text)]
+    vals = []
+    for line in lines:
+        nums = re.findall(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", line)
+        if p.is_file():
+            if nums and not re.search(r"[a-df-zA-DF-Z]", line):
+                vals.append(float(nums[-1]))
+        else:
+            vals += [float(v) for v in nums]
+    if len(vals) < 2:
+        raise ValueError(f"could not read a load history from '{text}'. Give a file with one value per row, or "
+                         "numbers like '0, 1, -0.5, 0.8'")
+    return np.asarray(vals)

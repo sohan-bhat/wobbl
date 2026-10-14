@@ -81,3 +81,24 @@ def test_errors_and_cycle_counts(tmp_path):
     with pytest.raises(ValueError):
         run_fatigue(FatigueStudy(source=str(tmp_path)), tmp_path / "c")
     assert count("2,000,000") == 2e6 and count("5 million") == 5e6 and count("1e7") == 1e7
+
+
+def test_a_load_history_from_a_strength_result_and_in_mpa(tmp_path):
+    d = tmp_path / "mount"
+    d.mkdir()
+    for f in ("outcome.json", "study.json"):
+        shutil.copy(ROOT / "examples" / "cast-motor-mount" / "output" / f, d / f)
+    peak = json.loads((d / "outcome.json").read_text())["governing_MPa"]
+    # three on and off cycles to the studied load and one to 1.2 times it: rainflow finds the big one first
+    o = run_fatigue(FatigueStudy(source=str(d), history="0, 1, 0, 1, 0, 1.2, 0, 1, 0", repeats=1000),
+                    tmp_path / "out")
+    v = o.values
+    big = max(v["blocks"], key=lambda b: b["amplitude_MPa"])
+    assert big["amplitude_MPa"] == pytest.approx(0.6 * peak, rel=1e-6) and big["mean_MPa"] == pytest.approx(0.6 * peak)
+    assert sum(b["cycles"] for b in v["blocks"]) == pytest.approx(4.0)
+    assert "load history" in o.headline and any("rainflow" in a for a in o.assumptions)
+    # the same history in MPa against a material, with no result at all
+    o2 = run_fatigue(FatigueStudy(material="6061-t6", history="0, 80, 0, 80, -80, 80"), tmp_path / "out2")
+    assert max(b["amplitude_MPa"] for b in o2.values["blocks"]) == pytest.approx(80.0)
+    with pytest.raises(ValueError):
+        run_fatigue(FatigueStudy(source=str(d), history="0, 1", blocks=["100% x 10"]), tmp_path / "out3")
