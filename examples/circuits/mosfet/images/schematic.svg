@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480" role="img" aria-label="Schematic of MOSFET conduction with a resistive load, drawn from the netlist." font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+<title>Schematic of MOSFET conduction with a resistive load, drawn from the netlist.</title>
+<defs>
+</defs>
+<rect width="640" height="480" fill="#0e1011"/>
+<text x="24" y="32" font-size="10.5" fill="#9ca099" font-weight="500" letter-spacing="1.3">SCHEMATIC</text>
+<text x="110.4" y="32" font-size="12" fill="#c9ccc5">MOSFET conduction with a resistive load</text>
+<g transform="translate(83.2 144.4) scale(1.080)">
+<path d="M0 0H340M0 220H340" stroke="#b9bdb6" stroke-width="2" fill="none"/>
+<path d="M170 220v8M158 228h24M163 233h14M167.5 238h5" stroke="#b9bdb6" stroke-width="2" fill="none" stroke-linecap="round"/>
+<g transform="translate(0 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H93M127 0H220" stroke="#b9bdb6"/>
+<circle cx="110" r="17"/>
+<path d="M97 0h8M101 -4v8M119 -4v8" stroke-width="1.6"/>
+</g>
+<g transform="translate(0 0) rotate(0)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H61M109 0H170" stroke="#b9bdb6"/>
+<path d="M61 0L65 -7L69 7L73 -7L77 7L81 -7L85 7L89 -7L93 7L97 -7L101 7L105 -7L109 0"/>
+</g>
+<g transform="translate(340 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H39M71 0H110" stroke="#b9bdb6"/>
+<circle cx="39" r="2.6" fill="#f2f2ee"/>
+<circle cx="71" r="2.6" fill="#f2f2ee"/>
+<path d="M39 0L69 11"/>
+<path d="M55 6V26" stroke-dasharray="3 3" stroke-width="1.4"/>
+</g>
+<g transform="translate(340 110) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H38M72 0H110" stroke="#b9bdb6"/>
+<circle cx="55" r="17"/>
+<text x="55" y="5" fill="#f2f2ee" stroke="none" font-size="14" text-anchor="middle" transform="rotate(-90 55 0)">A</text>
+</g>
+<path d="M314 55L274 55" stroke="#b9bdb6" stroke-width="2" fill="none"/>
+<g transform="translate(274 55) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H27M61 0H88" stroke="#b9bdb6"/>
+<circle cx="44" r="17"/>
+<path d="M35 5H40V-5H47V5H53" stroke-width="1.6" transform="rotate(-90 44 0)"/>
+</g>
+<path d="M274 143v8M262 151h24M267 156h14M271.5 161h5" stroke="#b9bdb6" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="-26" y="102" font-size="13" fill="#f2f2ee" text-anchor="end" font-weight="600">V1</text>
+<text x="-26" y="118" font-size="12" fill="#ffd400" text-anchor="end">12 V</text>
+<text x="85" y="30" font-size="13" fill="#f2f2ee" text-anchor="middle" font-weight="600">RL</text>
+<text x="85" y="46" font-size="12" fill="#ffd400" text-anchor="middle">792 mΩ</text>
+<text x="364" y="47" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">S1</text>
+<text x="364" y="63" font-size="12" fill="#ffd400" text-anchor="start">on 8 mΩ</text>
+<text x="364" y="157" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">VS</text>
+<text x="364" y="173" font-size="12" fill="#ffd400" text-anchor="start">0 V, current sense</text>
+<text x="250" y="73" font-size="13" fill="#f2f2ee" text-anchor="end" font-weight="600">VG</text>
+<text x="250" y="89" font-size="12" fill="#ffd400" text-anchor="end">pulse 0 to 10 V</text>
+<text x="250" y="104" font-size="12" fill="#c9ccc5" text-anchor="end">20 kHz, 50% on</text>
+<text x="8" y="-14" font-size="11" fill="#c9ccc5">vbus 12 V</text>
+<text x="348" y="-14" font-size="11" fill="#c9ccc5">d 0.12 V on</text>
+</g>
+</svg>

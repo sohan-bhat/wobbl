@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480" role="img" aria-label="Schematic of LED with series resistor, drawn from the netlist." font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+<title>Schematic of LED with series resistor, drawn from the netlist.</title>
+<defs>
+</defs>
+<rect width="640" height="480" fill="#0e1011"/>
+<text x="24" y="32" font-size="10.5" fill="#9ca099" font-weight="500" letter-spacing="1.3">SCHEMATIC</text>
+<text x="110.4" y="32" font-size="12" fill="#c9ccc5">LED with series resistor</text>
+<g transform="translate(200.9 192.1) scale(1.300)">
+<path d="M0 0H170M0 110H170" stroke="#b9bdb6" stroke-width="2" fill="none"/>
+<path d="M85 110v8M73 118h24M78 123h14M82.5 128h5" stroke="#b9bdb6" stroke-width="2" fill="none" stroke-linecap="round"/>
+<g transform="translate(0 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H38M72 0H110" stroke="#b9bdb6"/>
+<circle cx="55" r="17"/>
+<path d="M42 0h8M46 -4v8M64 -4v8" stroke-width="1.6"/>
+</g>
+<g transform="translate(0 0) rotate(0)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H61M109 0H170" stroke="#b9bdb6"/>
+<path d="M61 0L65 -7L69 7L73 -7L77 7L81 -7L85 7L89 -7L93 7L97 -7L101 7L105 -7L109 0"/>
+</g>
+<g transform="translate(170 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H46M64 0H110" stroke="#b9bdb6"/>
+<path d="M46 -10L64 0L46 10Z" fill="#f2f2ee"/>
+<path d="M64 -10V10"/>
+<path d="M52 13l6 9m-4.5 -0.4 4.5 0.4 0.3 -4.5" stroke="#ffd400" stroke-width="1.5"/>
+<path d="M60 13l6 9m-4.5 -0.4 4.5 0.4 0.3 -4.5" stroke="#ffd400" stroke-width="1.5"/>
+</g>
+<text x="-26" y="47" font-size="13" fill="#f2f2ee" text-anchor="end" font-weight="600">V1</text>
+<text x="-26" y="63" font-size="12" fill="#ffd400" text-anchor="end">5 V</text>
+<text x="85" y="30" font-size="13" fill="#f2f2ee" text-anchor="middle" font-weight="600">R1</text>
+<text x="85" y="46" font-size="12" fill="#ffd400" text-anchor="middle">47 Ω</text>
+<text x="194" y="47" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">D1</text>
+<text x="194" y="63" font-size="12" fill="#ffd400" text-anchor="start">LEDX</text>
+<text x="8" y="-14" font-size="11" fill="#c9ccc5">vin 5 V</text>
+<text x="178" y="-14" font-size="11" fill="#c9ccc5">a 3.27 V</text>
+</g>
+</svg>

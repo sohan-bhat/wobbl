@@ -31,8 +31,12 @@ text-transform:uppercase;letter-spacing:.06em}
 .badge.info{background:rgba(90,169,255,.15);color:var(--info)}.badge.skip{background:#22252a;color:var(--skip)}
 ul.reasons{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
 h2{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:var(--yellow);margin:34px 0 12px}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:20px 0 8px}
 figure{margin:0}
 figure img{width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line);background:#0e0f11}
+figure svg{width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line)}
+figure.drawing{display:inline-block;vertical-align:top;width:calc(50% - 8px);margin-bottom:16px}
+figure.drawing+figure.drawing{margin-left:16px}
 figcaption{color:var(--muted);font-size:13px;margin-top:6px}
 .hero{margin-bottom:16px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
@@ -46,13 +50,14 @@ ol.assume,ul.plain{padding-left:20px}ol.assume li,ul.plain li{margin:4px 0}
 .fix .t{font-weight:700}
 footer{margin-top:40px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:14px}
 pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12px}
-@media (max-width:760px){.verdict{grid-template-columns:1fr}.word{font-size:32px}header{flex-direction:column;
+@media (max-width:760px){figure.drawing{width:100%}figure.drawing+figure.drawing{margin-left:0}
+.verdict{grid-template-columns:1fr}.word{font-size:32px}header{flex-direction:column;
 align-items:flex-start}header .meta{text-align:left}}
 @media print{body{background:#fff;color:#111}.card,.fix,pre{background:#f6f6f6;border-color:#ddd}}
 </style></head>
 <body><main>
 <header><div><h1><span class="brand">WOBBL</span>led</h1><p class="question">Will a blue LED on 5 V with a 47 ohm resistor fry?</p></div>
-<div class="meta">Circuit report<br>2026-10-13 10:56</div></header>
+<div class="meta">Circuit report<br>2026-10-14 01:34</div></header>
 <section class="verdict">
  <div class="card"><div class="word fail">FAILS</div>
   <p class="headline">The LED fries: 36.9 mA through it, above its 30 mA rating (1.2x).</p></div>
@@ -60,6 +65,190 @@ align-items:flex-start}header .meta{text-align:left}}
   <p style="margin:14px 0 0">Confidence <span class="badge high">high</span></p>
   <ul class="reasons"><li>passed hand calculation, power balance</li></ul></div>
 </section>
-<h2>Checks</h2><table><thead><tr><th>status</th><th>check</th><th>result</th></tr></thead><tbody><tr><td class=""><span class="badge pass">pass</span></td><td class="">hand calculation</td><td class="">diode equation solved by hand gives 36.9 mA, ngspice 36.9 mA (5.4e-05% apart); the quick estimate (Vs - Vf)/R is 38.3 mA</td></tr><tr><td class=""><span class="badge pass">pass</span></td><td class="">power balance</td><td class="">supply gives 184 mW = resistor 63.9 mW + LED 120 mW (5.4e-08% apart)</td></tr><tr><td class=""><span class="badge info">info</span></td><td class="">operating limits</td><td class="">LED 36.9 mA of 30 mA; resistor 63.9 mW of 250 mW</td></tr></tbody></table><h2>How to fix it</h2><div class='fix'><div class='t'>Use a 91 ohm resistor</div><div>Gives about 19.8 mA; it dissipates 35.6 mW, so a 0.25 W part is enough.</div></div><h2>Assumptions</h2><ol class='assume'><li>blue LED modeled with the diode equation: 3.2 V at 20 mA, ideality 2.7, series resistance 1.5 ohm.</li><li>Resistor 47 ohm exact, rated 0.25 W.</li><li>Room temperature, steady DC.</li></ol>
-<footer>Made with Wobbl 0.1.0. Solver ngspice 41. Total time 0 s.</footer>
+<figure class="drawing"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480" role="img" aria-label="Bench setup drawn from this run. A 5 V supply drives a blue LED through a 47 ohm resistor on a breadboard, and 36.9 mA flows against its 30 mA rating." font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" data-live="1.8">
+<title>Bench setup drawn from this run. A 5 V supply drives a blue LED through a 47 ohm resistor on a breadboard, and 36.9 mA flows against its 30 mA rating.</title>
+<defs>
+<pattern id="led-grid1" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#15181b"/></pattern>
+<pattern id="led-main2" width="16.5" height="16.5" patternUnits="userSpaceOnUse" x="192.1" y="221.2"><rect x="5.8" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/></pattern>
+<pattern id="led-rail3" width="99" height="16.5" patternUnits="userSpaceOnUse" x="192.1" y="178.2"><rect x="5.8" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/><rect x="22.3" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/><rect x="38.8" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/><rect x="55.3" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/><rect x="71.8" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/></pattern>
+<pattern id="led-rail24" width="99" height="16.5" patternUnits="userSpaceOnUse" x="192.1" y="429.1"><rect x="5.8" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/><rect x="22.3" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/><rect x="38.8" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/><rect x="55.3" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/><rect x="71.8" y="5.8" width="5" height="5" rx="0.8" fill="#77736a"/></pattern>
+<clipPath id="led-rb5"><path d="M35.9 -7.8H39.6C41.3 -7.8 41.8 -6.3 43.5 -6.3H55.5C57.2 -6.3 57.7 -7.8 59.4 -7.8H63.1A7.8 7.8 0 0 1 63.1 7.8H59.4C57.7 7.8 57.2 6.3 55.5 6.3H43.5C41.8 6.3 41.3 7.8 39.6 7.8H35.9A7.8 7.8 0 0 1 35.9 -7.8Z"/></clipPath>
+<linearGradient id="led-l6" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/><stop offset="0.3" stop-color="#ffffff" stop-opacity="0"/><stop offset="0.6" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity="0.35"/></linearGradient>
+<radialGradient id="led-r7"><stop offset="0" stop-color="#3d7bff" stop-opacity="0.95"/><stop offset="0.3" stop-color="#3d7bff" stop-opacity="0.42"/><stop offset="1" stop-color="#3d7bff" stop-opacity="0"/></radialGradient>
+<radialGradient id="led-r8" cx="0.4" cy="0.38" r="0.7"><stop offset="0" stop-color="#9ebdff"/><stop offset="0.6" stop-color="#3d7bff"/><stop offset="1" stop-color="#22448c"/></radialGradient>
+</defs>
+<rect width="640" height="480" fill="#0e1011"/>
+<rect width="640" height="480" fill="url(#led-grid1)"/>
+<rect x="23" y="29" width="176" height="124" rx="7" fill="#000" opacity="0.5"/>
+<rect x="20" y="24" width="176" height="124" rx="7" fill="#1b1e22" stroke="#3b4047"/>
+<rect x="21" y="25" width="174" height="7" rx="6" fill="#24282d"/>
+<text x="32" y="45" font-size="8.5" fill="#9ca099" letter-spacing="1.2">DC POWER SUPPLY</text>
+<rect x="32" y="53" width="110" height="66" rx="3" fill="#07080a" stroke="#30353b"/>
+<text x="116" y="83" font-size="20" fill="#ffd400" text-anchor="end" font-weight="600">5.00</text>
+<text x="121" y="83" font-size="10" fill="#9ca099">V</text>
+<text x="116" y="109" font-size="20" fill="#ffd400" text-anchor="end" font-weight="600" data-series="0 0.004418 0.008469 0.01217 0.01553 0.01857 0.02131 0.02376 0.02594 0.02786 0.02955 0.031 0.03225 0.03331 0.0342 0.03492 0.0355 0.03595 0.03629 0.03653 0.03669 0.03679 0.03684 0.03686 0.03686" data-fmt="3">0.037</text>
+<text x="121" y="109" font-size="10" fill="#9ca099">A</text>
+<circle cx="167" cy="60" r="11" fill="#2b2f35" stroke="#4b5159"/>
+<circle cx="167" cy="60" r="7.5" fill="#353a40"/>
+<path d="M167 60l4.5 -7.8" stroke="#c9ccc5" stroke-width="1.6" stroke-linecap="round"/>
+<circle cx="167" cy="88" r="11" fill="#2b2f35" stroke="#4b5159"/>
+<circle cx="167" cy="88" r="7.5" fill="#353a40"/>
+<path d="M167 88l6.9 5.8" stroke="#c9ccc5" stroke-width="1.6" stroke-linecap="round"/>
+<circle cx="36" cy="134" r="3" fill="#46d17f"/>
+<text x="43" y="137.5" font-size="9" fill="#9ca099">CV</text>
+<circle cx="144" cy="133" r="8.5" fill="#2a2d31" stroke="#17191b"/>
+<circle cx="144" cy="133" r="4.2" fill="#1d2022"/>
+<circle cx="144" cy="133" r="1.6" fill="#0b0b0b"/>
+<circle cx="172" cy="133" r="8.5" fill="#c8342b" stroke="#6e1d18"/>
+<circle cx="172" cy="133" r="4.2" fill="#8c241e"/>
+<circle cx="172" cy="133" r="1.6" fill="#0b0b0b"/>
+<rect x="168" y="176" width="452.1" height="300.3" rx="6" fill="#000" opacity="0.6"/>
+<rect x="164" y="170" width="452.1" height="300.3" rx="6" fill="#e4e0d5" stroke="#c3bdae"/>
+<rect x="163" y="260.1" width="4" height="14.8" fill="#0e1011"/>
+<rect x="163" y="356.2" width="4" height="14.8" fill="#0e1011"/>
+<rect x="173.9" y="312.7" width="432.3" height="14.8" fill="#d6d1c5"/>
+<path d="M185.4 176.9H594.6" stroke="#d0392e" stroke-width="1.6"/>
+<path d="M185.4 212.6H594.6" stroke="#2f62bd" stroke-width="1.6"/>
+<path d="M185.4 427.7H594.6" stroke="#2f62bd" stroke-width="1.6"/>
+<path d="M185.4 463.4H594.6" stroke="#d0392e" stroke-width="1.6"/>
+<rect x="192.1" y="221.2" width="396" height="82.5" fill="url(#led-main2)"/>
+<rect x="192.1" y="336.6" width="396" height="82.5" fill="url(#led-main2)"/>
+<rect x="192.1" y="178.2" width="396" height="33" fill="url(#led-rail3)"/>
+<rect x="192.1" y="429.1" width="396" height="33" fill="url(#led-rail24)"/>
+<g font-size="7" fill="#9a9586" text-anchor="middle">
+<text x="183" y="231.9">a</text>
+<text x="597.1" y="231.9">a</text>
+<text x="183" y="248.4">b</text>
+<text x="597.1" y="248.4">b</text>
+<text x="183" y="264.9">c</text>
+<text x="597.1" y="264.9">c</text>
+<text x="183" y="281.4">d</text>
+<text x="597.1" y="281.4">d</text>
+<text x="183" y="297.9">e</text>
+<text x="597.1" y="297.9">e</text>
+<text x="183" y="347.4">f</text>
+<text x="597.1" y="347.4">f</text>
+<text x="183" y="363.9">g</text>
+<text x="597.1" y="363.9">g</text>
+<text x="183" y="380.4">h</text>
+<text x="597.1" y="380.4">h</text>
+<text x="183" y="396.9">i</text>
+<text x="597.1" y="396.9">i</text>
+<text x="183" y="413.4">j</text>
+<text x="597.1" y="413.4">j</text>
+<text x="200.3" y="221.5">1</text>
+<text x="266.3" y="221.5">5</text>
+<text x="348.8" y="221.5">10</text>
+<text x="431.3" y="221.5">15</text>
+<text x="513.8" y="221.5">20</text>
+</g>
+<g transform="translate(299.3 262.4) rotate(0)">
+<path d="M0 0H99" stroke="#80858c" stroke-width="2.8" stroke-linecap="round"/>
+<path d="M0 0H99" stroke="#d7dade" stroke-width="1.4" stroke-linecap="round"/>
+<path d="M35.9 -7.8H39.6C41.3 -7.8 41.8 -6.3 43.5 -6.3H55.5C57.2 -6.3 57.7 -7.8 59.4 -7.8H63.1A7.8 7.8 0 0 1 63.1 7.8H59.4C57.7 7.8 57.2 6.3 55.5 6.3H43.5C41.8 6.3 41.3 7.8 39.6 7.8H35.9A7.8 7.8 0 0 1 35.9 -7.8Z" fill="#d9bf8f"/>
+<g clip-path="url(#led-rb5)">
+<rect x="35.1" y="-15.7" width="3.2" height="31.3" fill="#f2cf1d"/>
+<rect x="42.9" y="-15.7" width="3.2" height="31.3" fill="#8443c9"/>
+<rect x="48" y="-15.7" width="3.2" height="31.3" fill="#1b1b1b"/>
+<rect x="60" y="-15.7" width="3.2" height="31.3" fill="#c9a645"/>
+</g>
+<path d="M35.9 -7.8H39.6C41.3 -7.8 41.8 -6.3 43.5 -6.3H55.5C57.2 -6.3 57.7 -7.8 59.4 -7.8H63.1A7.8 7.8 0 0 1 63.1 7.8H59.4C57.7 7.8 57.2 6.3 55.5 6.3H43.5C41.8 6.3 41.3 7.8 39.6 7.8H35.9A7.8 7.8 0 0 1 35.9 -7.8Z" fill="url(#led-l6)"/>
+<path d="M35.9 -7.8H39.6C41.3 -7.8 41.8 -6.3 43.5 -6.3H55.5C57.2 -6.3 57.7 -7.8 59.4 -7.8H63.1A7.8 7.8 0 0 1 63.1 7.8H59.4C57.7 7.8 57.2 6.3 55.5 6.3H43.5C41.8 6.3 41.3 7.8 39.6 7.8H35.9A7.8 7.8 0 0 1 35.9 -7.8Z" fill="none" stroke="#000" stroke-opacity="0.3" stroke-width="0.8"/>
+</g>
+<path d="M299.3 186.5L299.3 229.4" fill="none" stroke="#6e1d18" stroke-width="7" stroke-linejoin="round"/>
+<path d="M299.3 186.5L299.3 229.4" fill="none" stroke="#c8352b" stroke-width="5" stroke-linejoin="round"/>
+<path d="M299.3 186.5L299.3 229.4" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-width="1.4" stroke-linejoin="round"/>
+<circle cx="299.3" cy="186.5" r="2.2" fill="#b8bdc3" stroke="#5b574d" stroke-width="0.8"/>
+<circle cx="299.3" cy="229.4" r="2.2" fill="#b8bdc3" stroke="#5b574d" stroke-width="0.8"/>
+<path d="M398.3 410.9L398.3 437.3" fill="none" stroke="#18191c" stroke-width="7" stroke-linejoin="round"/>
+<path d="M398.3 410.9L398.3 437.3" fill="none" stroke="#2b2e33" stroke-width="5" stroke-linejoin="round"/>
+<path d="M398.3 410.9L398.3 437.3" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-width="1.4" stroke-linejoin="round"/>
+<circle cx="398.3" cy="410.9" r="2.2" fill="#b8bdc3" stroke="#5b574d" stroke-width="0.8"/>
+<circle cx="398.3" cy="437.3" r="2.2" fill="#b8bdc3" stroke="#5b574d" stroke-width="0.8"/>
+<circle cx="398.3" cy="320.1" r="85" fill="url(#led-r7)" opacity="1" data-series="0 0.47 0.6507 0.78 0.8812 0.9637 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1" data-attr="opacity"/>
+<g transform="translate(398.3 320.1) rotate(90)">
+<path d="M-28.7 0H-16.8" stroke="#80858c" stroke-width="2.8" stroke-linecap="round"/>
+<path d="M-28.7 0H-16.8" stroke="#d7dade" stroke-width="1.4" stroke-linecap="round"/>
+<path d="M16.8 0H28.7" stroke="#80858c" stroke-width="2.8" stroke-linecap="round"/>
+<path d="M16.8 0H28.7" stroke="#d7dade" stroke-width="1.4" stroke-linecap="round"/>
+<path d="M16.2 9.6A18.8 18.8 0 1 1 16.2 -9.6Z" fill="#2e5cbf" stroke="#1e3e80" stroke-width="0.8"/>
+<circle r="16.2" fill="url(#led-r8)"/>
+<circle r="5.5" fill="#fff" opacity="0.6" data-series="0 0.282 0.3904 0.468 0.5287 0.5782 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6" data-attr="opacity"/>
+<ellipse cx="-5.7" cy="-6.5" rx="4.9" ry="2.7" fill="#fff" opacity="0.6" transform="rotate(-35 -5.7 -6.5)"/>
+</g>
+<path d="M172 133C172 177 233.3 136.5 233.3 186.5" fill="none" stroke="#78201a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M172 133C172 177 233.3 136.5 233.3 186.5" fill="none" stroke="#c8352b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M172 133C172 177 233.3 136.5 233.3 186.5" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M144 133C94 223 120.8 437.3 216.8 437.3" fill="none" stroke="#5d636b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M144 133C94 223 120.8 437.3 216.8 437.3" fill="none" stroke="#2b2e33" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M144 133C94 223 120.8 437.3 216.8 437.3" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<g transform="translate(233.3 186.5) rotate(90)">
+<rect x="-17" y="-3.8" width="14" height="7.6" rx="1" fill="#1c1e21" stroke="#4a4f57" stroke-width="0.8"/>
+<rect x="-3" y="-1" width="4" height="2" fill="#b8bdc3"/>
+</g>
+<g transform="translate(216.8 437.3) rotate(0)">
+<rect x="-17" y="-3.8" width="14" height="7.6" rx="1" fill="#1c1e21" stroke="#4a4f57" stroke-width="0.8"/>
+<rect x="-3" y="-1" width="4" height="2" fill="#b8bdc3"/>
+</g>
+<circle cx="172" cy="133" r="6.5" fill="#c8352b" stroke="#641a16"/>
+<circle cx="144" cy="133" r="6.5" fill="#2b2e33" stroke="#5d636b"/>
+<g fill="none" stroke-linecap="round" stroke-dasharray="0 12" data-flow="98.3" data-k="0 0.12 0.23 0.33 0.421 0.504 0.578 0.645 0.704 0.756 0.802 0.841 0.875 0.904 0.928 0.947 0.963 0.975 0.984 0.991 0.995 0.998 0.999 1 1">
+<path d="M172 133C172 177 233.3 136.5 233.3 186.5L299.3 186.5L299.3 262.4L398.3 262.4L398.3 437.3L216.8 437.3C120.8 437.3 94 223 144 133" stroke="#0e0f11" stroke-width="5.5" stroke-opacity="0.6"/>
+<path d="M172 133C172 177 233.3 136.5 233.3 186.5L299.3 186.5L299.3 262.4L398.3 262.4L398.3 437.3L216.8 437.3C120.8 437.3 94 223 144 133" stroke="#ffd400" stroke-width="3"/>
+</g>
+<circle cx="398.3" cy="320.1" r="32.3" fill="none" stroke="#ff5a4a" stroke-width="1.5" stroke-dasharray="3 3" data-after=""/>
+<g stroke="#ff5a4a" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.8" data-after="" data-drift="1.6">
+<path d="M431.3 316.1c4 -4 -4 -8 0 -12s-4 -8 0 -12"/>
+<path d="M440.3 316.1c4 -4 -4 -8 0 -12s-4 -8 0 -12"/>
+<path d="M449.3 316.1c4 -4 -4 -8 0 -12s-4 -8 0 -12"/>
+</g>
+<rect x="424" y="18" width="196" height="100" rx="3" fill="#0a0b0c" fill-opacity="0.9" stroke="#3a3e45"/>
+<text x="438" y="40" font-size="10.5" fill="#9ca099" font-weight="500" letter-spacing="1.3">LED CURRENT</text>
+<text x="438" y="73" font-size="26" fill="#f2f2ee" font-weight="600" data-series="0 4.418 8.469 12.17 15.53 18.57 21.31 23.76 25.94 27.86 29.55 31 32.25 33.31 34.2 34.92 35.5 35.95 36.29 36.53 36.69 36.79 36.84 36.86 36.86" data-fmt="1 mA">36.9 mA</text>
+<rect x="559" y="27" width="47" height="19" fill="#ff5a4a" data-after=""/>
+<text x="582.5" y="40.5" font-size="11" fill="#0e0f11" text-anchor="middle" font-weight="700" data-after="">FAILS</text>
+<rect x="438" y="86" width="168" height="6" fill="#23272c"/>
+<rect x="438" y="86" width="113.9" height="6" fill="#ffd400" data-series="0 16.78 32.16 46.21 58.98 70.54 80.94 90.24 98.52 105.8 112.2 113.9 113.9 113.9 113.9 113.9 113.9 113.9 113.9 113.9 113.9 113.9 113.9 113.9 113.9" data-attr="width"/>
+<rect x="551.9" y="86" width="26.1" height="6" fill="#ff5a4a" data-series="0 0 0 0 0 0 0 0 0 0 0 3.813 8.563 12.58 15.94 18.68 20.88 22.59 23.88 24.8 25.41 25.79 25.98 26.05 26.06" data-attr="width"/>
+<path d="M551.9 82v14" stroke="#f2f2ee" stroke-width="1.5"/>
+<text x="551.9" y="110" font-size="10" fill="#9ca099" text-anchor="end">30 mA rating</text>
+</svg>
+<figcaption>Bench setup, drawn from this run</figcaption></figure><figure class="drawing"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480" role="img" aria-label="Schematic of LED with series resistor, drawn from the netlist." font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+<title>Schematic of LED with series resistor, drawn from the netlist.</title>
+<defs>
+</defs>
+<rect width="640" height="480" fill="#0e1011"/>
+<text x="24" y="32" font-size="10.5" fill="#9ca099" font-weight="500" letter-spacing="1.3">SCHEMATIC</text>
+<text x="110.4" y="32" font-size="12" fill="#c9ccc5">LED with series resistor</text>
+<g transform="translate(200.9 192.1) scale(1.300)">
+<path d="M0 0H170M0 110H170" stroke="#b9bdb6" stroke-width="2" fill="none"/>
+<path d="M85 110v8M73 118h24M78 123h14M82.5 128h5" stroke="#b9bdb6" stroke-width="2" fill="none" stroke-linecap="round"/>
+<g transform="translate(0 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H38M72 0H110" stroke="#b9bdb6"/>
+<circle cx="55" r="17"/>
+<path d="M42 0h8M46 -4v8M64 -4v8" stroke-width="1.6"/>
+</g>
+<g transform="translate(0 0) rotate(0)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H61M109 0H170" stroke="#b9bdb6"/>
+<path d="M61 0L65 -7L69 7L73 -7L77 7L81 -7L85 7L89 -7L93 7L97 -7L101 7L105 -7L109 0"/>
+</g>
+<g transform="translate(170 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H46M64 0H110" stroke="#b9bdb6"/>
+<path d="M46 -10L64 0L46 10Z" fill="#f2f2ee"/>
+<path d="M64 -10V10"/>
+<path d="M52 13l6 9m-4.5 -0.4 4.5 0.4 0.3 -4.5" stroke="#ffd400" stroke-width="1.5"/>
+<path d="M60 13l6 9m-4.5 -0.4 4.5 0.4 0.3 -4.5" stroke="#ffd400" stroke-width="1.5"/>
+</g>
+<text x="-26" y="47" font-size="13" fill="#f2f2ee" text-anchor="end" font-weight="600">V1</text>
+<text x="-26" y="63" font-size="12" fill="#ffd400" text-anchor="end">5 V</text>
+<text x="85" y="30" font-size="13" fill="#f2f2ee" text-anchor="middle" font-weight="600">R1</text>
+<text x="85" y="46" font-size="12" fill="#ffd400" text-anchor="middle">47 Ω</text>
+<text x="194" y="47" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">D1</text>
+<text x="194" y="63" font-size="12" fill="#ffd400" text-anchor="start">LEDX</text>
+<text x="8" y="-14" font-size="11" fill="#c9ccc5">vin 5 V</text>
+<text x="178" y="-14" font-size="11" fill="#c9ccc5">a 3.27 V</text>
+</g>
+</svg>
+<figcaption>Schematic, drawn from the netlist</figcaption></figure><h2>Checks</h2><table><thead><tr><th>status</th><th>check</th><th>result</th></tr></thead><tbody><tr><td class=""><span class="badge pass">pass</span></td><td class="">hand calculation</td><td class="">diode equation solved by hand gives 36.9 mA, ngspice 36.9 mA (5.4e-05% apart); the quick estimate (Vs - Vf)/R is 38.3 mA</td></tr><tr><td class=""><span class="badge pass">pass</span></td><td class="">power balance</td><td class="">supply gives 184 mW = resistor 63.9 mW + LED 120 mW (5.4e-08% apart)</td></tr><tr><td class=""><span class="badge info">info</span></td><td class="">operating limits</td><td class="">LED 36.9 mA of 30 mA; resistor 63.9 mW of 250 mW</td></tr></tbody></table><h2>How to fix it</h2><div class='fix'><div class='t'>Use a 91 ohm resistor</div><div>Gives about 19.8 mA; it dissipates 35.6 mW, so a 0.25 W part is enough.</div></div><h2>Assumptions</h2><ol class='assume'><li>blue LED modeled with the diode equation: 3.2 V at 20 mA, ideality 2.7, series resistance 1.5 ohm.</li><li>Resistor 47 ohm exact, rated 0.25 W.</li><li>Room temperature, steady DC.</li></ol>
+<footer>Made with Wobbl 0.1.1. Solver ngspice 41. Total time 0 s.</footer>
 </main></body></html>

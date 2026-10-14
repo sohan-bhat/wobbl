@@ -31,8 +31,12 @@ text-transform:uppercase;letter-spacing:.06em}
 .badge.info{background:rgba(90,169,255,.15);color:var(--info)}.badge.skip{background:#22252a;color:var(--skip)}
 ul.reasons{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
 h2{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:var(--yellow);margin:34px 0 12px}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:20px 0 8px}
 figure{margin:0}
 figure img{width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line);background:#0e0f11}
+figure svg{width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line)}
+figure.drawing{display:inline-block;vertical-align:top;width:calc(50% - 8px);margin-bottom:16px}
+figure.drawing+figure.drawing{margin-left:16px}
 figcaption{color:var(--muted);font-size:13px;margin-top:6px}
 .hero{margin-bottom:16px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
@@ -46,13 +50,14 @@ ol.assume,ul.plain{padding-left:20px}ol.assume li,ul.plain li{margin:4px 0}
 .fix .t{font-weight:700}
 footer{margin-top:40px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:14px}
 pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12px}
-@media (max-width:760px){.verdict{grid-template-columns:1fr}.word{font-size:32px}header{flex-direction:column;
+@media (max-width:760px){figure.drawing{width:100%}figure.drawing+figure.drawing{margin-left:0}
+.verdict{grid-template-columns:1fr}.word{font-size:32px}header{flex-direction:column;
 align-items:flex-start}header .meta{text-align:left}}
 @media print{body{background:#fff;color:#111}.card,.fix,pre{background:#f6f6f6;border-color:#ddd}}
 </style></head>
 <body><main>
 <header><div><h1><span class="brand">WOBBL</span>mosfet</h1><p class="question">How hot does this MOSFET get switching 15 A at 20 kHz in a 50 C box?</p></div>
-<div class="meta">Circuit report<br>2026-10-13 10:56</div></header>
+<div class="meta">Circuit report<br>2026-10-14 01:35</div></header>
 <section class="verdict">
  <div class="card"><div class="word pass">OK</div>
   <p class="headline">Junction reaches about 110 C (1.51 W: 1.37 W conduction, 0.144 W switching) with 40 C/W to 50 C air; limit 150 C.</p></div>
@@ -60,6 +65,208 @@ align-items:flex-start}header .meta{text-align:left}}
   <p style="margin:14px 0 0">Confidence <span class="badge high">high</span></p>
   <ul class="reasons"><li>passed hand calculation, thermal loop</li></ul></div>
 </section>
-<h2>Checks</h2><table><thead><tr><th>status</th><th>check</th><th>result</th></tr></thead><tbody><tr><td class=""><span class="badge pass">pass</span></td><td class="">hand calculation</td><td class="">conduction loss I_rms^2 R = 0.903 W; ngspice average of V x I = 0.903 W (0.00079% apart)</td></tr><tr><td class=""><span class="badge pass">pass</span></td><td class="">thermal loop</td><td class="">junction settles at 110 C after the on resistance warms up (12.1 mohm hot)</td></tr></tbody></table><h2>Assumptions</h2><ol class='assume'><li>On resistance 8 mohm at 25 C rising 0.6% per C.</li><li>Switching loss from 40 ns edges: 0.5 V I (tr + tf) f.</li><li>Junction to air 40 C/W (datasheet, no heatsink unless included).</li></ol>
-<footer>Made with Wobbl 0.1.0. Solver ngspice 41. Total time 0 s.</footer>
+<figure class="drawing"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480" role="img" aria-label="Bench setup drawn from this run. A 12 V supply drives 15 A through a 0.792 ohm load and a TO-220 MOSFET on a 40 C/W heatsink, switched at 20 kHz, and the junction settles at 110 C." font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" data-live="4">
+<title>Bench setup drawn from this run. A 12 V supply drives 15 A through a 0.792 ohm load and a TO-220 MOSFET on a 40 C/W heatsink, switched at 20 kHz, and the junction settles at 110 C.</title>
+<defs>
+<pattern id="mosfet-grid1" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#15181b"/></pattern>
+<radialGradient id="mosfet-r2"><stop offset="0" stop-color="#ff6a2b" stop-opacity="0.55"/><stop offset="1" stop-color="#ff6a2b" stop-opacity="0"/></radialGradient>
+<linearGradient id="mosfet-l3" x2="1" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity="0.08"/><stop offset="1" stop-color="#000000" stop-opacity="0.2"/></linearGradient>
+<radialGradient id="mosfet-r4"><stop offset="0" stop-color="#ff5a1f" stop-opacity="0.8"/><stop offset="1" stop-color="#ff5a1f" stop-opacity="0"/></radialGradient>
+<linearGradient id="mosfet-l5" x2="0" y2="1"><stop offset="0" stop-color="#e6c66e"/><stop offset="0.5" stop-color="#c9a24c"/><stop offset="1" stop-color="#8f7230"/></linearGradient>
+</defs>
+<rect width="640" height="480" fill="#0e1011"/>
+<rect width="640" height="480" fill="url(#mosfet-grid1)"/>
+<rect x="23" y="29" width="176" height="124" rx="7" fill="#000" opacity="0.5"/>
+<rect x="20" y="24" width="176" height="124" rx="7" fill="#1b1e22" stroke="#3b4047"/>
+<rect x="21" y="25" width="174" height="7" rx="6" fill="#24282d"/>
+<text x="32" y="45" font-size="8.5" fill="#9ca099" letter-spacing="1.2">DC POWER SUPPLY</text>
+<rect x="32" y="53" width="110" height="66" rx="3" fill="#07080a" stroke="#30353b"/>
+<text x="116" y="83" font-size="20" fill="#ffd400" text-anchor="end" font-weight="600">12.00</text>
+<text x="121" y="83" font-size="10" fill="#9ca099">V</text>
+<text x="116" y="109" font-size="20" fill="#ffd400" text-anchor="end" font-weight="600">7.53</text>
+<text x="121" y="109" font-size="10" fill="#9ca099">A</text>
+<circle cx="167" cy="60" r="11" fill="#2b2f35" stroke="#4b5159"/>
+<circle cx="167" cy="60" r="7.5" fill="#353a40"/>
+<path d="M167 60l4.5 -7.8" stroke="#c9ccc5" stroke-width="1.6" stroke-linecap="round"/>
+<circle cx="167" cy="88" r="11" fill="#2b2f35" stroke="#4b5159"/>
+<circle cx="167" cy="88" r="7.5" fill="#353a40"/>
+<path d="M167 88l6.9 5.8" stroke="#c9ccc5" stroke-width="1.6" stroke-linecap="round"/>
+<circle cx="36" cy="134" r="3" fill="#46d17f"/>
+<text x="43" y="137.5" font-size="9" fill="#9ca099">CV</text>
+<circle cx="144" cy="133" r="8.5" fill="#2a2d31" stroke="#17191b"/>
+<circle cx="144" cy="133" r="4.2" fill="#1d2022"/>
+<circle cx="144" cy="133" r="1.6" fill="#0b0b0b"/>
+<circle cx="172" cy="133" r="8.5" fill="#c8342b" stroke="#6e1d18"/>
+<circle cx="172" cy="133" r="4.2" fill="#8c241e"/>
+<circle cx="172" cy="133" r="1.6" fill="#0b0b0b"/>
+<rect x="217" y="29" width="184" height="124" rx="7" fill="#000" opacity="0.5"/>
+<rect x="214" y="24" width="184" height="124" rx="7" fill="#1b1e22" stroke="#3b4047"/>
+<rect x="215" y="25" width="182" height="7" rx="6" fill="#24282d"/>
+<text x="226" y="45" font-size="8.5" fill="#9ca099" letter-spacing="1.2">PULSE GENERATOR</text>
+<rect x="226" y="53" width="118" height="66" rx="3" fill="#07080a" stroke="#30353b"/>
+<text x="318" y="83" font-size="20" fill="#ffd400" text-anchor="end" font-weight="600">20.00</text>
+<text x="323" y="83" font-size="10" fill="#9ca099">kHz</text>
+<text x="318" y="109" font-size="20" fill="#ffd400" text-anchor="end" font-weight="600">50.0</text>
+<text x="323" y="109" font-size="10" fill="#9ca099">%</text>
+<circle cx="369" cy="60" r="11" fill="#2b2f35" stroke="#4b5159"/>
+<circle cx="369" cy="60" r="7.5" fill="#353a40"/>
+<path d="M369 60l4.5 -7.8" stroke="#c9ccc5" stroke-width="1.6" stroke-linecap="round"/>
+<circle cx="369" cy="88" r="11" fill="#2b2f35" stroke="#4b5159"/>
+<circle cx="369" cy="88" r="7.5" fill="#353a40"/>
+<path d="M369 88l6.9 5.8" stroke="#c9ccc5" stroke-width="1.6" stroke-linecap="round"/>
+<circle cx="230" cy="134" r="3" fill="#46d17f"/>
+<text x="237" y="137.5" font-size="9" fill="#9ca099">OUT</text>
+<circle cx="374" cy="133" r="7" fill="#aab0b6" stroke="#5d636b"/>
+<circle cx="374" cy="133" r="3.4" fill="#16181b"/>
+<circle cx="500" cy="330" r="150" fill="url(#mosfet-r2)" opacity="0.4" data-series="0 0.1064 0.2129 0.2915 0.3146 0.3377 0.3487 0.3537 0.3587 0.3598 0.3609 0.3617 0.3619 0.3621 0.3623 0.3623 0.3624 0.3624 0.3624 0.3624 0.3624 0.3624 0.3624 0.3624 0.3624" data-attr="opacity"/>
+<rect x="409" y="265" width="165" height="140" rx="3" fill="#000" opacity="0.5"/>
+<rect x="406" y="260" width="165" height="140" rx="3" fill="#969293" stroke="#4b5159" data-heat="#8e959c #969293"/>
+<path d="M412 264V396M422.9 264V396M433.9 264V396M444.8 264V396M455.7 264V396M466.6 264V396M477.6 264V396M488.5 264V396M499.4 264V396M510.4 264V396M521.3 264V396M532.2 264V396M543.1 264V396M554.1 264V396M565 264V396" stroke="#ffffff" stroke-opacity="0.2" stroke-width="3"/>
+<path d="M412 264V396M422.9 264V396M433.9 264V396M444.8 264V396M455.7 264V396M466.6 264V396M477.6 264V396M488.5 264V396M499.4 264V396M510.4 264V396M521.3 264V396M532.2 264V396M543.1 264V396M554.1 264V396M565 264V396" stroke="#000" stroke-opacity="0.2" stroke-width="1" transform="translate(2.5 0)"/>
+<g transform="translate(440 330) rotate(90)">
+<path d="M-35 -30V-74Q-35 -78 -31 -78H31Q35 -78 35 -74V-30Z" fill="#c9c0bd" stroke="#6d737a" data-heat="#c3c8cd #c9c0bd"/>
+<circle cy="-56" r="12.5" fill="#b9bec4" stroke="#6d737a"/>
+<circle cy="-56" r="8.5" fill="#8d9399"/>
+<path d="M-6 -56H6M0 -62V-50" stroke="#4a4f57" stroke-width="2"/>
+<path d="M-18 34V44" stroke="#9aa0a6" stroke-width="8"/>
+<path d="M-18 44V110" stroke="#9aa0a6" stroke-width="5"/>
+<path d="M-19 44V110" stroke="#d7dade" stroke-width="1.6"/>
+<path d="M0 34V44" stroke="#9aa0a6" stroke-width="8"/>
+<path d="M0 44V110" stroke="#9aa0a6" stroke-width="5"/>
+<path d="M-1 44V110" stroke="#d7dade" stroke-width="1.6"/>
+<path d="M18 34V44" stroke="#9aa0a6" stroke-width="8"/>
+<path d="M18 44V110" stroke="#9aa0a6" stroke-width="5"/>
+<path d="M17 44V110" stroke="#d7dade" stroke-width="1.6"/>
+<rect x="-35" y="-30" width="70" height="64" rx="2" fill="#17191c" stroke="#000"/>
+<rect x="-35" y="-30" width="70" height="64" rx="2" fill="url(#mosfet-l3)"/>
+</g>
+<circle cx="476" cy="330" r="46" fill="url(#mosfet-r4)" opacity="0.5" data-series="0 0.1597 0.3193 0.4373 0.4719 0.5065 0.523 0.5306 0.5381 0.5397 0.5413 0.5425 0.5429 0.5432 0.5434 0.5435 0.5435 0.5435 0.5436 0.5436 0.5436 0.5436 0.5436 0.5436 0.5436" data-attr="opacity"/>
+<circle cx="500" cy="304" r="3.5" fill="#c9a645" stroke="#6e5824"/>
+<rect x="484" y="296" width="30" height="16" rx="1.5" fill="#d9922e" opacity="0.6" transform="rotate(-8 496 304)"/>
+<path d="M500 304C536 240 580 230 580 132" fill="none" stroke="#8b7411" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M500 304C536 240 580 230 580 132" fill="none" stroke="#e8c21c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M500 304C536 240 580 230 580 132" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="571" y="120" width="18" height="12" rx="2" fill="#f2cf1d" stroke="#8c7410"/>
+<rect x="94" y="309" width="152" height="62" rx="3" fill="#000" opacity="0.5" transform="translate(3 5)"/>
+<rect x="100" y="310" width="140" height="60" rx="3" fill="#a8873a" stroke="#6e5824"/>
+<circle cx="110" cy="320" r="4" fill="#0e1011" stroke="#6e5824"/>
+<circle cx="110" cy="360" r="4" fill="#0e1011" stroke="#6e5824"/>
+<circle cx="230" cy="320" r="4" fill="#0e1011" stroke="#6e5824"/>
+<circle cx="230" cy="360" r="4" fill="#0e1011" stroke="#6e5824"/>
+<rect x="122" y="318" width="96" height="44" rx="4" fill="url(#mosfet-l5)"/>
+<path d="M126 326H214M126 333H214M126 347H214M126 354H214" stroke="#8f7230" stroke-width="1.2"/>
+<text x="170" y="368" font-size="7" fill="#3d2f10" text-anchor="middle" font-weight="600">792 mΩ</text>
+<rect x="88" y="334" width="16" height="12" rx="2" fill="#c7ccd1" stroke="#80868c"/>
+<circle cx="93" cy="340" r="2.6" fill="#5d636b"/>
+<rect x="236" y="334" width="16" height="12" rx="2" fill="#c7ccd1" stroke="#80868c"/>
+<circle cx="247" cy="340" r="2.6" fill="#5d636b"/>
+<path d="M374 133C374 193 356 218 356 268" fill="none" stroke="#232629" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M374 133C374 193 356 218 356 268" fill="none" stroke="#3a3f45" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M374 133C374 193 356 218 356 268" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M356 268C352 288 342 312 330 312" fill="none" stroke="#7d2923" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M356 268C352 288 342 312 330 312" fill="none" stroke="#d0453a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M356 268C352 288 342 312 330 312" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M356 268C372 298 364 318 360 348" fill="none" stroke="#5d636b" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M356 268C372 298 364 318 360 348" fill="none" stroke="#2b2e33" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M356 268C372 298 364 318 360 348" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M356 268C352 288 342 312 330 312" fill="none" stroke="#ffd400" stroke-width="3.2" stroke-linecap="round" opacity="0.8" data-pwm="0.5 1"/>
+<g transform="translate(330 312) rotate(0)">
+<rect x="-22" y="-4.5" width="18" height="9" rx="4" fill="#d0453a" stroke="#68221d"/>
+<path d="M-5 -2.5L2 -1M-5 2.5L2 1" stroke="#c3c8cd" stroke-width="1.6" stroke-linecap="round"/>
+</g>
+<g transform="translate(360 348) rotate(90)">
+<rect x="-22" y="-4.5" width="18" height="9" rx="4" fill="#2b2e33" stroke="#16171a"/>
+<path d="M-5 -2.5L2 -1M-5 2.5L2 1" stroke="#c3c8cd" stroke-width="1.6" stroke-linecap="round"/>
+</g>
+<path d="M172 133C172 223 93 230 93 334" fill="none" stroke="#78201a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M172 133C172 223 93 230 93 334" fill="none" stroke="#c8352b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M172 133C172 223 93 230 93 334" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M247 340C277 340 300 330 330 330" fill="none" stroke="#78201a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M247 340C277 340 300 330 330 330" fill="none" stroke="#c8352b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M247 340C277 340 300 330 330 330" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M330 348C310 452 70 462 46 360" fill="none" stroke="#5d636b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M330 348C310 452 70 462 46 360" fill="none" stroke="#2b2e33" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M330 348C310 452 70 462 46 360" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M46 360C36 250 144 203 144 133" fill="none" stroke="#5d636b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M46 360C36 250 144 203 144 133" fill="none" stroke="#2b2e33" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M46 360C36 250 144 203 144 133" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="172" cy="133" r="6.5" fill="#c8352b" stroke="#641a16"/>
+<circle cx="144" cy="133" r="6.5" fill="#2b2e33" stroke="#5d636b"/>
+<g transform="translate(330 330) rotate(0)">
+<rect x="-22" y="-4.5" width="18" height="9" rx="4" fill="#c8352b" stroke="#641a16"/>
+<path d="M-5 -2.5L2 -1M-5 2.5L2 1" stroke="#c3c8cd" stroke-width="1.6" stroke-linecap="round"/>
+</g>
+<g transform="translate(330 348) rotate(0)">
+<rect x="-22" y="-4.5" width="18" height="9" rx="4" fill="#2b2e33" stroke="#16171a"/>
+<path d="M-5 -2.5L2 -1M-5 2.5L2 1" stroke="#c3c8cd" stroke-width="1.6" stroke-linecap="round"/>
+</g>
+<g fill="none" stroke-linecap="round" stroke-dasharray="0 12" data-flow="85" data-pwm="0.5 1">
+<path d="M172 133C172 223 93 230 93 334L93 340L247 340C277 340 300 330 330 330L400 330L400 348L330 348C310 452 70 462 46 360C36 250 144 203 144 133" stroke="#0e0f11" stroke-width="5.5" stroke-opacity="0.6"/>
+<path d="M172 133C172 223 93 230 93 334L93 340L247 340C277 340 300 330 330 330L400 330L400 348L330 348C310 452 70 462 46 360C36 250 144 203 144 133" stroke="#ffd400" stroke-width="3"/>
+</g>
+<rect x="424" y="18" width="196" height="100" rx="3" fill="#0a0b0c" fill-opacity="0.9" stroke="#3a3e45"/>
+<text x="438" y="40" font-size="10.5" fill="#9ca099" font-weight="500" letter-spacing="1.3">JUNCTION</text>
+<text x="438" y="73" font-size="26" fill="#f2f2ee" font-weight="600" data-series="50 67.74 85.48 98.59 102.4 106.3 108.1 109 109.8 110 110.1 110.3 110.3 110.4 110.4 110.4 110.4 110.4 110.4 110.4 110.4 110.4 110.4 110.4 110.4" data-fmt="0 °C">110 °C</text>
+<rect x="578.8" y="27" width="27.2" height="19" fill="#46d17f" data-after=""/>
+<text x="592.4" y="40.5" font-size="11" fill="#0e0f11" text-anchor="middle" font-weight="700" data-after="">OK</text>
+<rect x="438" y="86" width="168" height="6" fill="#23272c"/>
+<rect x="438" y="86" width="103" height="6" fill="#ffd400" data-series="46.67 63.22 79.78 92.02 95.6 99.19 100.9 101.7 102.5 102.6 102.8 102.9 103 103 103 103 103 103 103 103 103 103 103 103 103" data-attr="width"/>
+<path d="M578 82v14" stroke="#f2f2ee" stroke-width="1.5"/>
+<text x="578" y="110" font-size="10" fill="#9ca099" text-anchor="end">150 °C limit</text>
+</svg>
+<figcaption>Bench setup, drawn from this run</figcaption></figure><figure class="drawing"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480" role="img" aria-label="Schematic of MOSFET conduction with a resistive load, drawn from the netlist." font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+<title>Schematic of MOSFET conduction with a resistive load, drawn from the netlist.</title>
+<defs>
+</defs>
+<rect width="640" height="480" fill="#0e1011"/>
+<text x="24" y="32" font-size="10.5" fill="#9ca099" font-weight="500" letter-spacing="1.3">SCHEMATIC</text>
+<text x="110.4" y="32" font-size="12" fill="#c9ccc5">MOSFET conduction with a resistive load</text>
+<g transform="translate(83.2 144.4) scale(1.080)">
+<path d="M0 0H340M0 220H340" stroke="#b9bdb6" stroke-width="2" fill="none"/>
+<path d="M170 220v8M158 228h24M163 233h14M167.5 238h5" stroke="#b9bdb6" stroke-width="2" fill="none" stroke-linecap="round"/>
+<g transform="translate(0 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H93M127 0H220" stroke="#b9bdb6"/>
+<circle cx="110" r="17"/>
+<path d="M97 0h8M101 -4v8M119 -4v8" stroke-width="1.6"/>
+</g>
+<g transform="translate(0 0) rotate(0)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H61M109 0H170" stroke="#b9bdb6"/>
+<path d="M61 0L65 -7L69 7L73 -7L77 7L81 -7L85 7L89 -7L93 7L97 -7L101 7L105 -7L109 0"/>
+</g>
+<g transform="translate(340 0) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H39M71 0H110" stroke="#b9bdb6"/>
+<circle cx="39" r="2.6" fill="#f2f2ee"/>
+<circle cx="71" r="2.6" fill="#f2f2ee"/>
+<path d="M39 0L69 11"/>
+<path d="M55 6V26" stroke-dasharray="3 3" stroke-width="1.4"/>
+</g>
+<g transform="translate(340 110) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H38M72 0H110" stroke="#b9bdb6"/>
+<circle cx="55" r="17"/>
+<text x="55" y="5" fill="#f2f2ee" stroke="none" font-size="14" text-anchor="middle" transform="rotate(-90 55 0)">A</text>
+</g>
+<path d="M314 55L274 55" stroke="#b9bdb6" stroke-width="2" fill="none"/>
+<g transform="translate(274 55) rotate(90)" fill="none" stroke="#f2f2ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M0 0H27M61 0H88" stroke="#b9bdb6"/>
+<circle cx="44" r="17"/>
+<path d="M35 5H40V-5H47V5H53" stroke-width="1.6" transform="rotate(-90 44 0)"/>
+</g>
+<path d="M274 143v8M262 151h24M267 156h14M271.5 161h5" stroke="#b9bdb6" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="-26" y="102" font-size="13" fill="#f2f2ee" text-anchor="end" font-weight="600">V1</text>
+<text x="-26" y="118" font-size="12" fill="#ffd400" text-anchor="end">12 V</text>
+<text x="85" y="30" font-size="13" fill="#f2f2ee" text-anchor="middle" font-weight="600">RL</text>
+<text x="85" y="46" font-size="12" fill="#ffd400" text-anchor="middle">792 mΩ</text>
+<text x="364" y="47" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">S1</text>
+<text x="364" y="63" font-size="12" fill="#ffd400" text-anchor="start">on 8 mΩ</text>
+<text x="364" y="157" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">VS</text>
+<text x="364" y="173" font-size="12" fill="#ffd400" text-anchor="start">0 V, current sense</text>
+<text x="250" y="73" font-size="13" fill="#f2f2ee" text-anchor="end" font-weight="600">VG</text>
+<text x="250" y="89" font-size="12" fill="#ffd400" text-anchor="end">pulse 0 to 10 V</text>
+<text x="250" y="104" font-size="12" fill="#c9ccc5" text-anchor="end">20 kHz, 50% on</text>
+<text x="8" y="-14" font-size="11" fill="#c9ccc5">vbus 12 V</text>
+<text x="348" y="-14" font-size="11" fill="#c9ccc5">d 0.12 V on</text>
+</g>
+</svg>
+<figcaption>Schematic, drawn from the netlist</figcaption></figure><h2>Checks</h2><table><thead><tr><th>status</th><th>check</th><th>result</th></tr></thead><tbody><tr><td class=""><span class="badge pass">pass</span></td><td class="">hand calculation</td><td class="">conduction loss I_rms^2 R = 0.903 W; ngspice average of V x I = 0.903 W (0.00079% apart)</td></tr><tr><td class=""><span class="badge pass">pass</span></td><td class="">thermal loop</td><td class="">junction settles at 110 C after the on resistance warms up (12.1 mohm hot)</td></tr></tbody></table><h2>Assumptions</h2><ol class='assume'><li>On resistance 8 mohm at 25 C rising 0.6% per C.</li><li>Switching loss from 40 ns edges: 0.5 V I (tr + tf) f.</li><li>Junction to air 40 C/W (datasheet, no heatsink unless included).</li></ol>
+<footer>Made with Wobbl 0.1.1. Solver ngspice 41. Total time 1 s.</footer>
 </main></body></html>

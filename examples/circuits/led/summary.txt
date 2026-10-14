@@ -18,4 +18,6 @@ Assumptions:
 
 Suggested fixes:
   - Use a 91 ohm resistor: Gives about 19.8 mA; it dissipates 35.6 mW, so a 0.25 W part is enough.
+
+Images: setup: images/setup.svg, schematic: images/schematic.svg
 Report: report.html

@@ -14,4 +14,6 @@ Assumptions:
   - On resistance 8 mohm at 25 C rising 0.6% per C.
   - Switching loss from 40 ns edges: 0.5 V I (tr + tf) f.
   - Junction to air 40 C/W (datasheet, no heatsink unless included).
+
+Images: setup: images/setup.svg, schematic: images/schematic.svg
 Report: report.html

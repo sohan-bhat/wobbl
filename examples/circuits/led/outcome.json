@@ -68,12 +68,23 @@
   },
   "_figures": [
    [
+    "setup",
+    "Bench setup, drawn from this run"
+   ],
+   [
+    "schematic",
+    "Schematic, drawn from the netlist"
+   ],
+   [
     "waveform",
     "Simulated waveform"
    ]
   ]
  },
- "images": {},
+ "images": {
+  "setup": "images/setup.svg",
+  "schematic": "images/schematic.svg"
+ },
  "fixes": [
   {
    "kind": "resistor",
@@ -85,6 +96,6 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 0.135679,
+ "t_total": 0.45367,
  "solver": "ngspice 41"
 }
