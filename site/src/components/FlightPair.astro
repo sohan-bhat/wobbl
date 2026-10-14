@@ -1,0 +1,41 @@
+---
+// The landing page's motion contrast: the simplest run beside a rich one, row for row.
+// Each side shows its command, what the model included, the altitude chart, the answer,
+// the checks and how long the run took, all read from the example's own outputs.
+import Term from './Term.astro';
+import FlightChart from './FlightChart.astro';
+import { COLOR, findRun, fmt3 } from '../lib/examples';
+import { url } from '../lib/site';
+interface Props { rels: string[] }
+const { rels } = Astro.props;
+
+const sides = rels.map((rel) => {
+  const { ex, run } = findRun(rel);
+  const o = run.outcome;
+  if (!o.model || !o.events?.length) throw new Error(`${rel} has no model or events in outcome.json`);
+  const checks = (o.checks ?? []).filter((c) => c.status === 'pass' || c.status === 'warn' || c.status === 'fail');
+  const passed = checks.filter((c) => c.status === 'pass').length;
+  const warned = checks.filter((c) => c.status === 'warn').length;
+  const tally = `${passed === checks.length ? passed : `${passed} of ${checks.length}`} checks passed${warned ? `, ${warned} with a warning` : ''}`;
+  return { ex, run, o, tally, id: `flight-${ex.name}` };
+});
+---
+<div class="pair">
+  {sides.map(({ ex, run, o, tally, id }) => (
+    <article class="flight" aria-labelledby={id}>
+      <header class="flight-head">
+        <h3 id={id}>{ex.title}</h3>
+        <p>{run.question}</p>
+      </header>
+      <Term code={run.command} />
+      <div>
+        <p class="run-label model-label">Modeled<span>{o.model!.states} state variables</span></p>
+        <ul class="effects" aria-label="Effects in the model">{o.model!.effects.map((e) => <li>{e}</li>)}</ul>
+      </div>
+      <FlightChart run={run} />
+      <p class="answer-line" data-verdict={COLOR[o.verdict] ?? 'marginal'}>{o.headline}</p>
+      <p class="flight-meta"><span>{tally}</span>{o.runtime_s !== undefined && <span>Ran in {fmt3(o.runtime_s)} s</span>}</p>
+      <p class="flight-more"><a href={url(`examples/${ex.name}/`)}>The {ex.title.toLowerCase()} example</a></p>
+    </article>
+  ))}
+</div>

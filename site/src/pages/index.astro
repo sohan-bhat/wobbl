@@ -1,15 +1,16 @@
 ---
-// The landing page: the claim, the install command, the 3D part, one run per domain,
-// the bake off in two counts and links into the docs.
+// The landing page: the claim, the install command, the 3D part, the simplest motion run beside
+// a rocket, one run per domain, the bake off in two counts and links into the docs.
 import Base from '../layouts/Base.astro';
 import Answer from '../components/Answer.astro';
 import Term from '../components/Term.astro';
 import HeroPart from '../components/HeroPart.astro';
+import FlightPair from '../components/FlightPair.astro';
 import { url } from '../lib/site';
 import { poster, posterSet } from '../lib/poster';
 ---
 <Base title="Wobbl: simulate anything before you build it" path=""
-      description="Verified strength, heat and circuit simulation for Claude Code, Codex, Cursor, Gemini CLI and you. Every answer is checked before you see it. Open source, MIT.">
+      description="Verified strength, heat, circuit and motion simulation for Claude Code, Codex, Cursor, Gemini CLI and you. Every answer is checked before you see it. Open source, MIT.">
   <link slot="head" rel="preload" as="image" fetchpriority="high" href={poster} imagesrcset={posterSet} imagesizes="(min-width: 1000px) 56vw, 100vw">
 
   <section class="hero" aria-labelledby="hero-title">
@@ -25,6 +26,13 @@ import { poster, posterSet } from '../lib/poster';
         </div>
         <HeroPart />
       </div>
+    </div>
+  </section>
+
+  <section class="section flights" aria-labelledby="flights-title">
+    <div class="wrap">
+      <h2 id="flights-title">A dropped rock and a rocket, checked the same way</h2>
+      <FlightPair rels={['falling-rock/output', 'rocket-launch/output']} />
     </div>
   </section>
 

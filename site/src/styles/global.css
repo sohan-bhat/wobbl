@@ -152,6 +152,25 @@ figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9rem; line-heig
 .answer-img .run-img, .answer-img .run-metric { aspect-ratio: 4 / 3; object-fit: contain; border: 0; }
 .answer-img:hover .run-img { outline: 1px solid var(--line-2); }
 
+/* A dropped rock and a rocket: two motion runs side by side, their rows lined up by a subgrid */
+.pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 56px; margin-top: 36px; }
+.flight { display: grid; align-content: start; gap: 24px; min-width: 0; }
+.flight + .flight { padding-top: 48px; border-top: 1px solid var(--line); }
+@media (min-width: 1000px) {
+  .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(7, auto); gap: 0; margin-top: 44px; }
+  .flight { grid-row: span 7; grid-template-rows: subgrid; row-gap: 24px; padding-right: 44px; }
+  .flight + .flight { padding: 0 0 0 44px; border-top: 0; border-left: 1px solid var(--line); }
+}
+.flight > * { margin: 0; min-width: 0; }
+.flight-head h3 { font-size: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem); }
+.flight-head p { margin: 8px 0 0; color: var(--fg-2); text-wrap: pretty; }
+.flight .term { margin-top: 0; align-self: start; }
+.flight .term pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.flight .term .ln { padding-left: 2ch; text-indent: -2ch; }
+.flight .answer-line { margin: 0; font-size: clamp(0.95rem, 0.92rem + 0.15vw, 1.05rem); }
+.flight-meta { display: flex; flex-wrap: wrap; gap: 6px 24px; font: 500 13px/1.4 var(--mono); color: var(--fg-2); }
+.flight-more a { font-weight: 600; text-decoration-color: var(--yellow); display: inline-block; padding: 4px 0; }
+
 /* Altitude over time for a motion run: a stretched SVG line under HTML labels and ticks */
 .fc { margin: 0; min-width: 0; }
 .fc-chart { font: 500 12px/1.2 var(--mono); color: var(--muted); }
