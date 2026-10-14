@@ -595,6 +595,19 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .ex-card .run-metric p:first-child { font-size: clamp(2.4rem, 1.8rem + 1.4vw, 3.2rem); white-space: nowrap; }
 .ex-notes { margin-top: 80px; padding-top: 8px; border-top: 1px solid var(--line); }
 
+/* A motion run's model: the effects it included, and how many state variables it solved */
+.model-label { display: flex; justify-content: space-between; gap: 16px; }
+.model-label span { color: var(--fg-2); letter-spacing: 0.04em; text-transform: none; }
+.effects { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.effects li { padding: 5px 10px; border: 1px solid var(--line-2); background: var(--bg-2); font: 500 13px/1.3 var(--mono); color: var(--fg); }
+.run-events .table-scroll { margin: 0; }
+.run-events table.data { font-size: 0.9rem; }
+.run-events table.data tbody th, .run-events table.data td { padding-block: 9px; }
+@media (max-width: 719px) {
+  .run-events table.data thead th, .run-events table.data tbody th, .run-events table.data td { padding-right: 12px; }
+  .run-events table.data td.num { font-size: 0.82rem; }
+}
+
 /* Example gallery */
 .ex-grid { list-style: none; margin: clamp(36px, 2rem + 2vw, 64px) 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
 @media (min-width: 720px) { .ex-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

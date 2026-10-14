@@ -167,9 +167,9 @@ function markNav() {
   }
 }
 
-/** Tables: give each cell its column name so narrow screens can stack rows. */
+/** Tables: give each cell its column name so narrow screens can stack rows. Short tables marked data-keep stay tables. */
 function stackTables() {
-  for (const wrap of $$('.table-scroll:not(.stack)')) {
+  for (const wrap of $$('.table-scroll:not(.stack):not([data-keep])')) {
     const heads = $$('thead th', wrap).map((th) => th.textContent?.trim() ?? '');
     for (const tr of $$('tbody tr', wrap)) {
       [...tr.children].forEach((cell, i) => {

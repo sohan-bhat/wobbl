@@ -9,7 +9,7 @@ import { ROOT } from './site';
 import type { FlightEvent } from './flight';
 
 export const ORDER = ['cast-motor-mount', 'shelf-bracket', 'motor-mount', 'enclosure', 'drone-arm', 'heat-sink',
-  'battery-pack', 'circuits'];
+  'battery-pack', 'circuits', 'falling-rock', 'rocket-launch'];
 
 const EX = resolve(ROOT, 'examples');
 
@@ -29,7 +29,7 @@ export const RUN_IMAGES: Record<string, Record<string, string>> = {
   'circuits/buck': { waveform: 'buck-waveform' },
 };
 
-const DOMAIN: Record<string, string> = { strength: 'Strength', thermal: 'Heat', circuit: 'Circuits' };
+const DOMAIN: Record<string, string> = { strength: 'Strength', thermal: 'Heat', circuit: 'Circuits', motion: 'Motion' };
 export const COLOR: Record<string, string> = { holds: 'holds', ok: 'holds', marginal: 'marginal', fails: 'fails', hot: 'fails' };
 
 export interface Check { name: string; status: string; summary: string }

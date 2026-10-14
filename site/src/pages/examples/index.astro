@@ -1,5 +1,5 @@
 ---
-// The examples gallery: every example with its result image, domain, question and verdict.
+// The examples gallery: every example with its result image or flight chart, domain, question and verdict.
 import Base from '../../layouts/Base.astro';
 import RunImage from '../../components/RunImage.astro';
 import { COLOR, examples, metrics } from '../../lib/examples';
@@ -7,12 +7,12 @@ import { url } from '../../lib/site';
 const all = examples();
 ---
 <Base title="Examples | Wobbl" path="examples/" search
-      description="Real Wobbl runs on a cast motor mount, a printed bracket, a drone arm, an enclosure, a heat sink, a battery pack and three circuits, with their reports.">
+      description="Real Wobbl runs on a cast motor mount, a printed bracket, a drone arm, an enclosure, a heat sink, a battery pack, three circuits, a falling rock and a rocket launch, with their reports.">
   <div class="wrap page">
     <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href={url()}>Home</a></li><li aria-current="page">Examples</li></ol></nav>
     <header class="page-head">
       <h1>Examples</h1>
-      <p class="page-lead">Real parts and circuits, each run with Wobbl, and every number here comes from that run’s own output.</p>
+      <p class="page-lead">Real parts, circuits and flights, each run with Wobbl, and every number here comes from that run’s own output.</p>
     </header>
     <ul class="ex-grid">
       {all.map((ex) => {
@@ -20,7 +20,7 @@ const all = examples();
         const [, v] = metrics(r)[0];
         return (
           <li><a class="ex-card" href={url(`examples/${ex.name}/`)}>
-            <RunImage run={r} sizes="(min-width: 1100px) 300px, (min-width: 720px) 45vw, 100vw" />
+            <RunImage run={r} sizes="(min-width: 1100px) 300px, (min-width: 720px) 45vw, 100vw" compact />
             <span class="ex-cat">{ex.domain}</span>
             <span class="ex-title">{ex.title}</span>
             <span class="ex-sub">{ex.subtitle}</span>
