@@ -37,6 +37,10 @@ cards:
 | [`wobbl check`](/guides/cli/check/) | shows the checks and confidence of a finished run |
 | [`wobbl report`](/guides/results/files/) | rebuilds and opens the HTML report of a finished run, covered with the result files |
 | [`wobbl fix`](/guides/cli/fix/) | lists fixes, or applies them and solves each version again |
+| [`wobbl uncertainty`](/guides/results/credibility/) | carries input scatter through a finished run to the odds of failure and Sobol indices |
+| [`wobbl validate-against`](/guides/results/credibility/) | compares a finished run with test readings as ASME V&V 20 does and calibrates its inputs |
+| [`wobbl credibility`](/guides/results/credibility/) | weighs the evidence in the manner of V&V 40 and writes `credibility.html` for a reviewer |
+| [`wobbl test-plan`](/guides/results/credibility/) | names the fewest physical tests that most reduce the risk |
 | [`wobbl materials`](/guides/cli/materials/) | prints the material table |
 | [`wobbl validate`](/guides/cli/validate/) | runs the {{cases}} validation cases |
 | [`wobbl setup`](/guides/cli/setup/) | installs the solvers and connects your coding agents |

@@ -1,6 +1,6 @@
 ---
 title: "Supports"
-description: "How to hold a part in a Wobbl strength study with fixed faces, bolted holes, rollers and walls it can lift off."
+description: "How to hold a part in a Wobbl strength study with fixed faces, bolted holes, rollers, walls it can lift off and elastic beds of springs."
 lead: "Hold the part the way the real one is mounted, because the supports decide the answer as much as the load does."
 order: 3
 ---
@@ -20,11 +20,13 @@ times as you need.
 | bolt | `bolt holes d=6.6` | the hole and the washer ring around it held still, with an outer radius twice the hole's |
 | roller | `roller y=0` | slides in its plane but cannot move off it, for symmetry planes and sliding fits |
 | wall | `wall x=min` | rests on a rigid wall that it can push on and lift off, solved as contact |
+| elastic | `elastic 50 N/mm3 @ z=min` | sits on a bed of springs this stiff per unit area, for a mount that gives a little |
 
 The words `fix`, `clamp`, `clamped`, `bolted`, `slider`, `symmetry`, `rest` and `support` also
 work, as `fixed`, `fixed`, `fixed`, `bolt`, `roller`, `roller`, `wall` and `wall` respectively,
 so `--fix "clamp x=min"` is the same as `--fix "x=min"`. Only fixed supports can hold some
-directions and not others, as in `clamp-z x=max`.
+directions and not others, as in `clamp-z x=max`. An elastic support also answers to `spring`,
+`springs` and `foundation`, and needs its stiffness before an `@`.
 
 ## Picking the right kind
 
@@ -40,6 +42,16 @@ shelf bracket against the wall it hangs on. The part can push into the wall and 
 from it, which Wobbl solves as contact. A coarse first solve finds the patch in contact, every
 mesh starts from the patch the last one found, and the loop stops when fewer than 2% of the
 contact nodes change state.
+
+## Elastic supports
+
+A rubber mount, a soft gasket or a part bolted to something that flexes is neither fixed nor
+free. An elastic support puts a bed of springs over the faces, with a stiffness per unit area
+like a foundation modulus, in N/mm3, N/cm3, MN/m3 or pci. Each node gets the stiffness times the
+area it carries, the same in every direction, so the bed pulls as readily as it pushes. Wobbl
+counts the springs in the force balance, and a cantilever on an elastic root matches beam
+theory on a Winkler bed to 0.01% in the validation suite. Its stiffness can also scatter in
+[`wobbl uncertainty`](/guides/results/credibility/) as `support`.
 
 ## A part that is not held
 

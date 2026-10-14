@@ -15,6 +15,9 @@ cards:
   - title: "Files"
     href: "/guides/results/files/"
     text: "summary.txt, outcome.json, report.html, result.vtu and the images in each result folder."
+  - title: "Credibility evidence"
+    href: "/guides/results/credibility/"
+    text: "The odds of failure, a comparison with test readings, a V&V 40 style assessment and a test plan."
 ---
 
 The order that works best is the one the agent skill teaches. Read the confidence and its
