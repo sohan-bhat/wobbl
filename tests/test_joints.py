@@ -109,3 +109,35 @@ def test_joint_check_shares_the_load_and_opens_at_fv_over_one_minus_phi():
     assert c.strip_safety > 1                       # a matching nut outlasts its bolt
     # VDI's torque for the preload with mu = 0.12 lands near the nut factor rule T = 0.2 F d
     assert V.torque_for(b, 20000) == pytest.approx(0.2 * 20000 * 10, rel=0.25)
+
+
+def test_bolt_specs_are_optional_and_read_in_any_order():
+    from wobbl.joints.bolts import parse_bolt, size_for_hole
+
+    s = parse_bolt("M8 8.8 @ holes d=9 torque 25 N*m")
+    assert (s.size, s.grade, s.faces, s.torque) == ("M8", "8.8", "holes d=9", 25000.0)
+    s = parse_bolt("10.9 preload 30 kN")
+    assert (s.size, s.grade, s.faces, s.preload) == ("", "10.9", None, 30000.0)
+    assert parse_bolt("").grade == "8.8" and parse_bolt("washer 16 @ x>40").washer == 16.0
+    assert [size_for_hole(d) for d in (3.4, 6.6, 9.0, 10.0, 13.5, 22.0)] == [3, 6, 8, 8, 12, 20]
+
+
+@pytest.mark.parametrize("name", ["tapped_block", "flange_pair"])
+def test_bolts_are_found_from_the_holes(name, tmp_path):
+    from wobbl.joints.assembly import prepare_assembly
+    from wobbl.joints.bolts import bolt_lines, parse_bolt
+    from wobbl.validation import generality as G
+
+    asm = prepare_assembly(G._step(tmp_path / "a.step", getattr(G, name)), tmp_path / "work")
+    if name == "tapped_block":
+        lines = bolt_lines(asm, [])
+        assert [ln.bolt.name for ln in lines] == ["M8 8.8", "M8 8.8"]
+        # a 9 mm hole in the 10 mm plate over a 6.8 mm hole tapped 20 mm deep in the block
+        assert all(ln.tapped and ln.bodies == [2, 1] and ln.clamp == pytest.approx(10) for ln in lines)
+        assert lines[0].engagement == pytest.approx(8.0) and lines[0].head[2] == pytest.approx(40)
+        assert lines[0].preload(0.2)[0] == pytest.approx(0.7 * 580 * 36.6, rel=0.01)
+    else:
+        lines = bolt_lines(asm, [parse_bolt("M8 8.8 torque 20 N*m")])
+        assert len(lines) == 4 and all(ln.clamp == pytest.approx(24) for ln in lines)
+        assert lines[0].preload(0.2)[0] == pytest.approx(20000 / (0.2 * 8))
+        assert any("40 mm hole" in n and "bore" in n for n in asm.prep.notes)
