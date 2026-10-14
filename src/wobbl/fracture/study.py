@@ -41,7 +41,8 @@ def _pct(x: float) -> str:
     return f"{100 * x:.3g}%"
 
 
-def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None):
+def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None, quick: bool = False):
+    """Run a crack growth study. quick skips the pictures and the fixes, which rerun the Monte Carlo."""
     from ..mesh.mesher import auto_sizing
     from ..outcome_generic import GenericOutcome
     from ..solvers import base as solvers
@@ -109,11 +110,11 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None):
     checks = _checks(st, res_path, first, cpath, inp, mc, unc, x_prof, sig_prof, material, spectrum)
     level, reasons = confidence(checks)
     verdict, head = _verdict(st, mc, first, spec, spectrum)
-    fixes = _fixes(st, cpath, inp, scatter, mc, law, material, insp, spectrum)
+    fixes = [] if quick else _fixes(st, cpath, inp, scatter, mc, law, material, insp, spectrum)
     say("render", "drawing the crack path and the lives")
     curve = growth_curve(cpath, inp, float(cpath.s[0]))
     n_at = np.interp([x.size for x in steps], curve[0], curve[1]) if len(curve[0]) else np.full(len(steps), np.nan)
-    images = _images(out, unc, res_path, curve, n_at, mc, st, first)
+    images = {} if quick else _images(out, unc, res_path, curve, n_at, mc, st, first)
     assumptions = _assumptions(st, law, record, material, spectrum, scatter, first, start, flow, cpath, res_path)
     p = mc.percentiles
     metrics = [("nominal life", f"{_counts(mc.nominal)} cycles"), ("B10", f"{_counts(p['B10'])} cycles"),

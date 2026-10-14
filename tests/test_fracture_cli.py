@@ -44,3 +44,20 @@ def test_studies_start_from_strength_and_fatigue_results():
     assert "70% x 1e8" in st.spectrum and st.target_life == pytest.approx(10 * (3650 + 1e8))
     st = study_from_options(str(root / "shelf-bracket" / "output"), material="6061-t6", crack="corner 1 mm at 5,5,5")
     assert st.material == "6061-t6" and st.crack.shape == "corner" and st.loads
+
+
+@pytest.mark.parametrize("question,expect", [
+    ("how long until a crack from the bolt hole grows critical", ["stress", "crack"]),
+    ("damage tolerance check with a 1 mm flaw at the hole", ["stress", "crack"]),
+    ("will it crack under 200 N?", ["stress"]),
+])
+def test_simulate_routes_crack_questions(question, expect):
+    from pathlib import Path
+
+    from wobbl.simulate import errors, get, route
+
+    part = Path(__file__).resolve().parents[1] / "examples" / "bracket-crack" / "bracket.py"
+    plan = route(str(part), question)
+    assert not errors and plan.domain == "part" and plan.names == expect
+    a = get("part", "crack")
+    assert a.needs == ("stress",) and a.takes("crack") and a.takes("target-life") and a.legacy == "wobbl crack"

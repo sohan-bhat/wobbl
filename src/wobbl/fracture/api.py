@@ -117,10 +117,11 @@ def from_result(result_dir, crack: str = "auto", material: str = "", loads=None,
                  **options)
 
 
-def run(st: FractureStudy, out_dir, progress=None):
-    """Run a crack growth study and return its outcome, which is also written to ``out_dir``."""
+def run(st: FractureStudy, out_dir, progress=None, quick: bool = False):
+    """Run a crack growth study and return its outcome, which is also written to ``out_dir``. quick skips the
+    pictures and fixes."""
     from .study import run_fracture
-    return run_fracture(st, out_dir, progress)
+    return run_fracture(st, out_dir, progress, quick)
 
 
 def simulate(request: dict, out_dir, progress=None):
