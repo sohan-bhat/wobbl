@@ -57,9 +57,12 @@ def test_playback_is_small_valid_json(box_mesh, tmp_path):
     assert (tmp_path / "playback.json").stat().st_size < 300_000
 
 
-def test_inside_test(box_mesh):
-    from wobbl.fracture.place import inside_test
+def test_part_shape(box_mesh):
+    from wobbl.fracture.place import PartShape
 
-    inside = inside_test(box_mesh)
-    got = inside(np.array([[20, 10, 2.5], [1, 1, 1], [41, 10, 2.5], [20, 10, 6], [-0.5, 5, 2]]))
+    part = PartShape(box_mesh)
+    got = part.inside(np.array([[20, 10, 2.5], [1, 1, 1], [41, 10, 2.5], [20, 10, 6], [-0.5, 5, 2]]))
     assert got.tolist() == [True, True, False, False, False]
+    assert part.ahead([20, 10, 2.5], [1, 0, 0]) == pytest.approx(20.0)
+    # a ray lying in the top face runs to the far edge rather than stopping on the face it lies in
+    assert part.ahead([20, 10, 5.0], [0, 1, 0], 1e-6) == pytest.approx(10.0)

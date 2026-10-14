@@ -48,7 +48,7 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None):
     from ..structural.build import build_static
     from ..structural.run import describe_part, resolve_selections
     from .path import front_size, grow
-    from .place import inside_test, place, section, solve_uncracked, stress_profile, structural_study
+    from .place import PartShape, auto_crack, place, section, solve_uncracked, stress_profile, structural_study
 
     t0 = time.time()
     say = progress or (lambda a, b: None)
@@ -56,7 +56,7 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None):
     out.mkdir(parents=True, exist_ok=True)
     work = out / "work"
     material = resolve_material(st.material)
-    law = law_for(material.key, st.law, st.growth, st.kc)
+    law = law_for(material, st.law, st.growth, st.kc)
     record = CRACK_GROWTH.get(material.key.rstrip("*"))
     spectrum = parse_spectrum(st.spectrum, st.r_ratio)
     adapter = solvers.for_domain("structural")
@@ -65,6 +65,9 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None):
     prep, features = describe_part(st.part, work, st.scale, None, st.params)
     spec = st.crack
     unc, origin = solve_uncracked(st, prep, features, material, adapter, work, spec, say)
+    if spec.shape == "auto":
+        spec = auto_crack(spec, unc, origin, features)
+        st = replace(st, crack=spec)
     h = auto_sizing(prep, thickness=features.thickness_typical).h
     start = math.exp(-P10 * st.flaw_scatter)
     spec0 = replace(spec, a=spec.a * start, c=None if spec.c is None else spec.c * start)
@@ -89,7 +92,7 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None):
 
     res_path = grow(prep, first.crack, build_model, material, law, spectrum, adapter, work, h, first.wall,
                     st.quality, st.steps, GROWTH_STEP, stop_k, stop_net, st.budget, say, st.keep,
-                    inside_test(unc.mesh))
+                    PartShape(unc.mesh))
     steps = res_path.steps
     s = np.array([x.size for x in steps])
     k = np.array([x.k_lead for x in steps])
@@ -105,7 +108,7 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None):
     insp = inspection(cpath, inp, spec.a, st.detectable)
     checks = _checks(st, res_path, first, cpath, inp, mc, unc, x_prof, sig_prof, material, spectrum)
     level, reasons = confidence(checks)
-    verdict, head = _verdict(st, mc, first, spec)
+    verdict, head = _verdict(st, mc, first, spec, spectrum)
     fixes = _fixes(st, cpath, inp, scatter, mc, law, material, insp, spectrum)
     say("render", "drawing the crack path and the lives")
     curve = growth_curve(cpath, inp, float(cpath.s[0]))
@@ -120,7 +123,8 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None):
     metrics.append(("inspect every", f"{_counts(insp['repeat'])} cycles"))
     values = {"nominal_cycles": mc.nominal, "percentiles": p, "b1_band": list(mc.b1_band), "pof": mc.pof,
               "pof_band": list(mc.pof_band), "inspection": insp, "path_end": res_path.end, "origin": first.origin,
-              "normal": first.normal, "where": first.where, "start_size_mm": float(s[0]), "steps": len(steps),
+              "normal": first.normal, "where": first.where, "crack": spec.describe(), "crack_reason": spec.reason,
+              "start_size_mm": float(s[0]), "steps": len(steps),
               "k_table": {"size_mm": s.tolist(), "k_mpa_sqrt_m": k.tolist(), "area_mm2": area.tolist()},
               "section": {"area_mm2": area0, "force_N": force0, "flow_stress_MPa": flow},
               "law": law.to_dict(), "spectrum": spectrum.describe(), "samples": scatter.samples,
@@ -212,6 +216,11 @@ def _checks(st, res_path, first, cpath, inp, mc, unc, x_prof, sig_prof, material
                                                               "there, which leaves out the last cycles and errs short"))
     else:
         checks.append(Check("crack path", "pass", path_note + "; every part sampled fails on the solved path"))
+    if inp.law.estimated:
+        checks.append(Check("material data", "warn",
+                            f"no crack growth data is built in for {material.name}, so its constants are estimated "
+                            "from its stiffness and lives can be off by a factor of a few. Measured constants given "
+                            "as growth 'C=..,n=..,dkth=..,kic=..' replace them", {"source": inp.law.source}))
     return checks
 
 
@@ -247,12 +256,13 @@ def _depth(unc, first) -> float:
     return _first(first.origin, first.toward, unc.mesh, skip=0.1 * first.crack.size)
 
 
-def _verdict(st: FractureStudy, mc, first, spec) -> tuple[str, str]:
+def _verdict(st: FractureStudy, mc, first, spec, spectrum) -> tuple[str, str]:
     p = mc.percentiles
     where = first.where
     crack = f"A {fmt(spec.a)} mm {spec.shape} crack {where}"
     if np.isfinite(mc.nominal):
-        life = f"{crack} fails after about {_counts(mc.nominal)} cycles in a typical part."
+        blocks = "" if spectrum.constant else f", {fmt(mc.nominal / spectrum.cycles)} passes through the load block"
+        life = f"{crack} fails after about {_counts(mc.nominal)} cycles in a typical part{blocks}."
     else:
         life = f"{crack} stops growing in a typical part, below the growth threshold."
     if np.isfinite(p["B10"]):
@@ -383,8 +393,9 @@ def _assumptions(st, law: GrowthLaw, record, material, spectrum, scatter, first,
            f"{law.C:.3g} mm/cycle and n {law.n:g}"
            + (f", threshold {law.dk1:g} MPa sqrt(m) at R = 0" if law.dk1 else "")
            + (f", toughness {law.kc:g} MPa sqrt(m)" if law.kc else ", no toughness, so failure is net section yield")
-           + f". Source: {record.source if record and not st.growth else 'user supplied'}.",
+           + f". Source: {law.source or 'user supplied'}.",
            f"Loads cycle as {spectrum.describe()}, with the loads given as the peak.",
+           *([st.crack.reason] if st.crack.reason else []),
            f"The crack plane at the start is normal to the largest principal stress at the origin, {fmt(first.stress)} "
            f"MPa before the crack.",
            f"The path starts from a crack {start:.2g} times the size given, the smallest tenth of the starting flaws "

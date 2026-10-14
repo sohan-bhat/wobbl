@@ -129,10 +129,11 @@ def front_size(size: float, crack: Crack, h: float, wall: float, quality: str) -
 
 def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Spectrum, adapter, workdir: Path,
          h: float, wall: float, quality: str, max_steps: int, growth_frac: float, stop_k: float,
-         stop_net, budget: float, progress=None, keep: bool = False, inside=None) -> PathResult:
+         stop_net, budget: float, progress=None, keep: bool = False, part=None) -> PathResult:
     """Grow the crack step by step until it fails, cuts through the part, stops growing, or the steps or the time
     budget run out. ``build_model(cm)`` gives the static model on a cracked mesh, ``stop_net(size, area)`` says
-    whether the ligament has yielded and ``inside(points)`` whether points are inside the uncracked part."""
+    whether the ligament has yielded and ``part`` (a place.PartShape) tells when the next front would leave the
+    uncracked part."""
     say = progress or (lambda a, b: None)
     t_start = time.time()
     steps: list[Step] = []
@@ -208,7 +209,7 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
             notes.append("Every front point is below the growth threshold at this load, so the crack stops "
                          "growing.")
             break
-        if inside is not None and any((~inside(m[0][2:-2])).any() for m in moved.values()):
+        if part is not None and any(_leaves(part, sampled[i]["xyz"], m[0], m[1]) for i, m in moved.items()):
             # the next front would leave the part: the crack has reached the far side of the wall it runs through
             end = "the crack cutting through the wall it grows across"
             end_fails = True
@@ -228,6 +229,18 @@ def grow(prep, crack: Crack, build_model, material, law: GrowthLaw, spectrum: Sp
         if not keep:
             shutil.rmtree(workdir / f"step{j}", ignore_errors=True)
     return PathResult(steps, crack, end, first, convergence, balance, notes, end_fails)
+
+
+def _leaves(part, old: np.ndarray, new: np.ndarray, da: np.ndarray) -> bool:
+    """Whether a front moving from ``old`` to ``new[1:-1]`` (``new`` carries one extra point past each end) leaves
+    the part: a point past the far side of the wall, or a point whose way ahead meets the far side within its step.
+    The second catches a front whose fastest point is at a surface, where the first cannot tell."""
+    if (~part.inside(new[2:-2])).any():
+        return True
+    for p0, p1, d in zip(old, new[1:-1], da):
+        if d > 0 and part.ahead(p0, (p1 - p0) / d, 0.02 * d) < d:
+            return True
+    return False
 
 
 def _keq(s: dict, nu: float) -> np.ndarray:

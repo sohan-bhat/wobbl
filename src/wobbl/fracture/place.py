@@ -19,6 +19,7 @@ from ..geometry.select import Selector, parse_point
 from ..mesh.mesher import Mesh, Refinement, build_mesh
 from ..structural.build import BuiltModel, build_static
 from ..structural.spec import SpecError, StructuralStudy
+from ..units import fmt
 from . import shapes
 from .crackmesh import Crack
 from .spec import CrackSpec, FractureStudy
@@ -66,6 +67,7 @@ def solve_uncracked(st: FractureStudy, prep, features: PartFeatures, material, a
     loads, fixtures, _ = resolve_selections(sst, features)
     sizing = initial_sizing(prep, features, sst, QUALITY[sst.quality], loads)
     origin, unc, levels = None, None, []
+    a_ref = crack.a if crack.a > 0 else HOLE_FLAW
     for lv in range(2):
         say("mesh", f"uncracked part, level {lv}: element size {sizing.h:.3g} mm")
         mesh = build_mesh(prep, sizing)
@@ -81,8 +83,8 @@ def solve_uncracked(st: FractureStudy, prep, features: PartFeatures, material, a
         origin = find_origin(crack, unc, features, prep)
         if lv == 0:
             h = float(np.nanmin(mesh.node_sizes()[[origin]]))
-            size = max(min(sizing.h / 5.0, 0.5 * crack.a, h / 2), 0.02 * sizing.h)
-            sizing.refinements.append(Refinement(size, points=[tuple(mesh.X[origin])], radius=max(3 * crack.a, 4 * size),
+            size = max(min(sizing.h / 5.0, 0.5 * a_ref, h / 2), 0.02 * sizing.h)
+            sizing.refinements.append(Refinement(size, points=[tuple(mesh.X[origin])], radius=max(3 * a_ref, 4 * size),
                                                  grow=3 * sizing.h, label="crack origin"))
     unc.levels = levels
     return unc, origin
@@ -138,16 +140,25 @@ def ray_hits(p: np.ndarray, v: np.ndarray, X: np.ndarray, tris: np.ndarray) -> n
     return np.sort(t[hit])
 
 
-def inside_test(mesh: Mesh):
-    """A function telling which points lie inside the part, by the parity of boundary crossings along a ray."""
-    X, tris = mesh.X, mesh.tris[:, :3]
-    v = np.array([0.5773, 0.5779, 0.5769])
-    v /= np.linalg.norm(v)
+class PartShape:
+    """The uncracked part's surface, for asking whether points are inside it and how far a ray runs before leaving."""
 
-    def inside(points) -> np.ndarray:
-        return np.array([len(ray_hits(np.asarray(p, float), v, X, tris)) % 2 == 1 for p in np.atleast_2d(points)],
-                        bool)
-    return inside
+    def __init__(self, mesh: Mesh):
+        self.X, self.tris = mesh.X, mesh.tris[:, :3]
+        v = np.array([0.5773, 0.5779, 0.5769])
+        self._v = v / np.linalg.norm(v)
+
+    def inside(self, points) -> np.ndarray:
+        """Which points are inside, by the parity of boundary crossings along a ray."""
+        return np.array([len(ray_hits(np.asarray(p, float), self._v, self.X, self.tris)) % 2 == 1
+                         for p in np.atleast_2d(points)], bool)
+
+    def ahead(self, p, v, skip: float = 0.0) -> float:
+        """Distance from p along v to the first boundary crossing past ``skip``. A ray lying in a flat face does
+        not cross it, and a ray just grazing a curved face crosses it within ``skip``."""
+        t = ray_hits(np.asarray(p, float), np.asarray(v, float), self.X, self.tris)
+        t = t[t > skip]
+        return float(t[0]) if len(t) else math.inf
 
 
 def _first(p, v, mesh, skip: float = 0.0) -> float:
@@ -225,12 +236,13 @@ def place(spec: CrackSpec, unc: Uncracked, origin: int, features: PartFeatures, 
             margin = _margin(mesh, o, -d, a, h_front)
             crack = shapes.surface(o, normal, d, a, c, margin)
         else:
-            probe = o + (0.5 * a if spec.shape == "through" else 0.0) * d
+            # a point inside the wall: half the crack along its way in, or just under the face it starts on
+            probe = o + (0.5 * a * d if spec.shape == "through" else 0.25 * size * -faces[0])
             lo, hi = _first(probe, -w, mesh), _first(probe, w, mesh)
             if not (np.isfinite(lo) and np.isfinite(hi)):
                 raise SpecError("could not find the wall the crack runs through; give its normal and toward "
                                 "directions")
-            o = o + 0.5 * (hi - lo) * w
+            o = o + float((probe - o) @ w) * w + 0.5 * (hi - lo) * w
             half = 0.5 * (hi + lo)
             if spec.shape == "center":
                 margin = max(2.0 * h_front, 0.1 * half)
@@ -244,6 +256,67 @@ def place(spec: CrackSpec, unc: Uncracked, origin: int, features: PartFeatures, 
     where = _describe(features, mesh, o, hole)
     return Placement(crack, o, normal, toward, s_n, where, 2 * half if spec.shape in ("through", "center") else 0.0,
                      margin, notes)
+
+
+# Starting flaws of damage tolerance practice (MIL-A-83444, carried into JSSG-2006): a 0.05 in corner crack at a
+# hole, or a 0.05 in through crack where the wall there is no thicker; elsewhere a semicircular surface crack 0.125
+# in long, or a 0.25 in long through crack where the wall is 0.125 in or thinner.
+HOLE_FLAW, SURFACE_FLAW, THROUGH_FLAW = 1.27, 3.175, 6.35
+_RULE = "the starting flaws of MIL-A-83444 and JSSG-2006"
+
+
+def auto_crack(spec: CrackSpec, unc: Uncracked, origin: int, features: PartFeatures) -> CrackSpec:
+    """The starting crack damage tolerance practice assumes at the origin, sized down to a fifth of the wall ahead
+    when the part is too small for it, so the crack has room to grow."""
+    from dataclasses import replace
+
+    mesh = unc.mesh
+    o = mesh.X[origin]
+    size = float(np.nanmin(mesh.node_sizes()[[origin]]))
+    inward = -_face_normals(mesh, o, 2.0 * size)[0]
+    normal = np.asarray(spec.normal, float) if spec.normal is not None else principal_direction(unc.S[origin])[1]
+    normal = normal / np.linalg.norm(normal)
+    hole = _hole_at(spec, features, o)
+    toward = spec.toward
+    if hole is not None:
+        wall = 2.0 * hole[3]
+        ahead = _first(o, inward, mesh, skip=0.25 * size)
+        a = min(HOLE_FLAW, 0.2 * ahead)
+        if wall > HOLE_FLAW:
+            shape, c = "corner", min(a, 0.4 * wall)
+            why = f"a {fmt(a)} mm corner crack where the {fmt(2 * hole[2])} mm hole meets a face"
+        else:
+            shape, c = "through", None
+            why = f"a {fmt(a)} mm crack through the {fmt(wall)} mm wall at the {fmt(2 * hole[2])} mm hole"
+    else:
+        wall = _first(o, inward, mesh, skip=0.25 * size)
+        d = inward - (inward @ normal) * normal
+        d = d / max(np.linalg.norm(d), 1e-12)
+        w = np.cross(normal, d)
+        if wall <= SURFACE_FLAW:
+            # a thin wall loaded across its face: a crack through it, centered on the origin, along the wall
+            along = np.cross(normal, inward)
+            along = along / max(np.linalg.norm(along), 1e-12)
+            mid = o + 0.5 * wall * inward
+            room = min(_first(mid, along, mesh), _first(mid, -along, mesh))
+            shape, a, c = "center", min(0.5 * THROUGH_FLAW, 0.2 * room), None
+            toward = along.tolist()
+            why = f"a {fmt(2 * a)} mm crack through the {fmt(wall)} mm wall"
+        else:
+            probe = o + 0.25 * SURFACE_FLAW * d
+            width = _first(probe, w, mesh) + _first(probe, -w, mesh)
+            if width >= 2.0 * SURFACE_FLAW:
+                a = min(0.5 * SURFACE_FLAW, 0.2 * wall)
+                shape, c = "surface", a
+                why = f"a semicircular surface crack {fmt(a)} mm deep"
+            else:
+                shape, a, c = "through", min(0.5 * SURFACE_FLAW, 0.2 * wall), None
+                why = f"a {fmt(a)} mm crack through the {fmt(width)} mm edge"
+    rule = f"{why}, after {_RULE}"
+    if a < (HOLE_FLAW if hole is not None else 0.5 * SURFACE_FLAW) - 1e-9:
+        rule += ", made smaller to leave the crack room in this small part"
+    return replace(spec, shape=shape, a=float(a), c=None if c is None else float(c), toward=toward,
+                   text=f"{shape} {fmt(a)} mm (automatic)", reason=rule[0].upper() + rule[1:] + ".")
 
 
 def _tensor(S) -> np.ndarray:

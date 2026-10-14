@@ -23,7 +23,7 @@ from ..geometry.select import SelectionError, parse_vector
 from ..structural.spec import Fixture, Load, SpecError, parse_fixture, parse_load
 from ..units import UnitError, parse_quantity
 
-SHAPES = ("through", "corner", "surface", "center")
+SHAPES = ("auto", "through", "corner", "surface", "center")
 _NUM = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?"
 _VEC = rf"(?:{_NUM}\s*,\s*{_NUM}\s*,\s*{_NUM}|[-+]?[xyz]|up|down|left|right|front|back)"
 
@@ -39,6 +39,7 @@ class CrackSpec:
     normal: list[float] | None = None
     toward: list[float] | None = None
     text: str = ""
+    reason: str = ""              # why an automatic crack has this shape and size
 
     def describe(self) -> str:
         return self.text or f"{self.shape} {self.a:g} mm at {self.where}"
@@ -52,10 +53,13 @@ def _length(text: str) -> float:
 
 
 def parse_crack(text: str) -> CrackSpec:
-    """Read a crack description. Raises SpecError saying what was expected."""
-    raw = str(text).strip()
+    """Read a crack description. Raises SpecError saying what was expected. An empty description, or 'auto',
+    leaves the shape and size to the damage tolerance rule once the origin is known (see place.auto_crack)."""
+    raw = str(text or "auto").strip()
     low = raw.lower()
-    m = re.match(r"^(through|corner|surface|center|centre|edge)\b\s*(.*)$", low)
+    if low.startswith("at "):
+        low = "auto " + low
+    m = re.match(r"^(auto|through|corner|surface|center|centre|edge)\b\s*(.*)$", low)
     if not m:
         raise SpecError(f"a crack starts with its shape, one of {', '.join(SHAPES)}, as in 'through 1.27 mm at hole "
                         f"d=6.4' (got '{raw}')")
@@ -75,6 +79,11 @@ def parse_crack(text: str) -> CrackSpec:
     if mw:
         where = mw.group(1).strip()
         rest = rest[:mw.start()].strip()
+    if shape == "auto":
+        if rest:
+            raise SpecError(f"an automatic crack takes only where it starts and its directions, as in 'auto at "
+                            f"hole d=8' (got '{raw}')")
+        return CrackSpec("auto", 0.0, None, where, vecs.get("normal"), vecs.get("toward"), raw)
     a = c = None
     ratio = None
     for key, val in re.findall(rf"(2a|a/c|a|c)\s*=\s*({_NUM}\s*(?:mm|in|um|cm)?)", rest):

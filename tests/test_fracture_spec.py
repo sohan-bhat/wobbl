@@ -43,3 +43,12 @@ def test_placement_helpers():
                      [1, 2, 6], [1, 6, 5], [0, 4, 7], [0, 7, 3]])
     hits = ray_hits(np.array([0.3, 0.6, 0.25]), np.array([0, 0, 1.0]), X, tris)
     assert hits == pytest.approx([0.75])
+
+
+@pytest.mark.parametrize("text,where", [("auto", "hottest"), ("", "hottest"), ("auto at 1,2,3", "1,2,3"),
+                                        ("at hole d=8", "hole d=8")])
+def test_automatic_cracks(text, where):
+    cs = parse_crack(text)
+    assert cs.shape == "auto" and cs.where == where and cs.a == 0
+    with pytest.raises(SpecError):
+        parse_crack("auto 2 mm")
