@@ -100,7 +100,8 @@ _A = [
      ("fuel", "mixture", "reaction"), True, (r"flame", r"\bburn", r"combust", r"adiabatic", r"ignit", r"how hot"),
      ("reaction",), ("flame",)),
     ("propellant", "Rocket propellant c* and Isp, shifting and frozen, CEA style",
-     ("propellant", "mixture", "reaction"), True, (r"\bisp\b", r"specific impulse", r"c\*", r"rocket", r"nozzle"), ("combustion", "reaction"), ()),
+     ("propellant", "mixture", "reaction"), True, (r"\bisp\b", r"specific impulse", r"c\*", r"rocket", r"nozzle"),
+     ("combustion", "reaction"), ()),
     ("crystal", "Crystal structure, lattice constant, density, cohesive energy and bulk modulus of an element or "
                 "solid, with its atomic data", SOLIDS, True,
      (r"lattice", r"crystal", r"density", r"bulk modulus", r"\bstiff", r"cohesive", r"unit cell", r"elastic",

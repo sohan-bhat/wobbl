@@ -58,7 +58,10 @@ ACCURACY = {
     "B3LYP/def2-TZVP": {"bond": 0.008, "angle": 0.8, "freq": 0.03, "dipole": 0.1, "reaction": 12.0,
                         "gap": "about 1 eV smaller than the fundamental gap"},
     "EMT": {"lattice": 0.015, "bulk": 0.20, "cohesive": 0.15},
+    "PBE/GTH-SZV": {"lattice": 0.03, "bulk": 0.25, "cohesive": 0.30},
+    "PBE/GTH-DZVP": {"lattice": 0.015, "bulk": 0.15, "cohesive": 0.15},
     "Lennard-Jones": {"lattice": 0.02, "cohesive": 0.10},
+    "Born-Mayer": {"lattice": 0.02, "bulk": 0.30},
     "tables": {"formation": 1.0},
 }
 # harmonic frequencies sit above measured fundamentals, by these factors on average (CCCBDB)

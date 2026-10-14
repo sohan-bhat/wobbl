@@ -304,3 +304,34 @@ def mixture(out: Path, label: str, values: dict) -> str:
                         "flame_T_K": _r(values.get("T_ad_K"), 5)},
             "frames": values.get("sweep", [])}
     return _write(out, data)
+
+
+def crystal(out: Path, name: str, atoms, desc: str, frames=None, volumes=None, energies=None, values=None, md=None,
+            md_fs: float = 0.0) -> str:
+    """A crystal's unit cell and atoms, with frames of the cell breathing through the equation of state (each
+    volume a computed energy) or of its atoms moving in a dynamics run."""
+    anims = []
+    if frames:
+        e0 = min(energies)
+        anims.append({"kind": "equation of state", "name": "the cell squeezed and stretched",
+                      "energies_eV_per_atom": [_r((e - e0) / len(atoms), 4) for e in energies],
+                      "volumes_A3": [_r(v, 5) for v in volumes],
+                      "cells": [[[round(float(x), 4) for x in row] for row in f.cell] for f in frames],
+                      "frames": [_pos(f.get_positions()) for f in frames]})
+    if md:
+        anims.append({"kind": "dynamics", "name": f"atoms at {_r((values or {}).get('T_K', 0), 4)} K",
+                      "frame_fs": _r(md_fs / max(len(md), 1), 4), "frames": md})
+    v = values or {}
+    data = {"manifest": {"kind": "crystal", "version": VERSION, "generator": "wobbl chem",
+                         "frames": sum(len(a["frames"]) for a in anims),
+                         "units": {"positions": "angstrom", "cell": "angstrom, rows are the lattice vectors",
+                                   "energies_eV_per_atom": "eV per atom above the minimum", "frame_fs": "fs"},
+                         "notes": "Periodic: the cell repeats in every direction. Equation of state frames are the "
+                                  "computed volumes, dynamics frames true positions."},
+            "crystal": {"name": name, "structure": desc, "method": v.get("method")},
+            "cell": [[round(float(x), 4) for x in row] for row in atoms.cell], "pbc": [True, True, True],
+            "atoms": atoms_block(atoms.get_chemical_symbols()), "positions": _pos(atoms.get_positions()),
+            "bonds": [], "animations": anims,
+            "properties": {k: _r(v[k], 5) for k in ("lattice_A", "density_g_cm3", "bulk_modulus_GPa",
+                                                     "cohesive_eV_atom", "drift_meV_atom") if v.get(k) is not None}}
+    return _write(out, data)
