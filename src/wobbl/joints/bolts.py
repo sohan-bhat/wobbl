@@ -112,6 +112,32 @@ def parse_bolt(text: str) -> BoltSpec:
     return sp
 
 
+_TORQUE = re.compile(r"(\d+(?:\.\d+)?)\s*(n\s*\*?\s*m|nm|n·m|kn\s*\*?\s*m|lbf?[\s*-]*ft|ft[\s*-]*lbf?|"
+                     r"in[\s*-]*lbf?|lbf?[\s*-]*in)\b", re.I)
+_PRELOAD = re.compile(r"preload(?:ed)?\s+(?:of\s+|to\s+)?(\d+(?:\.\d+)?\s*(?:k?n|lbf?|kips?))\b", re.I)
+
+
+def bolt_from_words(text: str) -> str:
+    """A bolt spec read from plain words, as 'four M8 bolts at 20 N m' gives 'M8 torque 20 N*m', or ''."""
+    m = _SIZE.search(text or "")
+    if not m:
+        return ""
+    spec = m.group(0).replace(" ", "")
+    g = _GRADE.search(text)
+    if g and g.group(1).lower() in V.GRADES:
+        spec += f" {g.group(1).lower()}"
+    t = _TORQUE.search(text)
+    if t:
+        unit = re.sub(r"[\s*·-]+", "", t.group(2).lower())
+        unit = {"nm": "N*m", "knm": "kN*m", "lbft": "lbf*ft", "lbfft": "lbf*ft", "ftlb": "lbf*ft", "ftlbf": "lbf*ft",
+                "inlb": "in*lbf", "inlbf": "in*lbf", "lbin": "in*lbf", "lbfin": "in*lbf"}.get(unit, "N*m")
+        spec += f" torque {t.group(1)} {unit}"
+    p = _PRELOAD.search(text)
+    if p:
+        spec += f" preload {p.group(1)}"
+    return spec
+
+
 def _quantity(t: str, kind: str, text: str) -> float:
     try:
         return parse_quantity(t.strip(), kind).value

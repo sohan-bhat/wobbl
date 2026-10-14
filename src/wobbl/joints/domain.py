@@ -36,17 +36,22 @@ def contact(job):
                       job.values("move"), friction, _bodies(job, "body-material"), bonded,
                       job.number("contact-size"), job.number("target-sf"), quality, job.question, base.scale,
                       base.params, job.flag("keep"), job.flag("playback"))
+    job.ready()
     o = run_contact(st, job.out, job.log, render_images=not job.quick)
     job.criterion("stress", "governing_MPa", o.values["governing_MPa"] * o.values["safety_factor"], "max")
     return o
 
 
 def bolts(job):
-    from .bolts import BoltStudy, run_bolts
+    from .bolts import BoltStudy, bolt_from_words, run_bolts
 
     base, quality = _common(job)
     given = job.values("bolt")
-    if not given:
+    words = "" if given else bolt_from_words(job.focus)
+    if words:
+        given = [words]
+        job.use("bolt", given)
+    elif not given:
         job.assume("bolts not given: assumed a class 8.8 bolt sized to its hole in every hole that runs through two "
                    "parts, tightened to 70% of its proof load", "--bolt " + shlex.quote("M8 8.8 torque 25 N*m"))
     friction = float(job.value("friction", "0.15", "friction coefficient between the clamped parts not given"))
@@ -54,6 +59,7 @@ def bolts(job):
     st = BoltStudy(base.part, base.material, given, [x.text for x in base.loads], [f.text for f in base.fixtures],
                    friction, nut, _bodies(job, "body-material"), [], quality, job.question, base.scale, base.params,
                    job.flag("keep"), job.flag("playback"))
+    job.ready()
     o = run_bolts(st, job.out, job.log, render_images=not job.quick)
     job.criterion("bolt proof use", "proof_use", 1.0, "max")
     job.criterion("clamp left", "least_clamp_N", 0.0, "min")
@@ -67,7 +73,7 @@ _SHARED = (Option("friction", "Friction coefficient between touching parts"),
 
 register(Analysis(
     "part", "contact", "Parts of an assembly that press on each other, slide and open, with friction",
-    contact, kinds=PART_KINDS, covers=("stress",), legacy="",
+    contact, dry=True, kinds=PART_KINDS, covers=("stress",), legacy="",
     keywords=(r"\bcontact", r"\bpress(?:es|ed|ing)?\s+(?:on|against|into)\b", r"\bslid(?:e|es|ing)\b",
               r"\bslip(?:s|ping)?\b", r"\bfriction", r"\bclamp(?:s|ed|ing)?\b", r"\bpin\b", r"\binterference",
               r"press[- ]fit", r"\btouch(?:es|ing)?\b", r"\bhertz", r"\bbearing pressure"),
@@ -80,7 +86,7 @@ register(Analysis(
 
 register(Analysis(
     "part", "bolts", "Bolted joints: preload from torque, then the load, checked for separation, slip and strength",
-    bolts, kinds=PART_KINDS, covers=("stress", "contact"), legacy="",
+    bolts, dry=True, kinds=PART_KINDS, covers=("stress", "contact"), legacy="",
     keywords=(r"\bbolt(?:s|ed)?\b", r"\bscrews?\b", r"\bfasten", r"\bpreload", r"\btighten", r"\bnuts?\b",
               r"\bflange", r"\bseparat", r"\bjoint\s+open", r"\bvdi\s*2230"),
     aliases=("bolt", "bolted", "fasteners", "joint"),

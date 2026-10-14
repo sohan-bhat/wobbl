@@ -141,3 +141,13 @@ def test_bolts_are_found_from_the_holes(name, tmp_path):
         assert len(lines) == 4 and all(ln.clamp == pytest.approx(24) for ln in lines)
         assert lines[0].preload(0.2)[0] == pytest.approx(20000 / (0.2 * 8))
         assert any("40 mm hole" in n and "bore" in n for n in asm.prep.notes)
+
+
+def test_bolts_are_read_from_plain_words():
+    from wobbl.joints.bolts import bolt_from_words
+
+    assert bolt_from_words("Do four M8 bolts at 20 N m keep it closed?") == "M8 torque 20 N*m"
+    assert bolt_from_words("two M10 10.9 screws torqued to 45 Nm") == "M10 10.9 torque 45 N*m"
+    assert bolt_from_words("M6 bolts preloaded to 8 kN") == "M6 preload 8 kN"
+    assert bolt_from_words("M12x1.5 8.8 at 30 lbf ft") == "M12x1.5 8.8 torque 30 lbf*ft"
+    assert bolt_from_words("will it hold 200 N?") == ""
