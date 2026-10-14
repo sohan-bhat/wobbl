@@ -43,3 +43,32 @@ def plastic_cylinder(out: Path):
     o, info = _plastic(part, [f"{p} MPa @ cylinders r={ri:g}"],
                        ["roller x=0", "roller y=0", "roller z=min", "roller z=max"], out / "run")
     return o.values["collapse_factor"] * p, 2.0 / math.sqrt(3.0) * SY * math.log(ro / ri), info
+
+
+def friction_slide(out: Path):
+    """A steel block 30 x 30 mm pressed onto a base with 5 MPa, then pushed 0.05 mm sideways, far past the slip of a
+    few microns at which it starts to slide. Coulomb's law gives the force to keep it sliding: mu N = 0.3 x 4500 N."""
+    from ..joints.contact import ContactStudy, run_contact
+    from .generality import _step, block_on_base
+
+    part = _step(out / "block.step", block_on_base)
+    o = run_contact(ContactStudy(str(part), "mild-steel", ["5 MPa -z @ body 2 and top"], ["body 1 and bottom"],
+                                 ["0.05 mm +x @ body 2 and x=min"], 0.3, quality="fast"), out / "run",
+                    render_images=False)
+    got = abs(o.values["move_force_N"][0])
+    return got, 0.3 * 5.0 * 900.0, {"confidence": o.confidence, "nodes": o.values["levels"][-1]["n_nodes"],
+                                    "time_s": round(o.t_total, 1)}
+
+
+def bolt_clamp(out: Path):
+    """Three steel plates on one M10 8.8 bolt tightened to 70% of its proof load. Before any load, statics leaves
+    every interface of the stack pressed with exactly the bolt's preload, whatever the stiffnesses."""
+    from ..joints.bolts import BoltStudy, run_bolts
+    from .generality import _step, three_plate_stack
+
+    part = _step(out / "stack.step", three_plate_stack)
+    o = run_bolts(BoltStudy(str(part), "mild-steel", [], ["1 N +z @ body 3 and top"], ["body 1 and bottom"],
+                            quality="fast"), out / "run", render_images=False)
+    b = o.values["bolts"][0]
+    return b["clamp_preload"], b["preload"], {"confidence": o.confidence, "nodes": o.values["levels"][-1]["n_nodes"],
+                                              "preload_N": round(b["preload"], 1), "time_s": round(o.t_total, 1)}

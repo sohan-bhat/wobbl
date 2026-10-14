@@ -858,6 +858,11 @@ CASES += [
          "fully plastic moment sigma_y b h^2 / 4", "collapse moment", "N m", 0.02, True, NL.plastic_cantilever),
     Case("plastic-cylinder", "Thick steel tube under internal pressure, plane strain", "plasticity",
          "Hill (1950), (2 / sqrt 3) sigma_y ln(b / a)", "collapse pressure", "MPa", 0.02, True, NL.plastic_cylinder),
+    Case("friction-slide", "Steel block pressed with 5 MPa and pushed sideways", "contact",
+         "Coulomb, mu N", "force to keep it sliding", "N", 0.01, True, NL.friction_slide),
+    Case("bolt-clamp", "Three plates on one tightened M10 bolt", "bolted joint",
+         "statics: each interface carries the preload", "clamp force at the weakest interface", "N", 0.02, True,
+         NL.bolt_clamp),
 ]
 
 # --- magnetic, electric, board, antenna and sound fields (the case functions are in fields_cases.py) -------------
