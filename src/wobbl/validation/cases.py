@@ -808,6 +808,11 @@ CASES += [
          "Hill (1950), (2 / sqrt 3) sigma_y ln(b / a)", "collapse pressure", "MPa", 0.02, True, NL.plastic_cylinder),
 ]
 
+# --- magnetic, electric, board, antenna and sound fields (the case functions are in fields_cases.py) -------------
+from .fields_cases import FIELD_CASES  # noqa: E402
+
+CASES += FIELD_CASES
+
 def run_cases(out_dir: str | Path, ids: list[str] | None = None, log=print) -> list[dict]:
     out = Path(out_dir)
     results = []
