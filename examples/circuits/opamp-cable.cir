@@ -1,0 +1,8 @@
+* An LM358 buffering a 2.5 V reference down a cable (about 1 uF of capacitance) to an ADC
+V1 v5 0 5 ; USB
+R1 v5 ref 10k ; 0603
+R2 ref 0 10k ; 0603
+C1 ref 0 100n ; 16V X7R
+XU1 ref out v5 0 out LM358
+CCABLE out 0 1u ; 16V X7R
+RADC out 0 100k ; 0603

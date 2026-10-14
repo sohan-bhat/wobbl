@@ -56,6 +56,218 @@
   "ripple_A": 0.603644,
   "vout_avg": 5.072582,
   "il_peak": 2.331019,
+  "parts": {
+   "V1": {
+    "ref": "V1",
+    "kind": "supply",
+    "part": "",
+    "items": [
+     {
+      "what": "current drawn",
+      "value": 0.896543,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "info",
+      "note": "delivers 10.8 W"
+     }
+    ],
+    "v": 12.0,
+    "i": 0.896543,
+    "p": 10.758515,
+    "tj": null,
+    "generic": false,
+    "source": "",
+    "status": "info",
+    "use": null
+   },
+   "VG": {
+    "ref": "VG",
+    "kind": "signal",
+    "part": "",
+    "items": [
+     {
+      "what": "current drawn",
+      "value": 0.0,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "info",
+      "note": "delivers 1.10e-09 W"
+     }
+    ],
+    "v": 5.0,
+    "i": 0.0,
+    "p": 0.0,
+    "tj": null,
+    "generic": false,
+    "source": "",
+    "status": "info",
+    "use": null
+   },
+   "S1": {
+    "ref": "S1",
+    "kind": "switch",
+    "part": "",
+    "items": [
+     {
+      "what": "power",
+      "value": 0.091734,
+      "limit": null,
+      "unit": "W",
+      "use": null,
+      "status": "info",
+      "note": "no ratings known"
+     }
+    ],
+    "v": 12.338769,
+    "i": 1.35388,
+    "p": 0.091734,
+    "tj": null,
+    "generic": false,
+    "source": "",
+    "status": "info",
+    "use": null
+   },
+   "D1": {
+    "ref": "D1",
+    "kind": "diode",
+    "part": "SCHOTTKY",
+    "items": [
+     {
+      "what": "forward current",
+      "value": 1.132722,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "unknown",
+      "note": ""
+     },
+     {
+      "what": "reverse voltage",
+      "value": 11.91366,
+      "limit": null,
+      "unit": "V",
+      "use": null,
+      "status": "unknown",
+      "note": ""
+     }
+    ],
+    "v": 11.91366,
+    "i": 1.132722,
+    "p": 0.373105,
+    "tj": null,
+    "generic": true,
+    "source": "model SCHOTTKY as the netlist defines it, no ratings known",
+    "status": "unknown",
+    "use": null
+   },
+   "L1": {
+    "ref": "L1",
+    "kind": "inductor",
+    "part": "inductor",
+    "items": [
+     {
+      "what": "peak current",
+      "value": 2.331019,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "unknown",
+      "note": "saturation current not given; pick one rated above this"
+     }
+    ],
+    "v": 6.845038,
+    "i": 2.036704,
+    "p": -6.6e-05,
+    "tj": null,
+    "generic": false,
+    "source": "current ratings not given",
+    "status": "unknown",
+    "use": null
+   },
+   "C1": {
+    "ref": "C1",
+    "kind": "capacitor",
+    "part": "capacitor",
+    "items": [
+     {
+      "what": "voltage",
+      "value": 5.076402,
+      "limit": null,
+      "unit": "V",
+      "use": null,
+      "status": "unknown",
+      "note": "rating not given; a 10 V part covers it"
+     }
+    ],
+    "v": 5.076402,
+    "i": 0.173475,
+    "p": 0.00113,
+    "tj": null,
+    "generic": false,
+    "source": "voltage rating not given",
+    "status": "unknown",
+    "use": null
+   },
+   "R2": {
+    "ref": "R2",
+    "kind": "resistor",
+    "part": "resistor",
+    "items": [
+     {
+      "what": "power",
+      "value": 0.000301,
+      "limit": 0.25,
+      "unit": "W",
+      "use": 0.001204,
+      "status": "ok",
+      "note": "surface near 25.1 C"
+     },
+     {
+      "what": "voltage",
+      "value": 0.00301,
+      "limit": 250,
+      "unit": "V",
+      "use": 1.2e-05,
+      "status": "ok",
+      "note": ""
+     }
+    ],
+    "v": 0.00301,
+    "i": 0.173475,
+    "p": 0.000301,
+    "tj": null,
+    "generic": false,
+    "source": "rating of a 1/4 W leaded resistor, the usual hobby part",
+    "status": "ok",
+    "use": 0.001204
+   },
+   "RLOAD": {
+    "ref": "RLOAD",
+    "kind": "load",
+    "part": "load",
+    "items": [
+     {
+      "what": "power",
+      "value": 10.292311,
+      "limit": null,
+      "unit": "W",
+      "use": null,
+      "status": "info",
+      "note": "draws 2.03 A"
+     }
+    ],
+    "v": 5.076996,
+    "i": 2.029021,
+    "p": 10.292311,
+    "tj": null,
+    "generic": false,
+    "source": "a load the circuit drives, not judged as a resistor",
+    "status": "info",
+    "use": null
+   }
+  },
   "params": {
    "vin": 12.0,
    "vout": 5.0,
@@ -92,6 +304,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 22.576575,
- "solver": "ngspice 41"
+ "t_total": 58.645196,
+ "solver": "ngspice 41",
+ "criteria": []
 }

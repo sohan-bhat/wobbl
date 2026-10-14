@@ -8,5 +8,5 @@ D1 0 sw SCHOTTKY
 L1 sw out 9.999999999999999e-06 IC=2.0
 C1 out cmid 2.2e-05 IC=5.0
 R2 cmid 0 0.01
-R1 out 0 2.5
+RLOAD out 0 2.5
 .end

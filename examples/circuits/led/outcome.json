@@ -57,6 +57,98 @@
   "i_led_A": 0.036862,
   "v_led_V": 3.267467,
   "p_resistor_W": 0.063865,
+  "parts": {
+   "V1": {
+    "ref": "V1",
+    "kind": "supply",
+    "part": "",
+    "items": [
+     {
+      "what": "current drawn",
+      "value": 0.036862,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "info",
+      "note": "delivers 0.184 W"
+     }
+    ],
+    "v": 5.0,
+    "i": 0.036862,
+    "p": 0.184312,
+    "tj": null,
+    "generic": false,
+    "source": "",
+    "status": "info",
+    "use": null
+   },
+   "R1": {
+    "ref": "R1",
+    "kind": "resistor",
+    "part": "resistor",
+    "items": [
+     {
+      "what": "power",
+      "value": 0.063865,
+      "limit": 0.25,
+      "unit": "W",
+      "use": 0.255461,
+      "status": "ok",
+      "note": "surface near 46.7 C"
+     },
+     {
+      "what": "voltage",
+      "value": 1.732533,
+      "limit": 250,
+      "unit": "V",
+      "use": 0.00693,
+      "status": "ok",
+      "note": ""
+     }
+    ],
+    "v": 1.732533,
+    "i": 0.036862,
+    "p": 0.063865,
+    "tj": null,
+    "generic": false,
+    "source": "rating of a 1/4 W leaded resistor, the usual hobby part",
+    "status": "ok",
+    "use": 0.255461
+   },
+   "D1": {
+    "ref": "D1",
+    "kind": "led",
+    "part": "LED-red",
+    "items": [
+     {
+      "what": "forward current",
+      "value": 0.036862,
+      "limit": 0.03,
+      "unit": "A",
+      "use": 1.228747,
+      "status": "over",
+      "note": ""
+     },
+     {
+      "what": "reverse voltage",
+      "value": 0.0,
+      "limit": 5.0,
+      "unit": "V",
+      "use": 0.0,
+      "status": "ok",
+      "note": ""
+     }
+    ],
+    "v": 3.267467,
+    "i": 0.036862,
+    "p": 0.120447,
+    "tj": null,
+    "generic": false,
+    "source": "model LEDX as the netlist defines it, ratings from the library (red indicator LED: 2 V at 20 mA, 30 mA most)",
+    "status": "over",
+    "use": 1.228747
+   }
+  },
   "params": {
    "supply": 5.0,
    "resistor": 47.0,
@@ -96,6 +188,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 0.45367,
- "solver": "ngspice 41"
+ "t_total": 0.869382,
+ "solver": "ngspice 41",
+ "criteria": []
 }

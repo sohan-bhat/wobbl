@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480" role="img" aria-label="Parts and nets of KiCad schematic kicad-board.kicad_sch, listed from the netlist." font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+<title>Parts and nets of KiCad schematic kicad-board.kicad_sch, listed from the netlist.</title>
+<defs>
+</defs>
+<rect width="640" height="480" fill="#0e1011"/>
+<text x="24" y="32" font-size="10.5" fill="#9ca099" font-weight="500" letter-spacing="1.3">SCHEMATIC</text>
+<text x="110.4" y="32" font-size="12" fill="#c9ccc5">KiCad schematic kicad-board.kicad_sch</text>
+<text x="24" y="58" font-size="11" fill="#9ca099">Drawn as a list, since this circuit is not a simple ladder.</text>
+<text x="24" y="92" font-size="10.5" fill="#9ca099" letter-spacing="1.3">PARTS</text>
+<text x="392" y="92" font-size="10.5" fill="#9ca099" letter-spacing="1.3">NETS</text>
+<text x="24" y="118" font-size="12" fill="#f2f2ee" font-weight="600">VJ1</text>
+<text x="96" y="118" font-size="12" fill="#c9ccc5">p12v 0</text>
+<text x="236" y="118" font-size="12" fill="#ffd400">12</text>
+<text x="24" y="140" font-size="12" fill="#f2f2ee" font-weight="600">XU1</text>
+<text x="96" y="140" font-size="12" fill="#c9ccc5">p12v 0 p5v</text>
+<text x="236" y="140" font-size="12" fill="#ffd400">U_L7805</text>
+<text x="24" y="162" font-size="12" fill="#f2f2ee" font-weight="600">C1</text>
+<text x="96" y="162" font-size="12" fill="#c9ccc5">p12v 0</text>
+<text x="236" y="162" font-size="12" fill="#ffd400">100u</text>
+<text x="24" y="184" font-size="12" fill="#f2f2ee" font-weight="600">C2</text>
+<text x="96" y="184" font-size="12" fill="#c9ccc5">p5v 0</text>
+<text x="236" y="184" font-size="12" fill="#ffd400">100n</text>
+<text x="24" y="206" font-size="12" fill="#f2f2ee" font-weight="600">XU2</text>
+<text x="96" y="206" font-size="12" fill="#c9ccc5">n_u2_1 n_u2_2 n_</text>
+<text x="236" y="206" font-size="12" fill="#ffd400">ATtiny85-20PU</text>
+<text x="24" y="228" font-size="12" fill="#f2f2ee" font-weight="600">C3</text>
+<text x="96" y="228" font-size="12" fill="#c9ccc5">p5v 0</text>
+<text x="236" y="228" font-size="12" fill="#ffd400">100n</text>
+<text x="24" y="250" font-size="12" fill="#f2f2ee" font-weight="600">R1</text>
+<text x="96" y="250" font-size="12" fill="#c9ccc5">led led_k</text>
+<text x="236" y="250" font-size="12" fill="#ffd400">330</text>
+<text x="24" y="272" font-size="12" fill="#f2f2ee" font-weight="600">D1</text>
+<text x="96" y="272" font-size="12" fill="#c9ccc5">led_k 0</text>
+<text x="236" y="272" font-size="12" fill="#ffd400">LED_green_20</text>
+<text x="24" y="294" font-size="12" fill="#f2f2ee" font-weight="600">R2</text>
+<text x="96" y="294" font-size="12" fill="#c9ccc5">gate_drv gate</text>
+<text x="236" y="294" font-size="12" fill="#ffd400">100</text>
+<text x="24" y="316" font-size="12" fill="#f2f2ee" font-weight="600">R3</text>
+<text x="96" y="316" font-size="12" fill="#c9ccc5">gate 0</text>
+<text x="236" y="316" font-size="12" fill="#ffd400">10k</text>
+<text x="24" y="338" font-size="12" fill="#f2f2ee" font-weight="600">MQ1</text>
+<text x="96" y="338" font-size="12" fill="#c9ccc5">stripm gate 0 m_</text>
+<text x="236" y="338" font-size="12" fill="#ffd400">MOSFET</text>
+<text x="24" y="360" font-size="12" fill="#f2f2ee" font-weight="600">RLOAD_J2</text>
+<text x="96" y="360" font-size="12" fill="#c9ccc5">p12v stripm</text>
+<text x="236" y="360" font-size="12" fill="#ffd400">6</text>
+<text x="392" y="118" font-size="12" fill="#f2f2ee" font-weight="600">ground</text>
+<text x="480" y="118" font-size="12" fill="#c9ccc5">VJ1, XU1, C1, C2, XU2,</text>
+<text x="392" y="140" font-size="12" fill="#f2f2ee" font-weight="600">gate</text>
+<text x="480" y="140" font-size="12" fill="#c9ccc5">R2, R3, MQ1</text>
+<text x="392" y="162" font-size="12" fill="#f2f2ee" font-weight="600">gate_drv</text>
+<text x="480" y="162" font-size="12" fill="#c9ccc5">XU2, R2</text>
+<text x="392" y="184" font-size="12" fill="#f2f2ee" font-weight="600">led</text>
+<text x="480" y="184" font-size="12" fill="#c9ccc5">XU2, R1</text>
+<text x="392" y="206" font-size="12" fill="#f2f2ee" font-weight="600">led_k</text>
+<text x="480" y="206" font-size="12" fill="#c9ccc5">R1, D1</text>
+<text x="392" y="228" font-size="12" fill="#f2f2ee" font-weight="600">m_irlz44n</text>
+<text x="480" y="228" font-size="12" fill="#c9ccc5">MQ1</text>
+<text x="392" y="250" font-size="12" fill="#f2f2ee" font-weight="600">n_u2_1</text>
+<text x="480" y="250" font-size="12" fill="#c9ccc5">XU2</text>
+<text x="392" y="272" font-size="12" fill="#f2f2ee" font-weight="600">n_u2_2</text>
+<text x="480" y="272" font-size="12" fill="#c9ccc5">XU2</text>
+<text x="392" y="294" font-size="12" fill="#f2f2ee" font-weight="600">n_u2_3</text>
+<text x="480" y="294" font-size="12" fill="#c9ccc5">XU2</text>
+<text x="392" y="316" font-size="12" fill="#f2f2ee" font-weight="600">n_u2_7</text>
+<text x="480" y="316" font-size="12" fill="#c9ccc5">XU2</text>
+<text x="392" y="338" font-size="12" fill="#f2f2ee" font-weight="600">p12v</text>
+<text x="480" y="338" font-size="12" fill="#c9ccc5">VJ1, XU1, C1, RLOAD_J2</text>
+<text x="392" y="360" font-size="12" fill="#f2f2ee" font-weight="600">p5v</text>
+<text x="480" y="360" font-size="12" fill="#c9ccc5">XU1, C2, XU2, C3</text>
+<text x="392" y="382" font-size="12" fill="#f2f2ee" font-weight="600">stripm</text>
+<text x="480" y="382" font-size="12" fill="#c9ccc5">MQ1, RLOAD_J2</text>
+</svg>

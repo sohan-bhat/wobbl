@@ -1,0 +1,20 @@
+* KiCad schematic kicad-board.kicad_sch
+VJ1 p12v 0 12
+XU1 p12v 0 p5v U_L7805
+C1 p12v 0 100u
+C2 p5v 0 100n
+XU2 n_u2_1 n_u2_2 n_u2_3 0 led gate_drv n_u2_7 p5v ATtiny85-20PU
+C3 p5v 0 100n
+R1 led led_k 330
+D1 led_k 0 LED_green_20
+R2 gate_drv gate 100
+R3 gate 0 10k
+MQ1 stripm gate 0 M_IRLZ44N
+RLOAD_J2 p12v stripm 6
+.model LED_green_20 D(IS=2.223217e-22 N=2.583 RS=1.5 BV=6 IBV=10u CJO=20p)
+.model M_IRLZ44N VDMOS(Vto=1.5 Kp=21.72 Rd=0.01327 Rs=0.003317 Rg=2 lambda=0.01 ksubthres=0.1 Cgs=1.55e-09 Cgdmax=7.5e-10 Cgdmin=7.5e-11 A=1 Cjo=2.5e-10 Is=1.199e-11 N=1.2 Rb=0.01064 BV=60.5 TT=50n)
+.subckt U_L7805 in gnd out
+B1 in out I = min(min(2.2, max(0, 50.0*(5.0 - V(out,gnd)))), max(0, (V(in,out) - 1.2)/0.5333))
+Iq in gnd 0.005
+.ends
+.end

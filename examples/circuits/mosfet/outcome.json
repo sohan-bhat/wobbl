@@ -50,6 +50,128 @@
   "p_total_W": 1.509969,
   "p_cond_W": 1.365969,
   "p_sw_W": 0.144,
+  "parts": {
+   "V1": {
+    "ref": "V1",
+    "kind": "supply",
+    "part": "",
+    "items": [
+     {
+      "what": "current drawn",
+      "value": 7.530076,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "info",
+      "note": "delivers 90.4 W"
+     }
+    ],
+    "v": 12.0,
+    "i": 7.530076,
+    "p": 90.360911,
+    "tj": null,
+    "generic": false,
+    "source": "",
+    "status": "info",
+    "use": null
+   },
+   "RL": {
+    "ref": "RL",
+    "kind": "load",
+    "part": "load",
+    "items": [
+     {
+      "what": "power",
+      "value": 89.457295,
+      "limit": null,
+      "unit": "W",
+      "use": null,
+      "status": "info",
+      "note": "draws 10.6 A"
+     }
+    ],
+    "v": 11.88,
+    "i": 10.627847,
+    "p": 89.457295,
+    "tj": null,
+    "generic": false,
+    "source": "a load the circuit drives, not judged as a resistor",
+    "status": "info",
+    "use": null
+   },
+   "VG": {
+    "ref": "VG",
+    "kind": "signal",
+    "part": "",
+    "items": [
+     {
+      "what": "current drawn",
+      "value": 0.0,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "info",
+      "note": "delivers 5.01e-09 W"
+     }
+    ],
+    "v": 10.0,
+    "i": 0.0,
+    "p": 0.0,
+    "tj": null,
+    "generic": false,
+    "source": "",
+    "status": "info",
+    "use": null
+   },
+   "S1": {
+    "ref": "S1",
+    "kind": "switch",
+    "part": "",
+    "items": [
+     {
+      "what": "power",
+      "value": 0.903616,
+      "limit": null,
+      "unit": "W",
+      "use": null,
+      "status": "info",
+      "note": "no ratings known"
+     }
+    ],
+    "v": 11.999999,
+    "i": 10.627847,
+    "p": 0.903616,
+    "tj": null,
+    "generic": false,
+    "source": "",
+    "status": "info",
+    "use": null
+   },
+   "VS": {
+    "ref": "VS",
+    "kind": "supply",
+    "part": "",
+    "items": [
+     {
+      "what": "current drawn",
+      "value": -7.530076,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "info",
+      "note": "delivers 0 W"
+     }
+    ],
+    "v": 0.0,
+    "i": -7.530076,
+    "p": -0.0,
+    "tj": null,
+    "generic": false,
+    "source": "",
+    "status": "info",
+    "use": null
+   }
+  },
   "params": {
    "current": 15.0,
    "rds_on": 0.008,
@@ -82,6 +204,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 1.098513,
- "solver": "ngspice 41"
+ "t_total": 3.378527,
+ "solver": "ngspice 41",
+ "criteria": []
 }

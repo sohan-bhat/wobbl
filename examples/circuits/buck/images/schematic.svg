@@ -65,7 +65,7 @@
 <text x="364" y="63" font-size="12" fill="#ffd400" text-anchor="start">22 µF</text>
 <text x="364" y="157" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">R2</text>
 <text x="364" y="173" font-size="12" fill="#ffd400" text-anchor="start">10 mΩ</text>
-<text x="534" y="102" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">R1</text>
+<text x="534" y="102" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">RLOAD</text>
 <text x="534" y="118" font-size="12" fill="#ffd400" text-anchor="start">2.5 Ω</text>
 <text x="99" y="-72" font-size="13" fill="#f2f2ee" text-anchor="start" font-weight="600">VG</text>
 <text x="99" y="-56" font-size="12" fill="#ffd400" text-anchor="start">pulse 0 to 5 V</text>

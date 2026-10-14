@@ -1,0 +1,22 @@
+* An LM358 buffering a 2.5 V reference down a cable (about 1 uF of capacitance) to an ADC
+V1 v5 0 5
+R1 v5 ref 10k
+R2 ref 0 10k
+C1 ref 0 100n
+XU1 ref out v5 0 out U_LM358
+CCABLE out 0 1u
+RADC out 0 100k
+.subckt U_LM358 inp inn vcc vee out
+Rin inp inn 10meg
+B1 0 n1 I = max(-0.006821, min(0.006821, 0.1*(V(inp,inn)+0.002)))
+R1 n1 0 1meg
+C1 n1 0 2.274e-08
+B2 n1 0 I = 10*max(0, V(n1)-V(vcc)+1.5) + 10*min(0, V(n1)-V(vee)-0.02)
+G2 0 n2 n1 0 1
+R2 n2 0 1
+C2 n2 0 1.137e-07
+Bsrc vcc out I = max(0, min(0.04, (V(n2)-V(out))/50))
+Bsnk out vee I = max(0, min(0.04, (V(out)-V(n2))/50))
+Iq vcc vee 0.00035
+.ends
+.end

@@ -1,0 +1,26 @@
+FAILS. U1 (LM358) does not work as wired: 2 degrees of phase margin at 47133 Hz: it oscillates or rings hard.
+
+Confidence: high. passed KCL, power balance, tolerance convergence, model provenance
+hardest part: CCABLE at 16%
+supply power: 0.00313 W
+hottest part: U1 at 25.2 C
+analysis: operating point
+
+Checks:
+  [pass] KCL: currents into every node sum to zero within 7.50e-10 A (largest at ref, against 6.25e-04 A flowing)
+  [pass] power balance: supplies give 0.00313 W and the parts dissipate 0.00313 W (0.00016% apart)
+  [pass] tolerance convergence: every part's power and current agree to 0% with solver tolerances 100 times tighter
+  [pass] model provenance: models: 7 from the parts library
+  [info] loop stability: U1: loop gain 99879 at low frequency crosses 1 at 47133 Hz with 2 degrees of phase margin and 5 dB of gain margin; it will ring hard or oscillate
+  [info] supply range: solved at both ends of the supply (V1 4.75 to 5.25 V); the hardest parts there: CCABLE at 16%, C1 at 16%, RADC at 4%
+
+Assumptions:
+  - V1: USB port: 5 V (4.75 to 5.25 V), 0.15 ohm inside, 0.5 A most.
+  - U1: LM358 datasheet: 0.7 MHz, 0.3 V/us, swing to 1.5 V of V+ and 0.02 V of V-, 40 mA short circuit, 3 to 32 V supply.
+  - Ambient 25 C; temperatures are ambient plus average power times each part's thermal resistance.
+
+Suggested fixes:
+  - Isolate U1 from its capacitive load with 100 ohm: Put 100 ohm between U1's output and CCABLE, with the feedback taken before it, so the load's capacitance is outside the loop. Solved again, U1 now has phase margin 72.3 deg, 72 degrees of phase margin at 444507 Hz: stable.
+
+Images: setup: images/setup.svg, schematic: images/schematic.svg
+Report: report.html

@@ -1,0 +1,33 @@
+OK. Works and nothing is stressed: the hardest working part is C1 (capacitor) at 53% of its voltage rating.
+
+Confidence: high. passed KCL, power balance, time step convergence, hand calculation, model provenance
+hardest part: C1 at 53%
+supply power: 24.1 W
+hottest part: Q1 at 32.7 C
+analysis: transient
+
+Checks:
+  [pass] KCL: currents into every node sum to zero within 2.40e-09 A (largest at STRIP-, against 18.7 A flowing)
+  [pass] power balance: over the run the supplies gave 0.0585 J, the parts dissipated 0.0511 J and the capacitors and inductors stored 0.0072 J (1/2 C V^2 and 1/2 L I^2), 0.33% apart
+  [pass] time step convergence: every part's power and current agree to 0.26% with half the time step; the most moved is C2 current: 6.71e-07 and 5.88e-06
+  [pass] hand calculation: divider R2/R3: 4.98 V x 10000 / (100 + 10000) = 4.93 V by hand, ngspice 4.93 V (4e-06% apart)
+  [pass] hand calculation: R1 into D1: the diode equation solved by hand gives 5.43 mA, ngspice 5.43 mA (4.4e-05% apart)
+  [pass] hand calculation: U1 dissipates (Vin - Vout) Iout + its own current: 0.136 W by hand, 0.136 W from its pins (2.7e-11% apart)
+  [pass] hand calculation: Q1 conduction loss I_rms^2 R_ds(on) = 1.99^2 x 30 mohm = 0.119 W by hand, ngspice 0.119 W (0.25% apart)
+  [pass] model provenance: models: 11 from the parts library
+  [info] supply range: solved at both ends of the supply (J1 10.8 to 13.2 V (10% either way, a guess)); the hardest parts there: C1 at 53%, C3 at 34%, Q1 at 34%
+
+Assumptions:
+  - Wobbl guessed: J2 (LED strip) drives 2A, as set.
+  - U1: L7805 datasheet: 5 V, 2 V dropout at 1.5 A, 2.2 A limit, 35 V most in, TO-220.
+  - C1: 25 V rating as marked, aluminum.
+  - U2: ATTINY85 datasheet: 2.7 to 5.5 V (6 V absolute), about 5 mA running, pins drive through about 40 ohm and take 40 mA most.
+  - D1: green 0805 indicator LED: 3.1 V at 20 mA, 30 mA most.
+  - Q1: VDMOS fitted to the IRLZ44N datasheet: 22 mohm at 10 V, 25 mohm at 5 V, 35 mohm at 4 V, threshold 1.5 V, 55 V 47 A TO-220.
+  - J2 load: what J2 drives, 2A.
+  - Ambient 25 C; temperatures are ambient plus average power times each part's thermal resistance.
+  - Transient: run for 0.0036 s, six of the longest time constant (0.0006 s).
+  - Transient: outputs switch on at power up and off at 60% of the run, so both states and the switch off are seen.
+
+Images: setup: images/setup.svg, schematic: images/schematic.svg
+Report: report.html

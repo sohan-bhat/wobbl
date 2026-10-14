@@ -1,0 +1,609 @@
+{
+ "domain": "circuit",
+ "part": "kicad-board.kicad_sch",
+ "question": "Will anything on this board overheat with a 2 A LED strip on J2?",
+ "verdict": "ok",
+ "headline": "Works and nothing is stressed: the hardest working part is C1 (capacitor) at 53% of its voltage rating.",
+ "metrics": [
+  [
+   "hardest part",
+   "C1 at 53%"
+  ],
+  [
+   "supply power",
+   "24.1 W"
+  ],
+  [
+   "hottest part",
+   "Q1 at 32.7 C"
+  ],
+  [
+   "analysis",
+   "transient"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed KCL, power balance, time step convergence, hand calculation, model provenance"
+ ],
+ "checks": [
+  {
+   "name": "KCL",
+   "status": "pass",
+   "summary": "currents into every node sum to zero within 2.40e-09 A (largest at STRIP-, against 18.7 A flowing)",
+   "detail": {
+    "residual_A": 0.0,
+    "node": "stripm"
+   }
+  },
+  {
+   "name": "power balance",
+   "status": "pass",
+   "summary": "over the run the supplies gave 0.0585 J, the parts dissipated 0.0511 J and the capacitors and inductors stored 0.0072 J (1/2 C V^2 and 1/2 L I^2), 0.33% apart",
+   "detail": {
+    "supplied_J": 0.058453,
+    "dissipated_J": 0.051054,
+    "stored_J": 0.007202,
+    "stored_integral_J": 0.007398
+   }
+  },
+  {
+   "name": "time step convergence",
+   "status": "pass",
+   "summary": "every part's power and current agree to 0.26% with half the time step; the most moved is C2 current: 6.71e-07 and 5.88e-06",
+   "detail": {
+    "change": 0.002595,
+    "value": "C2 current"
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "divider R2/R3: 4.98 V x 10000 / (100 + 10000) = 4.93 V by hand, ngspice 4.93 V (4e-06% apart)",
+   "detail": {
+    "shape": "divider",
+    "hand": 4.930751,
+    "sim": 4.930751
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "R1 into D1: the diode equation solved by hand gives 5.43 mA, ngspice 5.43 mA (4.4e-05% apart)",
+   "detail": {
+    "shape": "diode chain",
+    "hand": 0.00543,
+    "sim": 0.00543
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "U1 dissipates (Vin - Vout) Iout + its own current: 0.136 W by hand, 0.136 W from its pins (2.7e-11% apart)",
+   "detail": {
+    "shape": "regulator power"
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "Q1 conduction loss I_rms^2 R_ds(on) = 1.99^2 x 30 mohm = 0.119 W by hand, ngspice 0.119 W (0.25% apart)",
+   "detail": {
+    "shape": "mosfet loss"
+   }
+  },
+  {
+   "name": "model provenance",
+   "status": "pass",
+   "summary": "models: 11 from the parts library",
+   "detail": {
+    "library": [
+     "U1",
+     "C1",
+     "C2",
+     "U2",
+     "C3",
+     "R1",
+     "D1",
+     "R2",
+     "R3",
+     "Q1",
+     "J2 load"
+    ],
+    "netlist": [],
+    "generic": []
+   }
+  },
+  {
+   "name": "supply range",
+   "status": "info",
+   "summary": "solved at both ends of the supply (J1 10.8 to 13.2 V (10% either way, a guess)); the hardest parts there: C1 at 53%, C3 at 34%, Q1 at 34%",
+   "detail": {
+    "range": "J1 10.8 to 13.2 V (10% either way, a guess)"
+   }
+  }
+ ],
+ "assumptions": [
+  "Wobbl guessed: J2 (LED strip) drives 2A, as set.",
+  "U1: L7805 datasheet: 5 V, 2 V dropout at 1.5 A, 2.2 A limit, 35 V most in, TO-220.",
+  "C1: 25 V rating as marked, aluminum.",
+  "U2: ATTINY85 datasheet: 2.7 to 5.5 V (6 V absolute), about 5 mA running, pins drive through about 40 ohm and take 40 mA most.",
+  "D1: green 0805 indicator LED: 3.1 V at 20 mA, 30 mA most.",
+  "Q1: VDMOS fitted to the IRLZ44N datasheet: 22 mohm at 10 V, 25 mohm at 5 V, 35 mohm at 4 V, threshold 1.5 V, 55 V 47 A TO-220.",
+  "J2 load: what J2 drives, 2A.",
+  "Ambient 25 C; temperatures are ambient plus average power times each part's thermal resistance.",
+  "Transient: run for 0.0036 s, six of the longest time constant (0.0006 s).",
+  "Transient: outputs switch on at power up and off at 60% of the run, so both states and the switch off are seen."
+ ],
+ "values": {
+  "parts": {
+   "J1": {
+    "ref": "J1",
+    "kind": "supply",
+    "part": "",
+    "items": [
+     {
+      "what": "current drawn",
+      "value": 2.005946,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "info",
+      "note": "delivers 24.1 W"
+     }
+    ],
+    "v": 12.0,
+    "i": 2.005946,
+    "p": 24.07135,
+    "tj": null,
+    "generic": false,
+    "source": "",
+    "status": "info",
+    "use": null
+   },
+   "U1": {
+    "ref": "U1",
+    "kind": "regulator",
+    "part": "L7805",
+    "items": [
+     {
+      "what": "input voltage",
+      "value": 13.2,
+      "limit": 35,
+      "unit": "V",
+      "use": 0.377143,
+      "status": "ok",
+      "note": "with J1 at 13.2 V"
+     },
+     {
+      "what": "output current",
+      "value": 0.010923,
+      "limit": 1.5,
+      "unit": "A",
+      "use": 0.007282,
+      "status": "ok",
+      "note": "with J1 at 10.8 V"
+     },
+     {
+      "what": "temperature",
+      "value": 32.778626,
+      "limit": 125,
+      "unit": "C",
+      "use": 0.077786,
+      "status": "ok",
+      "note": "0.156 W at 50 C/W from 25 C; with J1 at 13.2 V"
+     }
+    ],
+    "v": 12.0,
+    "i": 0.010923,
+    "p": 0.136465,
+    "tj": 31.823235,
+    "generic": false,
+    "source": "L7805 datasheet: 5 V, 2 V dropout at 1.5 A, 2.2 A limit, 35 V most in, TO-220",
+    "status": "ok",
+    "use": 0.077786
+   },
+   "C1": {
+    "ref": "C1",
+    "kind": "electrolytic",
+    "part": "capacitor",
+    "items": [
+     {
+      "what": "voltage",
+      "value": 13.2,
+      "limit": 25.0,
+      "unit": "V",
+      "use": 0.528,
+      "status": "ok",
+      "note": "with J1 at 13.2 V"
+     },
+     {
+      "what": "ripple current",
+      "value": 0.0,
+      "limit": null,
+      "unit": "A",
+      "use": null,
+      "status": "info",
+      "note": "RMS, for checking against the part's ripple rating"
+     }
+    ],
+    "v": 12.0,
+    "i": 0.0,
+    "p": 0.0,
+    "tj": null,
+    "generic": false,
+    "source": "25 V rating as marked, aluminum",
+    "status": "ok",
+    "use": 0.528
+   },
+   "C2": {
+    "ref": "C2",
+    "kind": "capacitor",
+    "part": "capacitor",
+    "items": [
+     {
+      "what": "voltage",
+      "value": 5.425843,
+      "limit": 50.0,
+      "unit": "V",
+      "use": 0.108517,
+      "status": "ok",
+      "note": "with J1 at 10.8 V"
+     }
+    ],
+    "v": 5.016772,
+    "i": 1e-06,
+    "p": 0.0,
+    "tj": null,
+    "generic": false,
+    "source": "50 V rating as marked",
+    "status": "ok",
+    "use": 0.108517
+   },
+   "U2": {
+    "ref": "U2",
+    "kind": "mcu",
+    "part": "ATtiny85-20PU",
+    "items": [
+     {
+      "what": "supply voltage",
+      "value": 5.425843,
+      "limit": 6.0,
+      "unit": "V",
+      "use": 0.904307,
+      "status": "ok",
+      "note": "with J1 at 10.8 V"
+     },
+     {
+      "what": "supply current",
+      "value": 0.010923,
+      "limit": 0.06,
+      "unit": "A",
+      "use": 0.182053,
+      "status": "ok",
+      "note": "with J1 at 10.8 V"
+     },
+     {
+      "what": "pin PB1 current",
+      "value": 0.008177,
+      "limit": 0.04,
+      "unit": "A",
+      "use": 0.204436,
+      "status": "ok",
+      "note": "with J1 at 13.2 V"
+     },
+     {
+      "what": "temperature",
+      "value": 27.618809,
+      "limit": 125,
+      "unit": "C",
+      "use": 0.026188,
+      "status": "ok",
+      "note": "0.0262 W at 100 C/W from 25 C; with J1 at 10.8 V"
+     }
+    ],
+    "v": 5.016772,
+    "i": 0.010923,
+    "p": 0.026188,
+    "tj": 27.618809,
+    "generic": false,
+    "source": "ATTINY85 datasheet: 2.7 to 5.5 V (6 V absolute), about 5 mA running, pins drive through about 40 ohm and take 40 mA most",
+    "status": "ok",
+    "use": 0.204436
+   },
+   "C3": {
+    "ref": "C3",
+    "kind": "capacitor",
+    "part": "capacitor",
+    "items": [
+     {
+      "what": "voltage",
+      "value": 5.425843,
+      "limit": 16.0,
+      "unit": "V",
+      "use": 0.339115,
+      "status": "ok",
+      "note": "with J1 at 10.8 V"
+     }
+    ],
+    "v": 5.016772,
+    "i": 1e-06,
+    "p": 0.0,
+    "tj": null,
+    "generic": false,
+    "source": "16 V rating as marked",
+    "status": "ok",
+    "use": 0.339115
+   },
+   "R1": {
+    "ref": "R1",
+    "kind": "resistor",
+    "part": "resistor",
+    "items": [
+     {
+      "what": "power",
+      "value": 0.00973,
+      "limit": 0.125,
+      "unit": "W",
+      "use": 0.077843,
+      "status": "ok",
+      "note": "surface near 31.6 C"
+     },
+     {
+      "what": "voltage",
+      "value": 2.159098,
+      "limit": 150,
+      "unit": "V",
+      "use": 0.014394,
+      "status": "ok",
+      "note": "with J1 at 10.8 V"
+     }
+    ],
+    "v": 1.806432,
+    "i": 0.00543,
+    "p": 0.00973,
+    "tj": null,
+    "generic": false,
+    "source": "rating of a 0805 resistor",
+    "status": "ok",
+    "use": 0.077843
+   },
+   "D1": {
+    "ref": "D1",
+    "kind": "led",
+    "part": "LED-green",
+    "items": [
+     {
+      "what": "forward current",
+      "value": 0.00543,
+      "limit": 0.03,
+      "unit": "A",
+      "use": 0.181003,
+      "status": "ok",
+      "note": ""
+     },
+     {
+      "what": "reverse voltage",
+      "value": 0.0,
+      "limit": 5.0,
+      "unit": "V",
+      "use": 0.0,
+      "status": "ok",
+      "note": ""
+     }
+    ],
+    "v": 2.991378,
+    "i": 0.00543,
+    "p": 0.016239,
+    "tj": null,
+    "generic": false,
+    "source": "green 0805 indicator LED: 3.1 V at 20 mA, 30 mA most",
+    "status": "ok",
+    "use": 0.181003
+   },
+   "R2": {
+    "ref": "R2",
+    "kind": "resistor",
+    "part": "resistor",
+    "items": [
+     {
+      "what": "power",
+      "value": 2.4e-05,
+      "limit": 0.125,
+      "unit": "W",
+      "use": 0.000195,
+      "status": "ok",
+      "note": "surface near 25 C; with J1 at 10.8 V"
+     },
+     {
+      "what": "voltage",
+      "value": 0.817743,
+      "limit": 150,
+      "unit": "V",
+      "use": 0.005452,
+      "status": "ok",
+      "note": "with J1 at 13.2 V"
+     }
+    ],
+    "v": 0.801806,
+    "i": 0.000493,
+    "p": 2.4e-05,
+    "tj": null,
+    "generic": false,
+    "source": "rating of a 0805 resistor",
+    "status": "ok",
+    "use": 0.005452
+   },
+   "R3": {
+    "ref": "R3",
+    "kind": "resistor",
+    "part": "resistor",
+    "items": [
+     {
+      "what": "power",
+      "value": 0.002431,
+      "limit": 0.125,
+      "unit": "W",
+      "use": 0.01945,
+      "status": "ok",
+      "note": "surface near 26.7 C; with J1 at 13.2 V"
+     },
+     {
+      "what": "voltage",
+      "value": 5.364473,
+      "limit": 150,
+      "unit": "V",
+      "use": 0.035763,
+      "status": "ok",
+      "note": "with J1 at 10.8 V"
+     }
+    ],
+    "v": 4.940854,
+    "i": 0.000493,
+    "p": 0.002431,
+    "tj": null,
+    "generic": false,
+    "source": "rating of a 0805 resistor",
+    "status": "ok",
+    "use": 0.035763
+   },
+   "Q1": {
+    "ref": "Q1",
+    "kind": "nmos",
+    "part": "IRLZ44N",
+    "items": [
+     {
+      "what": "drain voltage",
+      "value": 13.200004,
+      "limit": 55,
+      "unit": "V",
+      "use": 0.24,
+      "status": "ok",
+      "note": "with J1 at 13.2 V"
+     },
+     {
+      "what": "gate voltage",
+      "value": 5.364473,
+      "limit": 16,
+      "unit": "V",
+      "use": 0.33528,
+      "status": "ok",
+      "note": "with J1 at 10.8 V"
+     },
+     {
+      "what": "drain current",
+      "value": 2.189022,
+      "limit": 47,
+      "unit": "A",
+      "use": 0.046575,
+      "status": "ok",
+      "note": "with J1 at 13.2 V"
+     },
+     {
+      "what": "temperature",
+      "value": 34.446098,
+      "limit": 175,
+      "unit": "C",
+      "use": 0.062974,
+      "status": "ok",
+      "note": "0.144 W at 62 C/W from 25 C; with J1 at 13.2 V"
+     }
+    ],
+    "v": 12.000003,
+    "i": 1.990023,
+    "p": 0.119131,
+    "tj": 32.728628,
+    "generic": false,
+    "source": "VDMOS fitted to the IRLZ44N datasheet: 22 mohm at 10 V, 25 mohm at 5 V, 35 mohm at 4 V, threshold 1.5 V, 55 V 47 A TO-220",
+    "status": "ok",
+    "use": 0.33528
+   },
+   "J2 load": {
+    "ref": "J2 load",
+    "kind": "load",
+    "part": "load",
+    "items": [
+     {
+      "what": "power",
+      "value": 23.761141,
+      "limit": null,
+      "unit": "W",
+      "use": null,
+      "status": "info",
+      "note": "draws 1.99 A"
+     }
+    ],
+    "v": 11.940136,
+    "i": 1.990023,
+    "p": 23.761141,
+    "tj": null,
+    "generic": false,
+    "source": "what J2 drives, 2A",
+    "status": "info",
+    "use": null
+   }
+  },
+  "nodes": {
+   "+12V": 12.0,
+   "+5V": 4.999782,
+   "N_U2_1": 0.016573,
+   "N_U2_2": 0.016573,
+   "N_U2_3": 0.016573,
+   "LED": 4.782577,
+   "GATE_DRV": 4.980058,
+   "N_U2_7": 0.016573,
+   "LED_K": 2.990644,
+   "GATE": 4.930751,
+   "STRIP-": 0.059864
+  },
+  "probes": {},
+  "U1_input_voltage": 13.2,
+  "U1_output_current": 0.010923,
+  "U1_temperature": 32.778626,
+  "C1_voltage": 13.2,
+  "C2_voltage": 5.425843,
+  "U2_supply_voltage": 5.425843,
+  "U2_supply_current": 0.010923,
+  "U2_pin_PB1_current": 0.008177,
+  "U2_temperature": 27.618809,
+  "C3_voltage": 5.425843,
+  "R1_power": 0.00973,
+  "R1_voltage": 2.159098,
+  "D1_forward_current": 0.00543,
+  "D1_reverse_voltage": 0.0,
+  "R2_power": 2.4e-05,
+  "R2_voltage": 0.817743,
+  "R3_power": 0.002431,
+  "R3_voltage": 5.364473,
+  "Q1_drain_voltage": 13.200004,
+  "Q1_gate_voltage": 5.364473,
+  "Q1_drain_current": 2.189022,
+  "Q1_temperature": 34.446098,
+  "tolerance": {
+   "supply_range": "J1 10.8 to 13.2 V (10% either way, a guess)"
+  },
+  "analysis": "tran",
+  "netlist_source": "kicad",
+  "_figures": [
+   [
+    "setup",
+    "Bench setup, drawn from this run"
+   ],
+   [
+    "schematic",
+    "Schematic, drawn from the netlist"
+   ]
+  ]
+ },
+ "images": {
+  "setup": "images/setup.svg",
+  "schematic": "images/schematic.svg"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 1.396022,
+ "solver": "ngspice 41",
+ "criteria": []
+}

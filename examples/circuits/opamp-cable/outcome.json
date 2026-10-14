@@ -1,0 +1,645 @@
+{
+ "domain": "circuit",
+ "part": "opamp-cable.cir",
+ "question": "Is this buffer stable driving the cable?",
+ "verdict": "fails",
+ "headline": "U1 (LM358) does not work as wired: 2 degrees of phase margin at 47133 Hz: it oscillates or rings hard.",
+ "metrics": [
+  [
+   "hardest part",
+   "CCABLE at 16%"
+  ],
+  [
+   "supply power",
+   "0.00313 W"
+  ],
+  [
+   "hottest part",
+   "U1 at 25.2 C"
+  ],
+  [
+   "analysis",
+   "operating point"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed KCL, power balance, tolerance convergence, model provenance"
+ ],
+ "checks": [
+  {
+   "name": "KCL",
+   "status": "pass",
+   "summary": "currents into every node sum to zero within 7.50e-10 A (largest at ref, against 6.25e-04 A flowing)",
+   "detail": {
+    "residual_A": 0.0,
+    "node": "ref"
+   }
+  },
+  {
+   "name": "power balance",
+   "status": "pass",
+   "summary": "supplies give 0.00313 W and the parts dissipate 0.00313 W (0.00016% apart)",
+   "detail": {
+    "supplied_W": 0.003125,
+    "dissipated_W": 0.003125
+   }
+  },
+  {
+   "name": "tolerance convergence",
+   "status": "pass",
+   "summary": "every part's power and current agree to 0% with solver tolerances 100 times tighter",
+   "detail": {
+    "change": 0.0,
+    "value": ""
+   }
+  },
+  {
+   "name": "model provenance",
+   "status": "pass",
+   "summary": "models: 7 from the parts library",
+   "detail": {
+    "library": [
+     "V1",
+     "R1",
+     "R2",
+     "C1",
+     "U1",
+     "CCABLE",
+     "RADC"
+    ],
+    "netlist": [],
+    "generic": []
+   }
+  },
+  {
+   "name": "loop stability",
+   "status": "info",
+   "summary": "U1: loop gain 99879 at low frequency crosses 1 at 47133 Hz with 2 degrees of phase margin and 5 dB of gain margin; it will ring hard or oscillate",
+   "detail": {
+    "dc_loop_gain": 99879.394266,
+    "f": [
+     0.1,
+     0.135936,
+     0.184785,
+     0.251189,
+     0.341455,
+     0.464159,
+     0.630957,
+     0.857696,
+     1.165914,
+     1.584893,
+     2.154435,
+     2.928645,
+     3.981072,
+     5.411695,
+     7.356423,
+     10.0,
+     13.593564,
+     18.478498,
+     25.118864,
+     34.145489,
+     46.415888,
+     63.095734,
+     85.76959,
+     116.59144,
+     158.489319,
+     215.443469,
+     292.864456,
+     398.107171,
+     541.169527,
+     735.642254,
+     1000.0,
+     1359.356391,
+     1847.849797,
+     2511.886432,
+     3414.548874,
+     4641.588834,
+     6309.573445,
+     8576.958986,
+     11659.144012,
+     15848.931925,
+     21544.3469,
+     29286.445646,
+     39810.717055,
+     54116.952655,
+     73564.225446,
+     100000.0,
+     135935.639088,
+     184784.979742,
+     251188.643151,
+     341454.887383,
+     464158.883361,
+     630957.34448,
+     857695.898591,
+     1165914.40118,
+     1584893.192461,
+     2154434.690032,
+     2928644.564625,
+     3981071.705535,
+     5411695.265465,
+     7356422.544596,
+     10000000.0
+    ],
+    "T_dB": [
+     99.989518,
+     99.988767,
+     99.987379,
+     99.984815,
+     99.980082,
+     99.971349,
+     99.955258,
+     99.92568,
+     99.871549,
+     99.773265,
+     99.597304,
+     99.2898,
+     98.773209,
+     97.955301,
+     96.758782,
+     95.160129,
+     93.203734,
+     90.976089,
+     88.566842,
+     86.04598,
+     83.460043,
+     80.837204,
+     78.193516,
+     75.537605,
+     72.873523,
+     70.202151,
+     67.521471,
+     64.825832,
+     62.10407,
+     59.336038,
+     56.487212,
+     53.502318,
+     50.302463,
+     46.795312,
+     42.905984,
+     38.615414,
+     33.971869,
+     29.063161,
+     23.978109,
+     18.785127,
+     13.529357,
+     8.237973,
+     2.92638,
+     -2.397238,
+     -7.729181,
+     -13.068915,
+     -18.418886,
+     -23.785392,
+     -29.180748,
+     -34.627142,
+     -40.162328,
+     -45.84582,
+     -51.760232,
+     -57.997641,
+     -64.625537,
+     -71.650632,
+     -79.014781,
+     -86.627442,
+     -94.402466,
+     -102.275674,
+     -110.205483
+    ],
+    "crossover_Hz": 47132.573637,
+    "phase_margin_deg": 1.946606,
+    "gain_margin_dB": 5.062269
+   }
+  },
+  {
+   "name": "supply range",
+   "status": "info",
+   "summary": "solved at both ends of the supply (V1 4.75 to 5.25 V); the hardest parts there: CCABLE at 16%, C1 at 16%, RADC at 4%",
+   "detail": {
+    "range": "V1 4.75 to 5.25 V"
+   }
+  }
+ ],
+ "assumptions": [
+  "V1: USB port: 5 V (4.75 to 5.25 V), 0.15 ohm inside, 0.5 A most.",
+  "U1: LM358 datasheet: 0.7 MHz, 0.3 V/us, swing to 1.5 V of V+ and 0.02 V of V-, 40 mA short circuit, 3 to 32 V supply.",
+  "Ambient 25 C; temperatures are ambient plus average power times each part's thermal resistance."
+ ],
+ "values": {
+  "parts": {
+   "V1": {
+    "ref": "V1",
+    "kind": "supply",
+    "part": "USB",
+    "items": [
+     {
+      "what": "current drawn",
+      "value": 0.000639,
+      "limit": 0.5,
+      "unit": "A",
+      "use": 0.001278,
+      "status": "ok",
+      "note": "with V1 at 5.25 V"
+     }
+    ],
+    "v": 5.0,
+    "i": 0.000625,
+    "p": 0.003125,
+    "tj": null,
+    "generic": false,
+    "source": "USB port: 5 V (4.75 to 5.25 V), 0.15 ohm inside, 0.5 A most",
+    "status": "ok",
+    "use": 0.001278
+   },
+   "R1": {
+    "ref": "R1",
+    "kind": "resistor",
+    "part": "resistor",
+    "items": [
+     {
+      "what": "power",
+      "value": 0.000689,
+      "limit": 0.1,
+      "unit": "W",
+      "use": 0.006891,
+      "status": "ok",
+      "note": "surface near 25.6 C; with V1 at 5.25 V"
+     },
+     {
+      "what": "voltage",
+      "value": 2.625004,
+      "limit": 75,
+      "unit": "V",
+      "use": 0.035,
+      "status": "ok",
+      "note": "with V1 at 5.25 V"
+     }
+    ],
+    "v": 2.500004,
+    "i": 0.00025,
+    "p": 0.000625,
+    "tj": null,
+    "generic": false,
+    "source": "rating of a 0603 resistor",
+    "status": "ok",
+    "use": 0.035
+   },
+   "R2": {
+    "ref": "R2",
+    "kind": "resistor",
+    "part": "resistor",
+    "items": [
+     {
+      "what": "power",
+      "value": 0.000689,
+      "limit": 0.1,
+      "unit": "W",
+      "use": 0.006891,
+      "status": "ok",
+      "note": "surface near 25.6 C; with V1 at 5.25 V"
+     },
+     {
+      "what": "voltage",
+      "value": 2.624996,
+      "limit": 75,
+      "unit": "V",
+      "use": 0.035,
+      "status": "ok",
+      "note": "with V1 at 5.25 V"
+     }
+    ],
+    "v": 2.499996,
+    "i": 0.00025,
+    "p": 0.000625,
+    "tj": null,
+    "generic": false,
+    "source": "rating of a 0603 resistor",
+    "status": "ok",
+    "use": 0.035
+   },
+   "C1": {
+    "ref": "C1",
+    "kind": "capacitor",
+    "part": "capacitor",
+    "items": [
+     {
+      "what": "voltage",
+      "value": 2.624996,
+      "limit": 16.0,
+      "unit": "V",
+      "use": 0.164062,
+      "status": "ok",
+      "note": "with V1 at 5.25 V"
+     }
+    ],
+    "v": 2.499996,
+    "i": 0.0,
+    "p": 0.0,
+    "tj": null,
+    "generic": false,
+    "source": "16 V rating as marked, X7R",
+    "status": "ok",
+    "use": 0.164062
+   },
+   "U1": {
+    "ref": "U1",
+    "kind": "opamp",
+    "part": "LM358",
+    "items": [
+     {
+      "what": "supply voltage",
+      "value": 5.25,
+      "limit": 32,
+      "unit": "V",
+      "use": 0.164062,
+      "status": "ok",
+      "note": "with V1 at 5.25 V"
+     },
+     {
+      "what": "output current",
+      "value": 2.6e-05,
+      "limit": 0.04,
+      "unit": "A",
+      "use": 0.000657,
+      "status": "ok",
+      "note": "with V1 at 5.25 V"
+     },
+     {
+      "what": "temperature",
+      "value": 25.238302,
+      "limit": 150,
+      "unit": "C",
+      "use": 0.001906,
+      "status": "ok",
+      "note": "0.00191 W at 125 C/W from 25 C; with V1 at 5.25 V"
+     },
+     {
+      "what": "phase margin",
+      "value": 1.946606,
+      "limit": 45.0,
+      "unit": "deg",
+      "use": null,
+      "status": "fails",
+      "note": "2 degrees of phase margin at 47133 Hz: it oscillates or rings hard"
+     }
+    ],
+    "v": 5.0,
+    "i": 2.5e-05,
+    "p": 0.001813,
+    "tj": 25.226563,
+    "generic": false,
+    "source": "LM358 datasheet: 0.7 MHz, 0.3 V/us, swing to 1.5 V of V+ and 0.02 V of V-, 40 mA short circuit, 3 to 32 V supply",
+    "status": "fails",
+    "use": 0.001906
+   },
+   "CCABLE": {
+    "ref": "CCABLE",
+    "kind": "capacitor",
+    "part": "capacitor",
+    "items": [
+     {
+      "what": "voltage",
+      "value": 2.626969,
+      "limit": 16.0,
+      "unit": "V",
+      "use": 0.164186,
+      "status": "ok",
+      "note": "with V1 at 5.25 V"
+     }
+    ],
+    "v": 2.501971,
+    "i": 0.0,
+    "p": 0.0,
+    "tj": null,
+    "generic": false,
+    "source": "16 V rating as marked, X7R",
+    "status": "ok",
+    "use": 0.164186
+   },
+   "RADC": {
+    "ref": "RADC",
+    "kind": "resistor",
+    "part": "resistor",
+    "items": [
+     {
+      "what": "power",
+      "value": 6.9e-05,
+      "limit": 0.1,
+      "unit": "W",
+      "use": 0.00069,
+      "status": "ok",
+      "note": "surface near 25.1 C; with V1 at 5.25 V"
+     },
+     {
+      "what": "voltage",
+      "value": 2.626969,
+      "limit": 75,
+      "unit": "V",
+      "use": 0.035026,
+      "status": "ok",
+      "note": "with V1 at 5.25 V"
+     }
+    ],
+    "v": 2.501971,
+    "i": 2.5e-05,
+    "p": 6.3e-05,
+    "tj": null,
+    "generic": false,
+    "source": "rating of a 0603 resistor",
+    "status": "ok",
+    "use": 0.035026
+   }
+  },
+  "nodes": {
+   "v5": 5.0,
+   "ref": 2.499996,
+   "out": 2.501971
+  },
+  "probes": {},
+  "V1_current_drawn": 0.000639,
+  "R1_power": 0.000689,
+  "R1_voltage": 2.625004,
+  "R2_power": 0.000689,
+  "R2_voltage": 2.624996,
+  "C1_voltage": 2.624996,
+  "U1_supply_voltage": 5.25,
+  "U1_output_current": 2.6e-05,
+  "U1_temperature": 25.238302,
+  "CCABLE_voltage": 2.626969,
+  "RADC_power": 6.9e-05,
+  "RADC_voltage": 2.626969,
+  "ac": {
+   "stability": {
+    "U1": {
+     "dc_loop_gain": 99879.394266,
+     "f": [
+      0.1,
+      0.135936,
+      0.184785,
+      0.251189,
+      0.341455,
+      0.464159,
+      0.630957,
+      0.857696,
+      1.165914,
+      1.584893,
+      2.154435,
+      2.928645,
+      3.981072,
+      5.411695,
+      7.356423,
+      10.0,
+      13.593564,
+      18.478498,
+      25.118864,
+      34.145489,
+      46.415888,
+      63.095734,
+      85.76959,
+      116.59144,
+      158.489319,
+      215.443469,
+      292.864456,
+      398.107171,
+      541.169527,
+      735.642254,
+      1000.0,
+      1359.356391,
+      1847.849797,
+      2511.886432,
+      3414.548874,
+      4641.588834,
+      6309.573445,
+      8576.958986,
+      11659.144012,
+      15848.931925,
+      21544.3469,
+      29286.445646,
+      39810.717055,
+      54116.952655,
+      73564.225446,
+      100000.0,
+      135935.639088,
+      184784.979742,
+      251188.643151,
+      341454.887383,
+      464158.883361,
+      630957.34448,
+      857695.898591,
+      1165914.40118,
+      1584893.192461,
+      2154434.690032,
+      2928644.564625,
+      3981071.705535,
+      5411695.265465,
+      7356422.544596,
+      10000000.0
+     ],
+     "T_dB": [
+      99.989518,
+      99.988767,
+      99.987379,
+      99.984815,
+      99.980082,
+      99.971349,
+      99.955258,
+      99.92568,
+      99.871549,
+      99.773265,
+      99.597304,
+      99.2898,
+      98.773209,
+      97.955301,
+      96.758782,
+      95.160129,
+      93.203734,
+      90.976089,
+      88.566842,
+      86.04598,
+      83.460043,
+      80.837204,
+      78.193516,
+      75.537605,
+      72.873523,
+      70.202151,
+      67.521471,
+      64.825832,
+      62.10407,
+      59.336038,
+      56.487212,
+      53.502318,
+      50.302463,
+      46.795312,
+      42.905984,
+      38.615414,
+      33.971869,
+      29.063161,
+      23.978109,
+      18.785127,
+      13.529357,
+      8.237973,
+      2.92638,
+      -2.397238,
+      -7.729181,
+      -13.068915,
+      -18.418886,
+      -23.785392,
+      -29.180748,
+      -34.627142,
+      -40.162328,
+      -45.84582,
+      -51.760232,
+      -57.997641,
+      -64.625537,
+      -71.650632,
+      -79.014781,
+      -86.627442,
+      -94.402466,
+      -102.275674,
+      -110.205483
+     ],
+     "crossover_Hz": 47132.573637,
+     "phase_margin_deg": 1.946606,
+     "gain_margin_dB": 5.062269
+    }
+   }
+  },
+  "tolerance": {
+   "supply_range": "V1 4.75 to 5.25 V"
+  },
+  "analysis": "op",
+  "netlist_source": "netlist",
+  "_figures": [
+   [
+    "setup",
+    "Bench setup, drawn from this run"
+   ],
+   [
+    "schematic",
+    "Schematic, drawn from the netlist"
+   ]
+  ]
+ },
+ "images": {
+  "setup": "images/setup.svg",
+  "schematic": "images/schematic.svg"
+ },
+ "fixes": [
+  {
+   "kind": "resistor",
+   "title": "Isolate U1 from its capacitive load with 100 ohm",
+   "summary": "Put 100 ohm between U1's output and CCABLE, with the feedback taken before it, so the load's capacitance is outside the loop. Solved again, U1 now has phase margin 72.3 deg, 72 degrees of phase margin at 444507 Hz: stable.",
+   "auto": false,
+   "part": "U1",
+   "resolved": true,
+   "after": {
+    "status": "ok",
+    "use": 0.001813
+   }
+  }
+ ],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 1.609824,
+ "solver": "ngspice 41",
+ "criteria": []
+}
