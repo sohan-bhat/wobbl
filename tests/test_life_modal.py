@@ -89,3 +89,23 @@ def test_consistent_mass_of_a_tetrahedron():
     # a rigid translation carries the whole mass, 2 x 1/6
     assert np.sum(ones * modal.mass_times(mesh, rho, ones)) == pytest.approx(rho / 6)
     assert modal.part_mass(mesh, rho, {"m": np.array([0.5])}) == pytest.approx(rho / 6 + 0.5)
+
+
+def test_element_masses_follow_curved_elements():
+    """A straight 10 node tetrahedron keeps the textbook consistent mass, and one whose midside node bows out is
+    heavier, as a coarse mesh of a round part is."""
+    from types import SimpleNamespace
+
+    import numpy as np
+
+    from wobbl.life.modal import element_masses, tet10_mass
+
+    c = np.array([[0, 0, 0], [2, 0, 0], [0, 1.5, 0], [0.3, 0.2, 1.7]], float)
+    edges = [(0, 1), (1, 2), (2, 0), (0, 3), (1, 3), (2, 3)]
+    X = np.vstack([c] + [0.5 * (c[i] + c[j]) for i, j in edges])
+    vol = abs(np.dot(c[1] - c[0], np.cross(c[2] - c[0], c[3] - c[0]))) / 6
+    straight = element_masses(SimpleNamespace(X=X, tets=np.arange(10)[None]))[0]
+    assert np.abs(straight - vol * tet10_mass()).max() < 1e-12
+    bowed = X.copy()
+    bowed[4] += [0, -0.2, 0]
+    assert element_masses(SimpleNamespace(X=bowed, tets=np.arange(10)[None]))[0].sum() > 1.1 * vol

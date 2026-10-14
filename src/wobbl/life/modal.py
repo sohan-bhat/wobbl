@@ -73,15 +73,61 @@ def _volumes(mesh) -> np.ndarray:
     return np.abs(np.einsum("ij,ij->i", c[:, 1] - c[:, 0], np.cross(c[:, 2] - c[:, 0], c[:, 3] - c[:, 0]))) / 6.0
 
 
+def _tet_quadrature(n: int = 5) -> tuple[np.ndarray, np.ndarray]:
+    """A collapsed Gauss rule on the unit tetrahedron, n^3 points, exact for polynomials up to degree 2n - 3."""
+    g, w = np.polynomial.legendre.leggauss(n)
+    g, w = (g + 1) / 2, w / 2
+    u, v, t = np.meshgrid(g, g, g, indexing="ij")
+    wu, wv, wt = np.meshgrid(w, w, w, indexing="ij")
+    pts = np.stack([u, v * (1 - u), t * (1 - u) * (1 - v)], -1).reshape(-1, 3)
+    return pts, (wu * wv * wt * (1 - u) ** 2 * (1 - v)).reshape(-1)
+
+
+def _tet10_shape(pts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Shape functions (q, 10) and their reference derivatives (q, 10, 3) in CalculiX C3D10 node order: corners,
+    then the midsides of edges 0-1, 1-2, 2-0, 0-3, 1-3 and 2-3."""
+    xi, eta, zeta = pts.T
+    L = np.stack([1 - xi - eta - zeta, xi, eta, zeta], 1)                     # (q, 4)
+    dL = np.array([[-1, -1, -1], [1, 0, 0], [0, 1, 0], [0, 0, 1]], float)    # (4, 3)
+    edges = [(0, 1), (1, 2), (2, 0), (0, 3), (1, 3), (2, 3)]
+    N = np.concatenate([L * (2 * L - 1), np.stack([4 * L[:, i] * L[:, j] for i, j in edges], 1)], 1)
+    dN = np.concatenate([(4 * L - 1)[:, :, None] * dL[None], np.stack(
+        [4 * (L[:, i, None] * dL[j] + L[:, j, None] * dL[i]) for i, j in edges], 1)], 1)
+    return N, dN
+
+
+_MASS_CACHE: dict = {}
+
+
+def element_masses(mesh) -> np.ndarray:
+    """Consistent mass matrices (e, 10, 10) of the mesh's 10 node tetrahedra at unit density, integrated over each
+    element's real, curved shape. A midside node on a curved face makes an element larger than its corners say, and
+    on a coarse mesh of a round part that is several percent of the mass. Cached for the last mesh asked about."""
+    key = (id(mesh), mesh.tets.shape, float(mesh.X[mesh.tets[:, 4:]].sum()) if len(mesh.tets) else 0.0)
+    if _MASS_CACHE.get("key") == key:
+        return _MASS_CACHE["M"]
+    pts, w = _tet_quadrature(5)
+    N, dN = _tet10_shape(pts)
+    NN = np.einsum("q,qa,qb->qab", w, N, N)
+    out = np.empty((len(mesh.tets), 10, 10))
+    for s in range(0, len(mesh.tets), 4000):
+        Xe = mesh.X[mesh.tets[s:s + 4000]]                                     # (e, 10, 3)
+        J = np.einsum("eai,qaj->eqij", Xe, dN)
+        out[s:s + 4000] = np.einsum("qab,eq->eab", NN, np.abs(np.linalg.det(J)))
+    _MASS_CACHE.clear()
+    _MASS_CACHE.update(key=key, M=out)
+    return out
+
+
 def mass_times(mesh, density: float, U: np.ndarray, mass_nodes: dict | None = None,
                mass_values: dict | None = None) -> np.ndarray:
     """M U for displacement fields U (n_all, 3) with the consistent mass of 10 node tetrahedra plus point masses."""
     out = np.zeros_like(U, dtype=float)
-    rho_v = density * _volumes(mesh)
     if mesh.tets.shape[1] == 10:
         ue = U[mesh.tets]                                                  # (e, 10, 3)
-        fe = np.einsum("ab,ebd->ead", tet10_mass(), ue) * rho_v[:, None, None]
+        fe = np.einsum("eab,ebd->ead", element_masses(mesh), ue) * density
     else:
+        rho_v = density * _volumes(mesh)
         ue = U[mesh.tets]
         fe = (np.full((4, 4), 1.0) + np.eye(4)) / 20.0
         fe = np.einsum("ab,ebd->ead", fe, ue) * rho_v[:, None, None]
@@ -92,7 +138,8 @@ def mass_times(mesh, density: float, U: np.ndarray, mass_nodes: dict | None = No
 
 
 def part_mass(mesh, density: float, mass_values: dict | None = None) -> float:
-    return float(density * _volumes(mesh).sum() + sum(float(np.sum(v)) for v in (mass_values or {}).values()))
+    vol = element_masses(mesh).sum() if mesh.tets.shape[1] == 10 else _volumes(mesh).sum()
+    return float(density * vol + sum(float(np.sum(v)) for v in (mass_values or {}).values()))
 
 
 def modal_masses(mesh, density: float, modes: Modes) -> np.ndarray:
