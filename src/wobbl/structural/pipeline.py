@@ -43,16 +43,16 @@ def analyze_strength(study: StructuralStudy, out_dir: str | Path, progress: Prog
 def _save_vtu(run, path: Path):
     """Full field results for ParaView or any VTK viewer."""
     try:
-        from ..report.render import _grid
+        from ..report.vtu import write_vtu
 
-        g = _grid(run.mesh.X, run.mesh.tets)
-        g.point_data["displacement_mm"] = run.result.U
-        # xx, yy, zz, xy, yz, zx: VTK's order for a symmetric tensor, so ParaView reads it as one
-        g.point_data["stress_MPa"] = run.result.S
-        g.point_data["von_mises_MPa"] = run.result.von_mises()
-        g.point_data["failure_measure_MPa"] = run.measure
-        g.point_data["max_principal_MPa"] = run.result.principal()[:, 2]
-        g.point_data["excluded_zone"] = run.excluded.astype(float)
-        g.save(str(path))
+        res = run.result
+        write_vtu(path, run.mesh.X, run.mesh.tets, {
+            "displacement_mm": res.U,
+            # xx, yy, zz, xy, yz, zx: VTK's order for a symmetric tensor, so ParaView reads it as one
+            "stress_MPa": res.S,
+            "von_mises_MPa": res.von_mises(),
+            "failure_measure_MPa": run.measure,
+            "max_principal_MPa": res.principal()[:, 2],
+            "excluded_zone": run.excluded.astype(float)})
     except Exception:  # noqa: BLE001  the VTU is a convenience, never a reason to fail
         pass
