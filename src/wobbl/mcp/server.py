@@ -83,7 +83,7 @@ def build_server():
     @srv.tool()
     def add_fixture(study_id: str, fixture: str) -> dict:
         """Add a support: 'holes d=4.5' (fixed), 'bolt holes d=6.6' (hole and washer ring), 'x=min',
-        'wall x=min' (compression only), 'roller y=0'."""
+        'wall x=min' (compression only), 'roller y=0', 'elastic 50 N/mm3 @ z=min' (a bed of springs)."""
         return tools.add_fixture(study_id, fixture)
 
     @srv.tool()

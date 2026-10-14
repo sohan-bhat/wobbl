@@ -52,7 +52,8 @@ def _strength_options(f):
                      help="Load, e.g. '200 N down @ top', or '300 N -x bearing @ hole d=6.6' for a bolt or pin "
                           "pressing on one side of a hole (repeatable)."),
         click.option("--fix", "-f", "fixes", multiple=True,
-                     help="Support, e.g. 'holes d=4.5', 'bolt holes', 'wall x=min' (repeatable)."),
+                     help="Support, e.g. 'holes d=4.5', 'bolt holes', 'wall x=min', 'elastic 50 N/mm3 @ z=min' "
+                          "(repeatable)."),
         click.option("--target-sf", type=float, default=None, help="Required safety factor."),
         click.option("--quality", type=click.Choice(["fast", "normal", "fine"]), default="normal"),
         click.option("--budget", type=float, default=300.0, show_default=True, help="Seconds for the study."),

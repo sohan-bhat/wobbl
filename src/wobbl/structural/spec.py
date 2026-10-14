@@ -17,6 +17,7 @@ Loads and fixtures can be written the way people talk about them:
     roller    "x=min"           faces can slide in their plane but not move off it
     bolt      "holes d=6.6"     bolted: the hole and the washer area around it held still
     wall      "x=min"           rests against a rigid wall: can push on it, can lift off
+    elastic   "50 N/mm3 @ z=min" a bed of springs over the faces, this stiff per unit area, pushing and pulling
 """
 from __future__ import annotations
 
@@ -29,11 +30,12 @@ from ..geometry.select import SelectionError, parse_point, parse_vector
 from ..units import UnitError, parse_quantity
 
 LOAD_KINDS = ("force", "pressure", "bolt", "gravity", "remote", "moment")
-FIXTURE_KINDS = ("fixed", "roller", "bolt", "wall")
+FIXTURE_KINDS = ("fixed", "roller", "bolt", "wall", "elastic")
 LOAD_ALIASES = {"torque": "moment", "pin": "bolt", "bearing": "bolt", "weight": "gravity", "accel": "gravity",
                 "acceleration": "gravity"}
 FIXTURE_ALIASES = {"fix": "fixed", "slider": "roller", "symmetry": "roller", "bolted": "bolt", "rest": "wall",
-                   "support": "wall", "clamp": "fixed", "clamped": "fixed"}
+                   "support": "wall", "clamp": "fixed", "clamped": "fixed", "spring": "elastic", "springs": "elastic",
+                   "foundation": "elastic"}
 # every word that can start a fixture, longest first so 'fixed' wins over 'fix'
 _FIXTURE_WORDS = "|".join(sorted({*FIXTURE_KINDS, *FIXTURE_ALIASES}, key=len, reverse=True))
 _FIXTURE_HEAD = re.compile(rf"^({_FIXTURE_WORDS})(?:-([xyz]{{1,3}}))?\s*[:@]?\s+(.+)$", re.I)
@@ -68,6 +70,7 @@ class Fixture:
     faces: str
     text: str = ""
     dofs: str = "xyz"        # for fixed faces: which directions are held, e.g. "z" or "xy"
+    stiffness: float = 0.0   # elastic supports: springs per unit area of the faces, N/mm3
 
     def describe(self) -> str:
         return self.text or f"{self.kind} {self.faces}"
@@ -100,7 +103,8 @@ class StructuralStudy:
         d = dict(d)
         loads = [Load(**x) if isinstance(x, dict) and "kind" in x and "magnitude" in x else parse_load(x)
                  for x in d.pop("loads", [])]
-        fixtures = [Fixture(**x) if isinstance(x, dict) and "kind" in x and "faces" in x and len(x) <= 4
+        fixtures = [Fixture(**x) if isinstance(x, dict) and "kind" in x and "faces" in x and
+                    set(x) <= set(Fixture.__dataclass_fields__)
                     else parse_fixture(x) for x in d.pop("fixtures", [])]
         known = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
         return cls(loads=loads, fixtures=fixtures, **known)
@@ -241,6 +245,18 @@ def parse_fixture(spec, kind: str | None = None) -> Fixture:
         raise SpecError("a fixture needs faces, for example 'holes' or 'x=min'")
     if dofs != "xyz" and kind != "fixed":
         raise SpecError("only fixed faces can hold some directions, e.g. 'fixed-z x=max'")
+    if kind == "elastic":
+        head, _, faces = text.partition("@")
+        if not faces.strip():
+            raise SpecError("an elastic support needs a stiffness per area and faces, for example "
+                            "'elastic 50 N/mm3 @ z=min'")
+        try:
+            k = parse_quantity(head.strip(), "foundation").value
+        except UnitError as e:
+            raise SpecError(f"{e} (in support '{text}', give it like 50 N/mm3)") from None
+        if k <= 0:
+            raise SpecError(f"an elastic support needs a positive stiffness, not '{head.strip()}'")
+        return Fixture(kind, faces.strip(), f"elastic {head.strip()} @ {faces.strip()}", "xyz", k)
     label = kind if dofs == "xyz" else f"{kind}-{dofs}"
     return Fixture(kind, text.strip(), f"{label} {text.strip()}", "".join(sorted(set(dofs))))
 

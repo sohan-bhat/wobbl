@@ -44,9 +44,11 @@ def test_fixtures():
     assert parse_fixture("roller y=0").kind == "roller"
 
 
-@pytest.mark.parametrize("word", sorted({*FIXTURE_KINDS, *FIXTURE_ALIASES}))
+@pytest.mark.parametrize("word", sorted(w for w in {*FIXTURE_KINDS, *FIXTURE_ALIASES}
+                                         if FIXTURE_ALIASES.get(w, w) != "elastic"))
 def test_every_fixture_word_is_read(word):
-    """Each support kind and every alias in the map starts a fixture string, in any case and with a colon."""
+    """Each support kind and every alias in the map starts a fixture string, in any case and with a colon. An
+    elastic support also needs its stiffness, so tests/test_elastic_support.py reads those words."""
     want = FIXTURE_ALIASES.get(word, word)
     for text in (f"{word} x=min", f"{word.upper()}: x=min", f"{word} @ x=min"):
         fx = parse_fixture(text)

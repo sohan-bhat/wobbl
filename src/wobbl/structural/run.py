@@ -343,6 +343,8 @@ def support_reactions(built: BuiltModel, res: StaticResult, mesh: Mesh) -> tuple
         else:  # an inclined roller carries its reaction along the normal through constraint equations
             held[nc.nodes, :] = True
     R = np.where(held, res.RF, 0.0)
+    for sp in built.model.springs:   # an elastic support pulls each node back by its stiffness times its motion
+        np.add.at(R, sp.nodes, -np.asarray(sp.stiffness)[:, None] * res.U[sp.nodes])
     return R.sum(0), np.cross(mesh.X, R).sum(0)
 
 

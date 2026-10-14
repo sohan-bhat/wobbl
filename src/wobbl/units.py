@@ -66,6 +66,9 @@ _UNITS: dict[str, dict[str, float]] = {
     "inductance": {"h": 1.0, "mh": 1e-3, "uh": 1e-6, "nh": 1e-9},
     "frequency": {"hz": 1.0, "khz": 1e3, "mhz": 1e6, "ghz": 1e9},
     "si_power": {"w": 1.0, "mw": 1e-3, "kw": 1e3},
+    # an elastic support: spring stiffness per unit area of the face (a Winkler foundation modulus), N/mm3
+    "foundation": {"n/mm3": 1.0, "n/mm^3": 1.0, "mpa/mm": 1.0, "n/cm3": 1e-3, "kn/m3": 1e-6, "mn/m3": 1e-3,
+                   "pci": 2.71447e-4, "lbf/in3": 2.71447e-4},
     # motion
     "speed": {"mm/s": 1.0, "m/s": 1000.0, "mps": 1000.0, "km/h": 1000 / 3.6, "kph": 1000 / 3.6, "kmh": 1000 / 3.6,
               "mph": 447.04, "ft/s": 304.8, "fps": 304.8, "kn": 1852 / 3.6, "kt": 1852 / 3.6, "knot": 1852 / 3.6,
@@ -80,7 +83,7 @@ INTERNAL = {
     "power": "mW", "time": "s", "heatflux": "mW/mm2", "film": "mW/(mm2 K)", "conductivity": "W/(m K)",
     "density": "t/mm3", "specific_heat": "mJ/(t K)", "volumetric_power": "mW/mm3", "voltage": "V",
     "current": "A", "resistance": "ohm", "capacitance": "F", "inductance": "H", "frequency": "Hz",
-    "si_power": "W", "temperature": "C", "speed": "mm/s", "angle": "deg",
+    "si_power": "W", "foundation": "N/mm3", "temperature": "C", "speed": "mm/s", "angle": "deg",
 }
 
 IMPERIAL_UNITS = {"in", "inch", "inches", '"', "ft", "foot", "feet", "lbf", "lb", "lbs", "pound", "pounds",

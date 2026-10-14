@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..fe import NodeConstraint, NormalConstraint, RigidCoupling, StaticModel
+from ..fe import NodeConstraint, NormalConstraint, RigidCoupling, Spring, StaticModel
 from ..geometry.faces import FaceInfo
 from ..geometry.select import Selection
 from ..materials import Material
@@ -43,6 +43,28 @@ def tri_area_weights(mesh: Mesh, mask: np.ndarray) -> tuple[np.ndarray, np.ndarr
     for k in range(3):
         np.add.at(w, cols[:, k], a / 3.0)
     return w, a
+
+
+SPRING_BINS = 64
+
+
+def binned_stiffness(k: np.ndarray, bins: int = SPRING_BINS) -> np.ndarray:
+    """Node stiffnesses grouped into at most this many geometric bins, each at the mean of its members.
+
+    CalculiX takes one spring stiffness per element set, so an elastic support is written as one set per bin. The
+    mean keeps every support's total stiffness exact, and each node lands within a few percent of its own share.
+    The reactions are summed with these same values, so the force balance closes.
+    """
+    k = np.asarray(k, float)
+    lo, hi = float(k.min()), float(k.max())
+    if hi <= lo * 1.001:
+        return np.full(len(k), k.mean())
+    edges = np.geomspace(lo, hi, bins + 1)
+    which = np.clip(np.searchsorted(edges, k, side="right") - 1, 0, bins - 1)
+    out = np.empty(len(k))
+    for b in np.unique(which):
+        out[which == b] = k[which == b].mean()
+    return out
 
 
 def traction_forces(mesh: Mesh, mask: np.ndarray, traction: np.ndarray) -> np.ndarray:
@@ -183,10 +205,16 @@ def build_static(mesh: Mesh, loads: list[tuple[Load, Selection | None]], fixture
                 model.normal_constraints.append(NormalConstraint(name, nodes, nrm))
             else:
                 built.walls.append(Wall(name, nodes, nrm))
+        elif fx.kind == "elastic":
+            # each node gets the foundation stiffness times the face area it carries, the consistent share of a
+            # uniform pressure, so the springs add up to stiffness x area over the faces
+            w, _ = tri_area_weights(mesh, mask)
+            nodes = np.nonzero(w > 0)[0]
+            model.springs.append(Spring(name, nodes, binned_stiffness(fx.stiffness * w[nodes])))
         else:
             raise SpecError(f"unknown fixture type {fx.kind}")
         built.zones[name] = model.constraints[-1].nodes if fx.kind in ("fixed", "bolt") else nodes
-        built.zone_kind[name] = {"fixed": "fixture"}.get(fx.kind, fx.kind)
+        built.zone_kind[name] = {"fixed": "fixture", "elastic": "fixture"}.get(fx.kind, fx.kind)
     for k, (ld, sel) in enumerate(loads):
         name = f"load{k + 1}"
         if ld.kind == "gravity":
@@ -267,6 +295,9 @@ def _check_held(model: StaticModel, built: BuiltModel):
         rows += _rbm_rows(X[nc.nodes] - origin, np.asarray(nc.normal))
     for w in built.walls:
         rows += _rbm_rows(X[w.nodes] - origin, np.asarray(w.normal))
+    for sp in model.springs:
+        for e in np.eye(3):
+            rows += _rbm_rows(X[sp.nodes] - origin, e)
     if not rows:
         raise SpecError("nothing holds the part. Add a fixture, for example --fix 'holes' or --fix 'x=min'")
     A = np.array(rows)

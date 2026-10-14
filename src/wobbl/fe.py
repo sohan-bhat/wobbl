@@ -41,6 +41,14 @@ class RigidCoupling:
 
 
 @dataclass
+class Spring:
+    """Grounded springs on a node set, the same stiffness in x, y and z at each node (N/mm), an elastic support."""
+    name: str
+    nodes: np.ndarray
+    stiffness: np.ndarray
+
+
+@dataclass
 class StaticModel:
     mesh: Mesh
     E: float                      # MPa
@@ -52,6 +60,7 @@ class StaticModel:
     gravity: np.ndarray | None = None         # body acceleration vector, mm/s2
     rigid: list[RigidCoupling] = field(default_factory=list)
     label: str = "static"
+    springs: list[Spring] = field(default_factory=list)
 
     def nodal_forces(self) -> np.ndarray:
         return self.forces if self.forces is not None else np.zeros((self.mesh.n_nodes, 3))

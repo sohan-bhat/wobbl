@@ -140,7 +140,8 @@ def evaluate(run: StructuralRun) -> Outcome:
     beam = None
     model = run.built.model
     fix_nodes = np.unique(np.concatenate([c.nodes for c in model.constraints] +
-                                         [c.nodes for c in model.normal_constraints] or [np.zeros(0, int)]))
+                                         [c.nodes for c in model.normal_constraints] +
+                                         [s.nodes for s in model.springs] or [np.zeros(0, int)]))
     load_nodes = np.nonzero(np.abs(model.nodal_forces()).sum(1) > 0)[0]
     extra_pts = [np.asarray(r.ref_point) for r in model.rigid]
     if model.gravity is not None and np.linalg.norm(model.gravity) > 0:
@@ -450,6 +451,10 @@ def assumptions(run: StructuralRun) -> list[str]:
         a.append("Wall supports push but cannot pull (frictionless contact, solved iteratively).")
     if "roller" in kinds:
         a.append("Roller faces slide freely in their plane.")
+    for fx in st.fixtures:
+        if fx.kind == "elastic":
+            a.append(f"The elastic support at {fx.faces} is a bed of springs of {fmt(fx.stiffness)} N/mm3 over its "
+                     "faces, the same in every direction, pushing and pulling alike.")
     if any(l.kind == "remote" and l.coupling == "rigid" for l in st.loads):
         a.append("Remote loads reach the part through a rigid attachment (the attached part does not flex).")
     if any(l.kind in ("remote", "moment") and l.coupling != "rigid" for l in st.loads):

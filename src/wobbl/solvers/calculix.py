@@ -171,6 +171,7 @@ def write_static_inp(path: Path, model: StaticModel, nlgeom: bool = False) -> di
         for k, r in enumerate(model.rigid):
             ref, rot = extra[r.name]
             f.write(f"*RIGID BODY, NSET=RB{k + 1}, REF NODE={ref + 1}, ROT NODE={rot + 1}\n")
+        _write_springs(f, model, len(mesh.tets) + 1)
         fixed = {}
         for c in model.constraints:
             for d in c.dofs:
@@ -320,6 +321,24 @@ def write_heat_inp(path: Path, model: HeatModel):
                     f.write(f"{e + 1},R{fc},{tenv:.10g},{eps:.10g}\n")
         tp = ", TIME POINTS=TP" if (model.transient and model.output_times) else ""
         f.write(f"*NODE FILE{tp}\nNT,RFL\n*EL FILE{tp}\nHFL\n*END STEP\n")
+
+
+def _write_springs(f, model: StaticModel, first: int):
+    """Grounded SPRING1 elements for elastic supports, one per node and direction. CalculiX gives a stiffness per
+    element set, so nodes that share a stiffness (the builder bins them) share a set."""
+    eid = first
+    for k, sp in enumerate(model.springs):
+        kk = np.asarray(sp.stiffness, float)
+        for b, value in enumerate(np.unique(kk)):
+            members = sp.nodes[kk == value]
+            for d in (1, 2, 3):
+                name = f"SP{k + 1}_{b + 1}_{d}"
+                f.write(f"*ELEMENT, TYPE=SPRING1, ELSET={name}\n")
+                for node in members:
+                    f.write(f"{eid},{int(node) + 1}\n")
+                    eid += 1
+                f.write(f"*SPRING, ELSET={name}\n{d}\n{value:.17g}\n")
+    return eid
 
 
 def _setname(name: str) -> str:
