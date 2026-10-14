@@ -76,24 +76,25 @@ def gci(values: list[float], sizes: list[float], formal: float = 2.0) -> GCI:
     return GCI(values, sizes, p, ext, band, kind)
 
 
-def gci_check(g: GCI | None, label: str, unit: str, tol: float = 0.03, values_only: list[float] | None = None) -> Check:
+def gci_check(g: GCI | None, label: str, unit: str, tol: float = 0.03, values_only: list[float] | None = None,
+              what: str = "grids") -> Check:
     if g is None:
         v = values_only or []
         return Check("grid convergence", "warn", f"{label} from {len(v)} grid{'s' if len(v) != 1 else ''} only, so "
-                                                 "no grid convergence index; treat the number as unverified",
+                                                 "there is no grid convergence index and the number is unverified",
                      {"values": v})
     trend = " -> ".join(fmt(v) for v in reversed(g.values))
     d = {"values_fine_to_coarse": g.values, "sizes": g.sizes, "order": g.order, "extrapolated": g.extrapolated,
          "gci_fine": g.gci_fine, "kind": g.kind}
-    base = (f"{label} {trend} {unit} over {len(g.values)} grids, grid convergence index {100 * g.gci_fine:.2g}% "
+    base = (f"{label} {trend} {unit} over {len(g.values)} {what}, grid convergence index {100 * g.gci_fine:.2g}% "
             f"(observed order {g.order:.2g}, extrapolated {fmt(g.extrapolated)} {unit})")
     if g.kind == "diverging":
-        return Check("grid convergence", "fail", base + "; the grids move apart, so the answer is not converged", d)
+        return Check("grid convergence", "fail", base + ", and the grids move apart, so the answer is not converged", d)
     if g.gci_fine <= tol:
         return Check("grid convergence", "pass", base, d)
     if g.gci_fine <= 3 * tol:
-        return Check("grid convergence", "warn", base + "; expect about that much discretization error", d)
-    return Check("grid convergence", "fail", base + "; the grid is too coarse for this answer", d)
+        return Check("grid convergence", "warn", base + ", so expect about that much discretization error", d)
+    return Check("grid convergence", "fail", base + ", so the grid is too coarse for this answer", d)
 
 
 _RES = re.compile(r"Solving for (\w+), Initial residual = ([-\d.eE+]+), Final residual = ([-\d.eE+]+)")
@@ -124,8 +125,8 @@ def residual_check(log: str, tol: float = 1e-4, steady: bool = True) -> Check:
     if worst[1][1] <= tol or converged:
         return Check("residuals", "pass", s + (", and the solver met its convergence target" if converged else ""), d)
     if worst[1][1] <= 10 * tol:
-        return Check("residuals", "warn", s + "; close to converged, the key number may still move slightly", d)
-    return Check("residuals", "fail", s + "; the solution did not converge, so its numbers are not reliable", d)
+        return Check("residuals", "warn", s + ", close to converged, so the key number may still move slightly", d)
+    return Check("residuals", "fail", s + ", so the solution did not converge and its numbers are not reliable", d)
 
 
 def mass_check(inflow: float, outflow: float, unit: str = "kg/s", tol: float = 0.005) -> Check:
@@ -133,7 +134,7 @@ def mass_check(inflow: float, outflow: float, unit: str = "kg/s", tol: float = 0
     err = abs(inflow - outflow) / max(abs(inflow), 1e-300)
     s = f"in {fmt(inflow)} {unit}, out {fmt(outflow)} {unit} ({100 * err:.2g}% apart)"
     st = "pass" if err <= tol else ("warn" if err <= 4 * tol else "fail")
-    return Check("mass conservation", st, s + ("" if st == "pass" else "; the solution has not settled"),
+    return Check("mass conservation", st, s + ("" if st == "pass" else ", so the solution has not settled"),
                  {"in": inflow, "out": outflow, "error": err})
 
 
@@ -147,18 +148,20 @@ def yplus_check(stats: dict[str, tuple[float, float, float]], treatment: str) ->
     s = f"y+ on the walls averages {fmt(mean)}, at most {fmt(top)}, with {treatment}"
     if treatment == "resolved":
         st = "pass" if top <= 2.5 else ("warn" if mean <= 5 else "fail")
-        why = "" if st == "pass" else "; the first cells are too tall to resolve the wall, refine near it"
+        why = "" if st == "pass" else ", too tall for the first cells to resolve the wall, so refine near it"
     else:
         st = "pass" if 25 <= mean <= 300 else "warn"
-        why = "" if st == "pass" else ("; part of the wall sits in the buffer layer, where wall functions are least "
-                                        "accurate (the blended wall function keeps the error to a few percent)")
+        why = "" if st == "pass" else (", so part of the wall sits in the buffer layer, where wall functions are "
+                                        "least accurate, though the blended wall function keeps the error to a "
+                                        "few percent")
     return Check("wall resolution", st, s + why, d)
 
 
 def compare_check(name: str, got: float, want: float, source: str, unit: str, tol: float,
                   info_only: bool = False) -> Check:
     err = abs(got - want) / max(abs(want), 1e-300)
-    s = f"{source} gives {fmt(want)} {unit}, the simulation {fmt(got)} {unit} ({100 * err:.2g}% apart)"
+    u = f" {unit}" if unit else ""
+    s = f"{source} gives {fmt(want)}{u}, the simulation {fmt(got)}{u} ({100 * err:.2g}% apart)"
     if info_only:
         return Check(name, "info", s, {"expected": want, "got": got, "error": err})
     st = "pass" if err <= tol else ("warn" if err <= 2 * tol else "fail")
@@ -170,10 +173,11 @@ def model_reason(model: str, flow: str) -> tuple[str, str] | None:
     if model in ("laminar", "none", "bem", "correlation"):
         return None
     if model in ("les", "des"):
-        return ("medium", "scale resolving turbulence on a modest grid; how much of the turbulence it resolved is "
-                          "in the checks")
+        return ("medium", "scale resolving turbulence on a modest grid, and how much of the turbulence it resolved "
+                          "is in the checks")
     band, why = RANS_BAND.get(flow, RANS_BAND["attached"])
     level = "medium" if band > 0.05 else "high"
     if level == "high":
         return None
-    return (level, f"RANS turbulence model, an estimate: {why}, so expect about {100 * band:.0f}% either way")
+    return (level, f"the RANS turbulence model is an estimate for {why}, so expect about {100 * band:.0f}% either "
+                   "way")
