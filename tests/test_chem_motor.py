@@ -114,7 +114,7 @@ def test_agents_get_the_chemistry_tools(tmp_path, monkeypatch):
     from wobbl.mcp.server import build_server
 
     names = {t.name for t in asyncio.run(build_server().list_tools())}
-    assert {"solve_motor", "solve_flame", "solve_propellant"} <= names
+    assert {"solve_motor", "solve_flame", "solve_propellant", "solve_runaway"} <= names
     monkeypatch.setenv("WOBBL_HOME", str(tmp_path))
     r = solve_motor_tool(propellant="knsb", grains=["bates d=48 core=20 L=75 x4"], throat="12", exit="30",
                          casing="6061-t6 od=54 wall=1.6")

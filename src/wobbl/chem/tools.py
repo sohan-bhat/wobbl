@@ -72,6 +72,25 @@ def solve_propellant_tool(propellant: str, chamber_pressure: str = "6.895 MPa", 
     return _compact(o, {"stations": o.values["stations"]})
 
 
+def solve_runaway_tool(cell: str = "18650", ambient: str = "25 C", film: str = "", emissivity: float = 0.8,
+                       from_result: str = "", question: str = "") -> dict:
+    from ..units import parse_quantity
+    from .runaway import cell_from, run_runaway, surroundings_from
+
+    try:
+        c = cell_from(cell, film, emissivity)
+        source = ""
+        if from_result:
+            Ta, source = surroundings_from(from_result)
+        else:
+            Ta = parse_quantity(ambient, "temperature").value + 273.15
+        out = wobbl_home() / "results" / f"{cell}-runaway-{uuid.uuid4().hex[:6]}"
+        o = run_runaway(c, Ta, out, question, source)
+    except Exception as e:  # noqa: BLE001
+        return _err(e)
+    return _compact(o)
+
+
 def footprint() -> dict:
     """What chemistry costs on disk: nothing until the first study, then the pruned Cantera wheel."""
     from . import install

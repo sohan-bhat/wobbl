@@ -1,10 +1,15 @@
 """Lithium ion thermal runaway onset: Semenov's criterion, the transient with reactants used up, and the commands."""
 import json
 import math
+from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 from wobbl.chem.runaway import Cell, cell_from, critical, generation, loss, run_runaway, semenov, transient
+from wobbl.cli.main import cli
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_semenov_point_is_a_tangency():
@@ -50,3 +55,15 @@ def test_cells_and_cooling_read_like_the_heat_domain():
     with pytest.raises(ValueError):
         cell_from("aa")
     assert math.isclose(cell_from("18650", "sealed box").h, 5.0)
+
+
+def test_runaway_command_reads_a_heat_result(tmp_path):
+    pack = ROOT / "examples" / "battery-pack" / "output"
+    r = CliRunner().invoke(cli, ["runaway", "--cell", "18650", "--from", str(pack), "-o", str(tmp_path / "r"),
+                                 "--json"])
+    assert r.exit_code == 0, r.output
+    d = json.loads(r.output[r.output.index("{"):])
+    t_max = json.loads((pack / "outcome.json").read_text())["values"]["t_max_C"]
+    assert d["values"]["ambient_C"] == pytest.approx(t_max) and d["verdict"] == "ok"
+    r = CliRunner().invoke(cli, ["runaway", "--cell", "aa"])
+    assert r.exit_code != 0

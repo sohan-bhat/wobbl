@@ -241,9 +241,10 @@ def render(result_dir: str) -> dict:
 
 
 _RERUN_TOOL = {"thermal": "solve_thermal", "circuit": "solve_circuit", "motion": "solve_motion",
-               "flow": "solve_flow", "motor": "solve_motor", "combustion": "solve_flame or solve_propellant"}
+               "flow": "solve_flow", "motor": "solve_motor", "combustion": "solve_flame or solve_propellant",
+               "battery": "solve_runaway"}
 _DOMAIN_WORD = {"thermal": "heat", "circuit": "circuit", "motion": "motion", "flow": "flow", "motor": "motor",
-                "combustion": "combustion"}
+                "combustion": "combustion", "battery": "battery"}
 _RERUN_TOOL.update({"buckling": "solve_buckling", "vibration": "solve_vibration", "fatigue": "fatigue_life"})
 _DOMAIN_WORD.update({"buckling": "buckling", "vibration": "vibration", "fatigue": "fatigue"})
 _RERUN_TOOL.update({"plastic": "solve_plastic"})

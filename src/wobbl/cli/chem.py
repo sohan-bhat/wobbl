@@ -131,3 +131,40 @@ def propellant(propellant, chamber, area_ratio, exit_pressure, ambient, out, que
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e), getattr(e, "hint", ""))
     _finish(o, as_json)
+
+
+@click.command()
+@click.option("--cell", default="18650", show_default=True,
+              help="18650, 21700, 26650 or 14500, or a size like 18x65 mm.")
+@click.option("--ambient", default="25 C", show_default=True, help="Temperature around the cell.")
+@click.option("--film", default="7.17 W/m2K", show_default=True,
+              help="Cooling on the cell, e.g. '25 W/m2K', or 'sealed box', 'open air', 'a small fan'.")
+@click.option("--emissivity", type=float, default=0.8, show_default=True)
+@click.option("--from", "from_", default="", help="A heat result folder whose hottest temperature surrounds the cell.")
+@click.option("--out", "-o", default=None)
+@click.option("--question", default="")
+@click.option("--json", "as_json", is_flag=True)
+def runaway(cell, ambient, film, emissivity, from_, out, question, as_json):
+    """Lithium ion thermal runaway onset: when a cell's self heating outruns its cooling.
+
+    \b
+    wobbl runaway --cell 18650 --ambient "60 C"
+    wobbl runaway --cell 21700 --film "sealed box" --from wobbl-out/pack
+    """
+    from ..chem.runaway import cell_from, run_runaway, surroundings_from
+    from ..units import parse_quantity
+    from .main import _out_dir
+
+    try:
+        c = cell_from(cell, film, emissivity)
+        source = ""
+        if from_:
+            Ta, source = surroundings_from(from_)
+        else:
+            Ta = parse_quantity(ambient, "temperature").value + 273.15
+        with ui.progress(not as_json) as cb:
+            cb("kinetics", f"{c.label} cell around {Ta - 273.15:.4g} C")
+            o = run_runaway(c, Ta, _out_dir(f"{cell}-runaway", out), question, source)
+    except Exception as e:  # noqa: BLE001
+        ui.fail(str(e), getattr(e, "hint", ""))
+    _finish(o, as_json)

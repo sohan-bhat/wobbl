@@ -17,6 +17,7 @@ INSTRUCTIONS = """Wobbl runs verified engineering simulations. Typical flow for 
 Heat questions: solve_thermal. Circuits: solve_circuit. Falling, thrown and rocket flights: solve_motion.
 Pipe pressure drop, drag, propellers, drones and boat hulls: solve_flow.
 Solid rocket motor designs: solve_motor. Flame temperatures: solve_flame. Propellant c* and Isp: solve_propellant.
+Lithium ion cell thermal runaway onset: solve_runaway.
 Buckling of struts, plates and shells: solve_buckling. Natural frequencies against motor or propeller speed, sine
 sweeps and random vibration: solve_vibration. Fatigue life of a finished strength or vibration result: fatigue_life.
 Odds of failure under scatter, comparison with test readings, credibility evidence and a test plan for a
@@ -202,6 +203,17 @@ def build_server():
         Give area_ratio, or exit_pressure (default the ambient). Matches NASA CEA to about 0.1%."""
         from ..chem.tools import solve_propellant_tool
         return solve_propellant_tool(propellant, chamber_pressure, area_ratio, exit_pressure, ambient, question)
+
+    @srv.tool()
+    def solve_runaway(cell: str = "18650", ambient: str = "25 C", film: str = "", emissivity: float = 0.8,
+                      from_result: str = "", question: str = "") -> dict:
+        """Lithium ion thermal runaway onset: the surrounding temperature at which a charged cell's own
+        decomposition heat outruns its cooling, by Semenov's criterion and a transient with the reactants used up
+        (Hatchard's LiCoO2 kinetics). cell is 18650, 21700, 26650, 14500 or '18x65' mm, film is the cooling as
+        '25 W/m2K' or words like 'sealed box' or 'a small fan', and from_result takes the surroundings from the
+        hottest point of a solve_thermal result. Returns the onset, the margin and fixes. Runs in seconds."""
+        from ..chem.tools import solve_runaway_tool
+        return solve_runaway_tool(cell, ambient, film, emissivity, from_result, question)
 
     @srv.tool()
     def solve_flow(kind: str, params: dict | None = None) -> dict:
