@@ -56,6 +56,8 @@ class Analysis:
     needs: tuple[str, ...] = ()        # analyses whose results it reads, run first
     covers: tuple[str, ...] = ()       # analyses it makes unnecessary when both are asked in the same clause
     covers_all: bool = False   # its covers hold for the whole question, as a layup says what the whole part is
+    covers_scope: str = "clause"   # or "sentence": a sentence it speaks in is one scenario, as a coolant with
+    #                                its heat load, while a drop and a shelf load in one sentence stay two cases
     legacy: str = ""           # the old command that ran the same study, kept as a hidden alias
     dry: bool = False          # the entry calls job.ready() just before it solves, so --plan can show its guesses
     example: str = ""

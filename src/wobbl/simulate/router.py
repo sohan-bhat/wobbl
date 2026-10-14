@@ -150,9 +150,20 @@ def _pool(d: Domain, kind: str) -> list[Analysis]:
 CLAUSE = re.compile(r"\s*(?:[,;?]|\band\b|\bthen\b|\bbut\b|\bwhile\b|\bplus\b|\balso\b)\s*", re.I)
 
 
+SENTENCE = re.compile(r"(?<!\d)\.(?!\d)|[!?;]")
+
+
 def clauses(text: str) -> list[str]:
     """A question cut where it joins separate asks, so 'survive a drop and hold a 10 kg shelf' is two load cases."""
-    return [c.strip() for c in CLAUSE.split(text or "") if c and c.strip()]
+    return [c for _, c in sentences(text)]
+
+
+def sentences(text: str) -> list[tuple[int, str]]:
+    """Each clause with the number of the sentence it sits in."""
+    out = []
+    for n, sent in enumerate(SENTENCE.split(text or "")):
+        out += [(n, c.strip()) for c in CLAUSE.split(sent) if c and c.strip()]
+    return out
 
 
 def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None
@@ -164,7 +175,8 @@ def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None
     if not pool:
         raise RouteError(f"Wobbl has no {d.name} analysis registered yet",
                          "Analyses register in a domain.py; see 'wobbl simulate --list'.")
-    parts = clauses(text)
+    where = sentences(text)
+    parts = [c for _, c in where]
     focus: dict[str, str] = {}
     if physics:
         chosen = []
@@ -185,16 +197,25 @@ def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None
                 if m:
                     hits.setdefault(a.key, {})[i] = m.group(0).strip()
         chosen = [a for a in pool if a.key in hits]
+
+        def reach(a: Analysis) -> set[int]:
+            """The clauses a covering analysis speaks for: its own, every clause of its sentences, or all."""
+            if a.covers_all or a.covers_scope == "question":
+                return set(range(len(parts)))
+            if a.covers_scope == "sentence":
+                said = {where[i][0] for i in hits[a.key]}
+                return {i for i, (n, _) in enumerate(where) if n in said}
+            return set(hits[a.key])
+
         def covered(b: Analysis) -> bool:
-            return any(b.name in a.covers and (a.covers_all or set(hits[b.key]) <= set(hits[a.key]))
-                       for a in chosen if a is not b)
+            return any(b.name in a.covers and set(hits[b.key]) <= reach(a) for a in chosen if a is not b)
 
         chosen = [b for b in chosen if not covered(b)]
         claimed = {i for a in chosen for i in hits[a.key]}
         shared = [i for i in range(len(parts)) if i not in claimed]
         word = {}
         for b in chosen:
-            mine = {i for i in hits[b.key] if not any(b.name in a.covers and i in hits[a.key] for a in chosen)}
+            mine = {i for i in hits[b.key] if not any(b.name in a.covers and i in reach(a) for a in chosen)}
             word[b.key] = hits[b.key][min(mine)] if mine else next(iter(hits[b.key].values()))
             if len(chosen) > 1 and mine:
                 focus[b.name] = " ".join(parts[i] for i in sorted(mine | set(shared)))

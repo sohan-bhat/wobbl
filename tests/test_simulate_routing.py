@@ -101,6 +101,13 @@ CASES = [
     Case(str(PARTS / "enclosure_shell.step"), "will it survive a 1.2 m drop onto tile?", "part", "step", ("drop",)),
     Case(str(EX / "drone-arm" / "arm.py"), "it is bolted at the base, will it hold 20 N and survive a 1 m drop?",
          "part", "parametric", ("stress", "drop")),
+    # a pressure drop is a flow question, not a drop test
+    Case(str(PARTS / "cast_motor_mount.step"), "what is the pressure drop through it at 20 L/min of water?", "part",
+         "step", ("cfd",)),
+    # a coolant and the heat load it carries are one scenario, so cooling covers heat across the sentence
+    Case(str(EX / "heat-sink" / "heatsink.py"),
+         "does it stay under 60 C with 50 W on the bottom and 1 L/min of water coolant?", "part", "parametric",
+         ("cooling",)),
     # a layup says what the whole part is made of, so it replaces the strength run in every clause
     Case(str(EX / "drone-arm" / "arm.py"), "carbon fiber [0/±45/0]s, 40 N at the tip, is it strong enough?", "part",
          "parametric", ("composite",), waits=lambda: registry.get("part", "composite").covers_all),

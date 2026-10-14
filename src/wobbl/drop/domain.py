@@ -82,8 +82,8 @@ def drop(job):
 register(Analysis(
     "part", "drop", "Drop onto a floor: peak stress, whether it cracks and the g it feels, worst landing found",
     drop, dry=True, kinds=PART_KINDS, default=False, covers=("stress",),
-    keywords=(r"\bdrop(?:ped|s|ping)?\b", r"\bfalls? (?:off|from|onto|on)\b", r"\bfell\b", r"\bimpact\b",
-              r"\bknocked off\b"),
+    keywords=(r"(?<!pressure )(?<!voltage )\bdrop(?:ped|s|ping)?\b", r"\bfalls? (?:off|from|onto|on)\b",
+              r"\bfell\b", r"\bimpact\b", r"\bknocked off\b"),
     aliases=("impact test", "drop test", "impact", "fall"),
     options=(Option("height", "Drop height; a bare number is meters", "1 m"),
              Option("floor", "concrete, steel, tile, stone, wood, vinyl, carpet, foam, grass, or "

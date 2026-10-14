@@ -356,7 +356,7 @@ register(Analysis(
 
 register(Analysis(
     "part", "cooling", "Forced convection cooling: CFD around or through the part sets the heat transfer, CalculiX "
-    "the part's temperature", cooling, kinds=PART_KINDS, covers=("heat", "cfd"),
+    "the part's temperature", cooling, kinds=PART_KINDS, covers=("heat", "cfd"), covers_scope="sentence",
     keywords=(r"\bfan\b", r"\bblower\b", r"forced (?:air|convection)", r"\bairflow\b.*\b(?:k?w|watts?)\b",
               r"\b(?:k?w|watts?)\b.*\bairflow\b", r"\bcfm\b.*\b(?:k?w|watts?)\b", r"\bcold ?plate\b",
               r"\bliquid cool", r"\bwater cool", r"\bcoolant\b.*\b(?:k?w|watts?)\b"),
