@@ -32,7 +32,7 @@ def run_transient(case: foam.Case, s, grid, tag: str, fields: bool) -> dict:
     """Write the time accurate controls on a meshed case, run it and read the statistics."""
     from .partflow import _functions, _non_orthogonal
 
-    settle, window = times_for(s, s.ref_length if s.mode != "external" else s.body_length)
+    settle, window = times_for(s, s.ref_length)
     end = settle + window
     dt0 = 0.2 * s.size / 2 ** max(x.level[1] for x in s.surfaces) / max(s.speed, 1e-12)
     fo = _functions(s, grid) + foam.fo_average(settle, nut=True) + foam.fo_cell_volumes()

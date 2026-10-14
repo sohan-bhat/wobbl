@@ -293,9 +293,9 @@ def _build_setup(st: PartFlowStudy, g: PartGeometry, p: Plan, q: dict, flow: flo
 
 def _surface_level(size: float, level: int, ext: np.ndarray, most: int = 7) -> int:
     """The refinement level at the surface: the quality's own, raised until the part's thinnest extent spans at
-    least four cells, so a long thin strut or a flat plate is not lost between background cells."""
+    least three cells, so a long thin strut or a flat plate is not lost between background cells."""
     thin = float(np.min(ext))
-    while size / 2 ** level > thin / 4 and level < most:
+    while size / 2 ** level > thin / 3 and level < most:
         level += 1
     return level
 
