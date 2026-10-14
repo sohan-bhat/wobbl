@@ -1,6 +1,6 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, asks whether a lithium ion cell can run away on its own, asks whether servos can lift a load or a robot arm can make a move, how far a linkage swings and where it binds, what a gear train gives, how hard two parts hit or whether something tips over, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed, or asks about solenoid, electromagnet or magnet force, capacitance and breakdown, PCB trace impedance, crosstalk and switch node ringing, antenna tuning and wireless range, room modes, muffler loss or panel noise. Also use it when someone asks where a fatigue crack will go and how many cycles until it fails a part (B10 and B1 lives, inspection intervals). Wobbl meshes the CAD, runs CalculiX, ngspice, GetDP, Cantera, MuJoCo or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
+description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks whether a circuit works or whether anything on a board burns (any SPICE netlist, KiCad schematic or circuit in words, from LED arrays and 555 timers to op amp stages, regulators, chargers and microcontroller boards), asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, asks whether a lithium ion cell can run away on its own, asks whether servos can lift a load or a robot arm can make a move, how far a linkage swings and where it binds, what a gear train gives, how hard two parts hit or whether something tips over, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed, or asks about solenoid, electromagnet or magnet force, capacitance and breakdown, PCB trace impedance, crosstalk and switch node ringing, antenna tuning and wireless range, room modes, muffler loss or panel noise. Also use it when someone asks where a fatigue crack will go and how many cycles until it fails a part (B10 and B1 lives, inspection intervals). Wobbl meshes the CAD, runs CalculiX, ngspice, GetDP, Cantera, MuJoCo or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
 ---
 
 # Wobbl: simulate before you build
@@ -52,9 +52,18 @@ never write your own finite element code.
 
 For heat, run `wobbl thermal part.step -m 6061-t6 --power "12 W" --film "5 W/m2K @ all" --ambient "25 C"`
 (MCP `solve_thermal`). The material is required, and adding `--duration "30 min"` makes the run transient.
-For circuits, give each template value its own `--set`, as in
-`wobbl circuit led --set supply=5V --set resistor=150 --set led=red`, or run your own netlist with
-`wobbl circuit board.cir --probe "v(out)"` (MCP `solve_circuit`).
+For circuits, pass whatever the user has: a SPICE netlist (`wobbl circuit amp.cir`), a KiCad
+schematic (`wobbl circuit board.kicad_sch --set J2.load=2A`) or a description in words
+(`wobbl circuit "three red LEDs in parallel from a 9 V battery, each with 330 ohm"`), and Wobbl
+judges every part against its voltage, current, power and temperature ratings, says whether the
+circuit works, and solves its fixes again before offering them. Parts named in a netlist (1N4148,
+2N3904, IRLZ44N, LM358, NE555, AMS1117-3.3 and many more) get their library models and ratings,
+and a note after a part's `;` gives its package or rating, as in `R1 a b 220 ; 0805` or
+`C1 out 0 10u ; 16V X5R`. Set part values and ratings with `--set`, as in `--set R1.power=1W` or
+`--set ambient=40C`, read a signal with `--probe "v(out)"`, and lead with another analysis with
+`--physics transient`, `ac` or `tolerance`. When a description would take more than a sentence,
+write the netlist yourself and pass it. The templates stay as shortcuts, as in
+`wobbl circuit led --set supply=5V --set resistor=150 --set led=red` (MCP `simulate`).
 
 For a drop test of a part, run
 `wobbl simulate phone.step "will it survive a 1.2 m drop onto tile?" -m pc --mass "45 g @ 0,0,5"`.

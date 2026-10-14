@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from pathlib import Path
 
-from .run import run_circuit, run_netlist
 from .templates import LEDS
 
 
@@ -68,26 +66,27 @@ def read_circuit_question(q: str) -> tuple[str, dict, list[str]]:
     raise ValueError("could not tell which circuit this is; use 'wobbl circuit led|buck|mosfet|rc' or a netlist")
 
 
-def solve_circuit_tool(template: str = "", netlist: str = "", params: dict | None = None) -> dict:
+def solve_circuit_tool(template: str = "", netlist: str = "", params: dict | None = None,
+                       question: str = "") -> dict:
+    """Any circuit (netlist text or path, KiCad schematic, words) or a template, as the MCP tool runs it."""
     from ..solvers.locate import wobbl_home
+    from .study import simulate_circuit
 
     params = dict(params or {})
-    out = wobbl_home() / "results" / f"circuit-{template or 'netlist'}-{uuid.uuid4().hex[:6]}"
+    probes = list(params.pop("vectors", []) or params.pop("probes", []) or [])
+    out = wobbl_home() / "results" / f"circuit-{template or 'any'}-{uuid.uuid4().hex[:6]}"
+    said: list[str] = []
     try:
-        if netlist:
-            path = Path(netlist)
-            if not path.exists():
-                out.mkdir(parents=True, exist_ok=True)
-                path = out / "input.cir"
-                path.write_text(netlist)
-            o = run_netlist(str(path), list(params.get("vectors", [])), out)
-        else:
-            o = run_circuit(template or "led", params, out)
+        o = simulate_circuit(netlist or template or "led", question, params, out, probes,
+                             assume=lambda t, ov="": said.append(t + (f" (override with {ov})" if ov else "")))
     except Exception as e:  # noqa: BLE001
-        return {"error": str(e)}
+        return {"error": str(e), **({"hint": e.hint} if getattr(e, "hint", "") else {})}
+    parts = o.values.get("parts", {})
     return {"verdict": o.verdict, "headline": o.headline, "metrics": dict(o.metrics),
-            "values": {k: v for k, v in o.values.items() if not k.startswith("_")},
+            "parts": {k: {"status": v.get("status"), "use": v.get("use"), "power_W": v.get("p"), "tj_C": v.get("tj")}
+                      for k, v in parts.items()},
+            "values": {k: v for k, v in o.values.items() if not k.startswith("_") and k != "parts"},
             "confidence": o.confidence, "confidence_reasons": o.confidence_reasons,
             "checks": [{"name": c.name, "status": c.status, "summary": c.summary} for c in o.checks],
-            "assumptions": o.assumptions, "fixes": o.fixes, "images": o.images, "report": o.report,
+            "guesses": said, "assumptions": o.assumptions, "fixes": o.fixes, "images": o.images, "report": o.report,
             "result_dir": o.workdir}

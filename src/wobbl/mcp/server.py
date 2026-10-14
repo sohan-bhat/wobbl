@@ -185,12 +185,15 @@ def build_server():
                                   radiation)
 
     @srv.tool()
-    def solve_circuit(template: str = "", netlist: str = "", params: dict | None = None) -> dict:
-        """Circuit checks with ngspice. template='led' (supply, resistor, led color or vf, current rating),
-        'buck' (vin, vout, current, frequency, inductor, capacitor), 'mosfet' (current, rds_on, theta_ja,
-        ambient, switching), 'rc' (r, c, v); or netlist=SPICE text with params.vectors to read."""
+    def solve_circuit(template: str = "", netlist: str = "", params: dict | None = None, circuit: str = "",
+                      question: str = "") -> dict:
+        """Any circuit with ngspice, every part judged against its ratings: circuit= a SPICE netlist (text or a
+        path), a KiCad .kicad_sch path, or a description in words; params holds part values and ratings
+        (R1.power, C3.voltage, J2.load, supply, ambient) and probes to report. The templates remain:
+        template='led' (supply, resistor, led), 'buck' (vin, vout, current, frequency, inductor, capacitor),
+        'mosfet' (current, rds_on, theta_ja, ambient) or 'rc' (r, c, v)."""
         from ..circuits.tools import solve_circuit_tool
-        return solve_circuit_tool(template, netlist, params or {})
+        return solve_circuit_tool(template, netlist or circuit, params or {}, question)
 
     @srv.tool()
     def solve_mechanism(template: str = "", spec: str = "", params: dict | None = None, question: str = "") -> dict:

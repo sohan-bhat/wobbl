@@ -82,13 +82,14 @@ def check_values(name: str, p: dict):
 
         build(name.split()[1], p)
     elif name == "circuit":
+        from wobbl.circuits.describe import build
         from wobbl.circuits.templates import TEMPLATES
 
-        if p["target"].lower().endswith((".cir", ".sp", ".spice", ".net")):
-            assert p["probes"], "a netlist run needs at least one --probe"
-        else:
-            assert all("=" in s for s in p["sets"]), p["sets"]
+        assert all("=" in s for s in p["sets"]), p["sets"]
+        if p["target"] in TEMPLATES:
             TEMPLATES[p["target"]](dict(s.split("=", 1) for s in p["sets"]))
+        elif not p["target"].lower().endswith((".cir", ".sp", ".spice", ".net", ".kicad_sch")):
+            build(p["target"], dict(s.split("=", 1) for s in p["sets"]))    # words must build a circuit
     elif name in ("magnetic", "electric", "board", "antenna", "sound"):
         from wobbl.fields.tools import check_params
 
