@@ -173,3 +173,67 @@ def nozzle(out: Path, rows: list[dict], info: dict) -> str:
                                    "condensed": "mass fraction of condensed products"}},
             "propellant": info, "frames": rows}
     return _write(out, data)
+
+
+# ------------------------------------------------------------------------------------------- atoms in 3D
+def atoms_block(symbols: list[str]) -> list[dict]:
+    """Each atom's element with the CPK colour and van der Waals radius a viewer draws it with."""
+    from .formula import element
+    out = []
+    for s in symbols:
+        e = element(s)
+        out.append({"element": s, "color": "#" + (e.get("color") or "FF1493"),
+                    "radius_A": _r((e.get("radius_pm") or 150) / 100.0, 3)})
+    return out
+
+
+def _pos(p) -> list:
+    return [[round(float(v), 3) for v in row] for row in np.asarray(p)]
+
+
+def mode_frames(positions: np.ndarray, vector: np.ndarray, frames: int = 16, amplitude: float = 0.25) -> list:
+    """One period of a normal mode, the largest atom swing set to amplitude angstrom so it can be seen."""
+    v = np.asarray(vector)
+    v = v / max(np.linalg.norm(v, axis=1).max(), 1e-12) * amplitude
+    return [_pos(positions + math.sin(2 * math.pi * k / frames) * v) for k in range(frames)]
+
+
+def molecule(out: Path, name: str, formula: str, symbols, positions, bonds, modes=None, md_frames=None,
+             values: dict | None = None, path: dict | None = None) -> str:
+    """Atoms, bonds and animations: the strongest IR modes vibrating, the molecular dynamics run, or a reaction
+    path, each as frames of positions in angstrom."""
+    pos = np.asarray(positions)
+    anims = []
+    if modes is not None and len(modes.freqs):
+        picks = list(np.argsort(-np.asarray(modes.intensities))[:5])
+        for extra in (0, len(modes.freqs) - 1):
+            if extra not in picks:
+                picks.append(extra)
+        for k in sorted({int(i) for i in picks}, key=lambda i: modes.freqs[i]):
+            label = f", {modes.labels[k]}" if modes.labels[k] else ""
+            period = 1e15 / (modes.freqs[k] * 2.99792458e10) if modes.freqs[k] > 0 else None
+            anims.append({"kind": "vibration", "name": f"{modes.freqs[k]:.0f} cm-1{label}",
+                          "frequency_cm": _r(modes.freqs[k], 5), "intensity_km_mol": _r(modes.intensities[k], 3),
+                          "period_fs": _r(period, 4) if period else None, "frames": mode_frames(pos, modes.vectors[k])})
+    if md_frames:
+        md = (values or {}).get("md", {})
+        anims.append({"kind": "dynamics", "name": f"molecular dynamics at {_r(md.get('T_target', 0), 4)} K",
+                      "frame_fs": _r(md.get("fs", 0) / max(len(md_frames), 1), 4), "frames": md_frames})
+    if path:
+        anims.append({"kind": "reaction path", "name": path.get("name", "reaction path"),
+                      "energies_kJ_mol": [_r(e, 4) for e in path["energies"]],
+                      "frames": [_pos(p) for p in path["frames"]]})
+    data = {"manifest": {"kind": "molecule", "version": VERSION, "generator": "wobbl chem",
+                         "frames": sum(len(a["frames"]) for a in anims),
+                         "units": {"positions": "angstrom", "frequency_cm": "cm-1", "intensity_km_mol": "km/mol",
+                                   "period_fs": "femtoseconds", "frame_fs": "femtoseconds per frame",
+                                   "energies_kJ_mol": "kJ/mol relative to the reactant"},
+                         "notes": "Vibration frames swing the largest moving atom by 0.25 A so the motion shows, and "
+                                  "real amplitudes are smaller. Dynamics and reaction path frames are true positions."},
+            "molecule": {"name": name, "formula": formula},
+            "atoms": atoms_block(symbols), "positions": _pos(pos),
+            "bonds": [[int(i), int(j), _r(o, 2)] for i, j, o in bonds], "animations": anims, "cell": None}
+    if values:
+        data["properties"] = {k: _r(values[k], 5) for k in ("dipole_D", "gap_eV", "homo_eV", "lumo_eV",
+                                                             "solvation_kJ_mol") if values.get(k) is not None}
+    return _write(out, data)

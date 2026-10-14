@@ -75,3 +75,26 @@ def sweep_chart(path, xs, ys, xlabel: str, ylabel: str, mark: tuple[float, float
         ax.legend(facecolor=BG, edgecolor="#3a3d42", labelcolor=FG, fontsize=9)
     _label(ax, xlabel, ylabel)
     return _save(fig, path)
+
+
+def ir_chart(path, freqs, intensities, labels) -> str:
+    """An infrared spectrum drawn the way chemists read one, wavenumber falling to the right, with the strongest
+    bands named."""
+    import numpy as np
+
+    from .vib import spectrum
+    fig, ax = _figure()
+    x, y = spectrum(np.asarray(freqs), np.asarray(intensities))
+    ax.plot(x, y, color=MARK, lw=1.6)
+    ax.fill_between(x, y, color=MARK, alpha=0.12)
+    ax.set_xlim(4000, 400)
+    ax.set_ylim(0, max(y.max() * 1.25, 1e-6))
+    top = np.argsort(-np.asarray(intensities))[:4]
+    for i in top:
+        f = freqs[i]
+        if 400 < f < 4000 and labels[i]:
+            yi = float(np.interp(f, x, y))
+            ax.annotate(f"{f:.0f}\n{labels[i]}", (f, yi), textcoords="offset points", xytext=(0, 6), ha="center",
+                        color=FG, fontsize=8)
+    _label(ax, "wavenumber, cm-1", "absorption, km/mol per cm-1")
+    return _save(fig, path)
