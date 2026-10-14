@@ -110,7 +110,10 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None, quick: b
     checks = _checks(st, res_path, first, cpath, inp, mc, unc, x_prof, sig_prof, material, spectrum)
     level, reasons = confidence(checks)
     verdict, head = _verdict(st, mc, first, spec, spectrum)
-    fixes = [] if quick else _fixes(st, cpath, inp, scatter, mc, law, material, insp, spectrum)
+    try:
+        fixes = [] if quick else _fixes(st, cpath, inp, scatter, mc, law, material, insp, spectrum)
+    except Exception as e:  # noqa: BLE001  fixes are advice, so a failed one never costs the answer
+        fixes, res_path.notes = [], res_path.notes + [f"The fixes could not be worked out ({str(e)[:120]})."]
     say("render", "drawing the crack path and the lives")
     curve = growth_curve(cpath, inp, float(cpath.s[0]))
     n_at = np.interp([x.size for x in steps], curve[0], curve[1]) if len(curve[0]) else np.full(len(steps), np.nan)
@@ -170,7 +173,10 @@ def _checks(st, res_path, first, cpath, inp, mc, unc, x_prof, sig_prof, material
         checks.append(Check("SIF mesh convergence", status,
                             f"largest K at the starting crack {trend} MPa sqrt(m) with front elements of {sizes} mm, "
                             f"last change {100 * ch:.1f}%", {"levels": conv, "change": ch}))
-    checks.append(_handbook(st, first, cpath, unc, x_prof, sig_prof))
+    try:
+        checks.append(_handbook(st, first, cpath, unc, x_prof, sig_prof))
+    except Exception as e:  # noqa: BLE001  a hand check that cannot be made never stops the answer
+        checks.append(Check("hand calculation", "skip", f"no handbook K could be formed here ({str(e)[:120]})"))
     if res_path.balance is not None:
         (fa, ma), (fr, mr), size, partial = res_path.balance
         checks.append(balance_check(fa, fr, ma, mr, size, partial))
@@ -233,9 +239,11 @@ def _handbook(st, first, cpath, unc, x_prof, sig_prof) -> Check:
         k_hb = H.edge_weight_function(x_prof, sig_prof, a0)
         what = "the edge crack weight function (Glinka and Shen) over the uncracked stress along the crack"
     elif shape == "surface":
-        c0 = (st.crack.c or st.crack.a) * a0 / st.crack.a
+        ratio = st.crack.a / (st.crack.c or st.crack.a)
+        if ratio > 1.0 + 1e-6:
+            return Check("hand calculation", "skip", "Newman and Raju's deepest point form covers a / c up to 1")
         t = _depth(unc, first)
-        k_hb = H.newman_raju(first.stress, a0, c0, max(t, 1.25 * a0), 1e6)
+        k_hb = H.newman_raju(first.stress, a0, a0 / min(ratio, 1.0), max(t, 1.25 * a0), 1e6)
         what = (f"Newman and Raju at the deepest point, with the {fmt(first.stress)} MPa at the origin taken as "
                 "uniform tension")
     else:
