@@ -77,6 +77,20 @@ def element_map(work: str | Path, fname: str, X: np.ndarray, tris: np.ndarray, n
     return out
 
 
+def peak_element(work: str | Path, fname: str, nodes_per_elem: int = 3) -> tuple[float, tuple[float, float]]:
+    """The largest value in an element table and the centroid of the element it sits in."""
+    best, where = -np.inf, (0.0, 0.0)
+    for ln in Path(work, fname).read_text().splitlines():
+        t = ln.split()
+        if not t:
+            continue
+        v = max(float(x) for x in t[-nodes_per_elem:])
+        if v > best:
+            xyz = np.array(t[2:2 + 3 * nodes_per_elem], float).reshape(nodes_per_elem, 3)
+            best, where = v, (float(xyz[:, 0].mean()), float(xyz[:, 1].mean()))
+    return float(best), where
+
+
 def read_point(work: str | Path, fname: str) -> np.ndarray:
     """A value printed OnPoint in Table format: the components after the point's coordinates."""
     t = Path(work, fname).read_text().split()

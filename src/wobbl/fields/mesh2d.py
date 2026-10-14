@@ -34,13 +34,14 @@ class Model2D:
     shapes: list[Shape]
     radius: float                   # outer disk radius
     center: tuple[float, float] = (0.0, 0.0)
-    clip: str = ""                  # "", "x>=0", "y>=0" or "x>=0,y>=0"
+    clip: str = ""                  # half planes the domain keeps, e.g. "x>=0" or "y>=0,y<=0.003"
     shell: float = 0.0              # outer radius of the shell mapped to infinity, 0 for none
     size: float = 0.0               # element size near the shapes
     far: float = 0.0                # element size at the outer boundary
     growth: float = 0.3             # how fast elements grow away from the shapes (size per distance)
     lines: dict[str, str] = field(default_factory=dict)   # boundary name: "x=0", "y<0.002", "outer", ...
     refine: list[tuple[str, float, float]] = field(default_factory=list)  # (shape, size at its edges, reach)
+    spots: list[tuple[float, float, float]] = field(default_factory=list)  # (x, y, size there): sharp features
 
     def scaled(self, k: float) -> "Model2D":
         """The same model with every element size multiplied by k (k < 1 refines)."""
@@ -48,7 +49,8 @@ class Model2D:
 
         shapes = [replace(s, size=s.size * k if s.size else None) for s in self.shapes]
         return replace(self, shapes=shapes, size=self.size * k, far=self.far * k,
-                       refine=[(n, h * k, d) for n, h, d in self.refine])
+                       refine=[(n, h * k, d) for n, h, d in self.refine],
+                       spots=[(x, y, h * k) for x, y, h in self.spots])
 
 
 @dataclass
@@ -76,7 +78,9 @@ def mesh(model: Model2D, path: str | Path, timeout: float = 120.0) -> Mesh2D:
 
 
 def _bbox_match(gm, tag: int, pred: str, center, radius, tol: float) -> bool:
-    x0, y0, _, x1, y1, _ = gm.getBoundingBox(1, tag)
+    """Whether a curve meets a predicate: terms like x=0, y<0.002, r=0.01 or outer, joined by & (all) and | (any)."""
+    if "|" in pred:
+        return any(_bbox_match(gm, tag, p, center, radius, tol) for p in pred.split("|"))
     lo, hi = gm.getParametrizationBounds(1, tag)
     pts = np.array(gm.getValue(1, tag, list(np.linspace(lo[0], hi[0], 7)))).reshape(-1, 3)
     for term in pred.split("&"):
@@ -110,14 +114,20 @@ def _build(model: Model2D, path: str) -> dict:
         gmsh.finalize()
 
 
-def _clipped(occ, tag: int, clip: str, big: float, center) -> list:
-    if not clip:
-        return [(2, tag)]
+def _clipped(occ, tag: int, clip: str, big: float, center, within: float = 0.0) -> list:
+    """Cut a surface down to the half planes in clip ("x>=0,y<=0.002") and, when within is set, to the disk of
+    that radius, so shapes that reach past the outer boundary end at it."""
     cx, cy = center
-    x0 = 0.0 if "x>=0" in clip else cx - big
-    y0 = 0.0 if "y>=0" in clip else cy - big
-    box = occ.addRectangle(x0, y0, 0, cx + big - x0, cy + big - y0)
-    out, _ = occ.intersect([(2, tag)], [(2, box)])
+    lim = {"x>": cx - big, "x<": cx + big, "y>": cy - big, "y<": cy + big}
+    for term in filter(None, (c.strip() for c in clip.split(","))):
+        lim[term[:2]] = float(term[3:])
+    out = [(2, tag)]
+    if clip:
+        box = occ.addRectangle(lim["x>"], lim["y>"], 0, lim["x<"] - lim["x>"], lim["y<"] - lim["y>"])
+        out, _ = occ.intersect(out, [(2, box)])
+    if within and out:
+        disk = occ.addDisk(cx, cy, 0, within, within)
+        out, _ = occ.intersect(out, [(2, disk)])
     return out
 
 
@@ -146,7 +156,7 @@ def _build_in(gmsh, model: Model2D, path: str) -> dict:
             pts = [occ.addPoint(x, y, 0) for x, y in s.data]
             ls = [occ.addLine(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
             t = occ.addPlaneSurface([occ.addCurveLoop(ls)])
-        objs.append(_clipped(occ, t, model.clip, big, model.center))
+        objs.append(_clipped(occ, t, model.clip, big, model.center, within=model.shell or model.radius))
         names.append(s.name)
     flat = [dt for o in objs for dt in o]
     _, mp = occ.fragment(flat, [])
@@ -234,10 +244,13 @@ def _sizes(gmsh, model: Model2D, keep: dict, names: list, hole_curves: dict) -> 
             pts += [(s.data[0] - s.data[2], s.data[1] - s.data[2]), (s.data[0] + s.data[2], s.data[1] + s.data[2])]
         else:
             pts += list(s.data)
-    core = max((math.hypot(x - cx, y - cy) for x, y in pts), default=0.0)
+    # shapes that span the domain (a substrate) do not count, or nothing would grow
+    near = [math.hypot(x - cx, y - cy) for x, y in pts]
+    core = max((r for r in near if r < 0.5 * model.radius), default=0.0)
     fields = []
     f = fl.add("MathEval")
-    fl.setString(f, "F", f"Min({model.far}, {model.size} + {model.growth}*Max(0, Sqrt((x-{cx})^2+(y-{cy})^2)-{core}))")
+    fl.setString(f, "F", f"Min({model.far}, {model.size} + {model.growth}*Max(0, Sqrt((x-({cx}))^2+(y-({cy}))^2)"
+                         f"-{core}))")
     fields.append(f)
     for i, s in enumerate(model.shapes, start=len(names) - len(model.shapes)):
         if not s.size:
@@ -280,6 +293,10 @@ def _sizes(gmsh, model: Model2D, keep: dict, names: list, hole_curves: dict) -> 
         fl.setNumber(th, "DistMin", 0.0)
         fl.setNumber(th, "DistMax", reach)
         fields.append(th)
+    for x, y, h in model.spots:
+        f = fl.add("MathEval")
+        fl.setString(f, "F", f"{h} + {model.growth}*Sqrt((x-({x}))^2+(y-({y}))^2)")
+        fields.append(f)
     mn = fl.add("Min")
     fl.setNumbers(mn, "FieldsList", fields)
     fl.setAsBackgroundMesh(mn)
