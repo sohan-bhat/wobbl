@@ -74,5 +74,29 @@
   "buck": {
     "group": "Circuits",
     "plain": "The output ripple of a 12 V to 5 V buck converter"
+  },
+  "free-fall": {
+    "group": "Motion",
+    "plain": "A ball dropped 300 m with the air taken away, and how long it takes to land"
+  },
+  "drag-fall": {
+    "group": "Motion",
+    "plain": "The falling rock example’s granite sphere dropped 300 m through air of one density, and how fast it lands"
+  },
+  "projectile": {
+    "group": "Motion",
+    "plain": "A ball thrown at 30 m/s and 40 degrees with no air, and how far it goes"
+  },
+  "rocket-speed": {
+    "group": "Motion",
+    "plain": "A rocket climbing straight up at a constant thrust in a vacuum, and its speed at burnout"
+  },
+  "rocket-height": {
+    "group": "Motion",
+    "plain": "The same rocket, and how high it is at burnout"
+  },
+  "chute-descent": {
+    "group": "Motion",
+    "plain": "A 5 kg payload sinking under a 2 m parachute, and how fast it comes down"
   }
 }

@@ -1,11 +1,11 @@
 ---
 title: "Validation"
-description: "Nineteen cases with known answers, from textbook formulas and NAFEMS benchmarks to real parts, heat and circuits, run through Wobbl's own pipeline."
-lead: "Nineteen cases with known answers run through the same pipeline your studies use, and every one lands inside its tolerance."
+description: "Twenty five cases with known answers, from textbook formulas and NAFEMS benchmarks to real parts, heat, circuits and motion, run through Wobbl's own pipeline."
+lead: "Twenty five cases with known answers run through the same pipeline your studies use, and every one lands inside its tolerance."
 cards:
   - title: "How the cases are set up"
     href: "/validation/cases/"
-    text: "The part, the loads and the reference behind each of the 19 cases."
+    text: "The setup and the reference behind each of the 25 cases."
   - title: "Bake-off"
     href: "/validation/bakeoff/"
     text: "A coding agent on its own against Wobbl, on six parts with a time limit."
@@ -15,8 +15,9 @@ cards:
 ---
 
 Every number above comes from one full run of `wobbl validate`, which took 29 minutes on a 2018
-six core laptop, except the bar whose end jumps to 120 C, which joined in 0.1.1 and comes from a
-run of its own. Each case whose reference is exact for the modeled setup lands within 2%. The
+six core laptop, except the bar whose end jumps to 120 C, which joined in 0.1.1, and the six
+motion cases, which joined with motion and take under three seconds together. Each of those comes
+from a run of its own. Each case whose reference is exact for the modeled setup lands within 2%. The
 real parts are compared with reference models that were refined until they stopped changing,
 and their tolerances follow how settled those references were.
 

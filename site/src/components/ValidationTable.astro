@@ -17,9 +17,9 @@ const notesFile = resolve(process.cwd(), 'src/data/validation-notes.json');
 const notes: Record<string, { group?: string; plain?: string }> = existsSync(notesFile)
   ? JSON.parse(readFileSync(notesFile, 'utf-8')) : {};
 
-const ORDER = ['Textbook formulas', 'Industry benchmarks', 'Real parts from the bake off', 'Heat', 'Circuits'];
+const ORDER = ['Textbook formulas', 'Industry benchmarks', 'Real parts from the bake off', 'Heat', 'Circuits', 'Motion'];
 const groupOf = (c: Case) => notes[c.id]?.group
-  ?? (c.domain === 'heat' ? 'Heat' : c.domain === 'circuit' ? 'Circuits'
+  ?? (c.domain === 'heat' ? 'Heat' : c.domain === 'circuit' ? 'Circuits' : c.domain === 'motion' ? 'Motion'
     : c.id.startsWith('nafems') ? 'Industry benchmarks' : c.exact_theory ? 'Textbook formulas' : 'Real parts from the bake off');
 const groups = [...new Set([...ORDER, ...cases.map(groupOf)])]
   .map((g) => ({ label: g, rows: cases.filter((c) => groupOf(c) === g) }))

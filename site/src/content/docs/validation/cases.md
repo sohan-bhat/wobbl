@@ -1,6 +1,6 @@
 ---
 title: "How the cases are set up"
-description: "The part, the loads, the supports and the reference answer behind each of Wobbl's 19 validation cases."
+description: "The part, the loads, the supports and the reference answer behind each of Wobbl's 25 validation cases."
 lead: "Each case builds its part, meshes it, refines until the answer settles and runs its checks, and the number is then compared with a known answer."
 order: 1
 ---
@@ -73,3 +73,22 @@ A red LED on 5 V through 150 ohm is compared with the diode equation solved by N
 with the same model parameters. An RC network's voltage at one time constant is compared with
 `1 - e^-1`. A 12 V to 5 V buck converter's output ripple is compared with the ideal triangular
 ripple current through the output capacitor and its ESR.
+
+## Motion
+
+The motion cases go through the same integrator, events and checks as a flight of your own, with
+gravity held at its ground value and either no air or air of one density, so each one has an
+exact answer. A ball dropped 300 m without air is compared with `sqrt(2 h / g)` for its fall
+time. The granite sphere from the [falling rock example](/examples/falling-rock/), 9 cm across
+with a drag coefficient of 0.6, drops 300 m through air of one density, and its impact speed is
+compared with the quadratic drag solution `vt tanh(g t / vt)`, with the fall time from
+`h = vt^2 / g ln cosh(g t / vt)`. A ball thrown at 30 m/s and 40 degrees without air is compared
+with `v^2 sin(2 theta) / g` for its range.
+
+The rocket climbs straight up in a vacuum off a 1 m rail, with 1000 N of thrust for 4 s that
+burns 4 kg of propellant and takes it from 11 kg to 7 kg. Its speed at burnout is compared with
+`ve ln(m0 / m1) - g tb`, and its height at burnout with
+`ve tb - ve (m1 / mdot) ln(m0 / m1) - g tb^2 / 2`. A 5 kg payload let go at 500 m under a 2 m
+parachute with a drag coefficient of 1.5 is compared with its terminal speed
+`sqrt(2 m g / (rho Cd A))` as it reaches the ground. Each of the six lands within a millionth of
+its answer.
