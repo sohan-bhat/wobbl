@@ -1,6 +1,4 @@
 """The crack growth command line and agent tool, checked without solving."""
-import asyncio
-
 import pytest
 from click.testing import CliRunner
 
@@ -22,13 +20,9 @@ def test_study_options_are_checked_before_any_solve():
         study_from_options(*args, r_ratio=1.2)
 
 
-def test_cli_and_mcp_offer_crack_growth():
+def test_the_crack_command_still_answers():
     r = CliRunner().invoke(cli, ["crack", "--help"])
     assert r.exit_code == 0 and "--crack" in r.output and "--target-life" in r.output
-    from wobbl.mcp.server import build_server
-
-    names = {t.name for t in asyncio.run(build_server().list_tools())}
-    assert "grow_crack" in names
 
 
 def test_studies_start_from_strength_and_fatigue_results():

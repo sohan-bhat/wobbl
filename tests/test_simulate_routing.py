@@ -58,6 +58,12 @@ CASES = [
          ("vibration",)),
     Case(str(PARTS / "shelf_bracket_sharp.step"), "how fast does a crack grow from the hole?", "part", "step",
          ("stress", "crack")),
+    Case(str(EX / "bracket-crack" / "bracket.py"), "damage tolerance check with a 1 mm flaw at the pin hole",
+         "part", "parametric", ("stress", "crack")),
+    Case(str(PARTS / "cast_motor_mount.step"), "how often should we inspect it for cracks?", "part", "step",
+         ("stress", "crack")),
+    Case(str(EX / "motor-mount-fatigue" / "output"), "how long until a crack from the fillet grows critical?",
+         "part", "result", ("crack",)),
     Case(str(EX / "battery-pack" / "pack.py"), "", "part", "parametric", ("stress",)),
     # circuits: netlists and circuits in words
     Case("", "will a blue LED on 5V with a 47 ohm resistor fry?", "circuit", "led"),
