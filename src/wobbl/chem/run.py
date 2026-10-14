@@ -109,7 +109,14 @@ def prepare(thing: str, question: str = "", physics: str | None = None, *, tempe
 
 
 def execute(p: Prepared, log=None):
-    """Run the prepared physics and return the outcome."""
+    """Run the prepared physics and return the outcome, with its 3D scene written next to it."""
+    o = _execute(p, log)
+    from .scene import write
+    write(getattr(o, "workdir", "") or p.out)
+    return o
+
+
+def _execute(p: Prepared, log=None):
     log = log or (lambda stage, msg="": None)
     q, phys, opts, out, options = p.q, p.physics, p.opts, p.out, p.options
     out.mkdir(parents=True, exist_ok=True)
@@ -225,6 +232,8 @@ def _molecule(q: Query, phys: str, opts: Options, out: Path, log, options: dict)
         name, formula = sp.name, sp.formula
     if phys == "dynamics":
         opts.md, opts.md_fs = True, float(options.get("md_fs", 1000.0))
+    elif "md" in options:
+        opts.md = bool(options["md"]) and str(options["md"]).lower() not in ("0", "false", "no")
     extra = {"resolved": q.resolved(), "physics": phys}
     if q.main is not None:
         extra["phases"] = _phase_changes(q.main)

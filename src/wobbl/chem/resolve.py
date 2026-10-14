@@ -290,10 +290,15 @@ def _from_smiles(smi: str, allow_online: bool) -> Species:
         sp.smiles = smi
         return sp
     if hit is None:
-        from .substances import by_smiles
+        from .substances import ANIONS, CATIONS, by_smiles
         known = by_smiles(smi)
         if known:
             return _from_substance(known, smi, "Wobbl's table of common substances, by its SMILES")
+        for ion in (*CATIONS.values(), *ANIONS.values()):
+            if ion.smiles == smi:
+                c, _ = F.parse(ion.formula)
+                return Species(smi, ion.name, F.hill(c, ion.charge), dict(c), ion.charge, smi, "ion", "aq",
+                               "Wobbl's table of ions, by its SMILES")
         raise ResolveError(f"could not read the SMILES '{smi}'",
                            "RDKit reads SMILES and installs on first use, or PubChem reads it online.")
     counts, charge = hit
@@ -380,7 +385,8 @@ NAMED = {
     "hydrogen fuel cell": "2 H2 + O2 -> 2 H2O",
     "fuel cell": "2 H2 + O2 -> 2 H2O",
 }
-ARROW = re.compile(r"\s*(?:<=>|<->|->|→|=>|⇌|⟶|=)\s*")
+# a bare = needs spaces around it, so a SMILES keeps its double bonds
+ARROW = re.compile(r"\s*(?:<=>|<->|->|→|=>|⇌|⟶)\s*|\s+=\s+")
 
 
 def resolve(text: str, temperature: float | None = None, pressure: float | None = None, solvent: str = "",
