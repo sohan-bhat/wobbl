@@ -336,18 +336,26 @@ def _lighting(cam: Camera, P: np.ndarray, N: np.ndarray, look: Look) -> tuple[np
     return look.ambient + look.diffuse * diff, look.specular * spec
 
 
-def draw(size: tuple[int, int], cam: Camera, surf: Surface, values, look: Look, lines: Lines | None = None):
-    """The picture of a surface colored by a field at its points, as an (H, W, 3) array of floats in 0..1."""
+def draw(size: tuple[int, int], cam: Camera, surf: Surface, values, look: Look, lines: Lines | None = None,
+         two_sided: bool = False):
+    """The picture of a surface colored by a field at its points, as an (H, W, 3) array of floats in 0..1.
+
+    A closed surface hides its back faces behind its front ones, so only faces toward the camera are drawn. A
+    two sided surface, a shell's midsurface, draws both sides and lights each from the side the camera sees.
+    """
     from matplotlib import colormaps
 
     W, H = size[0] * SS, size[1] * SS
     x, y, iz = cam.project(surf.P, SS)
-    P, T = surf.P, surf.T
-    front = np.einsum("ij,ij->i", np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]]), cam.eye - P[T[:, 0]]) > 0
-    T = T[front]                          # a closed surface hides its back faces behind its front ones
+    P, T, N = surf.P, surf.T, surf.N
+    if two_sided:
+        N = N * np.where(np.einsum("ij,ij->i", N, cam.eye - P) < 0, -1.0, 1.0)[:, None]
+    else:
+        toward = np.einsum("ij,ij->i", np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]]), cam.eye - P[T[:, 0]])
+        T = T[toward > 0]
     tri, w1, w2, zbuf = _rasterize(x, y, iz, T, W, H)
     pix = np.nonzero(tri >= 0)[0]
-    lit, shine = _lighting(cam, P, surf.N, look)
+    lit, shine = _lighting(cam, P, N, look)
     a = np.column_stack([iz, values, lit, shine]).astype(np.float32)[T][tri[pix]]   # (pixels, corner, 4)
     w1, w2 = w1[pix], w2[pix]
     q = np.column_stack([1.0 - w1 - w2, w1, w2]) * a[:, :, 0]
