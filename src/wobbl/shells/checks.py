@@ -47,65 +47,92 @@ def slender_axis(X: np.ndarray) -> tuple[int, float] | None:
 
 def section(X: np.ndarray, tris: np.ndarray, thick: np.ndarray, axis: int, at: float) -> dict | None:
     """Cut the midsurface with the plane x[axis] = at: the wall segments of the cross section with their
-    thickness, the centroid and the area. Each flat sub triangle crossing the plane gives one segment."""
+    thickness and wall normal, the centroid and the area. Each flat sub triangle crossing the plane gives one
+    segment."""
     t3 = split_tris(tris)
     d = X[t3, axis] - at
-    segs, ts = [], []
+    segs, ts, nrm = [], [], []
     for k in range(len(t3)):
         dk = d[k]
         if dk.min() >= 0 or dk.max() <= 0:
             continue
-        pts = []
+        pts, tk = [], []
         for i, j in ((0, 1), (1, 2), (2, 0)):
             if (dk[i] < 0) != (dk[j] < 0):
                 w = dk[i] / (dk[i] - dk[j])
                 pts.append(X[t3[k, i]] + w * (X[t3[k, j]] - X[t3[k, i]]))
-                ts.append(thick[t3[k, i]] + w * (thick[t3[k, j]] - thick[t3[k, i]]))
+                tk.append(thick[t3[k, i]] + w * (thick[t3[k, j]] - thick[t3[k, i]]))
         if len(pts) == 2:
+            P = X[t3[k]]
+            n = np.cross(P[1] - P[0], P[2] - P[0])
             segs.append(pts)
+            ts.append(np.mean(tk))
+            nrm.append(n / max(np.linalg.norm(n), 1e-300))
     if not segs:
         return None
     S = np.asarray(segs)
-    t = np.asarray(ts).reshape(-1, 2).mean(1)
+    t = np.asarray(ts)
     L = np.linalg.norm(S[:, 1] - S[:, 0], axis=1)
     mid = S.mean(1)
     A = float((t * L).sum())
-    return {"segments": S, "t": t, "length": L, "area": A, "centroid": (mid * (t * L)[:, None]).sum(0) / A}
+    return {"segments": S, "t": t, "normal": np.asarray(nrm), "length": L, "area": A,
+            "centroid": (mid * (t * L)[:, None]).sum(0) / A}
+
+
+def face_points(sec: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The ends of every section segment on both faces of the wall: (points on the midsurface, offsets along the
+    wall normal, the face points themselves), each flattened."""
+    S, t, n = sec["segments"], sec["t"], sec["normal"]
+    mids = np.repeat(S[:, :, None, :], 2, axis=2)                          # (k, 2 ends, 2 faces, 3)
+    off = np.stack([-0.5 * t, 0.5 * t], axis=1)[:, None, :].repeat(2, axis=1)   # (k, 2, 2)
+    faces = mids + off[..., None] * n[:, None, None, :]
+    return mids.reshape(-1, 3), off.ravel(), faces.reshape(-1, 3)
 
 
 def bending_strain(sec: dict, axis: int, force: np.ndarray, moment: np.ndarray, E: float,
-                   towards: float = 1.0) -> np.ndarray:
-    """Axial strain at the ends of each section segment from beam theory: the axial force over EA plus the
-    bending curvature that the moment about the centroid gives through the section's second moments. force and
-    moment are what the part beyond the section carries, and towards is +1 when that part lies toward +axis."""
+                   towards: float = 1.0, Ef: float | None = None) -> np.ndarray:
+    """Axial strain on both faces at the ends of each section segment (in face_points order) from beam theory.
+
+    The axial force over EA plus the bending curvature that the moment about the centroid gives through the
+    section's rigidity: E times the second moment of the walls' areas about the centroid, plus the flexural
+    modulus Ef times each wall's own t^3 / 12 term, which is what carries a flat plate's bending. force and
+    moment are what the part beyond the section carries, and towards is +1 when that part lies toward +axis.
+    """
+    Ef = E if Ef is None else Ef
     a = np.eye(3)[axis]
-    S, t, c = sec["segments"], sec["t"], sec["centroid"]
+    S, t, c, n = sec["segments"], sec["t"], sec["centroid"], sec["normal"]
     uv = [i for i in range(3) if i != axis]
     r = S - c                               # (k,2,3)
     y, z = r[..., uv[0]], r[..., uv[1]]
-    w = t * sec["length"]
-    # exact second moments of straight segments: L (y1^2 + y1 y2 + y2^2) / 3
-    Iyy = float((t * sec["length"] * (z[:, 0] ** 2 + z[:, 0] * z[:, 1] + z[:, 1] ** 2) / 3).sum())
-    Izz = float((t * sec["length"] * (y[:, 0] ** 2 + y[:, 0] * y[:, 1] + y[:, 1] ** 2) / 3).sum())
-    Iyz = float((t * sec["length"] * (2 * y[:, 0] * z[:, 0] + y[:, 0] * z[:, 1] + y[:, 1] * z[:, 0]
-                                      + 2 * y[:, 1] * z[:, 1]) / 6).sum())
+    tl = t * sec["length"]
+    own = tl * t ** 2 / 12.0
+    wy, wz = n[:, uv[0]], n[:, uv[1]]
+    # exact second moments of straight segments, L (y1^2 + y1 y2 + y2^2) / 3, plus each wall's own thickness
+    Iyy = E * float((tl * (z[:, 0] ** 2 + z[:, 0] * z[:, 1] + z[:, 1] ** 2) / 3).sum()) + Ef * float((own * wz ** 2).sum())
+    Izz = E * float((tl * (y[:, 0] ** 2 + y[:, 0] * y[:, 1] + y[:, 1] ** 2) / 3).sum()) + Ef * float((own * wy ** 2).sum())
+    Iyz = E * float((tl * (2 * y[:, 0] * z[:, 0] + y[:, 0] * z[:, 1] + y[:, 1] * z[:, 0]
+                           + 2 * y[:, 1] * z[:, 1]) / 6).sum()) + Ef * float((own * wy * wz).sum())
     My, Mz = float(moment[uv[0]]), float(moment[uv[1]])
-    # strain e = e0 + ky z - kz y with the moments M_y = E (ky Iyy - kz Iyz) and M_z = E (kz Izz - ky Iyz)
+    # strain e = e0 + ky z - kz y with the moments M_y = ky EIyy - kz EIyz and M_z = kz EIzz - ky EIyz
     det = Iyy * Izz - Iyz ** 2
-    ky = (My * Izz + Mz * Iyz) / (E * det)
-    kz = (Mz * Iyy + My * Iyz) / (E * det)
-    e0 = float(force @ a) / (E * float(w.sum()))
+    ky = (My * Izz + Mz * Iyz) / det
+    kz = (Mz * Iyy + My * Iyz) / det
+    e0 = float(force @ a) / (E * float(tl.sum()))
+    _, _, P = face_points(sec)
+    rp = P - c
     # the second section axis can make a left handed pair with the beam axis, which turns the moments round
     hand = 1.0 if (np.cross(np.eye(3)[uv[0]], np.eye(3)[uv[1]]) @ a) > 0 else -1.0
-    return towards * (e0 + hand * (ky * z - kz * y))
+    return towards * (e0 + hand * (ky * rp[:, uv[1]] - kz * rp[:, uv[0]]))
 
 
-def beam_hand_check(model: ShellModel, axial_strain_at, zones: dict, E: float, what: str) -> Check:
+def beam_hand_check(model: ShellModel, axial_strain_at, zones: dict, E: float, what: str,
+                    Ef: float | None = None) -> Check:
     """Compare the shell's axial strain with beam theory at a section 30% of the way from the supports.
 
     Holds for a slender part held at one end: everything past the section, loads and rigid attachments, makes a
-    force and a moment about the section's centroid, which beam theory turns into a strain. ``axial_strain_at``
-    gives the shell's midsurface axial strain at points; E is the wall's axial modulus.
+    force and a moment about the section's centroid, which beam theory turns into a strain on each face of the
+    walls. ``axial_strain_at(points, offsets)`` gives the shell's axial strain at midsurface points, offset
+    through the wall along its normal; E is the walls' axial modulus and Ef their flexural one.
     """
     mesh = model.mesh
     sl = slender_axis(mesh.X)
@@ -137,9 +164,9 @@ def beam_hand_check(model: ShellModel, axial_strain_at, zones: dict, E: float, w
             moment = moment + np.cross(np.asarray(r.ref_point) - c, r.force) + r.moment
     if model.gravity is not None and np.linalg.norm(model.gravity) > 0:
         return Check("hand calculation", "skip", "beam check skipped: self weight acts everywhere")
-    e_beam = bending_strain(sec, ax, force, moment, E, sgn)
-    pts = sec["segments"].reshape(-1, 3)
-    e_fea = axial_strain_at(pts)
+    e_beam = bending_strain(sec, ax, force, moment, E, sgn, Ef)
+    pts, off, _ = face_points(sec)
+    e_fea = axial_strain_at(pts, off)
     nb, nf = float(np.abs(e_beam).max()), float(np.abs(e_fea).max())
     if nb <= 0:
         return Check("hand calculation", "skip", "no bending or axial load reaches the section")
@@ -153,4 +180,4 @@ def beam_hand_check(model: ShellModel, axial_strain_at, zones: dict, E: float, w
                                                  "section_at_mm": at, "axis": "xyz"[ax], "E_MPa": E})
 
 
-__all__ = ["force_balance", "beam_hand_check", "section", "bending_strain", "slender_axis"]
+__all__ = ["force_balance", "beam_hand_check", "section", "face_points", "bending_strain", "slender_axis"]

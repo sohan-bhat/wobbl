@@ -181,16 +181,17 @@ def _where(shell, features, xyz, on_post) -> str:
 
 
 def _axial_strain(shell, res):
-    """Midsurface strain along an axis at points, from the strain profile at the nearest node."""
+    """Strain along the part's long axis at points, offset through the wall along its normal, from the strain
+    profile of the nearest node."""
     from scipy.spatial import cKDTree
 
     tree = cKDTree(shell.X)
+    a = np.eye(3)[int(np.argmax(np.ptp(shell.X, axis=0)))]
 
-    def at(pts, axis=None):
-        a = np.eye(3)[int(np.argmax(np.ptp(shell.X, axis=0)))] if axis is None else axis
+    def at(pts, off):
         _, idx = tree.query(pts)
         out = []
-        for i in idx:
+        for i, z in zip(idx, off):
             s, E = res.profiles[i]
             if not len(s):
                 out.append(0.0)
@@ -200,7 +201,7 @@ def _axial_strain(shell, res):
                           np.stack([ezx, eyz, ezz], -1)], -2)
             ea = np.einsum("i,kij,j->k", a, T, a)
             o = np.argsort(s, kind="stable")
-            out.append(float(np.interp(0.0, s[o], ea[o])))
+            out.append(float(np.interp(z, s[o], ea[o])))
         return np.asarray(out)
     return at
 
