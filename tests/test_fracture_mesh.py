@@ -74,3 +74,18 @@ def test_center_crack_k_matches_tada(plate, tmp_path):
         assert f.at(0.5)[0] == pytest.approx(want, rel=0.02)
         assert abs(f.at(0.5)[1]) < 0.02 * want and abs(f.at(0.5)[2]) < 0.02 * want
     assert not list((tmp_path / "solve").glob("crack.*"))   # the solve leaves no files behind
+
+
+def test_corner_and_surface_cracks_have_the_right_area(tmp_path):
+    import math
+
+    part = G.plate_with_hole(tmp_path / "ph.step", 120.0, 60.0, 6.0, 10.0)
+    prep, _ = describe_part(part, tmp_path / "geo")
+    # a quarter circle where the bore meets the top face, reaching 2 mm along each
+    corner = shapes.corner((5.0, 0, 6.0), (0, 1, 0), (1, 0, 0), (0, 0, -1), 2.0, 2.0, 0.5)
+    cm = build_cracked_mesh(prep, corner, Sizing(h=6.0, h_front=0.2, h_crack=0.5))
+    assert cm.area == pytest.approx(math.pi * 4 / 4, rel=0.02) and len(cm.fronts) == 1
+    # a half ellipse 1.5 mm deep and 6 mm long on the bottom face, away from the hole
+    surf = shapes.surface((40.0, 0, 0), (1, 0, 0), (0, 0, 1), 1.5, 3.0, 0.4)
+    cm = build_cracked_mesh(prep, surf, Sizing(h=6.0, h_front=0.15, h_crack=0.5))
+    assert cm.area == pytest.approx(math.pi * 1.5 * 3.0 / 2, rel=0.02) and len(cm.fronts) == 1
