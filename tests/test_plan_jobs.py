@@ -111,3 +111,25 @@ def test_a_plan_runs_in_the_background_exactly_as_planned(home, parts):
     assert req["analysis"] == "stress" and req["spec"]["options"]["load"] == ["100 N +x @ x=max"]
     runs = E.load_calibration()["runs"]
     assert [x["solver"] for x in runs] == ["wobbl run"] and runs[0]["predicted_time"] > 0
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the remote side is a POSIX shell")
+def test_a_plan_goes_to_a_remote_with_its_part(home, parts):
+    from wobbl.jobs import remote
+
+    fake = home / "fakewobbl.sh"
+    fake.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > args.txt\n')
+    fake.chmod(0o755)
+    remote.add("box", f"local:{home / 'far'}", wobbl=str(fake))
+    plan = route(parts["plate_hole"], "will it hold 100 N")
+    r = manage.start_plan(plan, {"load": ["100 N +x @ x=max"]}, on="box")
+    far = home / "far" / r["job_id"]
+    for _ in range(100):
+        if (far / "exit_code").exists():
+            break
+        time.sleep(0.1)
+    args = (far / "args.txt").read_text().splitlines()
+    name = Path(parts["plate_hole"]).name
+    assert args[:3] == ["jobs", "run-plan", f"inputs/1_{name}"] and (far / "inputs" / f"1_{name}").exists()
+    assert args[args.index("--physics") + 1] == "part.stress" and args[-2:] == ["-o", "result"]
+    assert args[args.index("--opt") + 1:args.index("--opt") + 3] == ["load", "100 N +x @ x=max"]
