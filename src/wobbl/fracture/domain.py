@@ -31,14 +31,14 @@ def crack(job):
     blocks = job.values("block")
     spectrum = "; ".join(blocks) if blocks else (val("spectrum") or "")
     target = num("target-life")
-    if target is None and cycles_in(job.question):
-        target = float(cycles_in(job.question))
+    if target is None and cycles_in(job.focus):
+        target = float(cycles_in(job.focus))
         job.use("target-life", f"{target:g}")
     opts = {"r_ratio": num("r-ratio"), "spectrum": spectrum, "target_life": target, "max_pof": num("max-pof"),
             "law": val("law"), "growth": val("growth") or "", "kc": num("kc"), "wheeler": num("wheeler"),
             "detectable": val("detectable"), "samples": int(num("samples", 4000 if job.quick else 20000)),
             "steps": int(num("steps", 5 if job.quick else 12)), "budget": num("budget", 1200.0),
-            "quality": "fast" if job.quick else (val("quality") or "normal"), "question": job.question,
+            "quality": "fast" if job.quick else (val("quality") or "normal"), "question": job.focus,
             "keep": job.flag("keep")}
     opts = {k: v for k, v in opts.items() if v not in (None, "")}
     where = val("crack") or "auto"
@@ -54,8 +54,9 @@ def crack(job):
         st = api.study(base.part, base.material, [x.text for x in base.loads], [f.text for f in base.fixtures],
                        where, scale=base.scale, params=params, **opts)
     if where == "auto":
-        job.assume(f"crack not given: the damage tolerance flaw at {st.crack.where}", "--crack 'through 1.27 mm at "
-                   "hole d=8'")
+        at = "the most stressed point" if st.crack.where == "hottest" else f"the result's governing point, " \
+            f"{st.crack.where}"
+        job.assume(f"crack not given: the damage tolerance flaw at {at}", "--crack 'through 1.27 mm at hole d=8'")
     if not st.spectrum and num("r-ratio") is None:
         job.assume(f"load cycles not given: constant amplitude at R = {st.r_ratio:g}", f"--r-ratio {st.r_ratio:g}")
     job.use("crack", st.crack.text or where)
@@ -64,6 +65,7 @@ def crack(job):
     job.use("fix", [f.text for f in st.fixtures])
     job.situate(supports=[f.text for f in st.fixtures], loads=[x.text for x in st.loads],
                 crack={"start": st.crack.text or where, "spectrum": st.spectrum or f"R = {st.r_ratio:g}"})
+    job.ready()
     o = api.run(st, job.out, job.log, job.quick)
     if st.target_life:
         job.criterion("crack life", "nominal_cycles", st.target_life, "min")
@@ -72,7 +74,7 @@ def crack(job):
 
 register(Analysis(
     "part", "crack", "Fatigue crack growth: where a crack goes, cycles until it fails the part and how lives spread",
-    crack, kinds=PART_KINDS + ("result",), needs=("stress",), legacy="wobbl crack",
+    crack, dry=True, kinds=PART_KINDS + ("result",), needs=("stress",), legacy="wobbl crack",
     keywords=(r"\bcrack(?:s|ing)?\s+(?:grow\w*|propagat\w*|from)\b", r"\ba crack\s+(?:at|in)\b",
               r"\bgrows?\s+critical", r"critical crack",
               r"\bflaws?\b", r"\binspect", r"damage toleran", r"fracture mechanic", r"stress intensity",
