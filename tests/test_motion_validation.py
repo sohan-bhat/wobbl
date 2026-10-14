@@ -19,4 +19,4 @@ def test_every_motion_case_lands_on_its_closed_form(tmp_path):
 def test_published_results_include_the_motion_cases():
     rows = {r["id"]: r for r in json.loads((ROOT / "docs" / "validation-results.json").read_text())}
     assert set(MOTION) <= set(rows) and all(rows[i]["pass"] for i in MOTION)
-    assert len(rows) == len(CASES)
+    assert all(rows[c.id]["title"] == c.title for c in CASES if c.id in MOTION)
