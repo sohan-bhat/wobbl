@@ -1,0 +1,295 @@
+{
+ "domain": "mechanism",
+ "part": "arm",
+ "question": "Can these hobby servos lift a 500 g payload through this desktop arm's pick and place?",
+ "verdict": "fails",
+ "headline": "The shoulder servo stalls. Carrying 500 g through this move needs 1.35 N m (13.7 kg cm) almost at rest, where the TowerPro MG996R at 6 V gives 1.07 N m (11 kg cm). The hand hits the table at 0.241 s.",
+ "metrics": [
+  [
+   "hardest joint",
+   "shoulder"
+  ],
+  [
+   "needs",
+   "1.35 N m"
+  ],
+  [
+   "servo gives",
+   "1.07 N m"
+  ],
+  [
+   "heat",
+   "362% of rated"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed hand statics, forward run, time step convergence, energy account"
+ ],
+ "checks": [
+  {
+   "name": "hand statics",
+   "status": "pass",
+   "summary": "at the pick pose the moments of the weights about each joint come to shoulder 1.29 N m, elbow 0.671 N m, wrist 0 N m, and MuJoCo's inverse dynamics needs 1.29, 0.671, 0 N m (1.7e-14% apart)",
+   "detail": {
+    "hand_Nm": [
+     1.287766,
+     0.67064,
+     0.0
+    ],
+    "mujoco_Nm": [
+     1.287766,
+     0.67064,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "forward run",
+   "status": "pass",
+   "summary": "the run with the servos' real limits falls 83.4 degrees behind the move, as the inverse dynamics says it must",
+   "detail": {
+    "lag_deg": {
+     "base": 55.184339,
+     "shoulder": 58.740469,
+     "elbow": 83.36873,
+     "wrist": 49.985129
+    }
+   }
+  },
+  {
+   "name": "time step convergence",
+   "status": "pass",
+   "summary": "how far the shoulder falls behind 58.7 deg with the normal step and 58.8 deg with half the step (0.023% apart)",
+   "detail": {
+    "normal": 58.740469,
+    "half": 58.754114,
+    "change": 0.000232
+   }
+  },
+  {
+   "name": "energy account",
+   "status": "pass",
+   "summary": "the work of the forces (drives 0.604 J, constraints -0.91 J) matches the change in kinetic and potential energy, -0.307 J, to 0.11% of the largest energy flow",
+   "detail": {
+    "scale_J": 1.067203,
+    "drives": 0.603532,
+    "loads": 0.0,
+    "gear losses": 0.0,
+    "damping": 0.0,
+    "constraints": -0.910213,
+    "delta_E_J": -0.306679,
+    "worst": 0.00106,
+    "end": 2e-06
+   }
+  }
+ ],
+ "assumptions": [
+  "The arm has a TowerPro MG996R at 6 V at the base, shoulder and elbow and a TowerPro MG90S at 6 V at the wrist. Each can carry 33% of its stall torque continuously unless a rating is given.",
+  "The move picks at 200, 0, 40 mm, lifts 80 mm, swings over to 0, 200, 40 mm and lowers, each step in 1.2 s on a minimum jerk profile, then holds 0.5 s. The heating estimate repeats that loaded cycle.",
+  "The servos follow the move by computed torque, as a well tuned controller would, and a hobby servo's own loop lags a little more.",
+  "Each servo's motor, felt through its gearbox, adds the inertia of a 20 ms mechanical time constant, typical of small brushed motors, since servo datasheets do not give it.",
+  "The 500 g payload and the gripper are point masses at the tip, and the base is screwed to the table.",
+  "Bodies are rigid, so links do not bend. A long or thin printed link flexes and rings more than this shows.",
+  "Contacts are stiff springs that let parts sink into each other by the depth the contact check reports.",
+  "Joints and gears have no backlash, and friction acts only where the inputs give it."
+ ],
+ "values": {
+  "joints": {
+   "base": {
+    "peak_usage": 0.195478,
+    "torque_Nm": 0.172554,
+    "speed_rpm": 12.978126,
+    "available_Nm": 0.882733,
+    "rms_Nm": 0.0684,
+    "rated_Nm": 0.359577,
+    "hold_Nm": 0.0,
+    "lag_deg": 55.184339,
+    "motor": "TowerPro MG996R at 6 V"
+   },
+   "shoulder": {
+    "peak_usage": 1.253021,
+    "torque_Nm": 1.345582,
+    "speed_rpm": 0.321877,
+    "available_Nm": 1.07387,
+    "rms_Nm": 1.302668,
+    "rated_Nm": 0.359577,
+    "hold_Nm": 1.287766,
+    "lag_deg": 58.740469,
+    "motor": "TowerPro MG996R at 6 V"
+   },
+   "elbow": {
+    "peak_usage": 0.764031,
+    "torque_Nm": 0.717156,
+    "speed_rpm": 9.275746,
+    "available_Nm": 0.938647,
+    "rms_Nm": 0.686409,
+    "rated_Nm": 0.359577,
+    "hold_Nm": 0.67064,
+    "lag_deg": 83.36873,
+    "motor": "TowerPro MG996R at 6 V"
+   },
+   "wrist": {
+    "peak_usage": 0.18594,
+    "torque_Nm": -0.040116,
+    "speed_rpm": 0.0,
+    "available_Nm": 0.215746,
+    "rms_Nm": 0.012022,
+    "rated_Nm": 0.071915,
+    "hold_Nm": 0.0,
+    "lag_deg": 49.985129,
+    "motor": "TowerPro MG90S at 6 V"
+   }
+  },
+  "payload_kg": 0.5,
+  "mount": "clamped",
+  "tipped": false,
+  "_figures": [
+   [
+    "torque_speed",
+    "Torque and speed each servo needs against its torque speed line"
+   ],
+   [
+    "usage",
+    "Share of each servo's available torque through the move"
+   ],
+   [
+    "frames",
+    "The move at several instants, from the side and from above"
+   ]
+  ],
+  "trajectory": "trajectory.csv",
+  "model_file": "model.xml",
+  "playback": "playback.json"
+ },
+ "images": {
+  "torque_speed": "images/torque_speed.png",
+  "usage": "images/usage.png",
+  "frames": "images/frames.png"
+ },
+ "fixes": [
+  {
+   "kind": "reduction",
+   "title": "Drive the elbow through 2.5:1 and the shoulder through 5:1 with a belt or gear stage",
+   "summary": "Each servo then sees a fraction of the torque and turns that much faster, with 10% lost in the stage. Solving the move again, the busiest servo uses 44% of its torque at speed and the warmest 85% of its continuous rating.",
+   "auto": false,
+   "after": {
+    "ratios": {
+     "elbow": 2.5,
+     "shoulder": 5
+    },
+    "worst_usage": 0.442854,
+    "heat": 0.849179
+   }
+  },
+  {
+   "kind": "servo",
+   "title": "Use a DSSERVO DS3218 at the elbow and a ROBOTIS Dynamixel XM430-W350 at the shoulder",
+   "summary": "Solving the move again with these, the busiest servo uses 39% of its torque at speed and the warmest 98% of its continuous rating.",
+   "auto": false,
+   "after": {
+    "servos": {
+     "elbow": "ds3218",
+     "shoulder": "xm430"
+    },
+    "ratios": {},
+    "worst_usage": 0.392042,
+    "heat": 0.976787
+   }
+  },
+  {
+   "kind": "balance",
+   "title": "Balance the shoulder with a 0.644 N m spring or 660 g on a 100 mm tail",
+   "summary": "Either carries about half the holding torque. Solving again with the counterweight, the shoulder uses 83% of its torque at speed and 233% of its continuous rating, and the base servo swings the extra mass, where a spring adds none.",
+   "auto": false,
+   "after": {
+    "counterweight_kg": 0.66,
+    "usage": 0.831062,
+    "heat": 2.33482
+   }
+  },
+  {
+   "kind": "payload",
+   "title": "Keep the payload under about 25.1 g",
+   "summary": "That is the heaviest load these servos carry through the same move over and over without running hot, found by solving the move at each weight. A single move without a stall works up to about 368 g.",
+   "auto": false,
+   "after": {
+    "max_payload_kg": 0.025146,
+    "max_single_move_kg": 0.367798
+   }
+  }
+ ],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 31.198,
+ "solver": "MuJoCo 3.10.0",
+ "events": [
+  {
+   "name": "shoulder servo at its limit",
+   "t_s": 0.0,
+   "detail": "asks 1.29 N m (13.1 kg cm), gets 1.08 N m (11 kg cm)"
+  },
+  {
+   "name": "pick",
+   "t_s": 0.0,
+   "detail": ""
+  },
+  {
+   "name": "elbow servo at its limit",
+   "t_s": 0.12,
+   "detail": "asks 0.654 N m (6.66 kg cm), gets 0.645 N m (6.58 kg cm)"
+  },
+  {
+   "name": "wrist servo at its limit",
+   "t_s": 0.19,
+   "detail": "asks 0.148 N m (1.51 kg cm), gets 0.141 N m (1.44 kg cm)"
+  },
+  {
+   "name": "the hand hits the table",
+   "t_s": 0.241,
+   "detail": "up to 97.7 N"
+  },
+  {
+   "name": "base servo at its limit",
+   "t_s": 0.28,
+   "detail": "asks 11.1 N m, gets 1.08 N m (11 kg cm)"
+  },
+  {
+   "name": "the base touches the upper arm",
+   "t_s": 0.5,
+   "detail": "up to 156 N"
+  },
+  {
+   "name": "lifted",
+   "t_s": 1.2,
+   "detail": ""
+  },
+  {
+   "name": "over the place point",
+   "t_s": 2.4,
+   "detail": ""
+  },
+  {
+   "name": "placed",
+   "t_s": 3.6,
+   "detail": ""
+  },
+  {
+   "name": "end of the hold",
+   "t_s": 4.1,
+   "detail": ""
+  }
+ ],
+ "runtime_s": 31.198,
+ "model": {
+  "bodies": 5,
+  "joints": 4,
+  "degrees_of_freedom": 4,
+  "constraints": 0,
+  "timestep_s": 0.001,
+  "steps": 4100,
+  "integrator": "semi implicit Euler",
+  "contact": "stiff contact settling in 5 ms"
+ }
+}

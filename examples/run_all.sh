@@ -3,7 +3,7 @@
 set -e
 cd "$(dirname "$0")"
 for d in cast-motor-mount shelf-bracket motor-mount enclosure drone-arm heat-sink battery-pack circuits \
-    falling-rock rocket-launch knsb-motor propane-flame wiper-linkage; do
+    falling-rock rocket-launch knsb-motor propane-flame wiper-linkage desktop-arm; do
   echo "== $d"
   sh "$d/run.sh"
 done

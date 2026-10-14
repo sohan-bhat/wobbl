@@ -1,0 +1,32 @@
+FAILS. The shoulder servo stalls. Carrying 500 g through this move needs 1.35 N m (13.7 kg cm) almost at rest, where the TowerPro MG996R at 6 V gives 1.07 N m (11 kg cm). The hand hits the table at 0.241 s.
+
+Confidence: high. passed hand statics, forward run, time step convergence, energy account
+hardest joint: shoulder
+needs: 1.35 N m
+servo gives: 1.07 N m
+heat: 362% of rated
+
+Checks:
+  [pass] hand statics: at the pick pose the moments of the weights about each joint come to shoulder 1.29 N m, elbow 0.671 N m, wrist 0 N m, and MuJoCo's inverse dynamics needs 1.29, 0.671, 0 N m (1.7e-14% apart)
+  [pass] forward run: the run with the servos' real limits falls 83.4 degrees behind the move, as the inverse dynamics says it must
+  [pass] time step convergence: how far the shoulder falls behind 58.7 deg with the normal step and 58.8 deg with half the step (0.023% apart)
+  [pass] energy account: the work of the forces (drives 0.604 J, constraints -0.91 J) matches the change in kinetic and potential energy, -0.307 J, to 0.11% of the largest energy flow
+
+Assumptions:
+  - The arm has a TowerPro MG996R at 6 V at the base, shoulder and elbow and a TowerPro MG90S at 6 V at the wrist. Each can carry 33% of its stall torque continuously unless a rating is given.
+  - The move picks at 200, 0, 40 mm, lifts 80 mm, swings over to 0, 200, 40 mm and lowers, each step in 1.2 s on a minimum jerk profile, then holds 0.5 s. The heating estimate repeats that loaded cycle.
+  - The servos follow the move by computed torque, as a well tuned controller would, and a hobby servo's own loop lags a little more.
+  - Each servo's motor, felt through its gearbox, adds the inertia of a 20 ms mechanical time constant, typical of small brushed motors, since servo datasheets do not give it.
+  - The 500 g payload and the gripper are point masses at the tip, and the base is screwed to the table.
+  - Bodies are rigid, so links do not bend. A long or thin printed link flexes and rings more than this shows.
+  - Contacts are stiff springs that let parts sink into each other by the depth the contact check reports.
+  - Joints and gears have no backlash, and friction acts only where the inputs give it.
+
+Suggested fixes:
+  - Drive the elbow through 2.5:1 and the shoulder through 5:1 with a belt or gear stage: Each servo then sees a fraction of the torque and turns that much faster, with 10% lost in the stage. Solving the move again, the busiest servo uses 44% of its torque at speed and the warmest 85% of its continuous rating.
+  - Use a DSSERVO DS3218 at the elbow and a ROBOTIS Dynamixel XM430-W350 at the shoulder: Solving the move again with these, the busiest servo uses 39% of its torque at speed and the warmest 98% of its continuous rating.
+  - Balance the shoulder with a 0.644 N m spring or 660 g on a 100 mm tail: Either carries about half the holding torque. Solving again with the counterweight, the shoulder uses 83% of its torque at speed and 233% of its continuous rating, and the base servo swings the extra mass, where a spring adds none.
+  - Keep the payload under about 25.1 g: That is the heaviest load these servos carry through the same move over and over without running hot, found by solving the move at each weight. A single move without a stall works up to about 368 g.
+
+Images: torque_speed: images/torque_speed.png, usage: images/usage.png, frames: images/frames.png
+Report: report.html
