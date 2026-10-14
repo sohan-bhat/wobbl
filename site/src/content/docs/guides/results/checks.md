@@ -1,6 +1,6 @@
 ---
 title: "Checks"
-description: "Every check Wobbl runs on strength, heat and circuit answers, what it compares and the thresholds that set its status."
+description: "Every check Wobbl runs on strength, heat, circuit and motion answers, what it compares and the thresholds that set its status."
 lead: "A finite element number is only as good as the mesh, the supports and the setup behind it, so Wobbl tests all three on every answer."
 order: 2
 ---
@@ -139,3 +139,21 @@ are coarse for how fast the part responds, so the temperatures between them are 
 | Time step convergence | the same transient at half the time step, passing within 1% |
 | Steady state | for a buck converter, that the average output stopped drifting between the last two 20 cycle windows |
 | Thermal loop | for a MOSFET, the junction temperature with the on resistance rising as it heats, which fails on thermal runaway |
+
+## Motion checks
+
+| Check | What it compares |
+|---|---|
+| Step convergence | the flight again with a tolerance ten times tighter, passing when the key numbers move under 0.1% and warning up to 1% |
+| Energy balance | the work done by thrust, drag and gravity, less the energy the burned propellant carried off, against the change in kinetic energy, passing within 0.1% |
+| Hand calculation | a drop from rest in still air against the quadratic drag solution with the air's density halfway down, passing within 1% and warning up to 3% |
+| Vacuum drop or flight | the same body with the air taken away and gravity at its ground value, against `sqrt(2 h / g)` for a drop or the closed form for a throw |
+| Delta v budget | Tsiolkovsky's ideal delta v less what gravity, drag and steering took, against the speed at burnout, passing within 0.5% |
+| Parachute descent | the sink rate under each parachute against its terminal speed, passing within 1% and warning up to 5% |
+| Units and sanity | the mass, density, speeds and burned propellant against physical ranges |
+
+A rocket's rocketry checks set its verdict rather than its confidence. The stability margin by
+Barrowman's method has to reach 1 caliber, the speed off the rail 15 m/s, and the landing speed
+has to stay under its limit, 6.1 m/s unless the spec sets another. The apogee passes within 5%
+of a target, and the peak dynamic pressure, peak acceleration and drift are information.
+[Motion](/guides/simulations/motion/) has the verdicts and the fixes.
