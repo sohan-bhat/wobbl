@@ -2,7 +2,8 @@
 # Regenerate every example output. Takes a while: each strength study refines until it converges.
 set -e
 cd "$(dirname "$0")"
-for d in cast-motor-mount shelf-bracket motor-mount enclosure drone-arm heat-sink battery-pack circuits; do
+for d in cast-motor-mount shelf-bracket motor-mount enclosure drone-arm heat-sink battery-pack circuits \
+    falling-rock rocket-launch; do
   echo "== $d"
   sh "$d/run.sh"
 done

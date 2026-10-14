@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+**Motion**
+- A new motion domain flies a body from release or ignition to the ground
+  through gravity that falls off with altitude, the 1976 standard atmosphere,
+  drag that can follow Mach number, wind, a launch rail, a thrust curve and
+  drogue and main parachutes, integrated with scipy one phase at a time
+  between events. It needs nothing beyond scipy, so it downloads nothing.
+- `wobbl motion` takes a round body as one line of flags or a rocket as a
+  TOML spec with units, and agents get a `solve_motion` tool and a skill
+  section on when to use it.
+- Each flight is integrated again with a tolerance ten times tighter,
+  compared with closed forms wherever the model reduces to one, closed with
+  an energy balance and, for a rocket, with Tsiolkovsky's delta v less its
+  gravity, drag and steering losses. Rockets also get Barrowman's stability
+  margin, rail exit speed, peak loads, apogee against a target, landing speed
+  and drift, with fixes for nose weight, fin span, rail length and the main
+  parachute.
+- Two new examples, a falling rock and a rocket launch, and six motion
+  validation cases against exact closed forms, which make 25 cases in all.
+
 ## 0.1.1 (2026-10-13)
 
 **Heat**

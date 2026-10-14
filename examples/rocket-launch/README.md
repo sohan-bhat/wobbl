@@ -6,7 +6,7 @@ This is a level 2 high power rocket, a 98 mm fiberglass airframe 2.1 m long with
 three clipped delta fins, flying on a 75 mm L class motor of 3773 N s that burns for 2.65 s. It
 weighs 7.95 kg on the pad and leaves an 8 ft rail tilted 5 degrees into a 10 mph wind. An altimeter
 fires an 18 inch drogue at apogee and a 60 inch main at 150 m on the way down. Everything is in
-[`rocket.toml`](rocket.toml), with a comment on every line.
+[`rocket.toml`](rocket.toml), with comments on the values that need them.
 
 ```sh
 ./run.sh

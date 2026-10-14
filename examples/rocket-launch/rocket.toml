@@ -1,7 +1,7 @@
 # A level 2 high power rocket on a 75 mm L class motor, flown with dual deploy recovery.
 #
 # Every quantity takes a unit ("4.6 kg", "98 mm", "10 mph"). Positions along the rocket are measured
-# from the tip of the nose. Run it with: wobbl motion rocket.toml
+# from the tip of the nose. Run it with wobbl motion rocket.toml
 
 name = "rocket"
 

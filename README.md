@@ -9,7 +9,7 @@
 
 <p align="center">
   <strong>Simulate anything before you build it.</strong><br>
-  Verified strength, heat and circuit simulation for coding agents and the people who design physical things.
+  Verified strength, heat, circuit and motion simulation for coding agents and the people who design physical things.
 </p>
 
 <p align="center">
@@ -45,6 +45,9 @@ point marked and fixes with numbers.
 - Heat, steady and transient, also with CalculiX.
 - Circuits with [ngspice](https://ngspice.sourceforge.io), for LEDs, RC networks,
   buck converters, MOSFETs or any netlist.
+- Motion with [scipy](https://scipy.org)'s ODE integrators, from a rock falling off
+  a cliff to a high power rocket on its thrust curve, through the standard
+  atmosphere, wind and dual deploy parachutes.
 
 `wobbl fix --apply` edits the part, adding fillets and gussets to any STEP file,
 and runs the whole study again. The same tools work from your terminal and from
@@ -145,6 +148,44 @@ Suggested fixes:
   <img alt="The bracket with a gusset, where the peak drops to 9.82 MPa near the gusset toe" src="examples/shelf-bracket/output/fix-gusset/images/stress.png" width="49%">
 </p>
 
+## Motion
+
+Motion flies a body from release or ignition to the ground with scipy's DOP853
+integrator, through gravity that falls off with altitude, the 1976 standard
+atmosphere, drag that can change with Mach number, wind, a launch rail, a thrust
+curve and drogue and main parachutes. The simplest run is a rock dropped off a
+cliff, and it takes one line.
+
+```console
+$ wobbl motion --name rock --diameter "9 cm" --density "2700 kg/m3" --cd 0.6 --height "300 m"
+OK. Hits the ground 8.72 s after release at 56.8 m/s (205 km/h). Without air it would land after 7.82 s at 76.7 m/s, so drag takes 26% off the impact speed.
+```
+
+A rocket is a TOML file with its motor's thrust curve, nose, fins, balance point,
+rail and parachutes, where every quantity carries its unit. Wobbl adds Barrowman's
+stability margin, the speed off the rail, peak dynamic pressure and acceleration,
+apogee against a target, landing speed and drift, and when one falls short it gives
+the nose weight, fin span, rail length or main parachute that would pass.
+
+```console
+$ wobbl motion examples/rocket-launch/rocket.toml
+OK. Reaches 3439 m (11284 ft) at Mach 1.27 and lands 29.3 m upwind of the pad at 5.72 m/s, with a 1.88 caliber margin and 30.6 m/s off the rail.
+```
+
+| Run | Answer | Checked against |
+|---|---|---|
+| [Falling rock](examples/falling-rock) | 8.72 s and 56.8 m/s, against 7.82 s and 76.7 m/s without air | the tanh drag solution, sqrt(2h/g) without air and an energy balance |
+| [Rocket launch](examples/rocket-launch) | 3439 m at Mach 1.27 with a 1.88 caliber margin, landing at 5.72 m/s | Tsiolkovsky's delta v less its losses, each parachute's terminal speed and an energy balance |
+
+![Altitude and speed of the rocket over its flight, colored by phase from boost through coast, drogue and main](examples/rocket-launch/output/images/flight.png)
+
+Every flight is integrated again with a tolerance ten times tighter, and each run
+writes `trajectory.csv` with a row at every event. The body is a point mass in a
+vertical plane, and a rocket turns into the wind it feels at its weathercock
+frequency, which is the depth flights are usually planned at rather than a six
+degree of freedom simulation. Motion needs nothing beyond scipy, so it downloads
+nothing.
+
 ## An agent on its own versus Wobbl
 
 Given a CAD file, a strength question and 15 minutes, a capable coding agent
@@ -179,9 +220,10 @@ exactly what it added.
 | Cursor | `mcpServers.wobbl` in `~/.cursor/mcp.json` | `~/.cursor/skills/wobbl/SKILL.md` |
 | Gemini CLI | extension at `~/.gemini/extensions/wobbl/` | `WOBBL.md` in the same extension |
 
-The agent gets 13 tools, `inspect_geometry`, `mesh`, `new_study`,
+The agent gets 15 tools, `inspect_geometry`, `mesh`, `new_study`,
 `set_material`, `apply_load`, `add_fixture`, `solve_structural`, `verify`,
-`render`, `suggest_fix`, `solve_thermal`, `solve_circuit` and `list_materials`.
+`render`, `suggest_fix`, `quantify_uncertainty`, `solve_thermal`,
+`solve_circuit`, `solve_motion` and `list_materials`.
 Results are compact JSON with image and report paths. The skill teaches the
 workflow and what never to skip, which means reading the checks before the number,
 never quoting an excluded peak and making the supports match the real build.
@@ -216,7 +258,11 @@ never reported as high confidence.
 - Large deflection, a nonlinear re-solve when the part bends a good fraction of its wall.
 
 Heat answers check energy balance and a lumped hand calculation, and circuit
-answers are compared with the textbook and run again at half the time step. Every
+answers are compared with the textbook and run again at half the time step. Motion
+answers are integrated again with a tolerance ten times tighter, compared with
+closed forms wherever the model reduces to one and closed with an energy balance,
+and a rocket's speed at burnout has to match Tsiolkovsky's delta v less what
+gravity, drag and steering took. Every
 study has a time budget, and when it runs out the last finished mesh level comes
 back with its checks. The same input gives the same answer on every run, because
 meshing, wall thickness sampling and the budget are all deterministic. The website
@@ -225,7 +271,7 @@ explains every [check](https://sohan-bhat.github.io/wobbl/guides/results/checks/
 
 ## Validation
 
-Nineteen cases with known answers run through the same pipeline you get. Every
+Twenty five cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
@@ -235,6 +281,7 @@ modeled setup lands within 2%.
 | Real parts against converged reference models | 5 | 4.26%, PLA bracket with a 6 mm fillet |
 | Heat (slab conduction, lumped cooling, a bar whose end jumps to 120 C) | 3 | 0.85%, the bar against the erfc solution |
 | Circuits (LED, RC, buck ripple) | 3 | 7.70%, buck ripple against an ideal formula that ignores switch and diode drops |
+| Motion (free fall, drag fall, a throw, a constant thrust rocket's burnout speed and altitude, parachute descent) | 6 | 0.0000014%, the rocket's burnout altitude |
 
 The full table is [on the website](https://sohan-bhat.github.io/wobbl/validation/). Run it yourself with
 `wobbl validate`, which takes about 30 minutes.
@@ -253,6 +300,8 @@ reports, heatmaps and summaries, and each has a page [on the website](https://so
 | [drone-arm](examples/drone-arm) | Is a PA12 drone arm strong enough at full throttle? | strength, rigid loads |
 | [heat-sink](examples/heat-sink) | Does a 15 W chip stay under 85 C without a fan? | heat |
 | [battery-pack](examples/battery-pack) | When does a pack in a sealed box pass 60 C? | transient heat |
+| [falling-rock](examples/falling-rock) | How fast does a rock hit the ground after a 300 m fall? | motion |
+| [rocket-launch](examples/rocket-launch) | Will an L class rocket fly straight, reach 11,000 ft and land softly? | motion, rocketry |
 | [circuits](examples/circuits) | Will this LED fry? What is the ripple? How hot is the MOSFET? | circuits |
 
 Each folder has a `run.sh` that regenerates its outputs.
@@ -262,9 +311,9 @@ Each folder has a `run.sh` that regenerates its outputs.
 - [Getting started](https://sohan-bhat.github.io/wobbl/get-started/), to install, set up and run a first study
 - [Guides](https://sohan-bhat.github.io/wobbl/guides/) for strength, heat and circuits, the inputs, the results and fixing parts
 - [CLI reference](https://sohan-bhat.github.io/wobbl/guides/cli/) with every command and option
-- [Agents and MCP](https://sohan-bhat.github.io/wobbl/guides/agents/) with what `wobbl setup` registers, the 13 tools and the skill
+- [Agents and MCP](https://sohan-bhat.github.io/wobbl/guides/agents/) with what `wobbl setup` registers, the 15 tools and the skill
 - [How it checks itself](https://sohan-bhat.github.io/wobbl/guides/results/checks/), every check and what sets the confidence
-- [Validation](https://sohan-bhat.github.io/wobbl/validation/), the 19 cases and their setups
+- [Validation](https://sohan-bhat.github.io/wobbl/validation/), the 25 cases and their setups
 - [Bake-off](https://sohan-bhat.github.io/wobbl/validation/bakeoff/), a coding agent on its own versus Wobbl
 - [Contributing](https://sohan-bhat.github.io/wobbl/get-started/contributing/), with the architecture and how a new solver plugs in
 - [Publishing](docs/publishing.md), the release steps for PyPI
@@ -282,9 +331,12 @@ Each folder has a `run.sh` that regenerates its outputs.
   tetrahedral meshes and take several minutes, and shell elements are on the roadmap.
 - Printed plastics are treated as isotropic at 100 percent infill, with a layer
   strength knockdown when you give the print direction.
+- Motion is a point mass in a vertical plane over a flat Earth, so it has no roll,
+  no pitch oscillation and no sideways wind, and Barrowman's stability margin holds
+  below about Mach 0.8.
 
 Shell elements, fatigue estimates and bolt preload come next in 0.2, then CFD with
-OpenFOAM in 0.3 and motion with MuJoCo in 0.4.
+OpenFOAM in 0.3 and multibody mechanisms with MuJoCo in 0.4.
 
 ## Contributing
 
