@@ -24,8 +24,8 @@ does it stay bent once the sling comes off, and what load opens it up?
 
 So the hook does yield under 3 kN, in small patches, but it springs back to within a few hundredths of a
 millimeter, and it takes 4 kN to pull it open. That is only 1.34 times the working load, under the 1.5
-margin most steel lifting gear asks for, so the verdict is MARGINAL. A section about 13.8 mm deep instead
-of 12, or a steel that yields above 278 MPa, reaches the margin, and so does keeping the sling under
+margin most steel lifting gear asks for, so the verdict is MARGINAL. A section about 12.7 mm deep instead
+of 12, or a steel that yields above 279 MPa, reaches the margin, and so does keeping the sling under
 2.7 kN.
 
 The run writes `output/scene.wobbl`, the 3D view embedded in `output/report.html`, where the hook takes
