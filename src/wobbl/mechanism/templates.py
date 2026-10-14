@@ -233,7 +233,7 @@ def fourbar(raw: dict) -> Built:
 
 # --- gear train ---------------------------------------------------------------------------------------------
 GEARS = {"teeth": "12:36,10:40", "efficiency": 0.97, "motor": "fa-130", "stall_torque": None, "no_load_speed": None,
-         "continuous_torque": None, "no_load_current": None, "stall_current": None, "load": "0.01 N*m",
+         "continuous_torque": None, "no_load_current": None, "stall_current": None, "load": "0.005 N*m",
          "load_inertia": "0 kg*m2", "module": "0.5 mm", "face": "4 mm", "density": "1410 kg/m3", "speed": None,
          "rotor_inertia": "auto", "time": None, "timestep": "0.1 ms"}
 
