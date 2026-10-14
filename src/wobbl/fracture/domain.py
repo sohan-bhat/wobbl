@@ -73,7 +73,8 @@ def crack(job):
 register(Analysis(
     "part", "crack", "Fatigue crack growth: where a crack goes, cycles until it fails the part and how lives spread",
     crack, kinds=PART_KINDS + ("result",), needs=("stress",), legacy="wobbl crack",
-    keywords=(r"crack\w*\s+(?:grow|growth|propagat|from|at|in)\b", r"\bgrows?\s+critical", r"critical crack",
+    keywords=(r"\bcrack(?:s|ing)?\s+(?:grow\w*|propagat\w*|from)\b", r"\ba crack\s+(?:at|in)\b",
+              r"\bgrows?\s+critical", r"critical crack",
               r"\bflaws?\b", r"\binspect", r"damage toleran", r"fracture mechanic", r"stress intensity",
               r"\bpropagat", r"\bparis law\b", r"\bnasgro\b"),
     aliases=("crack-growth", "fracture", "damage-tolerance"),

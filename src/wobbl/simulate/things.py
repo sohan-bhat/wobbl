@@ -257,8 +257,9 @@ def recognize_chemistry(thing: str, question: str) -> tuple[int, str] | None:
     hit = chemistry_kind(thing) if thing else None
     if hit:
         return hit
-    m = re.search(r"([A-Za-z0-9()]+(?:\s*\+\s*\d*\s*[A-Za-z0-9()]+)+\s*(?:->|=>|→|<=>|=)\s*[A-Za-z0-9() +]+)",
-                  question or "")
+    term = r"\d*\s*[A-Za-z0-9()]+"
+    m = re.search(rf"((?:\d+\s+)?[A-Za-z0-9()]+(?:\s*\+\s*{term})+\s*(?:->|=>|→|<=>|=)\s*{term}"
+                  rf"(?:\s*\+\s*{term})*)", question or "")
     if m and parse_equation(m.group(1)):
         return 6, "reaction"
     return None
