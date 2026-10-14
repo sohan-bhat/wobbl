@@ -162,4 +162,32 @@ def run_cooling(st, out_dir: str | Path, power: str, heat_faces: str, material: 
                         solver=f"{o.solver} and {to.solver}", t_total=time.time() - t0)
     if lim is not None:
         oc.criteria = [{"name": "temperature", "value": "t_max_C", "limit": lim, "sense": "max"}]
+    _playback(flow_out, out, tmax, watts, h_mean, rise, coeffs, o)
     return oc.write(out)
+
+
+def _playback(flow_out: Path, out: Path, tmax: float, watts: float, h_mean: float, rise: float, coeffs, o):
+    """The flow's playback with the heat answer added: each surface vertex's heat transfer coefficient and the
+    temperatures, so a player can colour the part by how hard each face is cooled while the fluid moves."""
+    import json
+
+    from . import playback
+
+    src = flow_out / "playback.json"
+    if not src.exists():
+        return
+    doc = json.loads(src.read_text())
+    g = o.geometry
+    h_vertex = np.zeros(len(g.X))
+    for fid, (h, _) in coeffs.items():
+        h_vertex[np.unique(g.tris[g.tri_face == fid])] = h
+    _, surf = playback.surface_block(g.X, g.tris, {"h": h_vertex}, {"h": "W/m2K"})
+    doc["surface"].update(surf)
+    doc["kind"] = "cooling"
+    doc["about"] += (" surface.h is each face's heat transfer coefficient from the flow, and the scalars give the "
+                     "part's hottest point and the heat it sheds.")
+    doc["scalars"].update({"hottest": {"value": round(tmax, 4), "unit": "C"},
+                           "power": {"value": round(watts, 4), "unit": "W"},
+                           "h_mean": {"value": round(h_mean, 4), "unit": "W/m2K"},
+                           "fluid_rise": {"value": round(rise, 4), "unit": "C"}})
+    (out / "playback.json").write_text(json.dumps(doc, separators=(",", ":")))
