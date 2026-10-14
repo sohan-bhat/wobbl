@@ -61,11 +61,23 @@ def key_reading(c: Circuit, w: Wave, stress: list[Stress]) -> dict | None:
 
 def draw(out: Path, c: Circuit, w: Wave, stress: list[Stress], verdict: str) -> dict[str, str]:
     """setup.svg and schematic.svg from draw.write_circuit; a drawing that cannot be made is left out."""
+    board(out, c, w, stress)
     try:
         from .draw import write_circuit
         return write_circuit(Path(out) / "images", c, wave_data(c, w), verdict, key_reading(c, w, stress))
     except Exception:  # noqa: BLE001  pictures never cost the result
         return {}
+
+
+def board(out: Path, c: Circuit, w: Wave, stress: list[Stress]) -> None:
+    """board.json, the board plan the interactive 3D view (wobbl.viz) is built from; it never costs the result."""
+    try:
+        from ..viz.adapters.circuits import write_board
+        write_board(out, c, w, stress)
+    except Exception:  # noqa: BLE001
+        import os
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
 
 
 def template_parts(netlist: str, analysis: str, tran, out: Path, ambient: float, verdict: str) -> dict:
@@ -90,4 +102,5 @@ def template_parts(netlist: str, analysis: str, tran, out: Path, ambient: float,
         w = run_op(c, work, "parts")
     stress = evaluate(c, w, ambient)
     write_playback(out, c, w, stress, verdict)
+    board(out, c, w, stress)
     return {s.ref: s.to_dict() for s in stress}
