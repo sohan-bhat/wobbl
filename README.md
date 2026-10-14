@@ -49,8 +49,10 @@ scenario playing out and fixes with numbers.
 - Buckling, vibration and fatigue, also with CalculiX, for struts that buckle, arms
   and brackets that ring at a motor's speed or on a shaker, and how many load cycles
   a part lasts.
-- Circuits with [ngspice](https://ngspice.sourceforge.io), for LEDs, RC networks,
-  buck converters, MOSFETs or any netlist.
+- Circuits with [ngspice](https://ngspice.sourceforge.io), for any circuit you bring:
+  a SPICE netlist, a KiCad schematic or a few words. Every part gets a library model
+  and its datasheet ratings, and Wobbl says whether the circuit works and whether
+  anything on it burns, across the supply range and the parts' tolerances.
 - Motion with [scipy](https://scipy.org)'s ODE integrators, from a rock falling off
   a cliff to a high power rocket on its thrust curve, through the standard
   atmosphere, wind and dual deploy parachutes.
@@ -547,7 +549,8 @@ never reported as high confidence.
 - Large deflection, a nonlinear re-solve when the part bends a good fraction of its wall.
 
 Heat answers check energy balance and a lumped hand calculation, and circuit
-answers are compared with the textbook and run again at half the time step. Motion
+answers check KCL at every node, account for every watt the supplies give, run again
+at half the time step and work any piece that reduces to a formula by hand. Motion
 answers are integrated again with a tolerance ten times tighter, compared with
 closed forms wherever the model reduces to one and closed with an energy balance,
 and a rocket's speed at burnout has to match Tsiolkovsky's delta v less what
@@ -601,6 +604,37 @@ On the [cast mount](examples/cast-mount-credibility) the chance of yielding unde
 explains 61% of the spread, and the plan asks for a gauged load test, one gauge
 where the two servo idealizations disagree, a load cell in service and coupons.
 
+## Circuits
+
+`wobbl circuit` (and `wobbl simulate` with a netlist, a schematic or words) takes any circuit:
+
+```sh
+wobbl circuit board.kicad_sch --set J2.load=2A        # a KiCad schematic, with a load on a connector
+wobbl circuit amp.cir --probe "v(out)"                 # a SPICE netlist
+wobbl circuit "a 555 flashing a blue LED at 5 Hz from a 12 V supply"
+wobbl circuit led --set supply=5V --set resistor=47 --set led=blue   # the templates stay as shortcuts
+```
+
+A KiCad schematic is traced the way eeschema connects it, symbols map onto parts by
+their library, value and part number fields, and pins map by name. Words become a
+netlist with every value Wobbl had to choose printed with the `--set` that changes it.
+Parts named on a netlist line (1N4148, 2N3904, IRLZ44N, LM358, NE555, AMS1117-3.3,
+TP4056, ESP32 and close to two hundred more) get their library models, fitted to their
+datasheets, and their ratings, and a note after a part's `;` gives a package or a
+rating, as in `R1 a b 220 ; 0805`. A part the library does not know gets a generic
+model of its kind, and the report says so.
+
+The analyses follow the circuit and the question: an operating point, a transient from
+power on run until it settles, the frequency response and every op amp's phase margin,
+and the supply range with Monte Carlo builds on the parts' tolerances. Every part is
+then judged against its voltage, current, power and temperature ratings, with what
+does not work said plainly (a regulator in dropout, a microcontroller on too much
+voltage, a MOSFET only partly on, a loop that oscillates). Fixes use real values and
+real parts, and each one is solved again before it is offered. Every run writes
+`playback.json` with the netlist and every part's voltage, current and power over time.
+Forty four circuits Wobbl was not tuned on all simulate, and 41 get the verdict an
+engineer wrote down for them before they ran (`tests/test_circuit_generality.py`).
+
 ## Validation
 
 Sixty three cases with known answers run through the same pipeline you get. Every
@@ -651,7 +685,7 @@ reports, heatmaps and summaries, and each has a page [on the website](https://so
 | [cell-runaway](examples/cell-runaway) | Can a cell at the hottest point of a sealed battery pack run away on its own? | battery, heat |
 | [desktop-arm](examples/desktop-arm) | Can hobby servos lift 500 g through a desktop arm's pick and place? | mechanisms |
 | [wiper-linkage](examples/wiper-linkage) | Does a wiper linkage sweep 95 degrees, and can its motor drive it over dry glass? | mechanisms |
-| [circuits](examples/circuits) | Will this LED fry? What is the ripple? How hot is the MOSFET? | circuits |
+| [circuits](examples/circuits) | Will this LED fry? What is the ripple? How hot is the MOSFET? Does anything on this KiCad board overheat? Is this op amp buffer stable? | circuits |
 
 Each folder has a `run.sh` that regenerates its outputs.
 

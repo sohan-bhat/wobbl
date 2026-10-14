@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+**Any circuit**
+- `wobbl circuit` and `wobbl simulate` take any circuit: a SPICE netlist, a KiCad
+  schematic or netlist export, or a description in words, with the LED, RC, buck
+  and MOSFET templates kept as shortcuts. KiCad schematics are traced as eeschema
+  connects them, symbols map onto parts by library, value and part number, pins by
+  name, and a rail nothing drives is held at the voltage its name gives.
+- A parts library of close to two hundred part numbers (diodes, LEDs, zeners,
+  transistors, MOSFETs, linear regulators, op amps and comparators, the 555,
+  chargers, the TL431, optocouplers, microcontrollers, batteries, motors and relay
+  coils) gives each part a model fitted to its datasheet, its ratings, its package
+  and its pinout. A part it does not know gets a generic model, and the report says
+  so.
+- The analyses follow the circuit and the question: an operating point, a power on
+  transient run until it settles, the frequency response and each op amp's phase
+  margin by Bode's return ratio, and the supply range with Monte Carlo builds on the
+  parts' tolerances.
+- Every part is judged against its voltage, current, power and temperature ratings,
+  with regulators in dropout, overvolted microcontrollers, half on MOSFETs and
+  oscillating loops called out as not working. Fixes use E24 values and library
+  parts and are solved again before they are offered.
+- Each run checks KCL at every node, the power account, half the time step or
+  tighter tolerances, closed form hand calculations wherever a piece reduces to one,
+  and where every model came from. Every run writes `playback.json` with the netlist
+  and every part's voltage, current and power over time, and hands its vectors to
+  the bench and schematic drawings. Board parasitics join the netlist through
+  `join_parasitics`.
+- Six new validation cases send netlists through the same study, and 44 circuits
+  Wobbl was not tuned on all simulate, 41 of them with the verdict an engineer gave
+  them beforehand.
+
 **One command for any thing**
 - `wobbl simulate THING "question"` takes a CAD part, a netlist or KiCad
   schematic, a mechanism, rocket or motor spec, a fluid case, a result folder, a
