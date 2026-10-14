@@ -38,3 +38,15 @@ export function picture(name: string): Pic {
   parts.push(`${url(`img/${name}.webp`)} ${width}w`);
   return { src: url(`img/${name}.webp`), srcset: parts.join(', '), width, height };
 }
+
+/**
+ * public/img/<name>.svg as markup to inline, so its labels use the site's fonts and the page can
+ * play it. Every id gets the prefix ns, so two drawings never clash on one page.
+ */
+export function inlineSvg(name: string, ns: string): string {
+  return readFileSync(resolve(PUBLIC, 'img', `${name}.svg`), 'utf-8').trim()
+    .replace(/\bid="([^"]+)"/g, `id="${ns}-$1"`)
+    .replace(/url\(#([^)]+)\)/g, `url(#${ns}-$1)`)
+    .replace(/href="#([^"]+)"/g, `href="#${ns}-$1"`)
+    .replace(/<svg /, '<svg focusable="false" ');
+}

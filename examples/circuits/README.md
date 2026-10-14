@@ -16,6 +16,6 @@ textbook answer computed independently.
 | How hot does a MOSFET get switching 15 A at 20 kHz in a 50 C box with 40 C/W to air? | About 110 C at the junction from 1.51 W, under the 150 C limit with margin | the conduction loss `I_rms^2 R` matches the simulated V x I to 0.001%, and the junction temperature is iterated with the on resistance rising 0.6% per C |
 
 Each folder (`led/`, `buck/`, `mosfet/`) holds `report.html`, `summary.txt`, `outcome.json` and the
-netlist Wobbl generated. Its `images/` folder has `setup.svg`, the circuit wired up on a bench with
-the run's own readings, `schematic.svg`, drawn from the netlist, and a waveform plot where the
-analysis is in time.
+netlist Wobbl generated. Its `images/` folder has the circuit wired up on a bench with the run's own
+readings in `setup.svg`, the schematic drawn from the netlist in `schematic.svg`, and a waveform plot
+where the analysis is in time.

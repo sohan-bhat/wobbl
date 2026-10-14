@@ -1,0 +1,36 @@
+---
+// A circuit run's bench, the setup.svg Wobbl drew from the run, inlined so its labels use the
+// site's fonts. The page draws the final state, so it reads in full without script and under
+// reduced motion, and scripts/bench.ts plays it from power on once it is on screen: the current
+// moves along the wires at its simulated speed and the reading climbs to the run's number before
+// the verdict shows. Where it can take a click, the schematic is a tab away.
+import { inlineSvg } from '../lib/images';
+import type { Run } from '../lib/examples';
+// controls: the view tabs and the pause button, left out where the bench sits inside a link
+interface Props { run: Run; setup: string; schematic?: string; controls?: boolean }
+const { run, setup, schematic, controls = false } = Astro.props;
+const id = `bench-${run.rel.replace(/[^a-z0-9]+/gi, '-')}`;
+const tabs = controls && schematic;
+---
+<figure class="bench" data-bench={controls ? 'loop' : 'once'} data-pagefind-ignore="all">
+  {controls && (
+    <div class="bench-bar">
+      {tabs && (
+        <div class="bench-views" role="tablist" aria-label="Drawing">
+          <button type="button" role="tab" class="btn-outline btn-sm" id={`${id}-t1`} aria-controls={`${id}-p1`}
+                  aria-selected="true">Bench</button>
+          <button type="button" role="tab" class="btn-outline btn-sm" id={`${id}-t2`} aria-controls={`${id}-p2`}
+                  aria-selected="false" tabindex="-1">Schematic</button>
+        </div>
+      )}
+      <button type="button" class="btn-outline btn-sm bench-toggle" hidden>Pause</button>
+    </div>
+  )}
+  <div class="bench-view" id={`${id}-p1`} role={tabs ? 'tabpanel' : undefined}
+       aria-labelledby={tabs ? `${id}-t1` : undefined}><Fragment set:html={inlineSvg(setup, `${id}-s`)} /></div>
+  {tabs && (
+    <div class="bench-view" id={`${id}-p2`} role="tabpanel" aria-labelledby={`${id}-t2`} hidden>
+      <Fragment set:html={inlineSvg(schematic!, `${id}-k`)} />
+    </div>
+  )}
+</figure>

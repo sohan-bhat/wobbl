@@ -63,7 +63,7 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
     )}
   </div>
   <div class="run-result">
-    <RunImage run={run} sizes="(min-width: 1000px) 46vw, 100vw" />
+    <RunImage run={run} sizes="(min-width: 1000px) 46vw, 100vw" controls />
     <p class="run-verdict"><span class="vword" data-verdict={COLOR[run.outcome.verdict] ?? 'marginal'}>{run.outcome.verdict.toUpperCase()}</span><samp class="run-said" translate="no">{run.outcome.headline}</samp></p>
     <dl class="readout">{metrics(run).map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
     {sugg.length > 0 && (

@@ -29,7 +29,10 @@ export const RUN_IMAGES: Record<string, Record<string, string>> = {
   'drone-arm/output': { stress: 'drone-arm-stress' },
   'heat-sink/output': { temperature: 'heat-sink-temperature' },
   'battery-pack/output': { temperature: 'battery-temperature', history: 'battery-history' },
-  'circuits/buck': { waveform: 'buck-waveform' },
+  // circuits: the bench Wobbl drew from the run, which the page plays, and its schematic
+  'circuits/led': { setup: 'led-setup', schematic: 'led-schematic' },
+  'circuits/buck': { setup: 'buck-setup', schematic: 'buck-schematic', waveform: 'buck-waveform' },
+  'circuits/mosfet': { setup: 'mosfet-setup', schematic: 'mosfet-schematic' },
   'falling-rock/output': { flight: 'falling-rock-flight' },
   'rocket-launch/output': { flight: 'rocket-flight', path: 'rocket-path' },
   'propane-flame/output': { sweep: 'propane-sweep' },
@@ -243,7 +246,7 @@ export function readmeImage(name: string, src: string): string | null {
     for (const [kind, img] of Object.entries(kinds)) {
       const run = examples().flatMap((e) => e.runs).find((r) => r.rel === rel);
       const file = run?.outcome.images?.[kind];
-      if (file && src === `${out}/${file}`) return `/img/${img}.webp`;
+      if (file && src === `${out}/${file}`) return `/img/${img}.${file.endsWith('.svg') ? 'svg' : 'webp'}`;
     }
   }
   return null;

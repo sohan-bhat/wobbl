@@ -1,14 +1,18 @@
 ---
-// A run's result picture: the playback of a motion run, its image, or a big number card for a
-// circuit without a plot.
+// A run's result picture: the playback of a motion run, the bench of a circuit run, its image, or a
+// big number card for a run with none of those.
 import { picture } from '../lib/images';
 import { COLOR, metrics, runImages, type Run } from '../lib/examples';
 import { hasSim } from '../lib/sim';
 import FlightSim from './FlightSim.astro';
-interface Props { run: Run; sizes: string; eager?: boolean; compact?: boolean }
-const { run, sizes, eager = false, compact = false } = Astro.props;
+import CircuitBench from './CircuitBench.astro';
+// controls: a circuit bench's view tabs and pause button, where the picture is not inside a link
+interface Props { run: Run; sizes: string; eager?: boolean; compact?: boolean; controls?: boolean }
+const { run, sizes, eager = false, compact = false, controls = false } = Astro.props;
 const flight = hasSim(run);
-const img = runImages(run)[0];
+const all = runImages(run);
+const bench = all.find((i) => i.kind === 'setup');
+const img = all.find((i) => i.kind !== 'setup' && i.kind !== 'schematic');
 const kinds: Record<string, string> = {
   stress: 'Stress heatmap', temperature: 'Temperature map', waveform: 'Simulated waveform',
   sweep: 'Flame temperature across mixtures', burn: 'Thrust and chamber pressure over the burn',
@@ -21,6 +25,9 @@ const [k, v] = metrics(run)[0];
 ---
 {flight ? (
   <FlightSim run={run} compact={compact} answer={false} />
+) : bench ? (
+  <CircuitBench run={run} setup={bench.name} schematic={all.find((i) => i.kind === 'schematic')?.name}
+                controls={controls} />
 ) : pic ? (
   <img class="run-img" src={pic.src} srcset={pic.srcset} sizes={sizes} width={pic.width} height={pic.height}
        loading={eager ? undefined : 'lazy'} decoding="async" alt={`${kinds[img!.kind] ?? img!.kind}. ${run.outcome.headline.replace(/[:;] /g, ', ')}`} />
