@@ -116,7 +116,6 @@ export function initHero(viewer: HTMLElement): () => void {
     auto = createAutoplay({
       root: viewer,
       home: v.view.get(),
-      start: { az: state.az, el: state.el },
       phone: matchMedia('(pointer: coarse)').matches,
       read: (): Frame => ({ az: state.az, el: state.el, load: state.load, view: v.view.get(), hand: 0 }),
       apply(f: Frame) {
