@@ -142,14 +142,17 @@ def test_templates_refuse_bad_values():
         check_params("sound", "cathedral", {})
 
 
-def test_cli_lists_the_field_commands():
+def test_field_analyses_are_registered_and_old_commands_still_run():
     from click.testing import CliRunner
 
     from wobbl.cli.main import cli
+    from wobbl.simulate import registry
 
-    r = CliRunner().invoke(cli, ["--help"])
+    names = {a.key for a in registry.analyses()}
+    assert {"part.magnetic", "part.electric", "part.acoustic", "board.parasitics", "field.magnetic", "field.electric",
+            "field.trace", "field.antenna", "field.acoustic"} <= names
     for c in ("magnetic", "electric", "board", "antenna", "sound"):
-        assert c in r.output
+        assert c in cli.commands        # hidden aliases of simulate, still callable
     r = CliRunner().invoke(cli, ["magnetic", "solenoid", "--set", "colour=red"])
     assert r.exit_code != 0 and "colour" in r.output
 

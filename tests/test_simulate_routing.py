@@ -188,16 +188,28 @@ CASES = [
     Case("{tmp}/cavity", "", "fluid", "cfd", ("cfd",)),
     Case("", "air through a 100 mm duct at 40 CFM, how much pressure is lost?", "fluid", "pipe", ("pressure-drop",)),
     # fields
-    Case("", "a solenoid with 800 turns at 0.6 A and a 6 mm stroke, does it pull 8 N?", "field", "solenoid"),
-    Case("", "what impedance is a 0.3 mm microstrip on 0.17 mm fr4?", "field", "microstrip"),
-    Case("", "where does a 2.4 GHz dipole 58 mm long resonate?", "field", "dipole"),
-    Case("", "what are the room modes of a 5 x 4 x 2.7 m room?", "field", "room"),
-    Case("", "two plates 100 mm across with a 2 mm gap at 3 kV, will it arc?", "field", "plates"),
+    Case("", "a solenoid with 800 turns at 0.6 A and a 6 mm stroke, does it pull 8 N?", "field", "solenoid",
+         ("magnetic",)),
+    Case("", "what impedance is a 0.3 mm microstrip on 0.17 mm fr4?", "field", "microstrip", ("trace",)),
+    Case("", "where does a 2.4 GHz dipole 58 mm long resonate?", "field", "dipole", ("antenna",)),
+    Case("", "what are the room modes of a 5 x 4 x 2.7 m room?", "field", "room", ("acoustic",)),
+    Case("", "two plates 100 mm across with a 2 mm gap at 3 kV, will it arc?", "field", "plates", ("electric",)),
+    # fields on the user's own CAD and boards
+    Case("{tmp}/actuator.step", "how hard does the coil pull the plunger?", "part", "step", ("magnetic",)),
+    Case("{tmp}/actuator.step", "will 20 kV arc from the electrode to the grounded case?", "part", "step",
+         ("electric",)),
+    Case("{tmp}/actuator.step", "where do standing waves form in the air inside the box?", "part", "step",
+         ("acoustic",)),
+    Case(str(ROOT / "tests" / "data" / "pcb" / "two_layer_k8.kicad_pcb"), "what is the trace impedance?", "board",
+         "kicad", ("parasitics",)),
+    Case(str(ROOT / "tests" / "data" / "pcb" / "gerber_two_layer"), "how much do the traces couple?", "board",
+         "gerber", ("parasitics",)),
 ]
 
 
 def _files(tmp: Path) -> None:
     (tmp / "lid.stl").write_text("solid lid\nendsolid lid\n")
+    (tmp / "actuator.step").write_text("ISO-10303-21;\nEND-ISO-10303-21;\n")
     (tmp / "board.cir").write_text("* divider\nV1 in 0 5\nR1 in out 1k\nR2 out 0 1k\n.op\n.end\n")
     (tmp / "board.kicad_sch").write_text("(kicad_sch (version 20231120) (generator eeschema))\n")
     (tmp / "export.net").write_text("(export (version D) (design (source board.kicad_sch)))\n")
