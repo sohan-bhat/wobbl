@@ -681,9 +681,69 @@ def run_parasitics(path: str, out_dir, question: str = "", netlist: str | None =
     o = GenericOutcome("board", Path(path).name, question, verdict, head, metrics, lvl, reasons, checks, assumptions,
                        values, images, fixes, solver="GetDP cross sections with gmsh", t_total=time.time() - t0)
     _playback(out, ex)
+    _view(out, o, ex, circ, Path(path).name, question)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
+
+
+def _view(out, o, ex: Extracted, circ, title: str, question: str):
+    """The board in 3D: its outline as a slab of the stackup's thickness, pours as sheets on their layers, every
+    track at its layer's height colored by its impedance, and the worst part's voltage with and without the
+    layout playing over the ringing window."""
+    try:
+        from ..viz import Scene
+
+        from . import view as V
+    except ImportError:
+        return None
+    b = ex.board
+    st = b.stackup
+    sc = Scene(f"{Path(title).stem} board", domain="board", question=question, length="mm")
+    wave = (circ or {}).get("wave") or {}
+    if wave:
+        t, yb, yi = wave["time"], wave["board"], wave["ideal"]
+        i = int(np.argmax(yb))
+        span = max(40 * circ["step"], 0.02 * (t[-1] - t[0]))
+        m = np.where((t >= t[i] - 0.3 * span) & (t <= t[i] + span))[0]
+        m = m[np.linspace(0, len(m) - 1, min(len(m), 160)).astype(int)]
+        sc.timeline((t[m] - t[i]) * 1e9, unit="ns", label="time", seconds=8.0, between="interpolated",
+                    note="the board's circuit as ngspice solved it, around the worst overshoot")
+        part = circ["worst"]["part"]
+        sc.readout(f"{part} with the layout", yb[m], unit="V")
+        sc.readout(f"{part} on the schematic alone", yi[m], unit="V")
+    x0, y0, x1, y1 = b.bbox()
+    for ring in b.outline[:1]:
+        pts = np.asarray(ring) * 1e3
+        if len(pts) >= 3:
+            th = st.board_thickness * 1e3
+            n = len(pts)
+            X = np.vstack([np.c_[pts, np.zeros(n)], np.c_[pts, np.full(n, th)]])
+            side = [[k, (k + 1) % n, n + (k + 1) % n] for k in range(n)] + [[k, n + (k + 1) % n, n + k] for k in range(n)]
+            sc.mesh(X, np.array(side), name="board edge", color="#2f6b3a", opacity=0.6)
+    for z in b.zones[:60]:
+        lay = st.layer(z.layer)
+        zz = (lay.z_top if lay.index == 0 else lay.z_bottom) * 1e3
+        for outer, _ in z.polygons[:4]:
+            if len(outer) < 3:
+                continue
+            P = np.asarray(outer) * 1e3
+            c = P.mean(axis=0)
+            X = np.vstack([np.c_[P, np.full(len(P), zz)], [[c[0], c[1], zz]]])
+            T = np.array([[k, (k + 1) % len(P), len(P)] for k in range(len(P))])
+            sc.mesh(X, T, name=f"{z.net} pour", color="#b87333", opacity=0.25)
+    pieces = sorted(ex.pieces, key=lambda p: -p.length)[:1500]
+    paths = [np.array([[p.a[0] * 1e3, p.a[1] * 1e3, st.layer(p.layer).z_top * 1e3 + 0.02],
+                       [p.b[0] * 1e3, p.b[1] * 1e3, st.layer(p.layer).z_top * 1e3 + 0.02]]) for p in pieces]
+    if paths:
+        sc.lines(paths, width=2.5, values=[np.full(2, p.z0) for p in pieces], field="impedance", unit="ohm",
+                 colormap="viridis", name="tracks")
+    sc.camera(target=((x0 + x1) * 500, (y0 + y1) * 500, 0), direction=(0.3, -0.6, 1.0),
+              distance=1.6 * max(x1 - x0, y1 - y0) * 1e3)
+    word, tn = V.tone(o.verdict)
+    sc.verdict(word, o.headline, tn)
+    sc.note("Tracks are colored by the impedance their cross section solved to; pours are shown on their layers.")
+    return sc.save(out)
 
 
 def _map(path, ex: Extracted) -> str:

@@ -507,9 +507,40 @@ def run(scene: Scene, s: MagSetup, out_dir: str | Path, question: str = "", qual
                        checks, assumptions, values, images, fixes, solver=f"GetDP {solve.getdp().version()} with gmsh",
                        t_total=time.time() - t0)
     _playback(out, fine, pl, scene, s, F, T, tgt)
+    _view(out, o, fine, pl, scene, s, F, tgt, title or scene.bodies[0].file, question)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
+
+
+def _view(out, o, fine, pl, scene, s, F, tgt, title, question):
+    """The bodies as solved, the flux density on the slice with flux lines traced through it, and the force."""
+    try:
+        from ..viz import Scene
+
+        from . import view as V
+    except ImportError:
+        return None
+    sc = Scene(f"{Path(title).stem} magnetic field", domain="magnetic", question=question, length="mm")
+    V.draw_bodies(sc, fine["msh"], {n: b.kind for n, b in s.bodies.items()})
+    if "slice_b" in fine:
+        b = fine["slice_b"]
+        V.slice_mesh(sc, pl, np.linalg.norm(b, axis=-1), "flux density", "T", cmap="inferno")
+        paths = V.stream(b[..., pl["iu"]], b[..., pl["iv"]], pl)
+        if paths:
+            sc.lines(paths, color="#e8e8e8", width=1.2, name="flux lines", flow=20.0)
+    body = next(x for x in scene.bodies if x.name == tgt)
+    Fm = float(np.linalg.norm(F))
+    if Fm > 0:
+        size = 0.6 * body.extent * 1e3
+        sc.arrows([np.array(body.center) * 1e3], [F / Fm * size], labels=["{force}"], name="force")
+        sc.readout("force", [Fm], unit="N", limit=None)
+    for n, L in (o.values.get("inductance_H") or {}).items():
+        sc.readout(f"inductance of {n}", [L * 1e3], unit="mH")
+    word, tn = V.tone(o.verdict)
+    sc.verdict(word, o.headline, tn)
+    sc.note("Flux lines are traced through the solved in-plane field on the slice; their glow only shows direction.")
+    return sc.save(out)
 
 
 def _knee(b: MagBody) -> float:

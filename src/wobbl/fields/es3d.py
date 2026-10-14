@@ -260,10 +260,36 @@ def run(scene: Scene, s: ElecSetup, out_dir: str | Path, question: str = "", qua
                        head.strip(), metrics, lvl, reasons, checks, assumptions, values, images, fixes,
                        solver=f"GetDP {solve.getdp().version()} with gmsh", t_total=time.time() - t0)
     _playback(out, op, pl, scene, fixed, C, peaks, strength)
+    _view(out, o, msh, op, pl, s, conds, diel, worst, peaks, title or scene.bodies[0].file, question)
     _ = unit0 if len(fixed) else None
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
+
+
+def _view(out, o, msh, op, pl, s, conds, diel, worst, peaks, title, question):
+    """The conductors and dielectrics as solved, the field on the slice, and the peak marked where it is."""
+    try:
+        from ..viz import Scene
+
+        from . import view as V
+    except ImportError:
+        return None
+    sc = Scene(f"{Path(title).stem} electric field", domain="electric", question=question, length="mm")
+    V.draw_bodies(sc, msh, {**{c: "conductor" for c in conds}, **{d: "dielectric" for d in diel}})
+    if pl is not None and "slice_e" in op:
+        V.slice_mesh(sc, pl, op["slice_e"] / 1e6, "electric field", "kV/mm")
+    if worst:
+        pk, where = peaks[worst]
+        sc.label(f"peak {pk / 1e6:.3g} kV/mm", np.array(where) * 1e3, kind="fail" if o.verdict == "fails" else "note")
+        sc.readout("peak field", [pk / 1e6], unit="kV/mm", limit=s.dielectrics.get(worst, (0, s.air_strength))[1] / 1e6)
+    C = o.values.get("capacitance_matrix_F") or []
+    if C:
+        sc.readout("capacitance", [C[0][0] * 1e12], unit="pF")
+    word, tn = V.tone(o.verdict)
+    sc.verdict(word, o.headline, tn)
+    sc.note("The field is the solved slice through the parts; the parts are drawn from their own mesh.")
+    return sc.save(out)
 
 
 def _reg(n: str) -> str:

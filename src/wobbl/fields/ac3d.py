@@ -277,6 +277,7 @@ def run_modes(scene: Scene, roles: SoundRoles, out_dir, question="", quality="no
                        assumptions + scene.notes, values, images, [], solver=f"GetDP {solve.getdp().version()} with "
                        "SLEPc and gmsh", t_total=time.time() - t0)
     _modes_playback(out, shapes, pl, air_scene, modes)
+    _modes_view(out, o, fine["msh"], [b.name for b in air], shapes, pl, title or "air", question)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
@@ -402,9 +403,61 @@ def run_radiation(scene: Scene, roles: SoundRoles, out_dir, question="", quality
                                           "point over frequency (x in Hz, dB)"},
                  {"frequency_Hz": freqs[-1], "slice": _pl_mm(pl), "p_re": pb.pack(g[..., 0], -m, m),
                   "p_im": pb.pack(g[..., 1], -m, m), "spl": pb.series(freqs, {f"p{j}": spl[:, j] for j in range(len(pts))})})
+        _wave_view(out, o, msh, holes, roles, g, pl, freqs[-1], m, title or "source", question)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
+
+
+def _modes_view(out, o, msh, air: list[str], shapes, pl, title, question):
+    """Each of the first modes breathing on the slice for one period, inside the air drawn from its mesh."""
+    try:
+        from ..viz import Scene
+
+        from . import view as V
+    except ImportError:
+        return None
+    if not shapes:
+        return None
+    per = 12
+    frames, t, freq = [], [], []
+    for k, (f, g) in enumerate(shapes):
+        m = np.nanmax(np.abs(g)) or 1.0
+        for j in range(per):
+            frames.append(g / m * math.cos(2 * math.pi * j / per))
+            t.append(k + j / per)
+            freq.append(f)
+    sc = Scene(f"{Path(title).stem} standing waves", domain="sound", question=question, length="mm")
+    sc.timeline(t, unit="", label="mode", seconds=3.0 * len(shapes), between="exact",
+                note="each mode plays one period of its standing wave, its shape times cos(2 pi f t)")
+    V.draw_bodies(sc, msh, {n: "air" for n in air}, {n: 0.18 for n in air})
+    V.slice_mesh(sc, pl, np.array(frames), "pressure", "relative", cmap="RdBu", frames=True, rng=(-1, 1))
+    sc.readout("mode frequency", freq, unit="Hz")
+    word, tn = V.tone(o.verdict)
+    sc.verdict(word, o.headline, tn)
+    sc.note("Mode shapes have no absolute size; red and blue are opposite phase.")
+    return sc.save(out)
+
+
+def _wave_view(out, o, msh, holes, roles, g, pl, f, m, title, question):
+    """The sound leaving the vibrating body over one period, from the solved pressure phasor on the slice."""
+    try:
+        from ..viz import Scene
+
+        from . import view as V
+    except ImportError:
+        return None
+    n = 16
+    ph = 2 * math.pi * np.arange(n) / n
+    frames = np.array([g[..., 0] * math.cos(a) - g[..., 1] * math.sin(a) for a in ph])
+    sc = Scene(f"{Path(title).stem} sound", domain="sound", question=question, length="mm")
+    sc.timeline(ph / (2 * math.pi * f) * 1e3, unit="ms", label="time", seconds=4.0, between="exact",
+                note=f"one period at {f:.4g} Hz, the real part of the solved pressure phasor")
+    V.draw_bodies(sc, msh, {h: ("source" if h in roles.sources else "wall") for h in holes})
+    V.slice_mesh(sc, pl, frames, "sound pressure", "Pa", cmap="RdBu", frames=True, rng=(-m, m))
+    word, tn = V.tone(o.verdict)
+    sc.verdict(word, o.headline, tn)
+    return sc.save(out)
 
 
 def _pl_mm(pl: dict) -> dict:
