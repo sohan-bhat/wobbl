@@ -312,6 +312,11 @@ def fatigue_data(mat: Material) -> FatigueData | None:
     if mat.category == "metal" and 150000 <= mat.E <= 230000:
         return FatigueData(min(0.5 * mat.tensile_strength, 700.0), 1e6, True, "steel", _SHIGLEY, estimated=True)
     if mat.category == "metal" and 60000 <= mat.E <= 80000:
+        if mat.process == "cast":
+            a356 = FATIGUE["a356-t6"].strength / LIBRARY["a356-t6"].tensile_strength
+            return FatigueData(a356 * mat.tensile_strength, 5e8, False, "aluminum",
+                               f"estimate: {a356:.2f} Sut at 5e8 cycles, the ratio of sand cast A356-T6",
+                               estimated=True)
         return FatigueData(0.3 * mat.tensile_strength, 5e8, False, "aluminum",
                            "estimate: 0.3 Sut at 5e8 cycles, close to the wrought aluminum alloys in this table",
                            estimated=True)
