@@ -46,9 +46,50 @@ def flow():
     """Air and water flow through pipes and around bodies, fan cooling, propellers and hulls.
 
     \b
+    wobbl flow pipe --length 40m --diameter 25mm --flow "30 L/min" --fittings "3 elbow90"
+    wobbl flow drag sphere --size 22cm --speed 20m/s
     wobbl flow prop apcsf_10x4.7 --mass 1.2kg --rotors 4
     wobbl flow hull --length 12m --beam 3.6m --draft 0.9m --displacement 16t --speed 8kn
     """
+
+
+@flow.command()
+@click.option("--length", required=True, help="Pipe length, e.g. '40 m'.")
+@click.option("--flow", "flow_rate", required=True, help="Flow rate, e.g. '30 L/min', '2 m3/h' or '40 CFM'.")
+@click.option("--diameter", default="", help="Bore of a round pipe, e.g. '25 mm'.")
+@click.option("--width", default="", help="Width of a rectangular duct.")
+@click.option("--height", default="", help="Height of a rectangular duct.")
+@click.option("--fluid", default="water", show_default=True, help="air, water, seawater or custom:rho=..,mu=..")
+@click.option("--temp", default="20 C", show_default=True, help="Fluid temperature.")
+@click.option("--material", default="pvc", show_default=True,
+              help="Wall: smooth, pvc, copper, pex, stainless, steel, galvanized, cast-iron, concrete.")
+@click.option("--roughness", default="", help="Wall roughness, e.g. '0.05 mm' (overrides the material).")
+@click.option("--fittings", default="", help="e.g. '3 elbow90, gate-valve, exit' or 'K=4.5'.")
+@click.option("--rise", default="0 m", show_default=True, help="Height of the outlet above the inlet.")
+@click.option("--max-dp", default="", help="Pressure the pump or supply can give, e.g. '50 kPa'.")
+@_common
+def pipe(length, flow_rate, diameter, width, height, fluid, temp, material, roughness, fittings, rise, max_dp, out,
+         question, as_json):
+    """Pressure drop through a pipe or duct with its fittings, on the Moody chart."""
+    _run("pipe", dict(length=length, flow=flow_rate, diameter=diameter, width=width, height=height, fluid=fluid,
+                      temp=temp, material=material, roughness=roughness, fittings=fittings, rise=rise, max_dp=max_dp,
+                      question=question), "pipe", out, as_json, "Darcy Weisbach and the Moody chart")
+
+
+@flow.command()
+@click.argument("shape", type=click.Choice(["sphere", "cylinder", "disk", "square-plate", "cube"]))
+@click.option("--size", required=True, help="Diameter or side, e.g. '22 cm'.")
+@click.option("--speed", required=True, help="Speed of the stream, e.g. '20 m/s' or '30 km/h'.")
+@click.option("--length", default="", help="Span of a cylinder (left out for a very long one).")
+@click.option("--fluid", default="air", show_default=True, help="air, water, seawater or custom:rho=..,mu=..")
+@click.option("--temp", default="20 C", show_default=True)
+@click.option("--cd", type=float, default=0.0, help="A known drag coefficient instead of the published curve.")
+@click.option("--max-drag", default="", help="Drag the design can take, e.g. '15 N'.")
+@_common
+def drag(shape, size, speed, length, fluid, temp, cd, max_drag, out, question, as_json):
+    """Drag force on a sphere, cylinder, plate or cube from published drag curves."""
+    _run("drag", dict(shape=shape, size=size, speed=speed, length=length, fluid=fluid, temp=temp, cd=cd,
+                      max_drag=max_drag, question=question), shape, out, as_json, "published drag curves")
 
 
 @flow.command()

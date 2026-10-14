@@ -15,7 +15,7 @@ INSTRUCTIONS = """Wobbl runs verified engineering simulations. Typical flow for 
 4. Open images.stress to see where the peak is. If the verdict is fails or marginal, call
    suggest_fix(result_dir, apply=true) for before and after numbers.
 Heat questions: solve_thermal. Circuits: solve_circuit. Falling, thrown and rocket flights: solve_motion.
-Propellers, drones and boat hulls: solve_flow."""
+Pipe pressure drop, drag, propellers, drones and boat hulls: solve_flow."""
 
 
 def _protect_stdout():
@@ -140,11 +140,14 @@ def build_server():
 
     @srv.tool()
     def solve_flow(kind: str, params: dict | None = None) -> dict:
-        """Air and water flow. kind='prop' takes prop (a UIUC key like apcsf_10x4.7, or '10x4.7' in inches), and
-        rpm, thrust='4 N' or mass='1.2 kg' with rotors=4 to hover, speed, altitude and max_rpm. kind='hull' takes
-        length, beam, draft, displacement ('16 t' or '15.6 m3'), speed='8 kn' and power='60 kW'. Values take
-        units. Returns the verdict, the key numbers, confidence with checks against measurements or hand
-        calculations, fixes and image paths. Both run in seconds."""
+        """Air and water flow. kind='pipe' takes length, flow='30 L/min', diameter='25 mm' (or width and height
+        for a duct), fluid (air, water, seawater), material or roughness, fittings='3 elbow90, gate-valve', rise
+        and max_dp='50 kPa'. kind='drag' takes shape (sphere, cylinder, disk, square-plate, cube), size, speed,
+        length for a cylinder's span, fluid and max_drag. kind='prop' takes prop (a UIUC key like apcsf_10x4.7, or
+        '10x4.7' in inches), and rpm, thrust='4 N' or mass='1.2 kg' with rotors=4 to hover, speed, altitude and
+        max_rpm. kind='hull' takes length, beam, draft, displacement ('16 t' or '15.6 m3'), speed='8 kn' and
+        power='60 kW'. Values take units. Returns the verdict, the key numbers, confidence with checks against
+        measurements or hand calculations, fixes and image paths. Each runs in seconds."""
         from ..flow.tools import solve_flow_tool
         return solve_flow_tool(kind, params or {})
 

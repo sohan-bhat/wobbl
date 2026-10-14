@@ -69,6 +69,11 @@ thrust to weight ratio at the prop's rated top speed. Give the size in inches fo
 bundled set, as in `wobbl flow prop 10x4.7 --rpm 6000`. A displacement boat's calm water resistance
 and engine power come from Holtrop and Mennen with
 `wobbl flow hull --length "12 m" --beam "3.6 m" --draft "0.9 m" --displacement "16 t" --speed "8 kn" --power "60 kW"`.
+Pressure drop through a pipe or duct with its fittings comes from Darcy Weisbach on the Moody chart, as in
+`wobbl flow pipe --length "40 m" --diameter "25 mm" --flow "30 L/min" --fittings "3 elbow90, gate-valve" --max-dp "50 kPa"`,
+and drag on a sphere, cylinder, plate or cube from published drag curves, as in
+`wobbl flow drag sphere --size "22 cm" --speed "20 m/s"`. A drag result near the drag crisis comes back
+with low confidence, because roughness and turbulence decide it there.
 
 ## Never skip
 

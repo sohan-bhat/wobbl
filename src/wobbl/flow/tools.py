@@ -5,7 +5,7 @@ import uuid
 
 from .fluids import qty
 
-KINDS = ("prop", "hull")
+KINDS = ("pipe", "drag", "prop", "hull")
 
 
 def _num(params: dict, key: str, kind: str, default: float = 0.0) -> float:
@@ -19,6 +19,12 @@ def _num(params: dict, key: str, kind: str, default: float = 0.0) -> float:
 def build(kind: str, params: dict):
     """The study for a kind and its parameters, and the function that runs it."""
     p = {k.lower(): v for k, v in (params or {}).items()}
+    if kind == "drag":
+        from .drag import DragStudy, run_drag
+        return DragStudy(str(p.get("shape") or "sphere").lower(), _num(p, "size", "length"),
+                         _num(p, "speed", "velocity"), _num(p, "length", "length"), str(p.get("fluid") or "air"),
+                         _num(p, "temp", "temperature", 20.0), _num(p, "cd", "plain"), _num(p, "max_drag", "force"),
+                         str(p.get("question", ""))), run_drag
     if kind == "prop":
         from .propeller import PropStudy, run_prop
         return PropStudy(str(p.get("prop", "apcsf_10x4.7")), rpm=_num(p, "rpm", "plain"),
@@ -39,6 +45,16 @@ def build(kind: str, params: dict):
                  transom_area=_num(p, "transom_area", "plain"))
         return HullStudy(h, _num(p, "speed", "velocity"), _num(p, "power", "power"),
                          _num(p, "efficiency", "plain", 0.55), fresh, str(p.get("question", ""))), run_hull
+    if kind == "pipe":
+        from .pipe import PipeStudy, parse_fittings, run_pipe
+        if not p.get("diameter") and not (p.get("width") and p.get("height")):
+            raise ValueError("give the pipe's diameter, or a duct's width and height")
+        return PipeStudy(_num(p, "length", "length"), _num(p, "flow", "flowrate"), _num(p, "diameter", "length"),
+                         _num(p, "width", "length"), _num(p, "height", "length"), str(p.get("fluid") or "water"),
+                         _num(p, "temp", "temperature", 20.0), str(p.get("material") or "pvc").lower(),
+                         _num(p, "roughness", "length") if p.get("roughness") not in (None, "") else None,
+                         parse_fittings(str(p.get("fittings") or "")), _num(p, "rise", "length"),
+                         _num(p, "max_dp", "pressure"), str(p.get("question", ""))), run_pipe
     raise ValueError(f"unknown flow study '{kind}'; use one of {', '.join(KINDS)}")
 
 
