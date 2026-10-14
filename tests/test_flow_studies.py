@@ -90,10 +90,11 @@ def test_playback_quantizes_fields_and_stays_small(tmp_path):
     f = playback.grid_field("flow", x.ravel(), y.ravel(), {"u": u.ravel()}, {"u": "m/s"}, nx=40, ny=20,
                             solid=lambda gx, gy: np.hypot(gx - 1, gy - 0.5) < 0.2)
     c = f["components"]["u"]
-    q = np.frombuffer(base64.b64decode(c["data"]), np.uint8).reshape(20, 40)
+    assert c["dtype"] == "uint8" and c["shape"] == [20, 40] and c["missing"] == 255
+    q = np.frombuffer(base64.b64decode(c["data"]), np.uint8).reshape(c["shape"])
     assert (q == 255).sum() > 0 and q[q < 255].max() <= 254
-    back = c["lo"] + q[0, -1] / 254 * (c["hi"] - c["lo"])         # the bottom row is y 0, where u is 0
-    assert back == pytest.approx(0.0, abs=(c["hi"] - c["lo"]) / 254)
+    back = c["offset"] + c["scale"] * q[0, -1]                    # the bottom row is y 0, where u is 0
+    assert back == pytest.approx(0.0, abs=c["scale"])
     path = playback.write(tmp_path, "test", "a test", "u on a grid", [f],
                           curves={"c": playback.series([0, 1], [2, 3], "s", "N")}, scalars={"g": (9.81, "m/s2")})
     doc = json.loads(open(path).read())
