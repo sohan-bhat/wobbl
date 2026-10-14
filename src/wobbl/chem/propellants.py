@@ -171,8 +171,9 @@ PROPELLANTS: dict[str, Propellant] = {p.key: p for p in [
     Propellant("knsu", "KNSU (65/35 potassium nitrate and sucrose)", 1800.0,
                BurnRate(((0.0, 10.34, 8.26, 0.319),)),
                1720.0, 41.98, 1.133, {"kno3": 0.65, "sucrose": 0.35},
-               source="burn rate a = 8.26 mm/s, n = 0.319 from Nakka's strand burner (nakka-rocketry.net/design1.html); "
-                      "T, M and k from Nakka's Technical Notepad 1, KNSU Ideal Performance Calculations",
+               source="burn rate a = 8.26 mm/s, n = 0.319 from Nakka's strand burner "
+                      "(nakka-rocketry.net/design1.html); T, M and k from Nakka's Technical Notepad 1, KNSU Ideal "
+                      "Performance Calculations",
                notes="Density is about 95% of the 1889 kg/m3 ideal.", aliases=("kn-sucrose", "sucrose", "rcandy")),
     Propellant("ocean-water", "MIT Ocean Water (APCP)", 1650.0, BurnRate(((0.0, 6.895, 2.8735, 0.382),)),
                3500.0, 23.67, 1.25, source=f"{MIT}, from the motor files of their 152 mm static fires",

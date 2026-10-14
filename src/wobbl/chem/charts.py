@@ -59,12 +59,14 @@ def motor_chart(path, t, thrust, pressure, allowable: float | None = None, allow
 
 
 def sweep_chart(path, xs, ys, xlabel: str, ylabel: str, mark: tuple[float, float] | None = None,
-                hline: float | None = None, hlabel: str = "", second: tuple[list, str] | None = None) -> str:
-    """One quantity against another, with the operating point marked and an optional limit line."""
+                hline: float | None = None, hlabel: str = "", label: str | None = None,
+                second: tuple[list, str] | None = None) -> str:
+    """One quantity against another, with the operating point marked, an optional second curve dashed and an
+    optional limit line."""
     fig, ax = _figure()
-    ax.plot(xs, ys, color=MARK, lw=2, label=second[1] if second else None)
+    ax.plot(xs, ys, color=MARK, lw=2, label=label)
     if second:
-        ax.plot(xs, second[0], color=BLUE, lw=2, ls="--", label=ylabel.split(",")[0] + " frozen")
+        ax.plot(xs, second[0], color=BLUE, lw=2, ls="--", label=second[1])
     if mark:
         ax.scatter([mark[0]], [mark[1]], s=40, color=FG, zorder=5)
     if hline is not None:
