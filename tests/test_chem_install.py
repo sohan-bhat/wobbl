@@ -35,7 +35,7 @@ def test_prune_keeps_the_library_and_the_three_data_files(tmp_path):
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("x" * 10)
     removed = install.prune(root)
-    left = sorted(str(p.relative_to(root)) for p in root.rglob("*") if p.is_file())
+    left = sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
     assert left == ["cantera-3.2.0.dist-info/METADATA", "cantera.libs/libhdf5.so", "cantera/__init__.py",
                     "cantera/_cantera.so", "cantera/composite.py", "cantera/data/gri30.yaml",
                     "cantera/data/nasa_condensed.yaml", "cantera/data/nasa_gas.yaml"]
@@ -91,5 +91,5 @@ def test_prune_drops_tests_stubs_and_named_paths(tmp_path):
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("x" * 10)
     assert install.prune_pkg("rdkit", root) == 40
-    left = sorted(str(p.relative_to(root)) for p in root.rglob("*") if p.is_file())
+    left = sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
     assert left == ["rdkit-2025.9.3.dist-info/METADATA", "rdkit/Chem/rdchem.so", "rdkit/__init__.py"]
