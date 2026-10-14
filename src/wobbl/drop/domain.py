@@ -70,6 +70,7 @@ def drop(job):
     floor = get_floor(fl)
     job.situate(environment={"floor": floor.key, "floor_name": floor.name, "height_m": parse_height(height) / 1000},
                 loads=[f"dropped from {height}"], objects=job.values("mass"))
+    job.ready()
     o = run_drop(st, job.out, job.log, render=not job.quick)
     v = o.values
     job.situate(environment={"down": v["down"], "landing": v["orientation"],
@@ -80,7 +81,7 @@ def drop(job):
 
 register(Analysis(
     "part", "drop", "Drop onto a floor: peak stress, whether it cracks and the g it feels, worst landing found",
-    drop, kinds=PART_KINDS, default=False, covers=("stress",),
+    drop, dry=True, kinds=PART_KINDS, default=False, covers=("stress",),
     keywords=(r"\bdrop(?:ped|s|ping)?\b", r"\bfalls? (?:off|from|onto|on)\b", r"\bfell\b", r"\bimpact\b",
               r"\bknocked off\b"),
     aliases=("impact test", "drop test", "impact", "fall"),

@@ -31,6 +31,7 @@ class Plan:
     analyses: list[Analysis]
     reasons: list[tuple[str, str]] = field(default_factory=list)    # (what was decided and why, the override)
     candidates: list[tuple[str, int]] = field(default_factory=list)   # every domain that scored, best first
+    focus: dict[str, str] = field(default_factory=dict)   # the part of the question each analysis answers
 
     @property
     def names(self) -> list[str]:
@@ -39,7 +40,7 @@ class Plan:
     def to_dict(self) -> dict:
         return {"thing": self.thing, "question": self.question, "domain": self.domain, "kind": self.kind,
                 "analyses": self.names, "reasons": [{"decided": r, "override": o} for r, o in self.reasons],
-                "candidates": [{"domain": d, "score": s} for d, s in self.candidates]}
+                "candidates": [{"domain": d, "score": s} for d, s in self.candidates], "focus": self.focus}
 
 
 def _search(rx: str, text: str):
@@ -146,12 +147,25 @@ def _pool(d: Domain, kind: str) -> list[Analysis]:
     return pool
 
 
-def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None) -> tuple[list[Analysis], str]:
-    """The analyses to run and the reason, from --physics, from the question's keywords or from the default."""
+CLAUSE = re.compile(r"\s*(?:[,;?]|\band\b|\bthen\b|\bbut\b|\bwhile\b|\bplus\b|\balso\b)\s*", re.I)
+
+
+def clauses(text: str) -> list[str]:
+    """A question cut where it joins separate asks, so 'survive a drop and hold a 10 kg shelf' is two load cases."""
+    return [c.strip() for c in CLAUSE.split(text or "") if c and c.strip()]
+
+
+def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None
+           ) -> tuple[list[Analysis], str, dict[str, str]]:
+    """The analyses to run, the reason, and the part of the question each one answers. An analysis that covers
+    another replaces it only for the clauses both were asked in, so a separate static load still gets its own
+    strength run next to a drop."""
     pool = _pool(d, kind)
     if not pool:
         raise RouteError(f"Wobbl has no {d.name} analysis registered yet",
-                         f"Analyses register in a domain.py; see 'wobbl simulate --list'.")
+                         "Analyses register in a domain.py; see 'wobbl simulate --list'.")
+    parts = clauses(text)
+    focus: dict[str, str] = {}
     if physics:
         chosen = []
         for name in physics:
@@ -164,18 +178,25 @@ def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None) ->
             chosen.append(a)
         reason = f"physics {', '.join(a.name for a in chosen)}, as asked"
     else:
-        hits: dict[str, str] = {}
+        hits: dict[str, dict[int, str]] = {}
         for a in pool:
-            for rx in a.keywords:
-                m = _search(rx, text)
+            for i, part in enumerate(parts):
+                m = next((m for rx in a.keywords if (m := _search(rx, part))), None)
                 if m:
-                    hits[a.key] = m.group(0).strip()
-                    break
+                    hits.setdefault(a.key, {})[i] = m.group(0).strip()
         chosen = [a for a in pool if a.key in hits]
-        covered = {c for a in chosen for c in a.covers}
-        chosen = [a for a in chosen if a.name not in covered]
+        chosen = [b for b in chosen if not any(b.name in a.covers and set(hits[b.key]) <= set(hits[a.key])
+                                               for a in chosen if a is not b)]
+        claimed = {i for a in chosen for i in hits[a.key]}
+        shared = [i for i in range(len(parts)) if i not in claimed]
+        word = {}
+        for b in chosen:
+            mine = {i for i in hits[b.key] if not any(b.name in a.covers and i in hits[a.key] for a in chosen)}
+            word[b.key] = hits[b.key][min(mine)] if mine else next(iter(hits[b.key].values()))
+            if len(chosen) > 1 and mine:
+                focus[b.name] = " ".join(parts[i] for i in sorted(mine | set(shared)))
         if chosen:
-            reason = "physics " + ", ".join(f'{a.name} from "{hits[a.key]}"' for a in chosen)
+            reason = "physics " + ", ".join(f'{a.name} from "{word[a.key]}"' for a in chosen)
         else:
             chosen = [a for a in pool if a.default][:1] or pool[:1]
             reason = f"the question names no physics, so {chosen[0].name}, the usual one for a {kind}"
@@ -192,9 +213,14 @@ def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None) ->
     for a in chosen:
         add(a)
     extra = [a.name for a in ordered if a not in chosen]
+    for a in ordered:
+        if a not in chosen:   # a result another analysis reads answers that analysis's part of the question
+            user = next((b for b in chosen if a.name in b.needs and b.name in focus), None)
+            if user is not None:
+                focus[a.name] = focus[user.name]
     if extra:
         reason += f", with {', '.join(extra)} first because the others read its result"
-    return ordered, reason
+    return ordered, reason, focus
 
 
 def route(thing: str = "", question: str = "", physics: list[str] | None = None, domain: str | None = None,
@@ -224,6 +250,8 @@ def route(thing: str = "", question: str = "", physics: list[str] | None = None,
     if kind:
         reasons.append((f"kind {kind}, as asked", f"--kind {kind}"))
     text = " ".join(x for x in (question, "" if _as_path(thing) else thing) if x)
-    chosen, reason = choose(d, k, text, physics)
+    chosen, reason, focus = choose(d, k, text, physics)
     reasons.append((reason, f"--physics {','.join(a.name for a in chosen)}"))
-    return Plan(thing, question, d.name, k, chosen, reasons, [(r[1].name, r[0]) for r in found])
+    for name, part in focus.items():
+        reasons.append((f'{name} answers "{part}"', ""))
+    return Plan(thing, question, d.name, k, chosen, reasons, [(r[1].name, r[0]) for r in found], focus)

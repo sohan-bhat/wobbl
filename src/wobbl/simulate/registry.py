@@ -56,6 +56,7 @@ class Analysis:
     needs: tuple[str, ...] = ()        # analyses whose results it reads, run first
     covers: tuple[str, ...] = ()       # analyses it makes unnecessary when both are asked for
     legacy: str = ""           # the old command that ran the same study, kept as a hidden alias
+    dry: bool = False          # the entry calls job.ready() just before it solves, so --plan can show its guesses
     example: str = ""
 
     @property

@@ -163,13 +163,25 @@ def _lowest(steps) -> str:
     return min(confs, key=order.index) if confs else "low"
 
 
-def show_guesses(steps) -> None:
-    rows = [(t, o) for s in steps for t, o in s.job.assumptions]
+def show_readings(steps) -> None:
+    rows = [(s.analysis.name, k, v) for s in steps for k, v in s.job.readings() if k != "kind"]
     if not rows:
         return
-    ui.section("what wobbl assumed")
-    for t, o in rows:
-        ui.console.print(f"  {t}")
+    ui.section("what wobbl read from the question")
+    many = len(steps) > 1
+    for name, k, vs in rows:
+        ui.console.print(f"  {name + '  ' if many else ''}{k} {', '.join(vs)}")
+        ui.console.print(f"  [dim]override with {' '.join(f'--{k} {shlex.quote(v)}' for v in vs)}[/dim]")
+
+
+def show_guesses(steps, title: str = "what wobbl assumed") -> None:
+    rows = [(s.analysis.name, t, o) for s in steps for t, o in s.job.assumptions]
+    if not rows:
+        return
+    ui.section(title)
+    many = len(steps) > 1
+    for name, t, o in rows:
+        ui.console.print(f"  {name + '  ' if many else ''}{t}")
         if o:
             ui.console.print(f"  [dim]override with {o}[/dim]")
 
@@ -286,8 +298,24 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
     if not as_json:
         show_plan(plan)
     if plan_only:
+        from ..simulate.runner import preview
+        steps = preview(plan, opts)
         if as_json:
-            click.echo(json.dumps(plan.to_dict(), indent=1))
+            click.echo(json.dumps(plan.to_dict() | {
+                "assumptions": [{"physics": s.analysis.name, "assumed": t, "override": o}
+                                for s in steps for t, o in s.job.assumptions],
+                "read": [{"physics": s.analysis.name, "option": k, "values": v} for s in steps
+                         for k, v in s.job.readings()],
+                "pending": {s.analysis.name: s.error or s.hint for s in steps if s.error or s.hint},
+                "explicit": explicit(plan, steps)}, indent=1))
+            return
+        show_readings(steps)
+        show_guesses(steps, "what wobbl would assume")
+        for s in steps:
+            if s.error or s.hint:
+                ui.console.print(f"  [dim]{s.analysis.name}: {s.error or s.hint}[/dim]")
+        ui.section("explicit form")
+        ui.console.print(f"  {explicit(plan, steps)}", soft_wrap=True)
         return
     if estimate_only:
         return show_estimate(plan, opts, as_json)
@@ -315,6 +343,7 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
             show_step(s)
     else:
         show_step(steps[0])
+    show_readings(steps)
     show_guesses(steps)
     ui.section("explicit form")
     ui.console.print(f"  {cmd}", soft_wrap=True)

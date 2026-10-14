@@ -84,6 +84,7 @@ def trajectory(job):
                         get("speed"), get("angle"), wind, job.question)
     job.situate(objects=["ground"], environment={"gravity": "1 g", "air": "1976 standard atmosphere",
                                                  **({"wind": wind} if wind else {})})
+    job.ready()
     return run_motion(st, job.out, job.log)
 
 
@@ -98,6 +99,7 @@ def motor(job):
                                  job.value("exit") or "", job.value("casing") or "", job.number("efficiency"))
     ms = read_spec(source, job.question)
     job.situate(objects=["test stand"], environment={"ambient": "1 atm"})
+    job.ready()
     return run_motor(ms, job.out, job.log, render=not job.quick)
 
 
@@ -106,7 +108,7 @@ FLIGHT_OPTS = (Option("wind", "Wind blowing back toward the start, e.g. '5 m/s'"
 
 register(Analysis(
     "flight", "trajectory", "Drops, throws and rocket flights under gravity, air drag, wind, thrust and parachutes",
-    trajectory, kinds=("body", "rocket"), default=True, legacy="wobbl motion",
+    trajectory, dry=True, kinds=("body", "rocket"), default=True, legacy="wobbl motion",
     keywords=(r"\bfall", r"\bdrop", r"\bthrow|\bthrown", r"\blaunch", r"apogee", r"\bland", r"how (?:far|high|fast)",
               r"\brange\b", r"impact speed", r"trajector", r"stability", r"parachute", r"\bflight\b|\bfly\b"),
     aliases=("motion", "flight", "ballistics"),
@@ -120,7 +122,7 @@ register(Analysis(
 
 register(Analysis(
     "flight", "motor", "Solid rocket motor ballistics: thrust curve, chamber pressure against the casing, Kn and "
-    "erosive burning", motor, kinds=("motor",), default=True, legacy="wobbl motor",
+    "erosive burning", motor, dry=True, kinds=("motor",), default=True, legacy="wobbl motor",
     keywords=(r"thrust curve", r"chamber pressure", r"\bcasing\b", r"total impulse", r"motor class", r"\bburn\b",
               r"\bkn\b", r"erosive"),
     aliases=("ballistics-internal", "solid-motor"),

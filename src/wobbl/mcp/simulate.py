@@ -63,7 +63,14 @@ def simulate_tool(thing: str = "", question: str = "", physics: list[str] | None
     head = {"plan": plan.to_dict(),
             "decisions": [{"decided": r, "override": o} for r, o in plan.reasons]}
     if plan_only:
-        return head | {"options_read": sorted(takes - {"*"})}
+        from ..simulate.runner import preview
+        steps = preview(plan, opts)
+        return head | {"options_read": sorted(takes - {"*"}),
+                       "assumptions": [{"physics": s.analysis.name, "assumed": t, "override": o}
+                                       for s in steps for t, o in s.job.assumptions],
+                       "read": [{"physics": s.analysis.name, "option": k, "values": v}
+                                for s in steps for k, v in s.job.readings()],
+                       "pending": {s.analysis.name: s.error or s.hint for s in steps if s.error or s.hint}}
     try:
         if estimate:
             from ..estimate import estimate_plan

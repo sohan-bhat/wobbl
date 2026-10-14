@@ -1,6 +1,7 @@
 """Static strength of a CAD part for wobbl simulate, and the part setup the other part analyses share."""
 from __future__ import annotations
 
+import re
 import shlex
 from pathlib import Path
 
@@ -48,7 +49,7 @@ def study(job, need_load: bool = True, need_fix: bool = True):
             st.loads = [placeholder]
         if not need_fix and not st.fixtures:
             st.fixtures = [parse_fixture("fixed bottom")]
-        guesses = read_question(job.question, pre[1], st).guesses
+        guesses = read_question(job.focus, pre[1], st).guesses
         st.loads = [x for x in st.loads if x is not placeholder]
         for g in guesses:
             text = g.split(" (override with")[0]
@@ -57,7 +58,10 @@ def study(job, need_load: bool = True, need_fix: bool = True):
             elif g.startswith("supports"):
                 job.assume(text, " ".join(f"--fix {shlex.quote(f.text)}" for f in st.fixtures))
             elif g.startswith("load"):
-                job.assume(text, " ".join(f"--load {shlex.quote(x.text)}" for x in st.loads))
+                newton = [f"{x.magnitude:.4g} N" for x in st.loads if x.kind in ("force", "bolt", "remote")
+                          and not re.search(r"\d\s*n\b", x.text.lower())]
+                job.assume(text + (f" ({', '.join(newton)})" if newton else ""),
+                           " ".join(f"--load {shlex.quote(x.text)}" for x in st.loads))
             else:
                 job.assume(text)
     job.use("material", st.material)
@@ -78,6 +82,7 @@ def stress(job):
     resolve_material(st.material)
     st.budget = job.number("budget", 300.0)
     st.print_direction = job.value("print-direction")
+    job.ready()
     if job.flag("shell"):
         from ..structural.shell_path import analyze_shell
         return analyze_shell(st, job.out, job.log, render=not job.quick, pre=pre)
@@ -94,7 +99,7 @@ def stress(job):
 
 register(Analysis(
     "part", "stress", "Static strength: peak stress, safety factor and deflection, with mesh convergence",
-    stress, kinds=PART_KINDS, default=True, legacy="wobbl run",
+    stress, dry=True, kinds=PART_KINDS, default=True, legacy="wobbl run",
     keywords=(r"\bhold", r"\bcrack", r"\bbreak", r"\bsurviv", r"\bfail", r"\bbend", r"\bstress", r"safety factor",
               r"\bstrong", r"\bstrength", r"\bdeflect", r"\bsnap", FORCE, r"\b\d+(?:\.\d+)?\s*(?:mpa|kpa|psi|bar)\b",
               r"\b\d+(?:\.\d+)?\s*g'?s\b|\bg load"),

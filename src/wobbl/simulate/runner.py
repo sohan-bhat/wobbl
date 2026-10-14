@@ -20,6 +20,10 @@ def _quote(v: str) -> str:
     return shlex.quote(str(v))
 
 
+class PlanOnly(Exception):
+    """Raised by job.ready() in a --plan preview, where the analysis stops before it solves."""
+
+
 @dataclass
 class Job:
     """What an analysis entry gets: the thing, the question, the options and a place to write."""
@@ -36,6 +40,20 @@ class Job:
     used: dict[str, list[str]] = field(default_factory=dict)          # every value the run used, for request.json
     criteria: list[dict] = field(default_factory=list)
     situation: dict = field(default_factory=dict)    # supports, loads, environment and objects, for the 3D view
+    part: str = ""             # the part of the question this analysis answers, when it asks several things
+    dry: bool = False          # a --plan preview: ready() stops the entry before it solves
+
+    @property
+    def focus(self) -> str:
+        """The words this analysis should read its own loads and values from. A question that asks for a drop
+        and a separate static load gives each analysis only its own clause, with the shared context."""
+        return self.part or self.question
+
+    def ready(self) -> None:
+        """Call right before the solve, once every input is read and every guess recorded. Under --plan the run
+        stops here, so the plan can show what the run would assume without running it."""
+        if self.dry:
+            raise PlanOnly(self.analysis.key)
 
     @property
     def path(self) -> Path | None:
@@ -56,7 +74,9 @@ class Job:
             return None
         else:
             v = default
-            self.assume(f"{why or name + ' not given'}, so Wobbl assumed {default}", f"--{name} {_quote(default)}")
+            why = why or f"{name} not given"
+            self.assume(f"{why} ({default})" if " so " in why else f"{why}, so Wobbl assumed {default}",
+                        f"--{name} {_quote(default)}")
         self.used[name] = [v]
         return v
 
@@ -108,11 +128,19 @@ class Job:
             else:
                 self.situation[k] = v
 
+    def readings(self, given: dict | None = None) -> list[tuple[str, list[str]]]:
+        """Values the run took from the question's words rather than from an option or a guess, such as a drop
+        height of 1 m, so a plan can show them with their override too."""
+        import re
+        guessed = {k for _, o in self.assumptions for k in re.findall(r"--([\w-]+)", o)}
+        given = self.options if given is None else given
+        return [(k, v) for k, v in self.used.items() if k not in guessed and k not in given]
+
     def spec(self) -> dict:
         opts = {k: list(v) for k, v in self.options.items()}
         opts.update(self.used)
         return {"thing": str(self.path or self.thing), "kind": self.kind, "question": self.question,
-                "options": opts}
+                **({"part": self.part} if self.part else {}), "options": opts}
 
 
 @dataclass
@@ -200,35 +228,45 @@ def run_spec(analysis: Analysis, spec: dict, out: Path, quick: bool = False) -> 
     """The rerun contract: the same spec gives the same study, with nothing guessed that the spec holds."""
     opts = {k: (list(v) if isinstance(v, (list, tuple)) else [str(v)]) for k, v in spec.get("options", {}).items()}
     job = Job(analysis, str(spec.get("thing", "")), str(spec.get("kind", "")), str(spec.get("question", "")), opts,
-              Path(out), quick)
+              Path(out), quick, part=str(spec.get("part", "")))
     o = analysis.function()(job)
     _fold(job, o)
     return _finish(job, o)
+
+
+def _jobs(plan, options: dict[str, list[str]], out: Path, log, quick: bool, dry: bool):
+    """Each analysis's job in turn. A value a part study settles, such as the material or the supports, carries to
+    the analyses after it, so a guess is made once for the whole run."""
+    from .registry import domain
+    many = len(plan.analyses) > 1
+    earlier: dict[str, Any] = {}
+    shared = {o.name for o in domain(plan.domain).options}
+    carry = {k: list(v) for k, v in options.items()}
+    focus = getattr(plan, "focus", {}) or {}
+    for a in plan.analyses:
+        job = Job(a, plan.thing, plan.kind, plan.question, dict(carry), out / a.name if many else out, quick,
+                  earlier, log, part=focus.get(a.name, ""), dry=dry)
+        job.situate(objects=objects_named(plan.question))
+        step = Step(a, job)
+        yield step
+        if step.outcome is not None:
+            earlier[a.name] = step.outcome
+        carry.update({k: v for k, v in job.used.items() if k in shared and k not in carry})
 
 
 def run_plan(plan, options: dict[str, list[str]], out: Path, log=None, quick: bool = False) -> list[Step]:
     """Run each analysis of a plan. With more than one, each writes into its own folder under out, and a later
     one can read an earlier one's outcome through job.earlier, as fatigue reads the stress result. Every run ends
     with simulation.json in out, which the 3D view reads."""
-    from .registry import domain
     log = log or (lambda stage, msg: None)
     many = len(plan.analyses) > 1
-    earlier: dict[str, Any] = {}
     steps = []
-    shared = {o.name for o in domain(plan.domain).options}
-    carry = {k: list(v) for k, v in options.items()}    # a material or support settled once holds for every physics
-    for a in plan.analyses:
-        job = Job(a, plan.thing, plan.kind, plan.question, dict(carry), out / a.name if many else out, quick,
-                  earlier, log)
-        job.situate(objects=objects_named(plan.question))
-        step = Step(a, job)
+    for step in _jobs(plan, options, out, log, quick, False):
         t0 = time.time()
         try:
             if many:
-                log("physics", f"{a.name}: {a.summary[:70]}")
-            step.outcome = run_job(job)
-            earlier[a.name] = step.outcome
-            carry.update({k: v for k, v in job.used.items() if k in shared and k not in carry})
+                log("physics", f"{step.analysis.name}: {step.analysis.summary[:70]}")
+            step.outcome = run_job(step.job)
         except Exception as e:  # noqa: BLE001  one failed analysis must not lose the others
             if not many:
                 raise
@@ -236,6 +274,27 @@ def run_plan(plan, options: dict[str, list[str]], out: Path, log=None, quick: bo
         step.seconds = time.time() - t0
         steps.append(step)
     write_summary(plan, steps, out)
+    return steps
+
+
+def preview(plan, options: dict[str, list[str]]) -> list[Step]:
+    """What each analysis would assume, read without solving. An analysis that calls job.ready() before its
+    solve stops there; one registered without dry=True is not started, and its guesses show when it runs."""
+    import tempfile
+    steps = []
+    with tempfile.TemporaryDirectory(prefix="wobbl-plan-") as tmp:
+        for step in _jobs(plan, options, Path(tmp), lambda stage, msg: None, True, True):
+            steps.append(step)
+            if not step.analysis.dry:
+                step.hint = "its guesses show when it runs"
+                continue
+            try:
+                step.analysis.function()(step.job)
+                step.hint = "it ran in full, since it never called job.ready()"
+            except PlanOnly:
+                pass
+            except Exception as e:  # noqa: BLE001  a plan should show every problem, not stop at the first
+                step.error, step.hint = str(e).strip("'\""), getattr(e, "hint", "")
     return steps
 
 

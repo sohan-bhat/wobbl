@@ -76,6 +76,7 @@ def vibration(job):
     st.excitations()
     job.situate(supports=_supports(base), loads=[x.text for x in base.loads], objects=job.values("mass"),
                 environment={k: v for k, v in (("rpm", rpm), ("sine", sine), ("psd", st.psd)) if v})
+    job.ready()
     o = run_vibration(st, job.out, job.log, pre=pre, render=not job.quick)
     if o.values.get("sf") is not None:
         job.criterion("vibration", "sf", o.values["target_sf"], "min")
@@ -89,6 +90,7 @@ def buckling(job):
     st = BucklingStudy(base, base.target_sf, job.value("shape") or "auto", int(job.number("modes", 4)),
                        job.flag("keep"))
     job.situate(supports=_supports(base), loads=[x.text for x in base.loads])
+    job.ready()
     o = run_buckling(st, job.out, job.log, pre=pre, render=not job.quick)
     if o.values.get("design_factor") is not None:
         job.criterion("buckling", "design_factor", o.values["target_sf"], "min")
@@ -118,6 +120,7 @@ def fatigue(job):
                       loading=job.value("loading") or "auto", reliability=num("reliability", 0.9) or 0.9,
                       mean_model=job.value("mean-stress") or "goodman", target_sf=num("target-sf"),
                       question=job.question, history=job.value("history") or "")
+    job.ready()
     o = run_fatigue(st, job.out, job.log, render=not job.quick)
     job.criterion("fatigue", "sf", o.values["target_sf"], "min")
     return o
@@ -127,7 +130,7 @@ PART_OPTS = (Option("keep", "Keep the solver's work files", flag=True),)
 
 register(Analysis(
     "part", "vibration", "Natural frequencies against rotors and tones, and the stress of a sine sweep of the base "
-    "or of the loads, or of random input", vibration, kinds=PART_KINDS, legacy="wobbl vibration",
+    "or of the loads, or of random input", vibration, dry=True, kinds=PART_KINDS, legacy="wobbl vibration",
     keywords=(r"vibrat", r"resonan", r"natural frequenc", r"\bmodes?\b", r"\bmodal\b", r"\brpm\b", r"\bshaker\b",
               r"sine sweep", r"random vibration", r"\bpsd\b", r"gevs", r"blade pass", r"\bhz\b", r"\bharmonic\b",
               r"forced response", r"\b(?:un|im)balance"),
@@ -147,7 +150,7 @@ register(Analysis(
 
 register(Analysis(
     "part", "buckling", "Buckling load factor with an imperfection knockdown for the shape", buckling,
-    kinds=PART_KINDS, covers=("stress",), legacy="wobbl buckling",
+    dry=True, kinds=PART_KINDS, covers=("stress",), legacy="wobbl buckling",
     keywords=(r"buckl", r"crippl", r"euler", r"\bcollapse under\b"),
     options=PART_OPTS + (Option("shape", "auto, column, plate, cylinder, dome or general", "auto"),
                          Option("modes", "Buckling modes to find", "4")),
@@ -156,7 +159,7 @@ register(Analysis(
 register(Analysis(
     "part", "fatigue", "Fatigue life: cycles before a crack starts and the safety factor on stress, under one load, "
     "load blocks or a load history", fatigue,
-    kinds=PART_KINDS + ("result",), needs=("stress",), legacy="wobbl fatigue",
+    dry=True, kinds=PART_KINDS + ("result",), needs=("stress",), legacy="wobbl fatigue",
     keywords=(r"fatigue", r"\bcycles?\b", r"how long (?:will|does) it last", r"\blifetime\b|\blife\b",
               r"\b(?:million|thousand) times\b", r"endurance", r"duty cycle", r"load history", r"rainflow"),
     aliases=("life", "cycles"),

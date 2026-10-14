@@ -65,6 +65,17 @@ CASES = [
     Case(str(EX / "motor-mount-fatigue" / "output"), "how long until a crack from the fillet grows critical?",
          "part", "result", ("crack",)),
     Case(str(EX / "battery-pack" / "pack.py"), "", "part", "parametric", ("stress",)),
+    # several asks in one question: each load case gets its own physics, and a drop replaces a strength run only
+    # for the clause it was asked in
+    Case(str(EX / "shelf-bracket" / "bracket.py"), "will it survive a 1 m drop and hold a 10 kg shelf?", "part",
+         "parametric", ("drop", "stress")),
+    Case(str(PARTS / "enclosure_shell.step"), "will it survive a drop and stay under 60 C at 5 W?", "part", "step",
+         ("drop", "heat")),
+    Case(str(PARTS / "drone_arm_truss.step"), "will it hold 200 N and not resonate at 3000 rpm?", "part", "step",
+         ("stress", "vibration")),
+    Case(str(PARTS / "enclosure_shell.step"), "will it survive a 1.2 m drop onto tile?", "part", "step", ("drop",)),
+    Case(str(EX / "drone-arm" / "arm.py"), "it is bolted at the base, will it hold 20 N and survive a 1 m drop?",
+         "part", "parametric", ("stress", "drop")),
     # circuits: netlists and circuits in words
     Case("", "will a blue LED on 5V with a 47 ohm resistor fry?", "circuit", "led", ("ratings",)),
     Case("buck converter from 12 V to 3.3 V at 2 A", "how big is the ripple?", "circuit", "buck", ("transient",)),

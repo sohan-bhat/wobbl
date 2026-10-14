@@ -9,7 +9,7 @@ def heat(job):
     from .study import run_thermal
     from .tools import read_thermal_question, study_from
 
-    r = read_thermal_question(job.question)
+    r = read_thermal_question(job.focus)
     power = job.value("power") or r.get("power")
     if not power:
         raise ValueError("the question has no heat load I can read. Say it like '12 W', or pass --power '12 W'")
@@ -35,6 +35,7 @@ def heat(job):
                     job.values("fixed-temp"), duration, limit, job.number("radiation", 0.0) or 0.0, job.question,
                     job.value("quality") or "normal")
     job.situate(environment={"ambient": ambient, "cooling": films}, loads=[f"{power} of heat"])
+    job.ready()
     o = run_thermal(st, job.out, job.log)
     if o.values.get("limit_C") is not None:
         job.criterion("temperature", "t_max_C", o.values["limit_C"], "max")
@@ -43,7 +44,7 @@ def heat(job):
 
 register(Analysis(
     "part", "heat", "Steady or transient heat: the hottest point against a temperature limit", heat,
-    kinds=PART_KINDS, legacy="wobbl thermal",
+    dry=True, kinds=PART_KINDS, legacy="wobbl thermal",
     keywords=(r"overheat", r"\bheat\b(?!\s*sink)", r"\bhot\b", r"temperature", r"thermal", r"\bcool", r"\bwarm",
               r"\b\d+(?:\.\d+)?\s*(?:k?w|watts?)\b", r"\b-?\d+(?:\.\d+)?\s*(?:°\s*)?[cf]\b(?![\w/])",
               r"celsius|fahrenheit|°"),

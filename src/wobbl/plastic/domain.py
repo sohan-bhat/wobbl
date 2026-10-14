@@ -13,6 +13,7 @@ def plastic(job):
                       job.number("target"), job.value("curve") or "auto", base.quality, job.question, base.scale,
                       base.body, base.params, job.flag("keep"))
     job.situate(supports=[f.text for f in base.fixtures], loads=[x.text for x in base.loads])
+    job.ready()
     o = run_plastic(st, job.out, job.log)
     if isinstance(o.values.get("collapse_factor"), (int, float)):
         job.criterion("collapse", "collapse_factor", 1.0, "min")
@@ -21,7 +22,7 @@ def plastic(job):
 
 register(Analysis(
     "part", "plastic", "Past first yield: permanent set after unloading and the load that collapses a metal part",
-    plastic, kinds=PART_KINDS, covers=("stress",), legacy="wobbl plastic",
+    plastic, dry=True, kinds=PART_KINDS, covers=("stress",), legacy="wobbl plastic",
     keywords=(r"\bplastic(?:ity|ally)?\b(?! part)", r"permanent(?:ly)?\s+(?:bend|set|deform)",
               r"bend\w*(?:\s+\w+)?\s+for good",
               r"past yield", r"\bcollapse", r"limit load"),
