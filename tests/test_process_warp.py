@@ -56,6 +56,25 @@ def test_cura_orca_and_prusa_profiles(tmp_path):
 
 @needs_ccx
 @pytest.mark.solver
+def test_a_plate_print_matches_the_plate_formula_and_writes_its_view(tmp_path):
+    from wobbl.process.printing import run_print_warp
+    from wobbl.validation import geometry as G
+
+    part = G.box(tmp_path / "plate.step", 120, 30, 4)
+    o = run_print_warp(W.WarpStudy(str(part), "abs", quality="fast", bed_C=100), tmp_path / "out")
+    assert o.domain == "warp" and o.verdict in ("ok", "marginal", "fails")
+    status = {c.name: c.status for c in o.checks}
+    assert status["hand calculation"] == "pass" and status["balance on the bed"] == "pass"
+    # the face that sat on the bed curls up at its ends: the corners lift as far as the face is out of flat
+    assert o.values["corner_lift_mm"] == pytest.approx(o.values["flatness_mm"], rel=0.05)
+    assert (tmp_path / "out" / "scene.wobbl").exists() and not (tmp_path / "out" / "work").exists()
+    # an enclosure takes the air closer to the glass transition and the warp scales down with the shrinkage
+    warm = run_print_warp(W.WarpStudy(str(part), "abs", quality="fast", chamber_C=60.0), tmp_path / "warm")
+    assert warm.values["flatness_mm"] == pytest.approx(o.values["flatness_mm"] * (105 - 60) / (105 - 25), rel=0.03)
+
+
+@needs_ccx
+@pytest.mark.solver
 def test_a_bonded_strip_curls_as_timoshenko_says(tmp_path):
     from wobbl.geometry.cad import prepare
     from wobbl.mesh.mesher import Sizing, build_mesh

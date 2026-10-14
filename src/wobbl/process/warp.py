@@ -208,6 +208,18 @@ def von_mises(S: np.ndarray) -> np.ndarray:
     return np.sqrt(0.5 * ((sxx - syy) ** 2 + (syy - szz) ** 2 + (szz - sxx) ** 2) + 3 * (sxy ** 2 + syz ** 2 + szx ** 2))
 
 
+def resting(X: np.ndarray, ws: WarpSolve) -> np.ndarray:
+    """The released displacements with the tilt the three holding points leave taken out (the best plane through
+    the face that sat on the bed), and lifted so its lowest point touches z = 0, as the part lies on a table."""
+    P = X[ws.bed]
+    A = np.column_stack([P[:, 0], P[:, 1], np.ones(len(P))])
+    c, *_ = np.linalg.lstsq(A, ws.U_free[ws.bed, 2], rcond=None)
+    U = ws.U_free.copy()
+    U[:, 2] -= X[:, 0] * c[0] + X[:, 1] * c[1] + c[2]
+    U[:, 2] -= U[ws.bed, 2].min()
+    return U
+
+
 def bottom_curvature(X: np.ndarray, ws: WarpSolve) -> tuple[float, float, float]:
     """Curvatures kxx, kyy and the twist kxy of the face that sat on the bed, from a quadratic surface fitted to its
     vertical displacement after release (a fit over the whole face, so no line of nodes picks up a tilt)."""
