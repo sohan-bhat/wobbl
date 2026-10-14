@@ -22,7 +22,7 @@ def test_prune_keeps_what_a_headless_simulation_loads(tmp_path):
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("x" * 10)
     removed = install.prune(root)
-    left = sorted(str(p.relative_to(root)) for p in root.rglob("*") if p.is_file())
+    left = sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
     assert left == ["mujoco.libs/libGL.so", "mujoco/__init__.py", "mujoco/_callbacks.cpython-313-darwin.so",
                     "mujoco/_constants.cpython-313-darwin.so", "mujoco/_enums.cpython-313-darwin.so",
                     "mujoco/_errors.cpython-313-darwin.so", "mujoco/_functions.cpython-313-darwin.so",
