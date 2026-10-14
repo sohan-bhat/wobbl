@@ -3,9 +3,11 @@
 // the fixed versions when there are some, the example's README, and how to run it.
 import Base from '../../layouts/Base.astro';
 import RunCard from '../../components/RunCard.astro';
+import LiveRun from '../../components/LiveRun.astro';
 import FixStrip from '../../components/FixStrip.astro';
 import Term from '../../components/Term.astro';
 import { examples, readmeBody } from '../../lib/examples';
+import { playFor } from '../../lib/playback';
 import { render } from '../../lib/markdown';
 import { hasSim } from '../../lib/sim';
 import { repoUrl, url } from '../../lib/site';
@@ -16,8 +18,9 @@ export function getStaticPaths() {
 }
 const { ex, prev, next } = Astro.props;
 const html = render(readmeBody(ex), `examples/${ex.name}/README.md`).html;
-// a motion example plays its run back above, so the README's charts fold away behind their own titles
-const notes = ex.runs.some(hasSim)
+// a motion example plays its run back above, and so does a strength or heat run, so the README's
+// charts fold away behind their own titles
+const notes = ex.runs.some((r) => hasSim(r) || playFor(ex, r))
   ? html.replace(/<figure>([\s\S]*?alt="([^"]*)"[\s\S]*?)<\/figure>/g,
     (_m, inner: string, alt: string) => `<details class="ex-chart"><summary>${alt}</summary><figure>${inner}</figure></details>`)
   : html;
@@ -36,8 +39,8 @@ const first = ex.runs[0];
     <div class="ex-runs">
       {ex.runs.map((r) => (
         <>
-          <RunCard run={r} />
-          {r.fixes.length > 0 && <FixStrip run={r} />}
+          {playFor(ex, r) ? <LiveRun ex={ex} run={r} /> : <RunCard run={r} />}
+          {r.fixes.length > 0 && !playFor(ex, r) && <FixStrip run={r} />}
         </>
       ))}
     </div>

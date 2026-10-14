@@ -1,0 +1,143 @@
+---
+// A strength or heat run on its example page, played back from its own results: the question, the
+// command, and the part in 3D with the load ramping up (or the temperatures rising over the run's
+// saved times), one live number per part and the verdict once it ends. A run that was fixed plays
+// beside the fix chosen under it. Before the script runs, without WebGL or with reduced motion, the
+// figure shows Wobbl's own heatmap and the final numbers. The checks, the other numbers, the charts
+// and summary.txt sit in a closed toggle under it, and the full report is a link.
+import Term from './Term.astro';
+import { picture } from '../lib/images';
+import { COLOR, metrics, type Example, type Run } from '../lib/examples';
+import { clock, finalValue, firstFix, fmt, meter, pace, panes as panesOf, type Pane, type StrengthRun } from '../lib/playback';
+import { url } from '../lib/site';
+import '../styles/live-run.css';
+
+interface Props { ex: Example; run: Run }
+const { ex, run } = Astro.props;
+const all = panesOf(ex, run);
+const fix = firstFix(all);
+const shown = fix > 0 ? [all[0], all[fix]] : [all[0]];
+const lead = all[0].play;
+const kind = lead.kind;
+const m = meter(lead);
+const p = pace(lead);
+const frac = (v: number) => Math.min(Math.max((v - m.lo) / (m.top - m.lo), 0), 1);
+const pct = (v: number) => `${frac(v) * 100}%`;
+const unit = kind === 'strength' ? 'MPa' : 'C';
+const word = (v: string) => v.toUpperCase();
+const loads = kind === 'strength' ? (lead as StrengthRun).loads : [];
+const loadText = loads.join(' and ');
+// the moment a part passes its limit, when it does: the load at that point (stress scales with it)
+// or the time the run itself reported
+const eventOf = (pane: Pane) => {
+  const q = pane.play;
+  if (q.kind === 'strength') {
+    if (q.governing_MPa <= q.allowable_MPa) return null;
+    const k = q.allowable_MPa / q.governing_MPa;
+    const at = loads.length === 1 ? (() => { const [v, u] = loads[0].split(' '); return `${fmt(Number(v) * k, Number(v) * k < 100 ? 1 : 0)} ${u}`; })()
+      : `${fmt(k * 100)}% of the load`;
+    return { k, text: `${all.length > 1 ? `${pane.name} passes` : 'Passes'} the ${fmt(q.allowable_MPa)} MPa limit at ${at}` };
+  }
+  return q.cross_s != null ? { k: q.cross_s, text: `Passes ${fmt(q.limit_C)} C at ${clock(q.cross_s)}` } : null;
+};
+const event = shown.map(eventOf).find((e) => e) ?? null;
+const label = kind === 'strength' ? 'Load' : 'Time';
+const steady = lead.kind === 'heat' && !lead.transient;
+const total = kind === 'strength' ? loadText : steady ? 'Steady state' : clock(p.span);
+const alt = (name: string) => `Wobbl's ${kind === 'strength' ? 'stress' : 'temperature'} heatmap of the ${ex.title.toLowerCase()}${all.length > 1 ? `, ${name.toLowerCase()}` : ''}`;
+const checks = (run.outcome.checks ?? []).filter((c) => c.status !== 'skip');
+// the convergence chart the site keeps for the bracket; a README's own charts fold away in its notes
+const extra = run.rel === 'shelf-bracket/output' ? ['bracket-convergence'] : [];
+const heatmap = all[0].poster;
+const data = JSON.stringify({
+  kind, fix, pace: p, meter: m, unit, loads, steady, total, title: ex.title.toLowerCase(),
+  panes: all.map((pane) => {
+    const pic = pane.poster ? picture(pane.poster) : null;
+    return { rel: pane.rel, name: pane.name, file: pane.file, run: pane.play, event: eventOf(pane), final: finalValue(pane.play),
+      poster: pic && { src: pic.src, srcset: pic.srcset, width: pic.width, height: pic.height, alt: alt(pane.name) } };
+  }),
+}).replace(/</g, '\\u003c');
+---
+<div class:list={['run', 'lrun-run', { 'lrun-wide': shown.length > 1 }]}>
+  <div class="run-steps">
+    <div class="run-step"><p class="run-label">You ask</p><p class="run-ask">{run.question}</p></div>
+    <div class="run-step"><p class="run-label">Wobbl runs</p><Term code={run.command} /></div>
+  </div>
+  <div class="run-result">
+    <figure class="lrun" data-lrun data-kind={kind} data-panes={shown.length}>
+      <div class="lrun-view" data-state="poster">
+        <div class="lrun-panes">
+          {shown.map((pane, i) => {
+            const pic = pane.poster ? picture(pane.poster) : null;
+            return (
+              <div class="lrun-pane" data-i={i}>
+                {pic && <img class="lrun-poster" src={pic.src} srcset={pic.srcset} sizes={shown.length > 1 ? '(min-width: 1000px) 640px, 100vw' : '(min-width: 1000px) 46vw, 100vw'}
+                             width={pic.width} height={pic.height} loading="lazy" decoding="async" alt={alt(pane.name)} />}
+                {shown.length > 1 && <p class="lrun-name" data-name>{pane.name}</p>}
+                <span class="lrun-mark" hidden aria-hidden="true"><span class="target"></span></span>
+              </div>
+            );
+          })}
+        </div>
+        <p class="lrun-tag" hidden>{p.tag}</p>
+        <button type="button" class="btn-outline btn-sm lrun-replay" hidden>Replay</button>
+        <p class="viewer-status lrun-status" role="status"></p>
+      </div>
+      {all.length > 2 && (
+        <div class="lrun-fixes" role="group" aria-label="Fixed version beside the part as drawn">
+          {all.slice(1).map((pane, i) => (
+            <button type="button" class="btn-outline btn-sm" data-fix={i + 1} aria-pressed={String(i + 1 === fix)}>{pane.name}</button>
+          ))}
+        </div>
+      )}
+      <div class="lrun-read">
+        <p class="lrun-clock"><span class="lrun-k">{label}</span> <span class="lrun-now" data-now>{total}</span><span class="lrun-of" data-of hidden> of {total}</span></p>
+        {shown.map((pane, i) => {
+          const q = pane.play;
+          const v = q.kind === 'strength' ? q.governing_MPa : q.t_max_C;
+          return (
+            <div class="lrun-row" data-row={i}>
+              {shown.length > 1 && <p class="lrun-row-name" data-name>{pane.name}</p>}
+              <div class="lrun-meter" aria-hidden="true">
+                <span class="lrun-fill" data-fill data-level={COLOR[q.verdict] ?? 'marginal'} style={`--f: ${frac(v)}`}></span>
+                {m.marks.map((mk) => <span class="lrun-mk" style={`left: ${pct(mk.at)}`}></span>)}
+              </div>
+              <p class="lrun-n"><span data-n>{finalValue(q)}</span>&nbsp;{unit}</p>
+              <p class="vword lrun-verdict" data-verdict={COLOR[q.verdict] ?? 'marginal'} data-word>{word(q.verdict)}</p>
+              <div class="lrun-ticks" aria-hidden="true">
+                <span style="left: 0">{kind === 'strength' ? '0' : `${fmt(m.lo)} C air`}</span>
+                {m.marks.map((mk) => <span style={`left: ${pct(mk.at)}`}>{mk.text}</span>)}
+              </div>
+            </div>
+          );
+        })}
+        {event && <p class="lrun-event" data-event>{event.text}</p>}
+        <p class="visually-hidden" data-said aria-live="polite"></p>
+      </div>
+      <script type="application/json" data-lrun-data set:html={data}></script>
+    </figure>
+    {run.report && <p class="run-files"><a href={url(run.report)} data-astro-reload data-astro-prefetch="false">Open the full report</a></p>}
+    <details class="lrun-more" data-pagefind-ignore="all">
+      <summary>Checks, numbers and charts</summary>
+      <p class="run-verdict"><span class="vword" data-verdict={COLOR[run.outcome.verdict] ?? 'marginal'}>{word(run.outcome.verdict)}</span><samp class="run-said" translate="no">{run.outcome.headline}</samp></p>
+      <dl class="readout">{metrics(run).map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      {checks.length > 0 && (
+        <ul class="run-checks">{checks.map((c) => <li data-status={c.status}><span class="st">{c.status}</span>{c.name}</li>)}</ul>
+      )}
+      {[...(heatmap ? [heatmap] : []), ...extra].map((name) => {
+        const pic = picture(name);
+        return <img class="lrun-more-img" src={pic.src} srcset={pic.srcset} sizes="(min-width: 1000px) 46vw, 100vw" width={pic.width} height={pic.height}
+                    loading="lazy" decoding="async" alt={name.includes('convergence') ? 'Peak stress at each mesh level, as Wobbl plotted it'
+                      : name.includes('history') ? 'Hottest point and average temperature over the run, as Wobbl plotted them' : alt('As drawn')} />;
+      })}
+      <Term code={run.summary} lang="text" label="summary.txt" />
+    </details>
+  </div>
+</div>
+
+<script>
+  import { initLiveRuns } from '../scripts/live-run';
+  let stop: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => { stop?.(); stop = initLiveRuns(); });
+  document.addEventListener('astro:before-swap', () => { stop?.(); stop = null; });
+</script>
