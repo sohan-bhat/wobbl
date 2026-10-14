@@ -33,6 +33,8 @@ def run_uncertainty(result_dir, vary: list[str], samples: int = 200000, method: 
     num = model.numerical() if numerical else None
     allin = inputs + ([num] if num else [])
     f, info = model.evaluator(allin, progress, solves)
+    # summing a field per load node by node costs more per sample than a scale factor, so fewer samples are drawn
+    samples = min(samples, info.pop("samples_cap", samples))
     if progress:
         progress("sample", f"{samples:,} {'Latin hypercube' if method == 'lhs' else 'Monte Carlo'} samples")
     X = uq.sample(allin, samples, method, seed)

@@ -33,7 +33,8 @@ def test_strength_model_knows_what_it_can_vary(tmp_path):
     m = for_result(d)
     assert isinstance(m, StrengthModel)
     assert m.known["load"].nominal == 2000.0 and m.known["load"].unit == "N"
-    assert m.known["yield"].nominal == 165.0 and m.known["E"].nominal == 72400.0
+    assert m.known["yield"].nominal == 165.0 and m.known["E"].nominal == 72400.0 and m.known["nu"].nominal == 0.33
+    assert "load1" not in m.known      # one load scales on its own, a study with several gets load1, load2 and so on
     assert [i.name for i in m.parse(["load 10%", "strength 8%", "young 3%"])] == ["load", "yield", "E"]
     with pytest.raises(uq.VaryError, match="can vary"):
         m.parse(["thickness 3%"])
@@ -294,6 +295,44 @@ def test_waveform_readings_calibrate_a_resistor(tmp_path):
     assert c["input"] == "r" and c["ci95"][0] < 10.3e3 < c["ci95"][1]
     # the run at 10 kohm, read at the true time constant
     assert r["readings"][1]["simulation"] == pytest.approx(5 * (1 - math.exp(-1.03)), rel=0.01)
+
+
+@pytest.mark.solver
+@needs_ccx
+@pytest.mark.parametrize("material", ["6061-t6", "pla"])
+def test_loads_scatter_one_at_a_time_on_the_final_mesh(parts, tmp_path, material):
+    """With a field per load the sum is exact: any mix of load factors gives the same governing stress and
+    deflection as solving that mix directly, for von Mises (quadratic) and the largest principal stress (pruned)."""
+    import copy
+
+    from wobbl.credibility.resolve import FinalMesh, Superposition
+    from wobbl.structural.pipeline import analyze_strength
+    from wobbl.structural.spec import StructuralStudy, parse_fixture, parse_load
+
+    st = StructuralStudy(parts["cantilever"], material, [parse_load("100 N -z @ x=max"), parse_load("60 N +y @ x=max")],
+                         [parse_fixture("x=min")], quality="fast", budget=120)
+    o = analyze_strength(st, tmp_path / "run", render=False, fixes=False)
+    fm = FinalMesh(tmp_path / "run")
+    try:
+        sup = Superposition(fm)
+        assert sup.quadratic == (material == "6061-t6")
+        gov, disp = sup(np.array([[1.0, 1.0], [1.3, 0.7], [0.5, 2.0]]))
+        assert gov[0] == pytest.approx(o.governing_MPa, rel=1e-5) and disp[0] == pytest.approx(o.max_disp_mm, rel=1e-5)
+        for k, a in enumerate(([1.3, 0.7], [0.5, 2.0]), start=1):
+            loads = [copy.deepcopy(ld) for ld in fm.study.loads]
+            for ld, f in zip(loads, a):
+                ld.magnitude *= f
+            res, meas, _, _ = fm.solve(loads)
+            assert gov[k] == pytest.approx(fm.governing(meas), rel=1e-5)
+            assert disp[k] == pytest.approx(float(res.displacement_magnitude().max()), rel=1e-5)
+    finally:
+        fm.cleanup()
+    if material == "6061-t6":
+        r = run_uncertainty(tmp_path / "run", ["load1 10%", "load2 20%", "nu uniform 0.28..0.36"], samples=20000,
+                            solves=4)
+        assert "one per load" in r["model"]["method"] and "Poisson" in r["model"]["method"]
+        names = {x["input"]: x["total"] for x in r["sensitivity"]["indices"]}
+        assert names["load1"] > names["load2"] > names["nu"]
 
 
 @pytest.mark.solver
