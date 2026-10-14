@@ -429,16 +429,18 @@ def remote():
 @click.option("--root", default="wobbl-jobs", show_default=True, help="Folder for jobs, relative to the home.")
 @click.option("--port", type=int, default=None)
 @click.option("--ccx", default="", help="CalculiX on the remote, when it is not on its PATH.")
-def remote_add(name, host, root, port, ccx):
+@click.option("--wobbl", default="", help="Wobbl on the remote, when it is not on its PATH, e.g. '~/venv/bin/wobbl'.")
+def remote_add(name, host, root, port, ccx, wobbl):
     """Add a machine, e.g. wobbl remote add workstation me@192.168.1.20."""
     from ..jobs import remote as R
 
     try:
-        e = R.add(name, host, root, port, ccx)
+        e = R.add(name, host, root, port, ccx, wobbl=wobbl)
     except (R.RemoteError, OSError) as err:
         ui.fail(str(err), "Check that ssh reaches it without a password prompt, for example ssh " + host + " true")
     ui.console.print(f"  added {name} with {e.get('cores')} cores, {float(e.get('ram') or 0) / 1e9:.0f} GB, "
-                     f"CalculiX {'at ' + e['ccx'] if e.get('ccx') else 'not found, so pass --ccx'}")
+                     f"CalculiX {'at ' + e['ccx'] if e.get('ccx') else 'not found, so pass --ccx'}, "
+                     f"Wobbl {'at ' + e['wobbl'] if e.get('wobbl') else 'not found, so pass --wobbl'}")
 
 
 @remote.command(name="list")

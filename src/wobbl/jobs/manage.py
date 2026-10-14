@@ -71,6 +71,23 @@ def job_name(args: list[str]) -> str:
     return w.command.split()[-1]
 
 
+def shown(job: Job) -> str:
+    """What a job runs, as a person would say it: the deck, the simulate question, or the Wobbl command."""
+    if job.kind != "wobbl":
+        return Path(job.input).name
+    a = job.args
+    if a[:2] == ["jobs", "run-plan"] and len(a) > 2:
+        q = a[a.index("--question") + 1] if "--question" in a else ""
+        return f"simulate {Path(a[2]).name}" + (f' "{q}"' if q else "")
+    words, skip = [], False
+    for x in a:                     # the result folder is where it goes, not what it runs
+        if skip or x in ("-o", "--out") or x.startswith("--out="):
+            skip = x in ("-o", "--out")
+            continue
+        words.append(Path(x).name if Path(x).is_absolute() else x)
+    return "wobbl " + " ".join(words[:6]) + (" ..." if len(words) > 6 else "")
+
+
 def find(job_id: str = "") -> Job:
     if job_id:
         return Job.load(job_id)
@@ -620,7 +637,7 @@ def describe(job: Job, st: dict | None = None) -> dict:
     st = st if st is not None else (job.status() if job.runner == "local" else
                                     json.loads((job.folder / "status.json").read_text()))
     est = job.estimate or {}
-    out = {"job_id": job.id, "kind": job.kind, "input": job.input, "runner": job.runner, "threads": job.threads,
+    out = {"job_id": job.id, "kind": job.kind, "input": shown(job), "runner": job.runner, "threads": job.threads,
            "state": st.get("state"), "progress": st.get("progress"), "detail": st.get("detail", ""),
            "elapsed": duration(st.get("elapsed_s") or 0.0), "report": str(job.folder / "report.html"),
            "log": str(job.folder / "solver.log"), "restarts": job.restarts}
@@ -740,8 +757,13 @@ def list_jobs() -> list[dict]:
     for j in all_jobs():
         st = j.status() if j.runner == "local" else (json.loads((j.folder / "status.json").read_text())
                                                      if (j.folder / "status.json").exists() else {})
+        if j.runner != "local" and st.get("state") in ACTIVE:
+            try:            # a remote job is asked how it is going, since nothing here watches it
+                st = _remote_status(j)
+            except (R.RemoteError, KeyError, OSError):
+                pass
         out.append({"job_id": j.id, "state": st.get("state"), "progress": st.get("progress"), "runner": j.runner,
-                    "input": Path(j.input).name if j.kind != "wobbl" else j.input, "created": j.created})
+                    "input": shown(j), "created": j.created})
     return out
 
 

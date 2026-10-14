@@ -79,7 +79,12 @@ def test_a_motion_job_runs_from_any_folder_and_teaches_the_next_estimate(home, m
 def test_a_command_runs_on_a_remote_with_its_inputs_and_comes_back(home):
     remote.add("box", f"local:{home / 'far'}", wobbl=f"{sys.executable} -m wobbl")
     r = manage.start("", ["motion", "rocket.toml"], on="box")
-    assert r["runner"] == "box"
+    assert r["runner"] == "box" and r["input"] == "wobbl motion rocket.toml"
+    for _ in range(480):            # listing the jobs is enough to learn that a remote one finished
+        if manage.list_jobs()[0]["state"] not in ("starting", "running"):
+            break
+        time.sleep(0.5)
+    assert manage.list_jobs()[0]["state"] == "done"
     st = wait(r["job_id"])
     assert st["state"] == "done", manage.logs(r["job_id"])
     far = home / "far" / r["job_id"]
