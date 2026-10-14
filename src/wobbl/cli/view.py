@@ -11,7 +11,7 @@ from . import ui
 
 
 @click.command("view")
-@click.argument("result", type=click.Path(exists=True))
+@click.argument("result", type=click.Path())
 @click.option("--no-open", is_flag=True, help="Print the page's path without opening it.")
 @click.option("--json", "as_json", is_flag=True, help="Print the page's path as JSON.")
 def view(result, no_open, as_json):
@@ -24,6 +24,8 @@ def view(result, no_open, as_json):
     from ..viz.embed import link
 
     d = Path(result)
+    if not d.exists():
+        raise click.BadParameter(f"{d} does not exist", param_hint="RESULT")
     d = d.parent if d.is_file() else d
     page = simulation_view(d / "simulation.json") if (d / "simulation.json").exists() else None
     page = page or attach(d)
