@@ -133,11 +133,18 @@ and blade pass bands, keeping every mode that moves mass 20% clear by default. G
 payload as a mass, because it sets the low modes. A shaker sweep and random vibration go in as
 `wobbl vibration bracket.step -m 6061-t6 --fix "bolt holes" --sine "2 g z 10-500 Hz"` and
 `wobbl vibration bracket.step -m 6061-t6 --fix "bolt holes" --psd gevs-qual --axis z`, which give the peak
-and the 3 sigma stress and, for random input, a fatigue estimate over the test.
+and the 3 sigma stress and, for random input, a fatigue estimate over the test. Any loads, such as an
+unbalanced motor pushing on a pad, sweep as harmonic forces when the band is given alone, as in
+`wobbl vibration bracket.step -m 6061-t6 --fix "bolt holes" --load "5 N z @ top" --sine "10-500 Hz"`.
+Supports, loads and walls work the same way as in a strength study, on any part.
 `wobbl fatigue wobbl-out/bracket --ratio 0 --cycles 1e6` (MCP `fatigue_life`) turns a finished strength
 result into the cycles before a crack starts and a safety factor on stress, a duty cycle goes in as
-`wobbl fatigue wobbl-out/bracket --block "100% x 2e4" --block "60% x 1e6" --repeats 10`, and stresses you
-already know run as `wobbl fatigue --material 4140 --amplitude "200 MPa" --mean "100 MPa" --kt 2 --radius "1 mm"`.
+`wobbl fatigue wobbl-out/bracket --block "100% x 2e4" --block "60% x 1e6" --repeats 10`, a measured load
+history as `wobbl fatigue wobbl-out/bracket --history loads.csv --repeats 1000`, counted by rainflow with
+each value a multiple of the studied load, and a part with no strength run yet as
+`wobbl fatigue bracket.step -m 6061-t6 --fix "bolt holes" --load "300 N down @ top" --ratio -1`, which
+solves it first. Stresses you already know run as
+`wobbl fatigue --material 4140 --amplitude "200 MPa" --mean "100 MPa" --kt 2 --radius "1 mm"`.
 It reads a vibration result folder the same way. Crack growth after a crack starts is a separate question.
 
 When a metal part reaches yield in a strength run, or someone asks whether it will bend for good or
