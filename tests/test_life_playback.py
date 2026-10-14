@@ -30,14 +30,44 @@ def test_quantized_arrays_decode_back():
 def test_surface_keeps_original_nodes():
     from types import SimpleNamespace
 
-    import pyvista as pv
+    from scipy.spatial import ConvexHull
 
-    sphere = pv.Sphere(radius=10, theta_resolution=80, phi_resolution=80).triangulate()
-    tris = sphere.faces.reshape(-1, 4)[:, 1:]
-    mesh = SimpleNamespace(X=np.asarray(sphere.points), tris=tris)
+    rng = np.random.default_rng(4)
+    d = rng.normal(size=(6000, 3))
+    X = 10 * d / np.linalg.norm(d, axis=1, keepdims=True)
+    hull = ConvexHull(X)
+    tris = hull.simplices.copy()
+    flip = np.einsum("ij,ij->i", np.cross(X[tris[:, 1]] - X[tris[:, 0]], X[tris[:, 2]] - X[tris[:, 0]]),
+                     X[tris].mean(1)) < 0
+    tris[flip] = tris[flip][:, ::-1]
+    mesh = SimpleNamespace(X=X, tris=tris)
     pts, faces, nodes = P.surface(mesh, max_vertices=1000)
-    assert len(pts) <= 1100 and faces.max() < len(pts)
+    assert 600 <= len(pts) <= 1000 and faces.max() < len(pts) and len(np.unique(faces)) == len(pts)
     assert np.allclose(mesh.X[nodes], pts)          # every vertex is a node of the mesh, so fields map exactly
+    # still a closed sphere facing out: the triangles add up to most of its area and none points inward
+    n = np.cross(pts[faces[:, 1]] - pts[faces[:, 0]], pts[faces[:, 2]] - pts[faces[:, 0]])
+    assert 0.5 * np.linalg.norm(n, axis=1).sum() > 0.9 * 4 * np.pi * 100
+    assert (np.einsum("ij,ij->i", n, pts[faces].mean(1)) > 0).mean() > 0.99
+
+
+def test_surface_keeps_both_sides_of_a_thin_wall():
+    """A 0.5 mm plate decimated far coarser than its thickness keeps its two faces apart."""
+    from types import SimpleNamespace
+
+    k = 60
+    g = np.linspace(0, 100, k)
+    xx, yy = np.meshgrid(g, g, indexing="ij")
+    top = np.column_stack([xx.ravel(), yy.ravel(), np.full(k * k, 0.5)])
+    X = np.vstack([top, top * [1, 1, 0]])
+    i, j = np.meshgrid(np.arange(k - 1), np.arange(k - 1), indexing="ij")
+    a = (i * k + j).ravel()
+    quads = np.column_stack([a, a + k, a + k + 1, a + 1])
+    up = np.vstack([quads[:, [0, 1, 2]], quads[:, [0, 2, 3]]])
+    tris = np.vstack([up, up[:, ::-1] + k * k])
+    pts, faces, nodes = P.surface(SimpleNamespace(X=X, tris=tris), max_vertices=500)
+    assert set(np.round(pts[:, 2], 3)) == {0.0, 0.5}
+    z = pts[faces][:, :, 2]
+    assert (np.ptp(z, axis=1) == 0).all()         # no triangle spans the wall
 
 
 def test_damage_builds_up_block_by_block(tmp_path):

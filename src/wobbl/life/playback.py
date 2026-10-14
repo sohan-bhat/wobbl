@@ -41,6 +41,99 @@ def quantize(values: np.ndarray, dtype: str = "int16") -> dict:
     return encode(np.round(values / scale).astype(dtype), dtype, scale=scale)
 
 
+def _normals(pts: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    return np.cross(pts[faces[:, 1]] - pts[faces[:, 0]], pts[faces[:, 2]] - pts[faces[:, 0]])
+
+
+def decimate(pts: np.ndarray, faces: np.ndarray, target: int, max_turn: float = 75.0) -> np.ndarray:
+    """Collapse edges of a closed triangle surface until at most target vertices are left; returns its triangles.
+
+    Each collapse moves one end of an edge onto the other, so every vertex left is an original one. The cheapest
+    collapses by Garland and Heckbert's quadric error go first, in rounds of collapses that touch no triangle in
+    common. A collapse is never made when it would pinch the surface (its two ends must share exactly two
+    neighbors) or turn a triangle around it by more than max_turn degrees, so none flips over.
+    """
+    from scipy.sparse import coo_matrix, csr_matrix
+
+    n = len(pts)
+    faces = np.asarray(faces).copy()
+    P4 = np.column_stack([pts, np.ones(n)])
+    fn = _normals(pts, faces)
+    area = np.linalg.norm(fn, axis=1)
+    nu = fn / np.maximum(area, 1e-300)[:, None]
+    plane = np.column_stack([nu, -np.einsum("ij,ij->i", nu, pts[faces[:, 0]])])
+    K = plane[:, :, None] * plane[:, None, :] * area[:, None, None]
+    Q = np.zeros((n, 4, 4))
+    for k in range(3):
+        np.add.at(Q, faces[:, k], K)
+    alive = np.zeros(n, bool)
+    alive[faces.ravel()] = True
+    cos = np.cos(np.radians(max_turn))
+    while alive.sum() > target:
+        nf = len(faces)
+        e = np.sort(faces[:, [0, 1, 1, 2, 2, 0]].reshape(-1, 2), axis=1)
+        key, count = np.unique(e[:, 0].astype(np.int64) * n + e[:, 1], return_counts=True)
+        edges = np.column_stack(np.divmod(key, n))
+        rim = np.zeros(n, bool)
+        rim[edges[count != 2].ravel()] = True
+        edges = edges[~rim[edges].any(1)]
+        a, b = edges.T
+        Qs = Q[a] + Q[b]
+        ca = np.einsum("ij,ijk,ik->i", P4[a], Qs, P4[a])
+        cb = np.einsum("ij,ijk,ik->i", P4[b], Qs, P4[b])
+        keep, drop = np.where(ca <= cb, a, b), np.where(ca <= cb, b, a)
+        # pinching: the ends of an edge inside a closed surface share exactly the two vertices across from it
+        A = coo_matrix((np.ones(2 * len(e)), (e.ravel(), e[:, ::-1].ravel())), shape=(n, n)).tocsr()
+        A.data[:] = 1.0
+        ok = np.asarray(A[a].multiply(A[b]).sum(1)).ravel() == 2
+        # turning: every triangle at the dropped end that survives keeps facing the same way
+        VF = csr_matrix((np.ones(3 * nf), (faces.ravel(), np.repeat(np.arange(nf), 3))), shape=(n, nf))
+        deg = np.diff(VF.indptr)[drop]
+        pair = np.repeat(np.arange(len(edges)), deg)
+        f = VF.indices[np.repeat(VF.indptr[drop], deg) + np.arange(deg.sum()) - np.repeat(np.cumsum(deg) - deg, deg)]
+        old = faces[f]
+        stays = ~(old == keep[pair][:, None]).any(1)
+        moved = np.where(old == drop[pair][:, None], keep[pair][:, None], old)
+        n0, n1 = _normals(pts, old), _normals(pts, moved)
+        turned = stays & (np.einsum("ij,ij->i", n0, n1) <= cos * np.linalg.norm(n0, axis=1) * np.linalg.norm(n1, axis=1))
+        ok &= np.bincount(pair[turned], minlength=len(edges)) == 0
+        cost = np.minimum(ca, cb)
+        length = np.einsum("ij,ij->i", pts[a] - pts[b], pts[a] - pts[b])
+        rank = np.empty(len(edges), np.int64)
+        rank[np.lexsort((length, cost))] = np.arange(len(edges))
+        # choose collapses cheapest first, a few passes of local minima, each blocking the triangles it touches
+        chosen = np.zeros(len(edges), bool)
+        blocked = np.zeros(n, bool)
+        big = np.iinfo(np.int64).max
+        for _ in range(6):
+            live = np.nonzero(ok & ~chosen & ~blocked[a] & ~blocked[b])[0]
+            if len(live) == 0:
+                break
+            low = np.full(n, big)
+            np.minimum.at(low, a[live], rank[live])
+            np.minimum.at(low, b[live], rank[live])
+            ring = np.full(n, big)
+            face_low = low[faces].min(1)
+            for k in range(3):
+                np.minimum.at(ring, faces[:, k], face_low)
+            pick = live[(rank[live] == ring[a[live]]) & (rank[live] == ring[b[live]])]
+            chosen[pick] = True
+            touched = faces[(np.isin(faces, np.r_[a[pick], b[pick]])).any(1)]
+            blocked[touched.ravel()] = True
+        go = np.nonzero(chosen)[0]
+        go = go[np.argsort(rank[go])][:int(alive.sum()) - target]
+        if len(go) == 0:
+            break
+        to = np.arange(n)
+        to[drop[go]] = keep[go]
+        new = to[faces]
+        gone = (new[:, 0] == new[:, 1]) | (new[:, 1] == new[:, 2]) | (new[:, 0] == new[:, 2])
+        np.add.at(Q, keep[go], Q[drop[go]])
+        alive[drop[go]] = False
+        faces = new[~gone]
+    return faces
+
+
 def surface(mesh, max_vertices: int = MAX_VERTICES) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The outer surface as (vertices, triangles, node index of each vertex), decimated when it is large. Decimation
     only removes vertices, so each one left is an original mesh node and carries its fields exactly."""
@@ -49,18 +142,10 @@ def surface(mesh, max_vertices: int = MAX_VERTICES) -> tuple[np.ndarray, np.ndar
     faces = inv.reshape(-1, 3)
     pts = mesh.X[nodes]
     if len(nodes) > max_vertices:
-        try:
-            import pyvista as pv
-
-            poly = pv.PolyData(pts, np.hstack([np.full((len(faces), 1), 3), faces]).ravel())
-            red = poly.decimate_pro(1.0 - max_vertices / len(nodes), preserve_topology=True)
-            from scipy.spatial import cKDTree
-
-            _, idx = cKDTree(pts).query(np.asarray(red.points))
-            keep = red.faces.reshape(-1, 4)[:, 1:]
-            nodes, pts, faces = nodes[idx], pts[idx], keep
-        except Exception:  # noqa: BLE001  a viewer can still play the full surface, only a larger file
-            pass
+        kept = decimate(pts, faces, max_vertices)
+        used, faces = np.unique(kept, return_inverse=True)
+        faces = faces.reshape(-1, 3)
+        nodes, pts = nodes[used], pts[used]
     return pts, faces, nodes
 
 
