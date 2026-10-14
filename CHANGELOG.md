@@ -41,6 +41,22 @@
 - Two new examples, a falling rock and a rocket launch, and six motion
   validation cases against exact closed forms, which make 25 cases in all.
 
+**Credibility evidence**
+- `wobbl uncertainty` carries load, material, geometry and boundary condition
+  scatter through a finished run and returns the probability of failure with
+  its 95% interval, the spread of the answer and Sobol indices. Strength runs
+  scale exactly, and geometry, heat and circuit inputs get new solves and a
+  polynomial chaos surrogate with its leave one out error.
+- `wobbl validate-against` compares a run with gauge, temperature, circuit or
+  scope readings as ASME V&V 20 does, adds the area metric, calibrates the
+  uncertain inputs and says which load attachment the readings favour.
+- `wobbl credibility` writes a V&V 40 style assessment into `report.html` and
+  a standalone `credibility.html`, and `wobbl test-plan` names the fewest
+  physical tests that most reduce the risk. Wobbl supplies the evidence and
+  certifies nothing.
+- Four new agent tools and a skill section, five validation cases,
+  and the cast mount credibility example with clearly synthetic readings.
+
 ## 0.1.1 (2026-10-13)
 
 **Heat**

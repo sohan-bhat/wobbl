@@ -275,10 +275,13 @@ exactly what it added.
 | Cursor | `mcpServers.wobbl` in `~/.cursor/mcp.json` | `~/.cursor/skills/wobbl/SKILL.md` |
 | Gemini CLI | extension at `~/.gemini/extensions/wobbl/` | `WOBBL.md` in the same extension |
 
-The agent gets 15 tools, `inspect_geometry`, `mesh`, `new_study`,
+The agent gets 26 tools, `inspect_geometry`, `mesh`, `new_study`,
 `set_material`, `apply_load`, `add_fixture`, `solve_structural`, `verify`,
-`render`, `suggest_fix`, `quantify_uncertainty`, `solve_thermal`,
-`solve_circuit`, `solve_motion` and `list_materials`.
+`render`, `suggest_fix`, `quantify_uncertainty`, `validate_against_tests`,
+`assess_credibility`, `plan_tests`, `solve_thermal`, `solve_circuit`,
+`solve_motion`, `solve_motor`, `solve_flame`, `solve_propellant`, `solve_flow`,
+`solve_buckling`, `solve_vibration`, `fatigue_life`, `solve_plastic` and
+`list_materials`.
 Results are compact JSON with image and report paths. The skill teaches the
 workflow and what never to skip, which means reading the checks before the number,
 never quoting an excluded peak and making the supports match the real build.
@@ -324,9 +327,49 @@ meshing, wall thickness sampling and the budget are all deterministic. The websi
 explains every [check](https://sohan-bhat.github.io/wobbl/guides/results/checks/) and how the
 [confidence](https://sohan-bhat.github.io/wobbl/guides/results/confidence/) is set.
 
+## How far a simulation can stand in for a test
+
+Industry already lets simulation replace some physical tests when the model's
+credibility is shown. Euro NCAP's virtual testing protocol accepts validated models
+in place of part of its test matrix, and ASME V&V 10, V&V 20 and V&V 40 and the
+NAFEMS guidance describe the evidence that takes. Wobbl produces that evidence for
+any finished run and narrows the physical tests to the ones that matter. It does
+not certify anything, and the reviewer decides what the evidence is enough for.
+
+```sh
+wobbl uncertainty wobbl-out/mount --vary "load lognormal 10%" --vary "yield 8%" --vary "E 3%"
+wobbl validate-against wobbl-out/mount readings.csv
+wobbl credibility wobbl-out/mount --influence high --consequence medium
+```
+
+- `wobbl uncertainty` carries load, material, geometry and boundary condition
+  scatter through the run with Latin hypercube sampling. It returns the probability
+  of failure with its 95% interval, the spread of the answer and Sobol indices that
+  rank the inputs. A strength run scales exactly with load, stiffness and strength,
+  so those take seconds and need no new solve. Geometry, heat and circuit inputs get
+  new solves and a polynomial chaos surrogate whose leave one out error is reported.
+- `wobbl validate-against` reads a CSV of strain gauge, displacement, temperature,
+  circuit or scope readings at stated places and loads, computes the ASME V&V 20
+  comparison error and validation uncertainty of each and the area metric, and
+  calibrates the uncertain inputs with stated posterior intervals. For a strength
+  run it also says which load attachment idealization the readings favour.
+- `wobbl credibility` weighs code verification (the validation suite), solution
+  verification (each run's own checks), validation, applicability and the answer's
+  uncertainty against the model's influence and the decision's consequence, in the
+  manner of V&V 40. It adds a credibility section to `report.html` and writes
+  `credibility.html`, a self contained page an engineer can hand to a reviewer.
+- `wobbl test-plan` recommends the smallest set of physical tests that most reduce
+  the risk, with gauge positions, load steps and predicted readings, and says which
+  usual tests the simulation evidence can likely stand in for and which it cannot.
+
+On the [cast mount](examples/cast-mount-credibility) the chance of yielding under a
+10% load scatter and an 8% yield scatter comes out about 1 in 77, the belt pull
+explains 61% of the spread, and the plan asks for a gauged load test, one gauge
+where the two servo idealizations disagree, a load cell in service and coupons.
+
 ## Validation
 
-Thirty three cases with known answers run through the same pipeline you get. Every
+Thirty eight cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
@@ -339,6 +382,7 @@ modeled setup lands within 2%.
 | Motion (free fall, drag fall, a throw, a constant thrust rocket's burnout speed and altitude, parachute descent) | 6 | 0.0000014%, the rocket's burnout altitude |
 | Combustion (methane flame against Turns, LOX and LH2 c* and Isp against NASA CEA, KNSU c* against PROPEP) | 4 | 0.05%, the LOX and LH2 c* |
 | Solid motors (steady Kn against the closed form, a neutral grain's web time, two MIT static fires) | 4 | 9.26%, the impulse of the O3800 static fire, whose peak pressure came out 7% low |
+| Uncertainty and calibration (a cantilever's mean and spread of deflection against lognormal propagation, Ishigami Sobol indices, two calibrations from synthetic data) | 5 | 0.97%, a film coefficient from a cooling curve |
 
 The full table is [on the website](https://sohan-bhat.github.io/wobbl/validation/). Run it yourself with
 `wobbl validate`, which takes about 30 minutes.
@@ -351,6 +395,7 @@ reports, heatmaps and summaries, and each has a page [on the website](https://so
 | Example | Question | Domain |
 |---|---|---|
 | [cast-motor-mount](examples/cast-motor-mount) | Does a cast motor mount meet a safety factor of 2 under a 2 kN belt pull? | strength, remote loads |
+| [cast-mount-credibility](examples/cast-mount-credibility) | How far can simulation stand in for testing that mount, and which tests does it still need? | uncertainty, tests, credibility |
 | [shelf-bracket](examples/shelf-bracket) | Does a printed PLA bracket hold an 8 kg shelf, and what fixes it? | strength, fixes |
 | [motor-mount](examples/motor-mount) | Do the ribs on a printed NEMA 17 mount earn their keep? | strength |
 | [enclosure](examples/enclosure) | Does a PC enclosure survive a thumb press, and how far does it dent? | strength, thin walls |
@@ -397,6 +442,9 @@ Each folder has a `run.sh` that regenerates its outputs.
   once, and erosive burning, throat erosion and slag are flagged but not modeled.
   Against two MIT static fires the predicted peak pressure was 7% low on one and
   12% high on the other.
+- In a strength study's uncertainty the loads scatter together as one factor, the
+  supports stay rigid with the two load attachments as bounds, and Poisson's ratio
+  is fixed, because each of those would need its own solves on the final mesh.
 
 Shell elements, fatigue estimates and bolt preload come next in 0.2, then CFD with
 OpenFOAM in 0.3 and multibody mechanisms with MuJoCo in 0.4.
