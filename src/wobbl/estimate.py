@@ -40,6 +40,7 @@ CCX = {"t_dof": 1.27e-4, "t_flop": 4.5e-9, "t_dof_heat": 2.46e-4, "t_flop_heat":
 FRD_NODE, FRD_ELEMENT = 50.0, 150.0
 FRD_SET = {3: 186.0, 1: 102.0}        # per node per result set: U, RF and S; or NT, RFL and HFL
 INP_NODE, INP_ELEMENT = 60.0, 110.0
+RESTART_NODE = 700.0    # a checkpoint (*RESTART, WRITE, OVERLAY): 350 per tet10 node measured static, 720 hex8 heat
 
 # OpenRadioss: core seconds per element and cycle, from the CCSA's published LS-DYNA run of the 2010 Toyota Yaris
 # (1.52 million elements, 200 ms in 5 h 58 min on 16 processors) at an assumed 1 microsecond step, taken back to
@@ -350,7 +351,7 @@ def compact_sums(n: float) -> tuple[float, float]:
 
 def calculix_cost(nodes: int, elements: int = 0, sample: np.ndarray | None = None, sums: tuple | None = None,
                   dof: int = 3, solves: float = 1.0, outputs: int = 1, procedure: str = "static",
-                  deck_bytes: float = 0.0) -> Cost:
+                  deck_bytes: float = 0.0, checkpoint: bool = False) -> Cost:
     """A CalculiX run of ``solves`` factorizations that writes ``outputs`` result sets."""
     basis = []
     if sums is None:
@@ -371,7 +372,7 @@ def calculix_cost(nodes: int, elements: int = 0, sample: np.ndarray | None = Non
         mem += CCX["m_transient"]          # a transient heat run holds about this much more, whatever its size
     elements = elements or int(nodes / 1.9)
     disk = (deck_bytes or INP_NODE * nodes + INP_ELEMENT * elements) + FRD_NODE * nodes + FRD_ELEMENT * elements \
-        + FRD_SET.get(dof, 186.0) * nodes * max(1, outputs)
+        + FRD_SET.get(dof, 186.0) * nodes * max(1, outputs) + (RESTART_NODE * nodes if checkpoint else 0.0)
     basis.append(f"CalculiX cost from the mesh's nested dissection, fit on {REFERENCE}.")
     size = {"nodes": int(nodes), "elements": int(elements), "dof": int(dof * nodes), "solves": round(solves, 1),
             "result_sets": int(outputs)}
@@ -433,7 +434,7 @@ def step_increments(step) -> tuple[float, float, str]:
     return 1.0, 1.0, ""
 
 
-def deck_cost(deck) -> Cost:
+def deck_cost(deck, checkpoint: bool = False) -> Cost:
     """The cost of a deck read by ``wobbl.decks``."""
     if deck.solver == "calculix":
         heat = bool(deck.steps) and all(s.procedure.startswith("heat") for s in deck.steps)
@@ -446,7 +447,8 @@ def deck_cost(deck) -> Cost:
                 notes.append(note)
         procs = sorted({s.procedure for s in deck.steps}) or ["static"]
         c = calculix_cost(deck.nodes, deck.n_elements, deck.sample, dof=1 if heat else 3, solves=max(1.0, solves),
-                          outputs=max(1, outputs), procedure=", ".join(procs), deck_bytes=deck.bytes)
+                          outputs=max(1, outputs), procedure=", ".join(procs), deck_bytes=deck.bytes,
+                          checkpoint=checkpoint)
         if notes:
             c.basis.append("The deck asks for " + ", then ".join(notes[:3]) + ". Results saved at every increment are "
                            "counted on disk.")
@@ -622,12 +624,14 @@ def advise(est: Estimate, max_hours: float | None = None) -> list[dict]:
 
 
 # ------------------------------------------------------------------------------------------------ entry points
-def estimate_deck(path: str | Path, machine: Machine | None = None, max_hours: float | None = None) -> Estimate:
+def estimate_deck(path: str | Path, machine: Machine | None = None, max_hours: float | None = None,
+                  checkpoint: bool = False) -> Estimate:
     """Read a deck or an OpenFOAM case without loading it and predict its run."""
     from .decks import read_deck
 
     deck = read_deck(path)
-    est = predict(deck_cost(deck), machine or this_machine(Path(path).resolve().parent), max_hours, str(path))
+    est = predict(deck_cost(deck, checkpoint), machine or this_machine(Path(path).resolve().parent), max_hours,
+                  str(path))
     est.basis += deck.notes
     return est
 
