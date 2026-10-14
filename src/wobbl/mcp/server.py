@@ -465,16 +465,20 @@ def build_server():
         return solve_casting_tool(path, alloy, risers, chills, mold, pour, mold_temp, quality)
 
     @srv.tool()
-    def grow_crack(path: str, material: str, loads: list[str], fixtures: list[str], crack: str, r_ratio: float = 0.1,
+    def grow_crack(path: str, material: str = "", loads: list[str] | None = None,
+                   fixtures: list[str] | None = None, crack: str = "auto", r_ratio: float | None = None,
                    spectrum: str = "", law: str = "nasgro", growth: str = "", kc: float | None = None,
                    wheeler: float = 0.0, target_life: float | None = None, max_pof: float = 0.01,
                    detectable: str = "1.27 mm", samples: int = 20000, steps: int = 12, budget: float = 1200.0,
                    quality: str = "normal", question: str = "") -> dict:
-        """Fatigue crack growth with CalculiX: cuts a crack into the part, e.g. crack='through 1.27 mm at hole d=8',
-        'corner 1 mm at hole d=8' or 'surface a=1 c=2 at hottest', reads K_I, K_II and K_III along the front, turns
-        and advances it step by step with remeshing, so the path comes from the geometry, and integrates the NASGRO
-        or Paris law (material needs crack growth data, e.g. 7075-t6, or growth='C=..,n=..,dkth=..,kic=..'). Loads
-        are the peak of each cycle, as in solve_structural, with r_ratio or a spectrum file of 'max,min' factors.
+        """Fatigue crack growth with CalculiX. path is a CAD file, or a strength or fatigue result_dir, whose part,
+        material, loads, fixtures, governing point and duty cycle it reuses. crack='auto' starts the damage
+        tolerance flaw at the most stressed point; or 'auto at 30,0,5', 'through 1.27 mm at hole d=8', 'corner 1 mm
+        at hole d=8', 'surface a=1 c=2 at hottest'. Reads K_I, K_II and K_III along the front, turns and advances it
+        step by step with remeshing, so the path comes from the geometry, and integrates the NASGRO or Paris law
+        (metals without data get constants estimated from their stiffness; growth='C=..,n=..,dkth=..,kic=..'
+        overrides). Loads are the peak of each cycle, with r_ratio, a spectrum file of 'max,min' factors or
+        blocks like '100% x 3650 R=0; 70% x 1e8 R=0.7'.
         Returns the nominal life, B50, B10 and B1 from a Monte Carlo over the starting flaw, growth constants, load
         and toughness, the probability of failing before target_life, inspection times, where the crack starts,
         checks (SIF mesh convergence, handbook K, force balance, integration step, sample count), fixes and the

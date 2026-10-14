@@ -11,8 +11,9 @@ def _r(x, digits: int = 0):
     return round(float(x), digits) if x is not None and math.isfinite(float(x)) else None
 
 
-def grow_crack_tool(path: str, material: str, loads: list[str], fixtures: list[str], crack: str,
-                    r_ratio: float = 0.1, spectrum: str = "", law: str = "nasgro", growth: str = "",
+def grow_crack_tool(path: str, material: str = "", loads: list[str] | None = None,
+                    fixtures: list[str] | None = None, crack: str = "auto",
+                    r_ratio: float | None = None, spectrum: str = "", law: str = "nasgro", growth: str = "",
                     kc: float | None = None, wheeler: float = 0.0, target_life: float | None = None,
                     max_pof: float = 0.01, detectable: str = "1.27 mm", samples: int = 20000, steps: int = 12,
                     budget: float = 1200.0, quality: str = "normal", question: str = "") -> dict:
@@ -25,7 +26,7 @@ def grow_crack_tool(path: str, material: str, loads: list[str], fixtures: list[s
                                 r_ratio=r_ratio, spectrum=spectrum, law=law, growth=growth, kc=kc, wheeler=wheeler,
                                 target_life=target_life, max_pof=max_pof, samples=samples, steps=steps, budget=budget,
                                 quality=quality, question=question)
-        out = wobbl_home() / "results" / f"{Path(path).stem}-crack-{uuid.uuid4().hex[:6]}"
+        out = wobbl_home() / "results" / f"{Path(path).name}-crack-{uuid.uuid4().hex[:6]}"
         o = run_fracture(st, out)
     except Exception as e:  # noqa: BLE001
         hint = getattr(e, "hint", "")

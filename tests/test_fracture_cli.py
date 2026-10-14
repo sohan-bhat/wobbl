@@ -29,3 +29,18 @@ def test_cli_and_mcp_offer_crack_growth():
 
     names = {t.name for t in asyncio.run(build_server().list_tools())}
     assert "grow_crack" in names
+
+
+def test_studies_start_from_strength_and_fatigue_results():
+    from pathlib import Path
+
+    from wobbl.fracture.api import result_inputs
+
+    root = Path(__file__).resolve().parents[1] / "examples"
+    got = result_inputs(root / "cast-motor-mount" / "output")
+    assert Path(got["part"]).exists() and got["material"].startswith("custom:") and got["fixtures"] == ["fixed z=min"]
+    st = study_from_options(str(root / "motor-mount-fatigue" / "output"))
+    assert st.crack.shape == "auto" and st.crack.where.startswith("43.8")
+    assert "70% x 1e8" in st.spectrum and st.target_life == pytest.approx(10 * (3650 + 1e8))
+    st = study_from_options(str(root / "shelf-bracket" / "output"), material="6061-t6", crack="corner 1 mm at 5,5,5")
+    assert st.material == "6061-t6" and st.crack.shape == "corner" and st.loads
