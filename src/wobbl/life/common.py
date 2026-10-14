@@ -64,6 +64,8 @@ def resolve_fixtures(base: StructuralStudy, features) -> tuple[list, dict]:
 
 
 CURVATURE = 8      # elements around a full circle: enough for the stiffness and mass a hole takes away
+COARSEST = 6       # the fewest a first mesh may use, where quadratic elements still follow a hole's curve
+CEILING = 300000   # nodes no level goes past, whatever it takes to show convergence
 
 
 def level_sizes(p: Prepared, quality: str, mesh_size: float | None = None) -> list[Sizing]:
@@ -73,7 +75,8 @@ def level_sizes(p: Prepared, quality: str, mesh_size: float | None = None) -> li
     first = max(8000, int(q["nodes"] / (1 / REFINE ** 3) ** (q["levels"] - 1)))
     s = auto_sizing(p.prep, thickness=p.features.thickness_typical, max_nodes=first)
     h = float(mesh_size) if mesh_size else min(s.h, 1.5 * p.features.thickness_typical)
-    return [Sizing(h=h * REFINE ** k, curvature=CURVATURE) for k in range(q["levels"])]
+    # each level refines holes and fillets with the rest, so convergence tests the curved features too
+    return [Sizing(h=h * REFINE ** k, curvature=CURVATURE / REFINE ** k) for k in range(q["levels"])]
 
 
 def fit_first(p: Prepared, sz: Sizing, mesh, cap: int):
@@ -86,25 +89,34 @@ def fit_first(p: Prepared, sz: Sizing, mesh, cap: int):
     room = cap * REFINE ** 3
     if mesh.n_nodes <= room:
         return sz, mesh
+    best = (sz, mesh)
     top = 3.0 * p.features.thickness_typical
-    if sz.h >= top:
-        return sz, mesh
-    h = min(top, sz.h * (mesh.n_nodes / room) ** 0.5)
-    coarse = Sizing(h=h, curvature=sz.curvature)
-    m2 = build_mesh(p.prep, coarse)
-    return (coarse, m2) if m2.n_nodes < mesh.n_nodes else (sz, mesh)
+    h = min(top, sz.h * (mesh.n_nodes / room) ** 0.5) if sz.h < top else sz.h
+    # holes and fillets can hold most of the nodes, so a coarser circle goes with the coarser size
+    for coarse in (Sizing(h=h, curvature=sz.curvature), Sizing(h=h, curvature=min(sz.curvature, COARSEST))):
+        if coarse.h == sz.h and coarse.curvature == sz.curvature:
+            continue
+        m2 = build_mesh(p.prep, coarse)
+        if m2.n_nodes < best[1].n_nodes:
+            best = (coarse, m2)
+        if best[1].n_nodes <= room:
+            break
+    return best
 
 
 def next_sizing(planned: Sizing, prev: Sizing, n_prev: int, cap: int) -> Sizing | None:
     """The size for the next level: the planned one when its mesh fits under the node cap, else a smaller step that
-    lands near the cap. None when even that step would add too few nodes to say anything about convergence (a
-    thin walled part whose first mesh is already large)."""
+    lands near the cap. When nothing finer fits under the cap at all, as on a part whose holes and fillets fill the
+    first mesh, the second mesh may go up to 2.5 times past it, because a single mesh cannot show convergence, and
+    past a first mesh already that large, to 1.6 times its nodes, never beyond CEILING. None when even that step would
+    be under 10% finer."""
     if n_prev * (prev.h / planned.h) ** 3 <= cap:
         return planned
-    f = (cap / n_prev) ** (1 / 3)      # how many times finer the cap lets the next mesh be
-    if f < 1 / 0.9:                    # under 10% finer says nothing about convergence
-        return None
-    return Sizing(h=prev.h / f, curvature=prev.curvature)
+    for limit in (cap, 2.5 * cap, min(CEILING, 1.6 * n_prev)):
+        f = (limit / n_prev) ** (1 / 3)      # how many times finer the limit lets the next mesh be
+        if f >= 1 / 0.9:
+            return Sizing(h=prev.h / f, curvature=prev.curvature * min(f, 1 / REFINE))
+    return None
 
 
 def excluded_nodes(mesh, built, features, sizing: Sizing, measure: np.ndarray) -> tuple[np.ndarray, float]:
