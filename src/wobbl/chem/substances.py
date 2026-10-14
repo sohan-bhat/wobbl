@@ -8,7 +8,7 @@ Vinegar and the like are solutions, so they carry what is dissolved and how much
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
