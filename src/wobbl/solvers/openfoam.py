@@ -68,9 +68,12 @@ class OpenFOAM(SolverAdapter):
         return env
 
     def run(self, app: str, case: str | Path, args: tuple[str, ...] = (), timeout: float = 1800,
-            log_name: str = "", check: bool = True) -> str:
+            log_name: str = "", check: bool = True, watch=None) -> str:
         """Run one OpenFOAM program on a case and return its log. A non zero exit or a FOAM FATAL ERROR raises,
-        quoting the error, unless check is False (checkMesh exits non zero when the grid fails a check)."""
+        quoting the error, unless check is False (checkMesh exits non zero when the grid fails a check).
+
+        watch(case) is called every two seconds while the program runs; once it returns True the run is told to
+        write its fields and stop, which a solver whose controlDict is runTimeModifiable does at its next step."""
         exe = bin_dir(self.root()) / app if self.root() else None
         if exe is None or not exe.exists():
             self.require()
@@ -79,12 +82,30 @@ class OpenFOAM(SolverAdapter):
         log_path = case / f"log.{log_name or app}"
         t0 = time.time()
         with open(log_path, "w") as lf:
-            try:
-                p = subprocess.run([str(exe), "-case", str(case), *args], stdout=lf, stderr=subprocess.STDOUT,
-                                   timeout=timeout, env=self.env(), stdin=subprocess.DEVNULL)
-            except subprocess.TimeoutExpired:
-                raise SolverError(f"{app} did not finish within {timeout:.0f} s",
-                                  "Use a coarser grid or a shorter run") from None
+            p = subprocess.Popen([str(exe), "-case", str(case), *args], stdout=lf, stderr=subprocess.STDOUT,
+                                 env=self.env(), stdin=subprocess.DEVNULL)
+            told = False
+            while p.poll() is None:
+                try:
+                    p.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    pass
+                if p.poll() is not None:
+                    break
+                if time.time() - t0 > timeout:
+                    p.kill()
+                    p.wait()
+                    raise SolverError(f"{app} did not finish within {timeout:.0f} s",
+                                      "Use a coarser grid or a shorter run")
+                if watch is not None and not told:
+                    try:
+                        done = watch(case)
+                    except Exception:  # noqa: BLE001  a watcher that cannot read yet just waits
+                        done = False
+                    if done:
+                        cd = case / "system" / "controlDict"
+                        cd.write_text(re.sub(r"stopAt\s+\w+;", "stopAt writeNow;", cd.read_text()))
+                        told = True
         log = log_path.read_text(errors="replace")
         if check and (p.returncode != 0 or "FOAM FATAL" in log):
             m = re.search(r"--> FOAM FATAL.*?(?=\n\n|\Z)", log, re.S)

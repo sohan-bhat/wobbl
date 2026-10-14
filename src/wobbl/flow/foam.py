@@ -17,7 +17,8 @@ from pathlib import Path
 
 import numpy as np
 
-HEADER = "FoamFile\n{{\n    version     2.0;\n    format      ascii;\n    class       {cls};\n    object      {obj};\n}}\n\n"
+HEADER = ("FoamFile\n{{\n    version     2.0;\n    format      ascii;\n    class       {cls};\n"
+          "    object      {obj};\n}}\n\n")
 PRANDTL_T = 0.85      # turbulent Prandtl number
 
 
@@ -97,9 +98,10 @@ class Case:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(HEADER.format(cls=cls, obj=obj) + (entries(body) if isinstance(body, dict) else body))
 
-    def run(self, app: str, *args: str, timeout: float = 1800, log_name: str = "", check: bool = True) -> str:
+    def run(self, app: str, *args: str, timeout: float = 1800, log_name: str = "", check: bool = True,
+            watch=None) -> str:
         from ..solvers.base import get
-        return get("openfoam").run(app, self.root, args, timeout, log_name, check)
+        return get("openfoam").run(app, self.root, args, timeout, log_name, check, watch)
 
     def clean(self):
         shutil.rmtree(self.root, ignore_errors=True)
