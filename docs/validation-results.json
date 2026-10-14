@@ -690,6 +690,26 @@
   "wall_s": 27.8
  },
  {
+  "id": "sdof-force",
+  "title": "Tip mass on a strip pushed through resonance by a swept force",
+  "domain": "vibration",
+  "source": "single degree of freedom, X = F / (k 2 zeta sqrt(1 - zeta^2))",
+  "quantity": "peak motion of the mass",
+  "unit": "mm",
+  "expected": 5.2093753126042035,
+  "wobbl": 5.192085658352728,
+  "error": 0.0033189496271544094,
+  "tolerance": 0.02,
+  "pass": true,
+  "exact_theory": false,
+  "confidence": "high",
+  "levels": 2,
+  "nodes": 5101,
+  "time_s": 66.0,
+  "peak_Hz": 5.9603,
+  "wall_s": 71.0
+ },
+ {
   "id": "shigley-fatigue",
   "title": "Shigley Example 6-2, 1050 HR steel at 55 kpsi",
   "domain": "fatigue",

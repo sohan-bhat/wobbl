@@ -115,6 +115,10 @@
     "group": "Buckling, vibration and fatigue",
     "plain": "A heavy weight on the end of a strip, shaken at the base through resonance, and how far the weight swings"
   },
+  "sdof-force": {
+    "group": "Buckling, vibration and fatigue",
+    "plain": "The same weight on the strip, now pushed at the tip by a force swept through resonance, and how far it swings"
+  },
   "shigley-fatigue": {
     "group": "Buckling, vibration and fatigue",
     "plain": "Shigley’s textbook example of a polished steel bar bent back and forth, and how many cycles it lasts"

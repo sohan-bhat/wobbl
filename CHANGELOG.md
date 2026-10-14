@@ -39,12 +39,20 @@
   stress from a strength or vibration result or from given stresses, with
   sourced S-N data per material, Marin factors, notch sensitivity, Goodman,
   Gerber or Soderberg and Miner's rule for a duty cycle.
+- All three take any part with any supports and loads, walls included. A sine
+  band alone sweeps the loads themselves as harmonic forces, with modal forces
+  from CalculiX's static solution under them. Fatigue reads a measured load
+  history by rainflow counting (ASTM E1049), and runs the strength study first
+  when it is given a part rather than a result. Loads that only stretch a part
+  get a plain answer that it does not buckle.
+- They run through `wobbl simulate`, with the old commands kept, and Python
+  callers get `wobbl.life.api.buckling`, `vibration` and `fatigue`.
 - Agents get `solve_buckling`, `solve_vibration` and `fatigue_life`. Nothing new
   is downloaded, since they run on the CalculiX strength uses.
-- Five validation cases, Euler's column, a cantilever's and a plate's modes, a
-  sine peak on a tip mass and Shigley's fatigue example, and three examples, a
-  drone arm's resonance, a strut's buckling and a motor mount's fatigue, each
-  with a `playback.json` for the website to animate.
+- Six validation cases, Euler's column, a cantilever's and a plate's modes, a
+  sine peak on a tip mass, a force swept through resonance and Shigley's fatigue
+  example, and three examples, a drone arm's resonance, a strut's buckling and a
+  motor mount's fatigue, each with a `playback.json` for the website to animate.
 
 **Rocket motors and combustion**
 - `wobbl motor` burns a solid motor design back to its thrust curve, from
