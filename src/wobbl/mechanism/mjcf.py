@@ -92,7 +92,7 @@ def to_mjcf(m: Mechanism) -> str:
                 if not b.collide:
                     g.set("contype", "0")
                     g.set("conaffinity", "0")
-            for pm in (p for p in m.masses if p.body == b.name):
+            for pm in (p for p in m.masses if p.body == b.name and p.mass > 0):
                 r = pm.radius or (3 * pm.mass / (4 * math.pi * POINT_DENSITY)) ** (1 / 3)
                 g = ET.SubElement(e, "geom", name=pm.name, type="sphere", size=f"{r:.9g}", pos=_f(pm.pos),
                                   mass=f"{pm.mass:.9g}", rgba="0.85 0.86 0.88 1")
