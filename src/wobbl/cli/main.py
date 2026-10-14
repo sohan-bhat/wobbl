@@ -421,10 +421,11 @@ def mcp():
 def _register():
     from .admin import doctor, setup, uninstall
     from .circuits import circuit
+    from .credibility import uncertainty
     from .motion import motion
     from .thermal import thermal
 
-    for c in (setup, doctor, uninstall, thermal, circuit, motion):
+    for c in (setup, doctor, uninstall, thermal, circuit, motion, uncertainty):
         cli.add_command(c)
 
 

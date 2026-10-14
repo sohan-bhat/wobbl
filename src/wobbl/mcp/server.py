@@ -138,6 +138,16 @@ def build_server():
         return solve_motion_tool(spec, name, mass, density, diameter, cd, height, speed, angle, wind, question)
 
     @srv.tool()
+    def quantify_uncertainty(result_dir: str, vary: list[str], samples: int = 200000,
+                             solves: int | None = None) -> dict:
+        """Carry input scatter through a finished study. vary lists inputs with their scatter, e.g. ['load 10%',
+        'yield 8%', 'E uniform 70000..75000', 'thickness tol 0.2', 'film uniform 3..8']. Returns the probability
+        of failure with its 95% interval, the spread of the answer and Sobol indices ranking the inputs. Load,
+        stiffness and strength scatter on a strength study scale the solution exactly and take seconds; geometry,
+        heat and circuit inputs need new solves and a surrogate whose error is reported."""
+        return tools.quantify_uncertainty(result_dir, vary, samples, solves)
+
+    @srv.tool()
     def list_materials() -> dict:
         """Built in materials with stiffness, strength limit, density, conductivity and temperature limit."""
         return tools.list_materials()

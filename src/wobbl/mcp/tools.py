@@ -275,6 +275,28 @@ def _input_fixes(d: dict, apply: bool) -> dict:
     return out
 
 
+def quantify_uncertainty(result_dir: str, vary: list[str], samples: int = 200000, solves: int | None = None) -> dict:
+    """Carry input scatter through a finished study: distributions, probability of failure and Sobol indices."""
+    from ..credibility import uq
+    from ..credibility.uncertainty import run_uncertainty
+
+    try:
+        r = run_uncertainty(result_dir, vary, samples, solves=solves)
+    except Exception as e:  # noqa: BLE001
+        return _err(e)
+    return {"headline": r["headline"], "model": r["model"]["method"],
+            "probability": {k: {"value": p["value"], "ci95": p["ci95"], "against": p["against"],
+                                "in_words": uq.odds(p)} for k, p in r["probability"].items()},
+            "outputs": {k: {x: round(v[x], 6) for x in ("mean", "sd", "p05", "p95")} | {"unit": v["unit"]}
+                        for k, v in r["outputs"].items()},
+            "sensitivity": [{"input": x["input"], "first_order": round(x["first_order"], 4),
+                             "total": round(x["total"], 4)} for x in r["sensitivity"]["indices"]],
+            "alternatives": [{"label": a["label"], "probability": a["probability"]["value"]}
+                             for a in r.get("alternatives", [])],
+            "files": {"uncertainty": str(Path(result_dir) / "uncertainty.json"),
+                      "report": str(Path(result_dir) / "report.html")}}
+
+
 def list_materials() -> dict:
     from ..materials import all_materials
 
