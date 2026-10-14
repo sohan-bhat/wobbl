@@ -55,11 +55,11 @@ def vibration(job):
     from .vibspec import VibrationStudy, parse_sine
 
     base, pre = study(job, need_load=False)
-    rpm = job.values("rpm") or _rpm(job.question)
+    rpm = job.values("rpm") or _rpm(job.focus)
     if rpm:
         job.use("rpm", rpm)
     loads = job.values("load")
-    sine = job.value("sine") or sweep_in(job.question, bool(loads), job.value("axis") or "z") or ""
+    sine = job.value("sine") or sweep_in(job.focus, bool(loads), job.value("axis") or "z") or ""
     if sine and not job.value("sine"):
         job.use("sine", sine)
     # loads shake the part only in a sweep of the loads (a band alone); with a base sweep or none they belong to
@@ -106,7 +106,7 @@ def fatigue(job):
     elif job.earlier.get("stress") is not None or job.earlier.get("vibration") is not None:
         prior = job.earlier.get("stress") or job.earlier.get("vibration")
         source = str(getattr(prior, "workdir", "") or prior.get("workdir", ""))
-    cycles = job.value("cycles") or cycles_in(job.question)
+    cycles = job.value("cycles") or cycles_in(job.focus)
     if cycles:
         job.use("cycles", cycles)
     else:
