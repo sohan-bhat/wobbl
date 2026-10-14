@@ -261,6 +261,8 @@ _DOMAIN_WORD.update({"magnetic": "magnetic", "electric": "electric field", "boar
                      "sound": "sound"})
 _RERUN_TOOL.update({"casting": "solve_casting", "molding": "solve_molding", "warp": "solve_print_warp"})
 _DOMAIN_WORD.update({"casting": "casting", "molding": "molding", "warp": "print warp"})
+_RERUN_TOOL.update({"fracture": "grow_crack"})
+_DOMAIN_WORD.update({"fracture": "crack growth"})
 
 
 def suggest_fix(result_dir: str, apply: bool = False, which: list[str] | None = None) -> dict:

@@ -30,7 +30,8 @@ impedance, crosstalk and board parasitics: solve_board. Antennas and wireless ra
 mufflers and panel noise: solve_sound.
 Big problems: estimate_cost before any long solve, and solve_submodel to refine only around a peak. start_job,
 job_status, job_logs, cancel_job and resume_job run a deck in the background or on a remote machine. A cloud run
-starts only after the user agrees to its plan."""
+starts only after the user agrees to its plan.
+Where a fatigue crack goes, when it fails the part and how lives spread over many parts: grow_crack."""
 
 
 def _protect_stdout():
@@ -462,6 +463,25 @@ def build_server():
         place to pass back. Takes two to eight minutes."""
         from ..process.tools import solve_casting_tool
         return solve_casting_tool(path, alloy, risers, chills, mold, pour, mold_temp, quality)
+
+    @srv.tool()
+    def grow_crack(path: str, material: str, loads: list[str], fixtures: list[str], crack: str, r_ratio: float = 0.1,
+                   spectrum: str = "", law: str = "nasgro", growth: str = "", kc: float | None = None,
+                   wheeler: float = 0.0, target_life: float | None = None, max_pof: float = 0.01,
+                   detectable: str = "1.27 mm", samples: int = 20000, steps: int = 12, budget: float = 1200.0,
+                   quality: str = "normal", question: str = "") -> dict:
+        """Fatigue crack growth with CalculiX: cuts a crack into the part, e.g. crack='through 1.27 mm at hole d=8',
+        'corner 1 mm at hole d=8' or 'surface a=1 c=2 at hottest', reads K_I, K_II and K_III along the front, turns
+        and advances it step by step with remeshing, so the path comes from the geometry, and integrates the NASGRO
+        or Paris law (material needs crack growth data, e.g. 7075-t6, or growth='C=..,n=..,dkth=..,kic=..'). Loads
+        are the peak of each cycle, as in solve_structural, with r_ratio or a spectrum file of 'max,min' factors.
+        Returns the nominal life, B50, B10 and B1 from a Monte Carlo over the starting flaw, growth constants, load
+        and toughness, the probability of failing before target_life, inspection times, where the crack starts,
+        checks (SIF mesh convergence, handbook K, force balance, integration step, sample count), fixes and the
+        path image. One part's failure cycle cannot be predicted, only the spread. Takes five to twenty minutes."""
+        from ..fracture.tools import grow_crack_tool
+        return grow_crack_tool(path, material, loads, fixtures, crack, r_ratio, spectrum, law, growth, kc, wheeler,
+                               target_life, max_pof, detectable, samples, steps, budget, quality, question)
 
     @srv.tool()
     def list_materials() -> dict:

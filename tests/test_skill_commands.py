@@ -77,6 +77,11 @@ def check_values(name: str, p: dict):
             template(p["target"], dict(s.split("=", 1) for s in p["sets"]))
         else:
             assert p["target"].endswith((".toml", ".json", ".xml", ".urdf")), p["target"]
+    elif name == "crack":
+        from wobbl.cli.crack import study_from_options
+
+        study_from_options(p["part"], p["material"], p["loads"], p["fixes"], p["crack"], r_ratio=p["r_ratio"],
+                           target_life=p["target_life"])
     elif name.startswith("flow "):
         from wobbl.flow.tools import build
 
@@ -99,7 +104,7 @@ def check_values(name: str, p: dict):
 def test_the_skill_names_every_kind_of_command():
     names = {dry_parse(shlex.split(c)[1:])[0] for c in skill_commands()}
     assert {"inspect", "run", "materials", "fix", "thermal", "circuit", "motion", "motor", "flame", "runaway",
-            "propellant", "mechanism"} <= names, names
+            "propellant", "mechanism", "crack"} <= names, names
 
 
 @pytest.mark.parametrize("command", skill_commands())
@@ -116,7 +121,9 @@ def test_skill_command_parses(command):
 def test_flags_named_alone_exist():
     """Flags the skill names on their own, like `--quality fine`, belong to a command and take the value shown."""
     bases = {"run": ["run", "part.step"], "thermal": ["thermal", "part.step", "-m", "6061-t6"],
-             "circuit": ["circuit", "led"], "motion": ["motion", "--diameter", "9 cm", "--mass", "1 kg"]}
+             "circuit": ["circuit", "led"], "motion": ["motion", "--diameter", "9 cm", "--mass", "1 kg"],
+             "crack": ["crack", "part.step", "-m", "7075-t6", "-l", "1 kN +x @ x=max", "-f", "x=min", "-c",
+                       "through 1 mm"]}
     spans = [s for s in _spans(SKILL) if s.startswith("--")]
     assert spans
     for s in spans:

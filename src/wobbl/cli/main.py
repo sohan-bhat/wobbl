@@ -8,6 +8,7 @@
     wobbl fix    wobbl-out/part --apply               apply suggested fixes and compare
     wobbl motion rocket.toml                          a drop, a throw or a rocket flight
     wobbl mechanism arm --set payload=500g            servos, linkages, gears, impacts, tipping
+    wobbl crack lug.step -m 7075-t6 --crack "through 1.27 mm at hole d=8" ...   where a crack goes and when
     wobbl doctor | setup | uninstall | materials | mcp | validate
 """
 from __future__ import annotations
@@ -467,6 +468,7 @@ def _register():
     from .admin import doctor, setup, uninstall
     from .chem import flame, motor, propellant, runaway
     from .circuits import circuit
+    from .crack import crack
     from .credibility import credibility, test_plan, uncertainty, validate_against
     from .flow import flow
     from .mechanism import mechanism
@@ -475,7 +477,7 @@ def _register():
     from .thermal import thermal
 
     for c in (setup, doctor, uninstall, thermal, circuit, motion, uncertainty, flow, validate_against, credibility,
-              test_plan):
+              test_plan, crack):
         cli.add_command(c)
     for c in (motor, flame, propellant, runaway, mechanism):
         cli.add_command(c)

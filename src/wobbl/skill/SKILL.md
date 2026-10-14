@@ -1,6 +1,6 @@
 ---
 name: wobbl
-description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, asks whether a lithium ion cell can run away on its own, asks whether servos can lift a load or a robot arm can make a move, how far a linkage swings and where it binds, what a gear train gives, how hard two parts hit or whether something tips over, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed, or asks about solenoid, electromagnet or magnet force, capacitance and breakdown, PCB trace impedance, crosstalk and switch node ringing, antenna tuning and wireless range, room modes, muffler loss or panel noise. Wobbl meshes the CAD, runs CalculiX, ngspice, GetDP, Cantera, MuJoCo or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
+description: Run verified engineering simulations on CAD parts, circuits and moving bodies with Wobbl. Use when someone asks whether a physical part will hold, crack, bend, yield, overheat or fail (brackets, mounts, enclosures, drone arms, heat sinks, battery packs), whether it buckles, resonates near a motor or propeller speed, survives a shaker or random vibration test or how many cycles it lasts in fatigue, wants stress, deflection, safety factor or temperature numbers, asks about LED current, regulator ripple or MOSFET heating, or asks whether a metal part bends for good or collapses past yield, or asks how something dropped, thrown or launched moves (fall time, impact speed, range, or a rocket's apogee, stability margin, top speed, landing speed and drift), designs a solid rocket motor (chamber pressure against the casing, thrust curve, total impulse and class), asks for a flame temperature or a propellant's c* and Isp, asks whether a lithium ion cell can run away on its own, asks whether servos can lift a load or a robot arm can make a move, how far a linkage swings and where it binds, what a gear train gives, how hard two parts hit or whether something tips over, or how likely a part is to fail under load and material scatter, whether a model matches test readings and which physical tests are still needed, or asks about solenoid, electromagnet or magnet force, capacitance and breakdown, PCB trace impedance, crosstalk and switch node ringing, antenna tuning and wireless range, room modes, muffler loss or panel noise. Also use it when someone asks where a fatigue crack will go and how many cycles until it fails a part (B10 and B1 lives, inspection intervals). Wobbl meshes the CAD, runs CalculiX, ngspice, GetDP, Cantera, MuJoCo or a scipy integrator, checks its own answer and returns a picture, a confidence level and fixes.
 ---
 
 # Wobbl: simulate before you build
@@ -195,6 +195,18 @@ rather than a full wave solve, so say that when you quote it.
 together, `enclosure` does the same for a box measured in millimeters, `muffler` gives an expansion chamber's
 transmission loss and `panel` gives the sound pressure level of a vibrating panel treated as a baffled piston,
 which is an upper estimate.
+
+For a fatigue crack, use crack growth (MCP `grow_crack`) instead of a hand Paris law estimate. It cuts
+the crack into the part, reads K_I, K_II and K_III along its front, turns and grows the front step by
+step with a fresh mesh each time, so the path comes from the geometry, and integrates the NASGRO equation
+along it, as in
+`wobbl crack lug.step -m 7075-t6 --fix "bolt holes d=6.6" --load "4 kN 0.866,0.5,0 bearing @ hole d=8" --crack "through 1.27 mm at hole d=8" --r-ratio 0.1 --target-life 100000`.
+A crack is `through`, `corner` or `surface`, as in `--crack "surface a=1 c=2 at hottest"`, and starts at
+the most stressed point unless it names faces or a point. The loads are the peak of each cycle. Give
+`--r-ratio` for constant amplitude or `--spectrum blocks.csv` for a block of `max,min` load factors, and
+`--wheeler` only with an exponent from tests. The result gives the nominal life, B10 and B1 from a Monte
+Carlo over thousands of parts, the chance of failing before the target and an inspection interval. Quote
+the spread, never one part's failure cycle, which nothing can predict.
 
 ## Never skip
 
