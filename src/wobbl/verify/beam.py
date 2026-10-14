@@ -36,35 +36,58 @@ def section_properties(tri_pts: np.ndarray, normal: np.ndarray):
 _EDGES = np.array([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
 
 
-def slice_tets(X: np.ndarray, tets: np.ndarray, normal, origin) -> tuple[np.ndarray, np.ndarray]:
-    """Cut the tetrahedra (their four corners) with a plane: the points and triangles of the cut.
+# a 10 node tetrahedron as eight linear ones: a corner tetrahedron at each corner, and the octahedron between them
+# cut along one of its three diagonals (pairs of opposite midside nodes)
+_CORNER_TETS = np.array([(0, 4, 6, 7), (4, 1, 5, 8), (6, 5, 2, 9), (7, 8, 9, 3)])
+_DIAGONALS = np.array([(4, 9), (5, 7), (6, 8)])
+_OCTAHEDRON = np.array([[(4, 9, 5, 6), (4, 9, 6, 7), (4, 9, 7, 8), (4, 9, 8, 5)],
+                        [(5, 7, 4, 6), (5, 7, 6, 9), (5, 7, 9, 8), (5, 7, 8, 4)],
+                        [(6, 8, 4, 5), (6, 8, 5, 9), (6, 8, 9, 7), (6, 8, 7, 4)]])
 
-    Each cut tetrahedron gives a triangle or a quadrilateral split in two, with a corner on the plane counted as in
-    front of it, as VTK's cutter does.
+
+def cut_tets(X: np.ndarray, tets: np.ndarray, normal, origin, quadratic: bool = False):
+    """Cut the tetrahedra (their four corners) with a plane.
+
+    Returns the cut as triangles, three points each (a tetrahedron gives a triangle or a quadrilateral split in
+    two), and for every point the mesh edge it lies on, a to b, and how far along it, so that a nodal field f is
+    f[a] + t (f[b] - f[a]) there. A corner on the plane counts as in front of it, as VTK's cutter counts it. With
+    quadratic=True a 10 node tetrahedron is first split into eight linear ones, so its midside nodes' values count,
+    along the diagonal whose ends lie nearest the same distance from the plane, which is how VTK cuts one.
     """
     n = np.asarray(normal, float) / np.linalg.norm(normal)
     d = (X - np.asarray(origin, float)) @ n
-    c = np.asarray(tets)[:, :4]
+    tets = np.asarray(tets)
+    if quadratic and tets.shape[1] == 10:
+        pick = np.argmin(np.abs(d[tets[:, _DIAGONALS[:, 0]]] - d[tets[:, _DIAGONALS[:, 1]]]), axis=1)
+        inner = tets[np.arange(len(tets))[:, None, None], _OCTAHEDRON[pick]]
+        tets = np.concatenate([tets[:, _CORNER_TETS].reshape(-1, 4), inner.reshape(-1, 4)])
+    c = tets[:, :4]
     front = d[c] >= 0
     c = c[(front.sum(1) > 0) & (front.sum(1) < 4)]
     a, b = c[:, _EDGES[:, 0]], c[:, _EDGES[:, 1]]
     cross = (d[a] >= 0) != (d[b] >= 0)
     with np.errstate(divide="ignore", invalid="ignore"):
         t = np.where(cross, d[a] / (d[a] - d[b]), 0.0)
-    P = X[a] + t[..., None] * (X[b] - X[a])
-    tris = []
+    out = []
     for k in (3, 4):
         sel = cross.sum(1) == k
-        pts = P[sel][cross[sel]].reshape(-1, k, 3)
+        ea, eb, et = (v[sel][cross[sel]].reshape(-1, k) for v in (a, b, t))
         if k == 4:   # order the quadrilateral's corners around its center, then split it
+            P = X[ea] + et[..., None] * (X[eb] - X[ea])
             u = np.cross(n, [1.0, 0, 0] if abs(n[0]) < 0.9 else [0, 1.0, 0])
-            r = pts - pts.mean(1, keepdims=True)
+            r = P - P.mean(1, keepdims=True)
             order = np.argsort(np.arctan2(r @ np.cross(n, u), r @ u), axis=1)
-            pts = np.take_along_axis(pts, order[..., None], axis=1)
-            pts = np.concatenate([pts[:, [0, 1, 2]], pts[:, [0, 2, 3]]])
-        tris.append(pts)
-    pts = np.concatenate(tris).reshape(-1, 3)
-    return pts, np.arange(len(pts)).reshape(-1, 3)
+            ea, eb, et = (np.take_along_axis(v, order, axis=1)[:, [0, 1, 2, 0, 2, 3]].reshape(-1, 3)
+                          for v in (ea, eb, et))
+        out.append((ea, eb, et))
+    ea, eb, et = (np.concatenate([o[i] for o in out]).ravel() for i in range(3))
+    pts = X[ea] + et[:, None] * (X[eb] - X[ea])
+    return pts, np.arange(len(pts)).reshape(-1, 3), ea, eb, et
+
+
+def slice_tets(X: np.ndarray, tets: np.ndarray, normal, origin) -> tuple[np.ndarray, np.ndarray]:
+    """The points and triangles where a plane cuts the tetrahedra."""
+    return cut_tets(X, tets, normal, origin)[:2]
 
 
 def beam_estimate(mesh, measure_at: np.ndarray, loads_force: np.ndarray, loads_moment: np.ndarray,

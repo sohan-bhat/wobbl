@@ -363,17 +363,11 @@ def _describe(features: PartFeatures, mesh: Mesh, o: np.ndarray, hole) -> str:
 
 def stress_profile(unc: Uncracked, p: Placement, depth: float, k: int = 60) -> tuple[np.ndarray, np.ndarray]:
     """Stress normal to the crack plane before the crack, along its first growth direction from the origin."""
-    import pyvista as pv
-
-    from ..report.render import _grid
+    from ..mesh.probe import sample
 
     x = np.linspace(0.0, depth, k)
     pts = p.origin + np.outer(np.maximum(x, 1e-4 * depth), p.toward)
-    g = _grid(unc.mesh.X, unc.mesh.tets)
-    g.point_data["S"] = unc.S
-    got = pv.PolyData(pts).sample(g)
-    S = np.asarray(got.point_data["S"])
-    valid = np.asarray(got.point_data.get("vtkValidPointMask", np.ones(k)), bool)
+    S, valid = sample(unc.mesh.X, unc.mesh.tets, unc.S, pts)
     n = p.normal
     sig = np.array([n @ _tensor(s) @ n for s in S])
     if not valid.all() and valid.any():
@@ -383,18 +377,27 @@ def stress_profile(unc: Uncracked, p: Placement, depth: float, k: int = 60) -> t
 
 def section(unc: Uncracked, p: Placement) -> tuple[float, float]:
     """Area of the part's section in the crack plane around the origin, mm2, and the force across it, N."""
-    from ..report.render import _grid
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
 
-    g = _grid(unc.mesh.X, unc.mesh.tets)
-    g.point_data["sn"] = np.array([p.normal @ _tensor(s) @ p.normal for s in unc.S])
-    try:
-        sl = g.slice(normal=p.normal, origin=p.origin, generate_triangles=True)
-        if sl.n_cells == 0:
-            return 0.0, 0.0
-        sl = sl.connectivity(extraction_mode="closest", closest_point=p.origin)
-        sizes = sl.compute_cell_sizes(length=False, area=True, volume=False)
-        area = np.asarray(sizes.cell_data["Area"])
-        sn = np.asarray(sl.point_data_to_cell_data().cell_data["sn"])
-    except Exception:  # noqa: BLE001  without a section, net section yield is not checked
+    from ..verify.beam import cut_tets
+
+    sn = np.array([p.normal @ _tensor(s) @ p.normal for s in unc.S])
+    pts, faces, a, b, t = cut_tets(unc.mesh.X, unc.mesh.tets, p.normal, p.origin, quadratic=True)
+    if len(faces) == 0:
         return 0.0, 0.0
-    return float(area.sum()), float((area * sn).sum())
+    # cut points on the same mesh edge, or at the same node, are one point; keep the piece of the cut that holds
+    # the point nearest the origin
+    key = np.where((t <= 0)[:, None], np.column_stack([a, a]), np.where((t >= 1)[:, None], np.column_stack([b, b]),
+                                                                          np.sort(np.column_stack([a, b]), axis=1)))
+    _, pid = np.unique(key, axis=0, return_inverse=True)
+    pid = pid.ravel()
+    f = pid[faces]
+    n = int(pid.max()) + 1
+    links = coo_matrix((np.ones(2 * len(f)), (np.r_[f[:, 0], f[:, 1]], np.r_[f[:, 1], f[:, 2]])), shape=(n, n))
+    _, part = connected_components(links, directed=False)
+    keep = part[f[:, 0]] == part[pid[int(np.argmin(np.linalg.norm(pts - p.origin, axis=1)))]]
+    tri = pts[faces[keep]]
+    area = 0.5 * np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1)
+    sv = sn[a] + t * (sn[b] - sn[a])
+    return float(area.sum()), float((area * sv[faces[keep]].mean(1)).sum())
