@@ -37,9 +37,12 @@ class Item:
     note: str = ""
 
     def text(self) -> str:
-        v = f"{fmt(self.value)} {self.unit}".strip()
+        unit, k = self.unit, 1.0
+        if unit in ("A", "W", "V") and 0 < max(abs(self.value), abs(self.limit or 0)) < 1:
+            unit, k = "m" + unit, 1000.0          # 27.5 mA reads better than 0.0275 A
+        v = f"{fmt(self.value * k)} {unit}".strip()
         if self.limit is not None and self.use is not None:
-            return f"{self.what} {v} of {fmt(self.limit)} {self.unit} ({100 * self.use:.0f}%)".replace("  ", " ")
+            return f"{self.what} {v} of {fmt(self.limit * k)} {unit} ({100 * self.use:.0f}%)".replace("  ", " ")
         return f"{self.what} {v}" + (f", {self.note}" if self.note else "")
 
 

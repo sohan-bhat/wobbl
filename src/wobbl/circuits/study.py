@@ -119,7 +119,7 @@ def simulate_circuit(source: str, question: str = "", params: dict | None = None
         try:
             from . import tolerance
             tol = tolerance.analyze(c, work, ta, dynamic=dynamic, monte_carlo=focus == "tolerance" or
-                                    bool(re.search(TOL_WORDS, q)), base=stress)
+                                    bool(re.search(TOL_WORDS, q)), base=stress, main=main)
             checks += tol["checks"]
             values["tolerance"] = tol["values"]
             stress = tol.get("stress", stress)
