@@ -86,8 +86,8 @@ class GenericOutcome:
                         "".join(f"<li>{esc(a)}</li>" for a in self.assumptions) + "</ol>")
         word = self.verdict.upper()
         cls = {"ok": "pass", "warm": "warn", "hot": "fail", "fails": "fail"}.get(self.verdict, "warn")
-        title = {"thermal": "Heat report", "circuit": "Circuit report", "motion": "Motion report"}.get(self.domain,
-                                                                                                    "Report")
+        title = {"thermal": "Heat report", "circuit": "Circuit report", "motion": "Motion report",
+                 "combustion": "Combustion report", "motor": "Rocket motor report"}.get(self.domain, "Report")
         title = FIELD_TITLES.get(self.domain, title)
         html = page(title, Path(self.part).name if self.part else self.domain, self.question, word, cls,
                     self.headline, self.metrics, self.confidence, self.confidence_reasons, sections,
