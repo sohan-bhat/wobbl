@@ -1,0 +1,52 @@
+{
+ "base": {
+  "part": "../strut.py",
+  "material": "6061-t6",
+  "loads": [
+   {
+    "kind": "force",
+    "faces": "z=max",
+    "magnitude": 7000.0,
+    "direction": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "point": null,
+    "coupling": "distributed",
+    "text": "7 kN -z @ z=max",
+    "imperial": false
+   }
+  ],
+  "fixtures": [
+   {
+    "kind": "fixed",
+    "faces": "z=min",
+    "text": "fixed z=min",
+    "dofs": "xyz"
+   },
+   {
+    "kind": "fixed",
+    "faces": "z=max",
+    "text": "fixed-xy z=max",
+    "dofs": "xy"
+   }
+  ],
+  "target_sf": null,
+  "quality": "normal",
+  "budget": 300.0,
+  "max_levels": 4,
+  "question": "Does this aluminum strut carry 7 kN with a factor of 3 against buckling?",
+  "imperial": false,
+  "scale": 1.0,
+  "body": null,
+  "mesh_size": null,
+  "print_direction": null,
+  "assumptions": [],
+  "params": {}
+ },
+ "target_sf": 3.0,
+ "shape": "auto",
+ "modes": 4,
+ "keep": false
+}
