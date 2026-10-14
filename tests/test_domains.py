@@ -130,6 +130,26 @@ def test_readings_of_any_value_keep_their_name_and_convert_their_unit(tmp_path):
     assert rs[1].value == pytest.approx(0.02) and rs[2].value == pytest.approx(100.0)
 
 
+def test_a_curved_answer_gets_more_reruns(tmp_path):
+    """A fit that misses more than 5% of the variance on reruns it did not see is given more of them."""
+    from wobbl.credibility.uncertainty import run_uncertainty
+
+    @D.register("toy4")
+    def run(req, out):
+        a = float(req.spec["a"])
+        return {"domain": "toy4", "values": {"y": float(np.exp(4.0 * a))}}
+
+    out = tmp_path / "run"
+    out.mkdir()
+    o = run(D.Request("toy4", {"a": 0.0}), out)
+    o.update(question="", verdict="ok", headline="ok", metrics=[], confidence="high", confidence_reasons=[],
+             assumptions=[], checks=[], part="toy")
+    (out / "outcome.json").write_text(json.dumps(o))
+    D.save_request(out, "toy4", {"a": 0.0})
+    r = run_uncertainty(out, ["a sd 0.5"], samples=20000)
+    assert r["model"]["surrogate"]["solves"] > 3 * 6       # more than the first design of a cheap rerun
+
+
 def test_registry_spec_leaves():
     spec = {"thing": "/x/bar.step", "kind": "step", "question": "q",
             "options": {"material": ["6061-t6"], "load": ["220 N down @ top", "60 N +y @ x=max"], "fix": ["x=min"],

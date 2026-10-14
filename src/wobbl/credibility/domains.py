@@ -356,7 +356,7 @@ def role_of(name: str, roles: dict | None = None) -> str:
 UNIT_TOKENS = {"C": "C", "K": "K", "F": "F", "mm": "mm", "m": "m", "km": "km", "s": "s", "ms": "ms", "min": "min",
                "h": "h", "N": "N", "kN": "kN", "Pa": "Pa", "kPa": "kPa", "MPa": "MPa", "bar": "bar", "W": "W",
                "kW": "kW", "A": "A", "mA": "mA", "V": "V", "mV": "mV", "Hz": "Hz", "dB": "dB", "J": "J", "kg": "kg",
-               "g": "g", "mps": "m/s", "m_s": "m/s", "deg": "deg", "pct": "%", "percent": "%", "rpm": "rpm",
+               "g": "g", "Ns": "N s", "mps": "m/s", "m_s": "m/s", "deg": "deg", "pct": "%", "percent": "%", "rpm": "rpm",
                "Nm": "N m", "ohm": "ohm", "T": "T", "cal": "cal", "ft": "ft", "cycles": "cycles"}
 
 

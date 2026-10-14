@@ -106,7 +106,7 @@ def run_motor(spec: MotorSpec, out_dir: str | Path, cb=None, render: bool = True
                        checks, assumptions(spec, chem_vals), values, imgs, fixes, solver=_solver(chem_vals),
                        t_total=time.time() - t0)
     if "safety_factor" in values and "target_sf" in values:
-        o.criteria.append({"name": "casing", "value": "safety_factor", "limit": 1.0, "sense": "min"})
+        o.criteria.append({"name": "casing safety factor", "value": "safety_factor", "limit": 1.0, "sense": "min"})
     if "port_throat" in values:
         o.criteria.append({"name": "port to throat", "value": "port_throat", "limit": 1.0, "sense": "min"})
     return o.write(out, [_numbers(spec, values)])

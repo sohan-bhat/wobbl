@@ -3,7 +3,9 @@
 Any numeric leaf of the request can scatter, in the unit it was written in. Each design point is the same request
 run again with those leaves changed, and the answer is a polynomial chaos fit of the reruns with its leave one out
 error. The run is first solved again exactly as it was, which checks that the rerun reproduces the answer and says
-how long one rerun takes. A rerun under half a second earns a larger design, since it costs little.
+how long one rerun takes. A rerun under half a second earns a larger design, since it costs little, and a fit
+that misses more than 5% of the variance on reruns it did not see gets as many reruns again, while they stay
+cheap, so a curved answer is not passed off as a straight one.
 
 What fails is read from the run's criteria (domains.criteria), and the numerical uncertainty from the change its
 own convergence checks measured. A domain with a faster exact path, like strength, plugs in its own model instead,
@@ -24,6 +26,8 @@ from .uq import Input, Known
 
 CHEAP_S = 0.5            # a rerun this quick gets a design three times the usual size
 MAX_SOLVES = 150
+MAX_LOO = 0.05           # a fit missing more of the variance than this on unseen reruns gets more of them
+REFINE_S = 600.0         # as long as all the reruns together stay under ten minutes
 
 
 def _signed(name: str, unit: str) -> bool:
@@ -100,14 +104,24 @@ class GenericModel(Model):
             n = solves or uq.design_size(len(solved))
             if not solves and runs.seconds[0] < CHEAP_S:
                 n = min(max(n, 3 * uq.design_size(len(solved))), MAX_SOLVES)
-            X = uq.sample(solved, n, "lhs", seed=7)
-            Y = []
-            for k, row in enumerate(X):
-                if progress:
-                    progress("solve", f"{self.domain} rerun {k + 1} of {n}")
-                o, s = runs({i.name: float(v) for i, v in zip(solved, row)})
-                Y.append(extract(o, s))
-            return uq.fit_pce(solved, X, np.array(Y, float), keys), nominal
+            X = np.zeros((0, len(solved)))
+            Y: list = []
+            seed, sur = 7, None
+            while True:
+                Xn = uq.sample(solved, n, "lhs", seed=seed)
+                for k, row in enumerate(Xn):
+                    if progress:
+                        progress("solve", f"{self.domain} rerun {len(Y) + 1} of {len(X) + n}")
+                    o, s = runs({i.name: float(v) for i, v in zip(solved, row)})
+                    Y.append(extract(o, s))
+                X = np.vstack([X, Xn])
+                sur = uq.fit_pce(solved, X, np.array(Y, float), keys)
+                # a fit that misses more than 5% of the variance gets as many points again, while reruns stay cheap
+                spent = float(np.sum(runs.seconds))
+                more = len(X) * float(np.mean(runs.seconds))
+                if solves or max(sur.loo) <= MAX_LOO or len(X) * 2 > MAX_SOLVES or spent + more > REFINE_S:
+                    return sur, nominal
+                n, seed = len(X), seed + 1
         finally:
             runs.cleanup()
 
