@@ -81,7 +81,12 @@ def stress(job):
     if job.flag("shell"):
         from ..structural.shell_path import analyze_shell
         return analyze_shell(st, job.out, job.log, render=not job.quick, pre=pre)
-    o = analyze_strength(st, job.out, job.log, render=not job.quick, fixes=not job.quick, pre=pre)
+    if job.flag("solid"):
+        o = analyze_strength(st, job.out, job.log, render=not job.quick, fixes=not job.quick, pre=pre)
+    else:
+        # thin walled parts go to the shell model, checked against a coarse solid, and back to the solid if not
+        from ..structural.shell_path import analyze_auto
+        o = analyze_auto(st, job.out, job.log, render=not job.quick, fixes=not job.quick, pre=pre)
     if o.allowable_MPa:
         job.criterion("stress", "governing_MPa", o.allowable_MPa, "max")
     return o
@@ -94,8 +99,9 @@ register(Analysis(
               r"\bstrong", r"\bstrength", r"\bdeflect", r"\bsnap", FORCE, r"\b\d+(?:\.\d+)?\s*(?:mpa|kpa|psi|bar)\b",
               r"\b\d+(?:\.\d+)?\s*g'?s\b|\bg load"),
     aliases=("strength", "static", "structural"),
-    options=(Option("shell", "Solve thin walls as shells on their midsurface, checked against a coarse solid",
-                    flag=True),
+    options=(Option("shell", "Solve thin walls as shells on their midsurface, checked against a coarse solid (thin "
+                             "walled parts get this on their own)", flag=True),
+             Option("solid", "Solve the solid even when the walls are thin", flag=True),
              Option("budget", "Seconds for the convergence study", "300"),
              Option("print-direction", "Axis the print layers stack along, e.g. z")),
     example='wobbl simulate bracket.step "will it hold 200 N?"'))

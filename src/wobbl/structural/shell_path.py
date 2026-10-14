@@ -141,6 +141,41 @@ def analyze_shell(study: StructuralStudy, out_dir: str | Path, progress=None, re
     return write_outputs(o, out)
 
 
+def analyze_auto(study: StructuralStudy, out_dir: str | Path, progress=None, render: bool = True,
+                 fixes: bool = True, pre: tuple | None = None) -> Outcome:
+    """The strength study on the faster shell model when the part's walls are thin and the shell model stands in
+    for it, checked by its coarse solid; on the solid otherwise, or when the shell model cannot be built or does
+    not match the solid."""
+    from ..mesh.mesher import MeshError
+    from .pipeline import analyze_strength
+    from .report import write_outputs
+    from .run import describe_part
+
+    out = Path(out_dir)
+    say = progress or (lambda a, b: None)
+    if pre is None:
+        say("geometry", f"reading {Path(study.part).name}")
+        pre = describe_part(study.part, out / "work", study.scale, study.body, study.params)
+    thin, why = thin_walled(pre[1])
+    if not thin:
+        return analyze_strength(study, out, progress, render=render, fixes=fixes, pre=pre)
+    say("check", f"thin walls, {why}: solving them as shells")
+    try:
+        o = analyze_shell(study, out, progress, render=render, pre=pre, keep=True)
+    except (SpecError, MeshError, solvers.SolverError, ValueError) as e:
+        reason = f"the shell model could not be built ({str(e).strip()[:160]})"
+    else:
+        cross = next((c for c in o.checks if c.name == "solid cross check"), None)
+        if cross is not None and cross.status in ("pass", "warn"):
+            shutil.rmtree(out / "work", ignore_errors=True)
+            return o
+        reason = cross.summary if cross is not None else "the shell model had no solid to check it against"
+    say("check", f"solving the solid instead: {reason}")
+    o = analyze_strength(study, out, progress, render=render, fixes=fixes, pre=pre)
+    o.notes.append(f"Wobbl tried a shell model of the thin walls first and solved the solid instead: {reason}.")
+    return write_outputs(o, out)
+
+
 def _level(k, h, shell, res, measure, excl, model, material) -> dict:
     keep = ~excl if (~excl).any() else np.ones(shell.n_nodes, bool)
     i = np.flatnonzero(keep)[int(np.argmax(measure[keep]))]
@@ -357,4 +392,4 @@ def _images(out, shell, res, measure, gxyz, gov, allow, target, mname) -> dict:
     return img
 
 
-__all__ = ["analyze_shell", "solid_cross_check", "shell_measure"]
+__all__ = ["analyze_shell", "analyze_auto", "solid_cross_check", "shell_measure"]
