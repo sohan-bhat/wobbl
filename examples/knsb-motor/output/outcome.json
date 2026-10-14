@@ -1,0 +1,250 @@
+{
+ "domain": "motor",
+ "part": "../motor.toml",
+ "question": "Will this 54 mm KNSB motor hold its casing, and what thrust curve does it give?",
+ "verdict": "marginal",
+ "headline": "Peak chamber pressure 4.14 MPa against a casing that yields at 16.8 MPa, a safety factor of 4.07 (target 2). J602 motor, 1238 N s over 2.06 s at 120 s Isp.",
+ "metrics": [
+  [
+   "peak pressure",
+   "4.14 MPa"
+  ],
+  [
+   "casing safety factor",
+   "4.07"
+  ],
+  [
+   "total impulse",
+   "1238 N s (J602)"
+  ],
+  [
+   "burn time",
+   "2.06 s"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "erosive burning: the narrowest port is 1.59 times the throat area at ignition and the peak mass flux down the cores is 2336 kg/(m2 s), against the usual limits of 2 and 1406. Fast core flow changes the burn rate, which this model leaves out, so the real pressure early in the burn can differ from this prediction"
+ ],
+ "checks": [
+  {
+   "name": "time step convergence",
+   "status": "pass",
+   "summary": "total impulse 1238 N s with a 2.07 ms step and 1238 N s with 1.04 ms, peak pressure 4.14 MPa and 4.14 MPa, largest change 0.1%",
+   "detail": {
+    "runs": [
+     {
+      "dt_s": 0.00207,
+      "steps": 1005,
+      "impulse_Ns": 1237.937336,
+      "peak_Pa": 4138406.274738,
+      "burn_time_s": 2.053558
+     },
+     {
+      "dt_s": 0.001035,
+      "steps": 2010,
+      "impulse_Ns": 1237.936449,
+      "peak_Pa": 4138407.167586,
+      "burn_time_s": 2.055629,
+      "change": 0.001007
+     }
+    ]
+   }
+  },
+  {
+   "name": "mass balance",
+   "status": "pass",
+   "summary": "1.06 kg of propellant burned and 1.06 kg left through the throat, with 0.26 g still in the chamber (0.0057% apart)",
+   "detail": {
+    "error": 5.7e-05
+   }
+  },
+  {
+   "name": "closed form",
+   "status": "pass",
+   "summary": "at peak pressure, where it holds still, Kn 314 gives (a rho c* Kn)^(1/(1-n)) = 4.14 MPa against the simulated 4.14 MPa (0.00017% apart). The textbook form that leaves out the gas filling the room the propellant leaves gives 4.2 MPa",
+   "detail": {
+    "kn": 313.965353,
+    "closed_form_Pa": 4138414.096896,
+    "classic_Pa": 4202250.527577,
+    "error": 2e-06
+   }
+  },
+  {
+   "name": "geometry",
+   "status": "pass",
+   "summary": "the burning area swept over the web matches the propellant's volume to 0.022% (worst grain, BATES 48 mm with a 16 mm core, 75 mm long)",
+   "detail": {
+    "error": 0.000215
+   }
+  },
+  {
+   "name": "chemistry",
+   "status": "pass",
+   "summary": "Cantera's equilibrium for knsb at the average 3.72 MPa gives 1591 K, 39.7 kg/kmol and c* 907 m/s against the propellant data's 908 m/s (0.097% apart), with its elements and energy balanced to 8e-16 and 7e-13. The ideal Isp at this nozzle is 142 s frozen and 144 s shifting, and the motor delivers 120 s, 84% of frozen",
+   "detail": {
+    "cantera": "3.2.0",
+    "equilibrium_T_K": 1591.471328,
+    "equilibrium_M": 39.72485,
+    "equilibrium_gamma": 1.136876,
+    "equilibrium_cstar_m_s": 907.263563,
+    "ideal_isp_frozen_s": 142.020126,
+    "ideal_isp_shifting_s": 143.699337,
+    "average_pressure_Pa": 3721355.650669,
+    "delivered_fraction": 0.842051,
+    "condensed_fraction": 0.430819
+   }
+  },
+  {
+   "name": "burn rate data",
+   "status": "pass",
+   "summary": "the burn runs from 1.26 MPa to 4.14 MPa, inside the 0.103 MPa to 10.7 MPa the burn rate was measured over",
+   "detail": {
+    "min_Pa": 1255183.608381,
+    "data_range_Pa": [
+     103000.0,
+     10670000.0
+    ]
+   }
+  },
+  {
+   "name": "erosive burning",
+   "status": "warn",
+   "summary": "the narrowest port is 1.59 times the throat area at ignition and the peak mass flux down the cores is 2336 kg/(m2 s), against the usual limits of 2 and 1406. Fast core flow changes the burn rate, which this model leaves out, so the real pressure early in the burn can differ from this prediction",
+   "detail": {
+    "port_throat": 1.587203,
+    "peak_mass_flux": 2336.020962
+   }
+  },
+  {
+   "name": "casing",
+   "status": "pass",
+   "summary": "peak 4.14 MPa puts 67.8 MPa of hoop stress on the bore of the 54 mm Aluminum 6061-T6 casing with a 1.6 mm wall (65.7 MPa by the thin wall hand calculation P r / t), a safety factor of 4.07 on its 276 MPa yield against a target of 2. It yields at 16.8 MPa and bursts near 18.4 MPa by Barlow's formula on the tensile strength",
+   "detail": {
+    "material": "Aluminum 6061-T6",
+    "hoop_Pa": 67829599.158038,
+    "hoop_thin_Pa": 65697213.785427,
+    "yield_Pa": 276000000.0,
+    "tensile_Pa": 310000000.0,
+    "yield_pressure_Pa": 16839261.803575,
+    "burst_pressure_Pa": 18370370.37037,
+    "safety_factor": 4.06902,
+    "burst_margin": 4.438995,
+    "allowable_Pa": 8419630.901787,
+    "target_sf": 2.0
+   }
+  },
+  {
+   "name": "nozzle",
+   "status": "pass",
+   "summary": "area ratio 6.35 expands the gas to 99.7 kPa at the average chamber pressure, against 101 kPa outside (an area ratio of 6.27 would match it)",
+   "detail": {
+    "exit_pressure_Pa": 99658.236649,
+    "area_ratio": 6.348813,
+    "optimum_area_ratio": 6.268289,
+    "separated_fraction": 0.0
+   }
+  }
+ ],
+ "assumptions": [
+  "KNSB (65/35 potassium nitrate and sorbitol), 1750 kg/m3, burning at r = a P^n by its published law (burn rate from Nakka, KN-Dextrose and KN-Sorbitol Propellants, Burn Rate Experimentation (nakka-rocketry.net/bntest.html), Table 2, with T, M and k from Nakka's KN-Sorbitol data as listed in openMotor's KNSB preset).",
+  "The burning itself comes from that burn rate law, not resolved flame chemistry. Erosive burning, ignition delay, throat erosion and slag are not modeled.",
+  "c* 908 m/s from T 1600 K, M 39.9 kg/kmol and k 1.14.",
+  "Thrust from the ideal thrust coefficient for k 1.14 and area ratio 6.35, times 98.9% for a 12 degree cone and a nozzle efficiency of 0.85.",
+  "Every surface lights at once at ambient pressure, and the gas in the chamber is combustion gas from the start.",
+  "The casing is checked as a long tube under internal pressure at room temperature strength. Closures, retaining rings, bolts and the tube's heating are not checked, so line the casing and size those parts on their own.",
+  "Against two MIT static fires in Wobbl's validation the predicted peak pressure was 7% low on one and 12% high on the other, so keep the casing's safety factor margin for what this model leaves out."
+ ],
+ "values": {
+  "designation": "J602",
+  "class": "J",
+  "impulse_Ns": 1237.936449,
+  "burn_time_s": 2.055629,
+  "average_thrust_N": 602.217965,
+  "peak_thrust_N": 685.630711,
+  "peak_pressure_Pa": 4138407.167586,
+  "isp_s": 119.588254,
+  "propellant_kg": 1.055575,
+  "kn_initial": 275.776552,
+  "kn_max": 313.989052,
+  "kn_final": 256.146626,
+  "cstar_m_s": 908.146508,
+  "time_step_runs": [
+   {
+    "dt_s": 0.00207,
+    "steps": 1005,
+    "impulse_Ns": 1237.937336,
+    "peak_Pa": 4138406.274738,
+    "burn_time_s": 2.053558
+   },
+   {
+    "dt_s": 0.001035,
+    "steps": 2010,
+    "impulse_Ns": 1237.936449,
+    "peak_Pa": 4138407.167586,
+    "burn_time_s": 2.055629,
+    "change": 0.001007
+   }
+  ],
+  "port_throat": 1.587203,
+  "peak_mass_flux": 2336.020962,
+  "material": "Aluminum 6061-T6",
+  "hoop_Pa": 67829599.158038,
+  "hoop_thin_Pa": 65697213.785427,
+  "yield_Pa": 276000000.0,
+  "tensile_Pa": 310000000.0,
+  "yield_pressure_Pa": 16839261.803575,
+  "burst_pressure_Pa": 18370370.37037,
+  "safety_factor": 4.06902,
+  "burst_margin": 4.438995,
+  "allowable_Pa": 8419630.901787,
+  "target_sf": 2.0,
+  "exit_pressure_Pa": 99658.236649,
+  "area_ratio": 6.348813,
+  "optimum_area_ratio": 6.268289,
+  "separated_fraction": 0.0,
+  "cantera": "3.2.0",
+  "equilibrium_T_K": 1591.471328,
+  "equilibrium_M": 39.72485,
+  "equilibrium_gamma": 1.136876,
+  "equilibrium_cstar_m_s": 907.263563,
+  "ideal_isp_frozen_s": 142.020126,
+  "ideal_isp_shifting_s": 143.699337,
+  "average_pressure_Pa": 3721355.650669,
+  "delivered_fraction": 0.842051,
+  "condensed_fraction": 0.430819,
+  "files": {
+   "thrust_csv": "thrust.csv",
+   "eng": "motor.eng"
+  },
+  "_figures": [
+   [
+    "burn",
+    "Thrust and chamber pressure over the burn"
+   ]
+  ]
+ },
+ "images": {
+  "burn": "images/burn.png"
+ },
+ "fixes": [
+  {
+   "kind": "core",
+   "title": "Open the cores to 23.5 mm",
+   "summary": "That gives a port to throat ratio of 3.42 and a peak core mass flux of 1377 kg/(m2 s). Simulated, the peak pressure is 5 MPa with 1083 N s (J765), since a wider core carries less propellant.",
+   "auto": false,
+   "after": {
+    "core_mm": 23.482674,
+    "port_throat": 3.41891,
+    "peak_mass_flux": 1376.916505,
+    "peak_pressure_Pa": 4997628.881607,
+    "impulse_Ns": 1082.857859
+   }
+  }
+ ],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 14.221192,
+ "solver": "Wobbl internal ballistics (Runge-Kutta, scipy) and Cantera 3.2.0"
+}
