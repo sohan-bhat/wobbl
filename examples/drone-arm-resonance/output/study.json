@@ -1,0 +1,44 @@
+{
+ "base": {
+  "part": "../../drone-arm/arm.py",
+  "material": "pa12",
+  "loads": [],
+  "fixtures": [
+   {
+    "kind": "bolt",
+    "faces": "holes d=3.2 and x<0",
+    "text": "bolt holes d=3.2 and x<0",
+    "dofs": "xyz"
+   }
+  ],
+  "target_sf": null,
+  "quality": "normal",
+  "budget": 300.0,
+  "max_levels": 4,
+  "question": "Will this printed arm resonate with its propeller anywhere from hover to full throttle?",
+  "imperial": false,
+  "scale": 1.0,
+  "body": null,
+  "mesh_size": null,
+  "print_direction": null,
+  "assumptions": [],
+  "params": {}
+ },
+ "masses": [
+  "80 g at 150,0,32 @ top and within 15 of 150,0,15"
+ ],
+ "modes": 15,
+ "rpm": [
+  "5000-12000 rpm"
+ ],
+ "blades": 2,
+ "frequencies": [],
+ "margin": 0.2,
+ "sine": "",
+ "psd": "",
+ "axis": "z",
+ "duration": "",
+ "damping": null,
+ "target_sf": null,
+ "keep": false
+}

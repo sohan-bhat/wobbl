@@ -1,0 +1,29 @@
+FAILS. Mode 3 at 197 Hz sits inside the once per turn from 83.3 to 200 Hz, where the response grows about 17 times.
+
+Confidence: high. passed mesh convergence, mass balance, hand calculation, units and sanity
+first mode: 30.4 Hz
+nearest excitation: mode 3, 0% away
+damping: 3%
+
+Checks:
+  [pass] mesh convergence: frequency of mode 4 settled: 221 -> 219 Hz over 2 meshes, last change 1.2%
+  [pass] mass balance: the part weighs 120 g with its attached masses, and Wobbl's own mass matrix gives the first 6 modes a modal mass of one to 0.00032%, as CalculiX scaled them
+  [info] mass participation: the modes found move 88% of the mass along x, 94% of the mass along y, 93% of the mass along z
+  [pass] hand calculation: Rayleigh's quotient with the static sag under 1 g along y (0.292 mm) gives 30.4 Hz, +0.0% from mode 1 at 30.4 Hz
+  [pass] units and sanity: first mode 30.4 Hz, mass 120 g: plausible
+
+Assumptions:
+  - Linear elastic, small vibrations about the unloaded shape. Supports are as rigid as modeled; real mounts flex, which lowers every natural frequency.
+  - Damping is the same for every mode: 3% of critical, typical of a plastic, wood or composite part. The response at a resonance grows as damping falls.
+  - Nylon PA12 (SLS or MJF): E 1700 MPa, Poisson 0.39, density 1010 kg/m3, von Mises vs yield 48 MPa (HP 3D High Reusability PA 12 datasheet; EOS PA 2200).
+  - Mass 1, 80 g (80 g at 150,0,32 @ top and within 15 of 150,0,15), is a point at (150, 0, 32) held rigidly by its faces, with no rotary inertia of its own.
+  - Printed part treated as isotropic at 100% infill; across the layers it is roughly 90% as strong. Pass --print-direction to check that.
+
+Suggested fixes:
+  - Stiffen to move mode 3 above 480 Hz: A natural frequency grows with the square root of stiffness, so mode 3 at 197 Hz needs about 6 times the stiffness to clear the blade pass (2 blades) and the once per turn by 20%. For a beam carrying a heavy end mass that is a section about 1.8 times as deep in the bending direction, and when the beam's own mass dominates about 2.4 times as deep.
+  - Or move mode 3 below 69.4 Hz: Softer mounts or isolators that bring it to 0.12 times the stiffness put the mode under the excitation, which works when the speed only passes through it on the way up.
+  - Lighten the attached mass: With an end mass dominating, the frequency goes as 1/sqrt(mass), so 2.4 times the frequency needs about 0.17 of the mass.
+  - Add damping: At resonance the response is about 1/(2 zeta) of the static one, 16.7 times now. A damping layer or a damped mount that doubles the damping halves it.
+
+Images: modes: images/modes.jpg, frequencies: images/frequencies.png
+Report: report.html

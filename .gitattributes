@@ -11,3 +11,4 @@ examples/**/geometry.json linguist-generated -diff
 examples/**/summary.txt linguist-generated
 examples/**/*.html linguist-generated -diff
 examples/**/*.vtu binary
+examples/**/playback.json linguist-generated -diff

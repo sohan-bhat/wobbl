@@ -1,0 +1,445 @@
+{
+ "domain": "vibration",
+ "part": "../../drone-arm/arm.py",
+ "question": "Will this printed arm resonate with its propeller anywhere from hover to full throttle?",
+ "verdict": "fails",
+ "headline": "Mode 3 at 197 Hz sits inside the once per turn from 83.3 to 200 Hz, where the response grows about 17 times.",
+ "metrics": [
+  [
+   "first mode",
+   "30.4 Hz"
+  ],
+  [
+   "nearest excitation",
+   "mode 3, 0% away"
+  ],
+  [
+   "damping",
+   "3%"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed mesh convergence, mass balance, hand calculation, units and sanity"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "frequency of mode 4 settled: 221 -> 219 Hz over 2 meshes, last change 1.2%",
+   "detail": {
+    "values": [
+     221.4467,
+     218.7802
+    ],
+    "last_change": 0.012188,
+    "tolerance": 0.02,
+    "stopped_by": "converged"
+   }
+  },
+  {
+   "name": "mass balance",
+   "status": "pass",
+   "summary": "the part weighs 120 g with its attached masses, and Wobbl's own mass matrix gives the first 6 modes a modal mass of one to 0.00032%, as CalculiX scaled them",
+   "detail": {
+    "wobbl_kg": 0.120368,
+    "modal_mass": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.000003
+    ]
+   }
+  },
+  {
+   "name": "mass participation",
+   "status": "info",
+   "summary": "the modes found move 88% of the mass along x, 94% of the mass along y, 93% of the mass along z",
+   "detail": {
+    "captured": [
+     0.880645,
+     0.936611,
+     0.927833
+    ]
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "Rayleigh's quotient with the static sag under 1 g along y (0.292 mm) gives 30.4 Hz, +0.0% from mode 1 at 30.4 Hz",
+   "detail": {
+    "frequency": 30.379759,
+    "direction": "y",
+    "mode": 1,
+    "mode_frequency": 30.36998,
+    "first": 30.36998,
+    "sag_mm": 0.291894
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "first mode 30.4 Hz, mass 120 g: plausible",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Linear elastic, small vibrations about the unloaded shape. Supports are as rigid as modeled; real mounts flex, which lowers every natural frequency.",
+  "Damping is the same for every mode: 3% of critical, typical of a plastic, wood or composite part. The response at a resonance grows as damping falls.",
+  "Nylon PA12 (SLS or MJF): E 1700 MPa, Poisson 0.39, density 1010 kg/m3, von Mises vs yield 48 MPa (HP 3D High Reusability PA 12 datasheet; EOS PA 2200).",
+  "Mass 1, 80 g (80 g at 150,0,32 @ top and within 15 of 150,0,15), is a point at (150, 0, 32) held rigidly by its faces, with no rotary inertia of its own.",
+  "Printed part treated as isotropic at 100% infill; across the layers it is roughly 90% as strong. Pass --print-direction to check that."
+ ],
+ "values": {
+  "analysis": "vibration",
+  "frequencies": [
+   30.36998,
+   43.64228,
+   196.6622,
+   218.7802,
+   597.0751,
+   645.2575,
+   1253.267,
+   1614.527,
+   1615.55,
+   1894.952,
+   2952.46,
+   3576.509,
+   3587.994,
+   3784.811,
+   4375.618
+  ],
+  "mass_fraction": [
+   [
+    0.0,
+    0.8219,
+    0.0
+   ],
+   [
+    0.0251,
+    0.0,
+    0.805
+   ],
+   [
+    0.0001,
+    0.0168,
+    0.0
+   ],
+   [
+    0.5692,
+    0.0,
+    0.0598
+   ],
+   [
+    0.0,
+    0.0493,
+    0.0
+   ],
+   [
+    0.1115,
+    0.0,
+    0.0213
+   ],
+   [
+    0.1031,
+    0.0,
+    0.0016
+   ],
+   [
+    0.059,
+    0.0024,
+    0.0005
+   ],
+   [
+    0.0073,
+    0.0197,
+    0.0001
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0149,
+    0.0
+   ],
+   [
+    0.0002,
+    0.0,
+    0.0379
+   ],
+   [
+    0.0051,
+    0.0,
+    0.0016
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0114,
+    0.0
+   ]
+  ],
+  "total_mass_kg": 0.120368,
+  "target_sf": 2.0,
+  "modes": 15,
+  "masses_g": [
+   80.0
+  ],
+  "_figures": [
+   [
+    "modes",
+    "Mode shapes that the excitation can drive, motion exaggerated"
+   ],
+   [
+    "frequencies",
+    "Natural frequencies against the excitation, as tall as the share of mass each moves"
+   ],
+   [
+    "response",
+    "Sine sweep response at the governing point"
+   ],
+   [
+    "stress",
+    "Response stress with the governing point marked"
+   ],
+   [
+    "random",
+    "3 sigma stress of the random input"
+   ]
+  ],
+  "resonance": [
+   {
+    "mode": 2,
+    "frequency": 43.64228,
+    "excitation": "once per turn from 83.3 to 200 Hz",
+    "lo": 83.333333,
+    "hi": 200.0,
+    "separation": 0.476293,
+    "status": "clear",
+    "amplification": 0.12899,
+    "mass_share": 0.805016
+   },
+   {
+    "mode": 3,
+    "frequency": 196.6622,
+    "excitation": "once per turn from 83.3 to 200 Hz",
+    "lo": 83.333333,
+    "hi": 200.0,
+    "separation": 0.0,
+    "status": "resonant",
+    "amplification": 16.666667,
+    "mass_share": 0.016839
+   },
+   {
+    "mode": 4,
+    "frequency": 218.7802,
+    "excitation": "once per turn from 83.3 to 200 Hz",
+    "lo": 83.333333,
+    "hi": 200.0,
+    "separation": 0.093901,
+    "status": "resonant",
+    "amplification": 1.531962,
+    "mass_share": 0.569152
+   },
+   {
+    "mode": 3,
+    "frequency": 196.6622,
+    "excitation": "blade pass (2 blades) from 167 to 400 Hz",
+    "lo": 166.666667,
+    "hi": 400.0,
+    "separation": 0.0,
+    "status": "resonant",
+    "amplification": 16.666667,
+    "mass_share": 0.016839
+   },
+   {
+    "mode": 4,
+    "frequency": 218.7802,
+    "excitation": "blade pass (2 blades) from 167 to 400 Hz",
+    "lo": 166.666667,
+    "hi": 400.0,
+    "separation": 0.0,
+    "status": "resonant",
+    "amplification": 16.666667,
+    "mass_share": 0.569152
+   },
+   {
+    "mode": 5,
+    "frequency": 597.0751,
+    "excitation": "blade pass (2 blades) from 167 to 400 Hz",
+    "lo": 166.666667,
+    "hi": 400.0,
+    "separation": 0.492688,
+    "status": "clear",
+    "amplification": 1.229392,
+    "mass_share": 0.049344
+   }
+  ],
+  "excitations": [
+   "once per turn from 83.3 to 200 Hz",
+   "blade pass (2 blades) from 167 to 400 Hz"
+  ],
+  "margin": 0.2,
+  "_tables": [
+   [
+    "Natural frequencies against the excitation",
+    [
+     "mode",
+     "Hz",
+     "excitation",
+     "separation",
+     "amplification",
+     "status"
+    ],
+    [
+     [
+      2,
+      "43.6",
+      "once per turn from 83.3 to 200 Hz",
+      "48%",
+      "0.13x",
+      "clear"
+     ],
+     [
+      3,
+      "197",
+      "once per turn from 83.3 to 200 Hz",
+      "0%",
+      "17x",
+      "resonant"
+     ],
+     [
+      4,
+      "219",
+      "once per turn from 83.3 to 200 Hz",
+      "9%",
+      "1.5x",
+      "resonant"
+     ],
+     [
+      3,
+      "197",
+      "blade pass (2 blades) from 167 to 400 Hz",
+      "0%",
+      "17x",
+      "resonant"
+     ],
+     [
+      4,
+      "219",
+      "blade pass (2 blades) from 167 to 400 Hz",
+      "0%",
+      "17x",
+      "resonant"
+     ],
+     [
+      5,
+      "597",
+      "blade pass (2 blades) from 167 to 400 Hz",
+      "49%",
+      "1.2x",
+      "clear"
+     ]
+    ],
+    "Modes within 20% of an excitation are close, within half that resonant. Amplification is the steady response of that mode at the middle of the excitation for 3% damping."
+   ]
+  ],
+  "sf": null,
+  "damping": 0.03,
+  "damping_reason": "3% of critical, typical of a plastic, wood or composite part. The response at a resonance grows as damping falls",
+  "duration_s": 0.0,
+  "duration_reason": "",
+  "levels": [
+   {
+    "level": 0,
+    "n_nodes": 10417,
+    "h": 8.567308,
+    "freq": [
+     30.56275,
+     43.94779,
+     201.0294,
+     221.4467,
+     601.935,
+     659.8016,
+     1272.161,
+     1629.684
+    ],
+    "watch_mode": 4,
+    "watch_Hz": 221.4467,
+    "stress": null
+   },
+   {
+    "level": 1,
+    "n_nodes": 12659,
+    "h": 6.425481,
+    "freq": [
+     30.36998,
+     43.64228,
+     196.6622,
+     218.7802,
+     597.0751,
+     645.2575,
+     1253.267,
+     1614.527
+    ],
+    "watch_mode": 4,
+    "watch_Hz": 218.7802,
+    "stress": null
+   }
+  ],
+  "playback": "playback.json"
+ },
+ "images": {
+  "modes": "images/modes.jpg",
+  "frequencies": "images/frequencies.png"
+ },
+ "fixes": [
+  {
+   "kind": "stiffen",
+   "title": "Stiffen to move mode 3 above 480 Hz",
+   "summary": "A natural frequency grows with the square root of stiffness, so mode 3 at 197 Hz needs about 6 times the stiffness to clear the blade pass (2 blades) and the once per turn by 20%. For a beam carrying a heavy end mass that is a section about 1.8 times as deep in the bending direction, and when the beam's own mass dominates about 2.4 times as deep.",
+   "params": {
+    "stiffness_factor": 5.95718,
+    "target_Hz": 480.0
+   },
+   "auto": false
+  },
+  {
+   "kind": "soften",
+   "title": "Or move mode 3 below 69.4 Hz",
+   "summary": "Softer mounts or isolators that bring it to 0.12 times the stiffness put the mode under the excitation, which works when the speed only passes through it on the way up.",
+   "params": {
+    "stiffness_factor": 0.12469
+   },
+   "auto": false
+  },
+  {
+   "kind": "lighten",
+   "title": "Lighten the attached mass",
+   "summary": "With an end mass dominating, the frequency goes as 1/sqrt(mass), so 2.4 times the frequency needs about 0.17 of the mass.",
+   "auto": false
+  },
+  {
+   "kind": "damping",
+   "title": "Add damping",
+   "summary": "At resonance the response is about 1/(2 zeta) of the static one, 16.7 times now. A damping layer or a damped mount that doubles the damping halves it.",
+   "auto": false
+  }
+ ],
+ "notes": [
+  "Built from arm.py with length=150, width=16, root_height=20, tip_height=12, window=3, pad=30."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 110.722492,
+ "solver": "CalculiX 2.23"
+}
