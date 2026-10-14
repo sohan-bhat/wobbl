@@ -27,6 +27,11 @@ def value(params: dict, key: str, default, kind: str = "number"):
     if isinstance(v, (int, float)):
         return float(v) * (_SI_FACTOR.get(kind, 1.0) if kind == "length" else 1.0)
     s = str(v).strip()
+    if kind == "distance":                         # like length, but a bare number is in meters
+        try:
+            return parse_quantity(s, "length", default_unit="m").value * 1e-3
+        except UnitError as e:
+            raise ParamError(f"{key}: {e}") from None
     if kind == "number":
         try:
             return float(s)
