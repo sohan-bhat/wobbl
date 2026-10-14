@@ -15,6 +15,9 @@ from . import quantities as Q
 
 # hobby servo datasheets give no continuous rating; a third of stall is the usual rule for small brushed motors
 CONTINUOUS_SHARE = 1 / 3
+# nor do they give rotor inertia, so a motor's rotor seen through its gearbox gets the inertia of this mechanical
+# time constant (J w0 / Ts), typical of small brushed motors
+MECH_TAU = 0.02
 
 
 @dataclass(frozen=True)
@@ -66,6 +69,10 @@ class Motor:
         tau = np.asarray(tau, float)
         avail = np.where(tau >= 0, hi, -lo)
         return np.where(np.abs(tau) < 1e-12, 0.0, np.abs(tau) / np.maximum(avail, 1e-12))
+
+    def rotor_inertia(self) -> float:
+        """Inertia of the rotor as the output shaft feels it, from MECH_TAU; zero for a motor with no speed limit."""
+        return MECH_TAU * self.stall_torque / self.no_load_speed if math.isfinite(self.no_load_speed) else 0.0
 
     def max_efficiency_torque(self) -> float:
         """Torque of best efficiency. For a DC motor it sits where the current is sqrt(I0 Is); without currents

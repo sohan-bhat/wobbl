@@ -161,6 +161,7 @@ def arm(raw: dict) -> Built:
         mot = servos[j]
         r = p.get(f"{j}_ratio", Q.number) or (ratio if j == rjoint else 1.0)
         m.drives.append(Drive(j, mot, "servo", r, 0.9 if r != 1 else 1.0))   # a belt or gear stage loses 10%
+        m.joint(j).armature = m.drives[-1].at_joint.rotor_inertia()          # the motor behind its gears
     m.move = [(i * tseg, pose) for i, pose in enumerate(poses)]
     m.hold = dwell
     p.done()
@@ -217,6 +218,7 @@ def fourbar(raw: dict) -> Built:
     w_est = motor.no_load_speed if motor is not None and math.isfinite(motor.no_load_speed) else speed
     if motor is not None:
         m.drives.append(Drive("crank", motor, "voltage"))
+        m.joint("crank").armature = motor.rotor_inertia()
         m.duration = turns * 2 * math.pi / w_est * 1.3 + 0.3
     else:
         m.drives.append(Drive("crank", None, "servo"))
@@ -236,7 +238,6 @@ GEARS = {"teeth": "12:36,10:40", "efficiency": 0.97, "motor": "fa-130", "stall_t
          "rotor_inertia": "auto", "time": None, "timestep": "0.1 ms"}
 
 
-ROTOR_TAU = 0.02
 
 
 def _stages(v) -> list[tuple[int, int]]:
@@ -261,11 +262,8 @@ def gears(raw: dict) -> Built:
     rho = p.get("density", lambda v: Q.number(str(v).lower().replace("kg/m3", "")))
     j_load = p.get("load_inertia", lambda v: Q.number(str(v).lower().replace("kg*m2", "").replace("kgm2", "")))
     rotor = str(p.get("rotor_inertia")).strip().lower()
-    # without a datasheet value, a rotor that gives the bare motor a 20 ms mechanical time constant, typical of small
-    # brushed motors: tau = J w0 / Ts
-    rotor_auto = rotor == "auto"
-    j_rotor = (ROTOR_TAU * motor.stall_torque / motor.no_load_speed if rotor_auto and math.isfinite(motor.no_load_speed)
-               else 0.0 if rotor_auto else Q.number(rotor.replace("kg*m2", "").replace("kgm2", "")))
+    rotor_auto = rotor == "auto"      # without a datasheet value, the rotor of a 20 ms mechanical time constant
+    j_rotor = motor.rotor_inertia() if rotor_auto else Q.number(rotor.replace("kg*m2", "").replace("kgm2", ""))
     ratio, eff_total = T.gear_train(stages, eff)
     m = Mechanism("gear train", timestep=p.get("timestep", Q.time), gravity=(0.0, 0.0, -T.G))
     x = 0.0

@@ -191,7 +191,8 @@ def answer(b, img: Path, say) -> Answer:
         f"{fmt(info['dwell_s'])} s. The heating estimate repeats that loaded cycle.",
         "The servos follow the move by computed torque, as a well tuned controller would, and a hobby servo's own "
         "loop lags a little more.",
-        "The inertia of each servo's motor behind its gearbox is left out, which makes fast starts look easier.",
+        "Each servo's motor, felt through its gearbox, adds the inertia of a 20 ms mechanical time constant, "
+        "typical of small brushed motors, since servo datasheets do not give it.",
         f"The {fmt(payload_g)} g payload and the gripper are point masses at the tip, and the base is "
         + ("screwed to the table." if info["mount"] == "clamped" else
            f"standing free on the table ({fmt(info['base_mass'] * 1000)} g, "
