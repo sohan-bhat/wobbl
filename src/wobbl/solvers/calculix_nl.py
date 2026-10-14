@@ -122,6 +122,7 @@ class NonlinearResult:
     last_attempt: float = float("nan")       # increment of the last attempt, as a fraction of its step
     contact_totals: dict[str, list[dict]] = field(default_factory=dict)   # pair -> totals at each saved time
     bolt_ids: dict[str, dict] = field(default_factory=dict)  # bolt -> its extra nodes (H, HR, N, NR, Q, P)
+    timed_out: bool = False                  # a may_stop ramp that ran out of time: its increments are a lower bound
 
 
 def write_nonlinear_inp(path: Path, model: NonlinearModel) -> dict:
@@ -441,18 +442,25 @@ def solve_nonlinear(model: NonlinearModel, workdir: str | Path, job: str = "nonl
         (work / f"{job}{ext}").unlink(missing_ok=True)
     info = write_nonlinear_inp(work / f"{job}.inp", model)
     t0 = time.time()
+    timed_out = False
     try:
         r = subprocess.run([str(ccx), "-i", job], cwd=work, capture_output=True, text=True, timeout=timeout,
                            env=tool_env(ccx, THREADS))
     except subprocess.TimeoutExpired:
-        raise SolverError(f"CalculiX did not finish the nonlinear run within {timeout:.0f} s",
-                          "Use --quality fast for a coarser mesh") from None
+        incs, _, last_step = read_sta(work / f"{job}.sta")
+        step = model.steps[last_step - 1] if 0 < last_step <= len(model.steps) else None
+        if not (step is not None and step.may_stop and incs > 0):
+            raise SolverError(f"CalculiX did not finish the nonlinear run within {timeout:.0f} s",
+                              "Use --quality fast for a coarser mesh") from None
+        # a ramp toward collapse that runs out of time still holds every increment it converged: a lower bound
+        timed_out = True
+        r = subprocess.CompletedProcess([], 1, "", "")
     log = (r.stdout or "") + (r.stderr or "")
     t = time.time() - t0
     errs = [ln.strip() for ln in log.splitlines() if "*ERROR" in ln]
     incs, iters, last_step = read_sta(work / f"{job}.sta")
-    stopped = bool(errs) and all(STOPPED in e for e in errs)
-    finished = r.returncode == 0 and not errs
+    stopped = (bool(errs) and all(STOPPED in e for e in errs)) or timed_out
+    finished = r.returncode == 0 and not errs and not timed_out
     if not finished:
         step = model.steps[last_step - 1] if 0 < last_step <= len(model.steps) else None
         if not (stopped and step is not None and step.may_stop and incs > 0):
@@ -480,7 +488,7 @@ def solve_nonlinear(model: NonlinearModel, workdir: str | Path, job: str = "nonl
                                 else np.nan for fr in frames]) for b in model.bolts}
     return NonlinearResult(times, reactions, monitor, frames, finished, log, t, f"CalculiX {_version()}",
                            incs, iters, forces, last_attempt(work / f"{job}.sta"),
-                           read_contact_totals(work / f"{job}.dat"), info["bolts"])
+                           read_contact_totals(work / f"{job}.dat"), info["bolts"], timed_out)
 
 
 def read_sta(path: Path) -> tuple[int, int, int]:

@@ -185,8 +185,12 @@ def run_plastic(study: PlasticStudy, out_dir: str | Path, progress=None, pre=Non
         levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sizing.h, "first_yield": y["factor"],
                        "collapse": lim["factor"], "collapsed": lim["collapsed"], "increments": lim["increments"],
                        "iterations": lim["iterations"], "t_solve": lim["t_solve"]})
-        say("check", f"level {k}: collapse at {lim['factor']:.4g}x the load")
+        say("check", f"level {k}: collapse at {lim['factor']:.4g}x the load" if lim["collapsed"] else
+            f"level {k}: no collapse up to {lim['factor']:.4g}x the load")
         last = (mesh, built, lin, y, lim)
+        if not lim["collapsed"]:
+            # nothing to converge: a second ramp on a finer mesh would only find no collapse again, slower
+            break
     mesh, built, lin, y, lim = last
     service = None
     if y["factor"] < 1.0 and lim["factor"] > 1.0:
@@ -281,7 +285,8 @@ def limit_run(built, mat, lam_y: float, lin, work: Path) -> dict:
             w = g[i - 1] / (g[i - 1] - g[i])
             tes = float(lam[i - 1] + w * (lam[i] - lam[i - 1]))
     frame = res.frames[-1] if res.frames else {}
-    return {"factor": float(lam[-1]) if n else 0.0, "collapsed": not res.finished, "ramp": lam_max,
+    return {"factor": float(lam[-1]) if n else 0.0, "collapsed": not res.finished and not res.timed_out,
+            "timed_out": res.timed_out, "ramp": lam_max,
             "lam": lam.tolist(), "u": u.tolist(), "monitor_xyz": built.model.mesh.X[mon].tolist(),
             "stiffness_ratio": float(k_end / k0) if np.isfinite(k0) and k0 > 0 else None, "tes": tes,
             "bracket": float(res.last_attempt * lam_max) if not res.finished else 0.0, "frame": frame,
@@ -332,9 +337,14 @@ def evaluate(study, mat, curve, prep, feats, loads, mesh, built, lin, y, lim, le
     vals = [L["collapse"] for L in levels]
     if all(L["collapsed"] for L in levels):
         checks.append(convergence_check(vals, COLLAPSE_TOL, "collapse load", "x the load", min_levels=2))
+    elif lim.get("timed_out"):
+        checks.append(Check("mesh convergence", "warn", f"the ramp ran out of time at {fmt(lim['factor'])}x the load "
+                            "without collapsing, so the collapse load is only known to be above that; one mesh was "
+                            "ramped"))
     else:
         checks.append(Check("mesh convergence", "info", f"no collapse up to {fmt(lim['ramp'])}x the load, "
-                            f"{RAMP:g} times first yield, so the collapse load is only known to be above that"))
+                            f"{RAMP:g} times first yield, so the collapse load is only known to be above that and "
+                            "one mesh was enough to show it"))
     # the ramp ends either at a mechanism (the part keeps moving for almost no extra load) or at a numerical stop
     ratio = lim["stiffness_ratio"]
     if lim["collapsed"] and ratio is not None:
