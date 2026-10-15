@@ -249,12 +249,28 @@ def open_view(path: Path) -> None:
     webbrowser.open(Path(path).resolve().as_uri())
 
 
+class DomainOption(click.Option):
+    """--domain, whose help names the domains the registry holds. The names are read when help is shown, so the
+    list follows the registry and costs nothing at startup."""
+
+    @property
+    def help(self):
+        from ..simulate.registry import domains
+        names = [d.name for d in domains()]
+        listed = ", ".join(names[:-1]) + (" or " if len(names) > 1 else "") + names[-1] if names else "none"
+        return f"What the thing is when Wobbl reads it wrongly, one of {listed}."
+
+    @help.setter
+    def help(self, value):
+        pass   # click sets the static help at decoration; the property above is the one shown
+
+
 @click.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True}, epilog=EPILOG)
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 @click.option("--physics", multiple=True, help="The physics to run, e.g. stress,heat, read from the question "
                                                  "when left out. See --list.")
-@click.option("--domain", default=None, help="What the thing is when Wobbl reads it wrongly, one of part, "
-                                              "circuit, mechanism, flight, fluid, field or chemistry.")
+@click.option("--domain", default=None, cls=DomainOption,
+              help="What the thing is when Wobbl reads it wrongly, one of the registered domains.")
 @click.option("--kind", default=None, help="The kind of thing within the domain, e.g. buck, solenoid or rocket.")
 @click.option("--material", "-m", default=None, help="Material name, or custom:E=..,nu=..,yield=..")
 @click.option("--load", "-l", "loads", multiple=True, help="Load, e.g. '200 N down @ top' (repeatable).")

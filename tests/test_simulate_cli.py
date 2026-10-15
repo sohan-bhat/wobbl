@@ -32,6 +32,21 @@ def test_unknown_options_and_physics_are_caught():
     assert r.exit_code != 0 and "file not found" in r.output
 
 
+def test_drop_reads_a_time_budget():
+    drop = str(ROOT / "examples" / "handheld-drop" / "handheld.py")
+    r = CliRunner().invoke(cli, ["simulate", drop, "will it survive a 1.2 m drop onto tile?", "--budget", "300",
+                                 "--plan"])
+    assert r.exit_code == 0, r.output
+
+
+def test_domain_help_names_every_registered_domain():
+    from wobbl.simulate import domains
+    r = CliRunner().invoke(cli, ["simulate", "--help"])
+    assert r.exit_code == 0
+    line = " ".join(r.output.split())
+    assert "one of " in line and all(d.name in line for d in domains())
+
+
 def test_list_names_every_domain():
     r = CliRunner().invoke(cli, ["simulate", "--list"])
     assert r.exit_code == 0

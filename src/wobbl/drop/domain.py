@@ -93,5 +93,7 @@ register(Analysis(
              Option("mass", "A point mass on the part, like a battery: '45 g @ 0,0,5' or '45 g @ <faces>'",
                     multiple=True),
              Option("watch", "Where the accelerometer sits: 'x,y,z' or faces (default the first mass, else the "
-                             "center of mass)")),
+                             "center of mass)"),
+             Option("budget", "Run time in seconds the drop may be predicted to take before its mesh is coarsened",
+                    "600")),
     example='wobbl simulate phone.step "will it survive a 1.2 m drop onto tile?"'))
