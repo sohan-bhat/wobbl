@@ -64,15 +64,25 @@ class Scene:
 
     # time
     def timeline(self, t, *, unit: str = "s", label: str = "time", seconds: float = 8.0,
-                 between: str = "interpolated", loop: bool = True, note: str = "") -> "Scene":
+                 between: str = "interpolated", loop: bool = True, note: str = "", kind: str = "time",
+                 design=None) -> "Scene":
         """The saved frames' times (or loads, or cycles). between says what the viewer may show between two saved
         frames: interpolated (smooth, and labeled as interpolated), exact (in between is exact, as for a linear
-        model scaled by load) or step (each saved frame held until the next)."""
+        model scaled by load) or step (each saved frame held until the next).
+
+        kind "input" makes the frames a sweep over something the user controls, such as a load, a supply voltage,
+        a payload or a wind speed. The viewer then shows a slider labeled with it instead of play controls, never
+        plays on its own, and opens at design, the value the question asked about."""
         if between not in ("interpolated", "exact", "step"):
             raise ValueError("between is interpolated, exact or step")
+        if kind not in ("time", "input"):
+            raise ValueError("kind is time or input")
         self.t = np.asarray(t, float).ravel()
         self.n = len(self.t)
-        self.tl = {"unit": unit, "label": label, "seconds": float(seconds), "between": between, "loop": loop}
+        self.tl = {"unit": unit, "label": label, "seconds": float(seconds), "between": between, "loop": loop,
+                   "kind": kind}
+        if design is not None:
+            self.tl["design"] = float(design)
         if note:
             self.tl["note"] = note
         return self
