@@ -30,6 +30,9 @@ LAUNCH = "(nohup sh run.sh > /dev/null 2>&1 < /dev/null &)"
 ALIVE = ("if [ ! -f watcher.pid ]; then echo starting; elif kill -0 $(cat watcher.pid) 2>/dev/null; then echo alive; "
          "else echo gone; fi")
 STARTING = 120.0
+# Whether the run is alive is asked before its files are read. The disk guard writes disk_stop and then kills the
+# run, so asking after reading could see the run gone and no disk_stop yet, and call a stopped run interrupted.
+ASK = f"A=$({ALIVE}); "
 
 
 class JobError(RuntimeError):
@@ -431,8 +434,8 @@ def _remote_status_wobbl(job: Job, st: dict, t: R.Transport) -> dict:
     from .watch import eta
 
     d = shlex.quote(job.remote_dir)
-    cmd = (f"cd {d} && cat exit_code disk_stop 2>/dev/null; echo '@@'; tail -c 6000 solver.log 2>/dev/null; echo '@@'; "
-           f"{ALIVE}; echo '@@'; cat started 2>/dev/null")
+    cmd = (f"cd {d} && {ASK}cat exit_code disk_stop 2>/dev/null; echo '@@'; tail -c 6000 solver.log 2>/dev/null; "
+           "echo '@@'; echo $A; echo '@@'; cat started 2>/dev/null")
     try:
         out = t.run(cmd, timeout=60).stdout.split("@@")
     except R.RemoteError as e:
@@ -531,9 +534,9 @@ def _remote_status(job: Job) -> dict:
         return _remote_status_wobbl(job, st, t)
     d = shlex.quote(job.remote_dir)
     names = ["job"] + [f"job_r{r}" for r in range(1, job.restarts + 1)]
-    cmd = f"cd {d} && cat exit_code disk_stop 2>/dev/null; echo '@@'; " + " ".join(
+    cmd = f"cd {d} && {ASK}cat exit_code disk_stop 2>/dev/null; echo '@@'; " + " ".join(
         f"tail -c 6000 work/{n}.sta 2>/dev/null; echo '@@';" for n in names) + \
-        f" {ALIVE}; echo '@@'; cat started 2>/dev/null"
+        " echo $A; echo '@@'; cat started 2>/dev/null"
     try:
         out = t.run(cmd, timeout=60).stdout.split("@@")
     except R.RemoteError as e:
