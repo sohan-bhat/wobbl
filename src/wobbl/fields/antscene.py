@@ -96,14 +96,12 @@ def write(out: Path, *, title: str, question: str, scene, setup, feed: dict, msh
         iu, iv, ik = plane["iu"], plane["iv"], plane["ik"]
         nu, nv = plane["nu"], plane["nv"]
         e = sl[..., :3] + 1j * sl[..., 3:]
-        mag = np.abs(e)
-        top = float(np.nanpercentile(np.sqrt(np.sum(mag ** 2, axis=-1)), 97)) or 1.0
+        c = int(np.argmax(np.abs(np.asarray(feed["t"], float))))     # the component along the feed, so the wave reads
+        ec = e[..., c]                                                # as a wave (a thin wire's near field is radial)
+        top = float(np.nanpercentile(np.abs(ec), 92)) or 1.0
         ph = np.arange(FRAMES) / FRAMES * 2 * math.pi
-        # the component along the feed keeps its sign, so the wave reads as a wave (the near field of a thin wire
-        # is mostly radial, which would hide it)
-        c = int(np.argmax(np.abs(np.asarray(feed["t"], float))))
-        sig = np.real(e[..., c][None] * np.exp(1j * ph)[:, None, None]) / top
-        sig = np.clip(sig, -1.0, 1.0)
+        raw = np.real(ec[None] * np.exp(1j * ph)[:, None, None]) / top
+        sig = np.sign(raw) * np.sqrt(np.minimum(np.abs(raw), 1.0))      # square root keeps the far field visible
         uu = np.linspace(plane["u0"], plane["u1"], nu) * mm
         vv = np.linspace(plane["v0"], plane["v1"], nv) * mm
         gu, gv = np.meshgrid(uu, vv)
@@ -117,7 +115,7 @@ def write(out: Path, *, title: str, question: str, scene, setup, feed: dict, msh
         if len(tri):
             vals = np.nan_to_num(sig.reshape(FRAMES, -1))
             m = s.mesh(P, tri, name="electric field", opacity=0.82, max_vertices=nu * nv + 1, smooth=True)
-            m.color_by(f"E{'xyz'[c]}", vals, unit="of the 97th percentile", colormap="coolwarm", range=[-1, 1], digits=2)
+            m.color_by(f"E{'xyz'[c]}", vals, unit="of the 92nd percentile, square rooted", colormap="coolwarm", range=[-1, 1], digits=2)
     # the radiation pattern
     d = base.get("d_sphere")
     if d is not None:
