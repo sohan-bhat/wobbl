@@ -34,8 +34,16 @@
 - The CAD flow core is proven on sixteen varied parts, and cold plate and fan heat sink
   examples are added.
 - A sand cast pulley example is checked for shrinkage porosity.
-- Weld lines in molding are judged where the fronts meet first, and isolated weld line
-  nodes are dropped, so the line does not depend on the mesher.
+- Weld lines in molding are found from the flow direction averaged over a few wall
+  thicknesses. A node is on a line when the melt moves toward it from both sides, so a
+  fixed mesh size finds the line behind a hole and nothing at the gate or side walls.
+- Print, casting and molding studies predict the cost of their mesh levels before
+  solving and give up curve elements and element size rung by rung until two levels fit
+  a 600 s budget, so the mesh convergence check always has two meshes. A slender truss
+  print that took 967 s on one mesh now solves two.
+- The process generality harness runs each case in its own process group with a hard
+  time limit, stops the solvers it started when the limit runs out and records the case
+  as timed out. Its results sit in docs/process-generality.json.
 
 **Bluff body drag**
 - External flow drag is judged against published references. A sphere meets Clift,
