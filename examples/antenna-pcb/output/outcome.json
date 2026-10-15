@@ -1,0 +1,242 @@
+{
+ "domain": "antenna",
+ "part": "ifa trace antenna",
+ "question": "Does the trace antenna resonate at 2.4 GHz, and what is its S11 and gain?",
+ "verdict": "fails",
+ "headline": "The antenna resonates at 2640 MHz (+10.0% from 2400 MHz), with 37.5 - j40.1 ohm and S11 of -7.2 dB against 50 ohm at 2400 MHz. Peak gain 1.92 dBi toward theta 32 and phi 75 degrees.",
+ "metrics": [
+  [
+   "resonance",
+   "2640 MHz"
+  ],
+  [
+   "S11",
+   "-7.2 dB"
+  ],
+  [
+   "impedance",
+   "37.5 - j40.1 ohm"
+  ],
+  [
+   "gain",
+   "1.92 dBi"
+  ],
+  [
+   "mesh",
+   "72624 unknowns"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "a fast run skips the finer mesh and the farther boundary, so the discretization error is not measured"
+ ],
+ "checks": [
+  {
+   "name": "power balance",
+   "status": "pass",
+   "summary": "the power flowing out through a sphere around the antenna matches the power fed in less the dielectric loss to 1.3% or better at all 8 frequencies (worst at 1800 MHz, 11.9 W out against 11.2 W for 1 A at the port), and the far field carries 16 W at 2400 MHz (5.3% apart)",
+   "detail": {
+    "worst": 0.013456,
+    "far_field_vs_flux": 0.053352
+   }
+  },
+  {
+   "name": "run time",
+   "status": "info",
+   "summary": "predicted 10 min from the 11,053 node mesh before any solve, took 7 min for 8 frequencies. It gave up 2 fewer frequencies in the sweep; a coarser mesh (the 'fast' quality); no verification solves on finer or larger meshes to fit the 15 min budget",
+   "detail": {
+    "predicted_s": 618.941121,
+    "took_s": 420.503189
+   }
+  }
+ ],
+ "assumptions": [
+  "Fed by a lumped port, a 0.5 mm wide strip across the 0.6 mm gap from (-9, 3.6, 1.583) to (-9, 3, 1.583) mm carrying 1 A. The impedance is the voltage across the gap over that current, so it holds the gap's capacitance and the strip's inductance.",
+  "Metals and copper sheets are perfect conductors, so conductor loss is left out. Dielectric loss comes from each material's loss tangent.",
+  "Free space around the antenna, closed by a sphere of 108 mm radius that absorbs outgoing waves (a second order boundary condition). The far field comes from the fields on a sphere of 66.7 mm.",
+  "First order edge elements no larger than a tenth of the shortest wavelength in air, one mesh for the whole sweep with 72624 unknowns.",
+  "'board' is board laminate, relative permittivity 4.4, loss tangent 0.02.",
+  "Solved in 3D. The antenna is the geometry in ifa.kicad_pcb, which no closed form describes.",
+  "The antenna is net ANT. Ground is GND.",
+  "The board is a slab of relative permittivity 4.4 and loss tangent 0.02, 1.6 mm thick (kicad stackup).",
+  "Vias are not modeled and copper is a perfect conductor of zero thickness."
+ ],
+ "values": {
+  "freqs_Hz": [
+   1800000000.0,
+   2100000000.0,
+   2250000000.0,
+   2400000000.0,
+   2641823836.726108,
+   2649703333.504184,
+   2700000000.0,
+   3000000000.0
+  ],
+  "z_ohm": [
+   [
+    117.552788,
+    -46.034281
+   ],
+   [
+    79.955339,
+    -179.513149
+   ],
+   [
+    44.971936,
+    -83.535509
+   ],
+   [
+    37.487982,
+    -40.145664
+   ],
+   [
+    34.930426,
+    0.224253
+   ],
+   [
+    34.919879,
+    1.308091
+   ],
+   [
+    34.94613,
+    8.086368
+   ],
+   [
+    38.99204,
+    47.318979
+   ]
+  ],
+  "s11_dB": [
+   -6.549664,
+   -1.710793,
+   -3.587488,
+   -7.193464,
+   -15.018315,
+   -14.980566,
+   -13.968097,
+   -6.338768
+  ],
+  "resonance_Hz": 2640480514.232635,
+  "resonance_kind": "reactance zero",
+  "z_resonance_ohm": [
+   34.944633,
+   0.0
+  ],
+  "z_at_f0_ohm": [
+   37.487982,
+   -40.145664
+  ],
+  "s11_at_f0_dB": -7.193464,
+  "bandwidth_Hz": 58176163.273892,
+  "directivity_dBi": 2.418832,
+  "gain_dBi": 1.920684,
+  "efficiency": 0.891631,
+  "peak_theta_deg": 32.5,
+  "peak_phi_deg": 75.0,
+  "gain_over_sweep_dBi": [
+   -4.019843,
+   1.234274,
+   1.66786,
+   1.920684,
+   2.140004,
+   2.144719,
+   2.172619,
+   2.295905
+  ],
+  "radiated_power_W_per_A2": 16.862553,
+  "input_power_W_per_A2": 18.743991,
+  "dielectric_loss_W_per_A2": 2.031267,
+  "unknowns": [
+   72624
+  ],
+  "nodes": [
+   11053
+  ],
+  "air_radius_m": 0.108288,
+  "sampling_radius_m": 0.066651,
+  "port_width_m": 0.0005,
+  "port_gap_m": 0.0006,
+  "plan": {
+   "quality": "fast",
+   "points": 5,
+   "refine": 3,
+   "nodes": 11053,
+   "unknowns": 78476,
+   "solves": 7.25,
+   "cpu_s": 1237.882243,
+   "seconds": 618.941121,
+   "memory_bytes": 1313507568.228929,
+   "verify": false,
+   "gave_up": [
+    "2 fewer frequencies in the sweep",
+    "a coarser mesh (the 'fast' quality)",
+    "no verification solves on finer or larger meshes"
+   ]
+  },
+  "mesh_seconds": 27.22693,
+  "mesh_resonance_shift": null,
+  "peak_memory_bytes": 979939328.0,
+  "solve_cpu_s": [
+   74.042279,
+   70.491593,
+   64.826775,
+   89.259936,
+   78.707533,
+   65.349343,
+   92.35833,
+   63.392196
+  ],
+  "solve_wall_s": [
+   41.95244,
+   42.833259,
+   37.729867,
+   86.575613,
+   42.323939,
+   37.053925,
+   66.00584,
+   38.651712
+  ],
+  "_figures": [
+   [
+    "s11",
+    "S11 over the sweep"
+   ],
+   [
+    "impedance",
+    "Input impedance"
+   ],
+   [
+    "pattern",
+    "Radiation pattern cuts"
+   ],
+   [
+    "field",
+    "Field strength near the antenna"
+   ],
+   [
+    "range",
+    "Received power over distance"
+   ]
+  ]
+ },
+ "images": {
+  "s11": "images/s11.png",
+  "impedance": "images/impedance.png",
+  "pattern": "images/pattern.png",
+  "field": "images/field.png"
+ },
+ "fixes": [
+  {
+   "kind": "length",
+   "title": "Scale the resonant length by 1.100",
+   "summary": "Make the part that sets the resonance 10.0% longer, since resonance scales inversely with length.",
+   "auto": false
+  }
+ ],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 427.116469,
+ "solver": "GetDP 3.5.0 with gmsh",
+ "criteria": []
+}

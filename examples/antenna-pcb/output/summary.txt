@@ -1,0 +1,29 @@
+FAILS. The antenna resonates at 2640 MHz (+10.0% from 2400 MHz), with 37.5 - j40.1 ohm and S11 of -7.2 dB against 50 ohm at 2400 MHz. Peak gain 1.92 dBi toward theta 32 and phi 75 degrees.
+
+Confidence: medium. a fast run skips the finer mesh and the farther boundary, so the discretization error is not measured
+resonance: 2640 MHz
+S11: -7.2 dB
+impedance: 37.5 - j40.1 ohm
+gain: 1.92 dBi
+mesh: 72624 unknowns
+
+Checks:
+  [pass] power balance: the power flowing out through a sphere around the antenna matches the power fed in less the dielectric loss to 1.3% or better at all 8 frequencies (worst at 1800 MHz, 11.9 W out against 11.2 W for 1 A at the port), and the far field carries 16 W at 2400 MHz (5.3% apart)
+  [info] run time: predicted 10 min from the 11,053 node mesh before any solve, took 7 min for 8 frequencies. It gave up 2 fewer frequencies in the sweep; a coarser mesh (the 'fast' quality); no verification solves on finer or larger meshes to fit the 15 min budget
+
+Assumptions:
+  - Fed by a lumped port, a 0.5 mm wide strip across the 0.6 mm gap from (-9, 3.6, 1.583) to (-9, 3, 1.583) mm carrying 1 A. The impedance is the voltage across the gap over that current, so it holds the gap's capacitance and the strip's inductance.
+  - Metals and copper sheets are perfect conductors, so conductor loss is left out. Dielectric loss comes from each material's loss tangent.
+  - Free space around the antenna, closed by a sphere of 108 mm radius that absorbs outgoing waves (a second order boundary condition). The far field comes from the fields on a sphere of 66.7 mm.
+  - First order edge elements no larger than a tenth of the shortest wavelength in air, one mesh for the whole sweep with 72624 unknowns.
+  - 'board' is board laminate, relative permittivity 4.4, loss tangent 0.02.
+  - Solved in 3D. The antenna is the geometry in ifa.kicad_pcb, which no closed form describes.
+  - The antenna is net ANT. Ground is GND.
+  - The board is a slab of relative permittivity 4.4 and loss tangent 0.02, 1.6 mm thick (kicad stackup).
+  - Vias are not modeled and copper is a perfect conductor of zero thickness.
+
+Suggested fixes:
+  - Scale the resonant length by 1.100: Make the part that sets the resonance 10.0% longer, since resonance scales inversely with length.
+
+Images: s11: images/s11.png, impedance: images/impedance.png, pattern: images/pattern.png, field: images/field.png
+Report: report.html

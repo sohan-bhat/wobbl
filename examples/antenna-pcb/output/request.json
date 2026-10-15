@@ -1,0 +1,15 @@
+{
+ "domain": "board",
+ "analysis": "antenna",
+ "spec": {
+  "thing": "ifa.kicad_pcb",
+  "kind": "kicad",
+  "question": "Does the trace antenna resonate at 2.4 GHz, and what is its S11 and gain?",
+  "options": {
+   "frequency": [
+    "2.4GHz"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

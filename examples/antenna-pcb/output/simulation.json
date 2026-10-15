@@ -1,0 +1,44 @@
+{
+ "thing": "ifa.kicad_pcb",
+ "question": "Does the trace antenna resonate at 2.4 GHz, and what is its S11 and gain?",
+ "plan": {
+  "thing": "ifa.kicad_pcb",
+  "question": "Does the trace antenna resonate at 2.4 GHz, and what is its S11 and gain?",
+  "domain": "board",
+  "kind": "kicad",
+  "analyses": [
+   "antenna"
+  ],
+  "reasons": [
+   {
+    "decided": "ifa.kicad_pcb is a .kicad_pcb file, read as a board (kicad)",
+    "override": "--domain board"
+   },
+   {
+    "decided": "physics antenna, as asked",
+    "override": "--physics antenna"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "board",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "fail",
+ "situation": {},
+ "steps": [
+  {
+   "analysis": "antenna",
+   "domain": "board",
+   "verdict": "fails",
+   "headline": "The antenna resonates at 2640 MHz (+10.0% from 2400 MHz), with 37.5 - j40.1 ohm and S11 of -7.2 dB against 50 ohm at 2400 MHz. Peak gain 1.92 dBi toward theta 32 and phi 75 degrees.",
+   "confidence": "medium",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": []
+  }
+ ]
+}
