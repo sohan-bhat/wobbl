@@ -503,13 +503,16 @@ def mesh_inputs(scene: Scene, s: WaveSetup, quality: str = "normal") -> dict:
     _, r_ext = _extent(scene, s, sheets)
     R = r_ext + lam_max / 2
     sizes = element_sizes(scene, s, lam_min, sheets, fd["gap"])
-    surf = []
+    surf, wires = [], []
     for b in scene.bodies:
         if b.name in sizes and (b.name in s.metals or b.name in s.dielectrics):
             surf.append((b.area, sizes[b.name] * k))
+            side = sorted(b.bbox[i + 3] - b.bbox[i] for i in range(3))
+            if b.name in s.metals and side[2] > 8 * side[0]:
+                wires.append((side[2], sizes[b.name] * k))
     for n, polys in sheets.items():
         surf.append((sum(_polygon_area(p) for p in polys), sizes.get(n, lam_min / 20) * k))
-    return {"R": R, "far": min(lam_min / 10, R / 5) * k, "surfaces": surf}
+    return {"R": R, "far": min(lam_min / 10, R / 5) * k, "surfaces": surf, "wires": wires}
 
 
 FINE_STEP = 1 / (1 - 0.75 ** 2)       # coarse error over the change to a mesh 0.75 as large, for an error of h squared

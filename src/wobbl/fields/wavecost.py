@@ -20,6 +20,7 @@ REFUSE_OVER = 2.5                 # a study predicted this many times over budge
 UNKNOWNS_PER_NODE = 7.1           # edge elements on tetrahedra, plus the absorbing sphere's surface unknowns
 AIR_CELLS = 0.84                  # nodes per far sized cell of air
 SKIN_CELLS = 1.57                 # nodes per cell of surface, with the graded mesh around it
+WIRE_CELLS = 21.0                 # nodes per element length of a thin wire, for the fine skirt that grows around it
 CPU_AT_100K = 175.0               # cpu seconds for one frequency (solve and field sampling) at 100 thousand unknowns
 EXPONENT = 1.4
 MESH_CPU_PER_NODE = 4.0e-3        # cpu seconds a node costs to mesh
@@ -63,12 +64,14 @@ class Plan:
 def nodes_from(inp: dict) -> float:
     """The base mesh's node count from what sets its element sizes (wave3d.mesh_inputs): the air sphere's volume in
     cells of the far size, and each surface's area in cells of its own size, with the refinement that grows around
-    it. Fit to the node counts of six patch meshes of the tests, to 7% or better on all of them."""
+    it, and a thin wire's fine skirt by its length in cells. Fit to the node counts of six patch meshes and three
+    dipole meshes, to 10% or better on all of them."""
     import math
 
     air = 4 / 3 * math.pi * inp["R"] ** 3 / inp["far"] ** 3
     skin = sum(a / (h * h) for a, h in inp["surfaces"])
-    return AIR_CELLS * air + SKIN_CELLS * skin
+    wires = sum(length / h for length, h in inp.get("wires", ()))
+    return AIR_CELLS * air + SKIN_CELLS * skin + WIRE_CELLS * wires
 
 
 def solve_cpu(unknowns: float) -> float:
