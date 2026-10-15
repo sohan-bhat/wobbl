@@ -25,6 +25,25 @@ def test_steady_playback_becomes_streamlines(tmp_path):
     assert "lines" in kinds
 
 
+def test_volume_streamlines_run_through_gaps_between_fins(tmp_path):
+    # air along +y through a box whose middle plane z = 10 is all metal: fins fill 0 to 20 in x except two gaps
+    g = np.stack(np.meshgrid(np.linspace(0, 40, 41), np.linspace(-10, 50, 61), np.linspace(0, 20, 21),
+                             indexing="ij"), -1).reshape(-1, 3)
+    metal = (g[:, 1] > 5) & (g[:, 1] < 35) & ~(((g[:, 0] > 8) & (g[:, 0] < 14)) | ((g[:, 0] > 26) & (g[:, 0] < 32)))
+    metal |= (g[:, 1] > 5) & (g[:, 1] < 35) & (np.abs(g[:, 2] - 10) < 1.5)
+    pts = g[~metal]
+    U = np.tile([0.0, 3.0, 0.0], (len(pts), 1))
+    vol = playback.volume_field(pts, U, np.ones(len(pts)), g.min(0), g.max(0), n=20000)
+    lines = scene.streamlines({"volume": vol}, around=([0, 5, 0], [40, 35, 20]))
+    assert len(lines) > 10
+    through = [p for p, _ in lines if p[:, 1].min() < 5 and p[:, 1].max() > 35]
+    assert through
+    for p in through:                    # a line that crosses the fins does it in a gap, never through metal
+        inside = (p[:, 1] > 7) & (p[:, 1] < 33)
+        x = p[inside, 0]
+        assert np.all(((x > 7) & (x < 15)) | ((x > 25) & (x < 33)))
+
+
 def test_unsteady_playback_becomes_particles(tmp_path):
     frames = [{"t": 0.1 * i, "fields": [_field()]} for i in range(4)]
     playback.write(tmp_path, "case", "test", "about", [_field()], frames=frames)

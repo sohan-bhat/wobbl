@@ -13,6 +13,7 @@ plain arrays with their units. The file stays under 400 kB, and the same run wri
      "surface": {"name": encoded uint8 per vertex, ...},
      "fields": [{"name", "plane": {"origin", "u", "v"}, "grid": {"x0", "x1", "y0", "y1", "nx", "ny", "unit"},
                  "components": {"u": encoded uint8 (ny, nx) with "missing": 255, ...}}],
+     "volume": {"grid": {"lo", "hi", "n", "unit"}, "components": {"u", "v", "w"}},   the velocity in 3D
      "frames": [{"t": 0.0, "fields": [...]}],                    unsteady runs only
      "series": {"name": {"x": [...], "y": [...], "x_unit", "y_unit"}},
      "scalars": {"name": {"value", "unit"}}}
@@ -58,6 +59,29 @@ def grid_field(name: str, x, y, comps: dict, units: dict, nx: int = 160, ny: int
     return out
 
 
+def volume_field(pts, U, size, lo, hi, n: int = 24000) -> dict:
+    """The velocity in 3D on a regular grid over the box lo to hi (mm), x fastest then y then z, from the cells
+    nearest each grid point. Points further than a cell size from every cell (inside the part, outside the domain)
+    are marked missing, so a streamline traced through it stops at the walls."""
+    from scipy.spatial import cKDTree
+
+    lo, hi = np.asarray(lo, float), np.asarray(hi, float)
+    ext = np.maximum(hi - lo, 1e-9)
+    h = float(np.prod(ext) / n) ** (1 / 3)
+    shape = np.maximum(np.round(ext / h).astype(int), 4)
+    axes = [np.linspace(lo[i], hi[i], shape[i]) for i in range(3)]
+    gz, gy, gx = np.meshgrid(axes[2], axes[1], axes[0], indexing="ij")
+    q = np.c_[gx.ravel(), gy.ravel(), gz.ravel()]
+    dist, idx = cKDTree(pts).query(q)
+    far = dist > 0.9 * np.maximum(np.asarray(size, float)[idx], 0.75 * h)
+    out = {"grid": {"lo": [_r(v) for v in lo], "hi": [_r(v) for v in hi], "n": [int(v) for v in shape],
+                    "unit": "mm"}, "components": {}}
+    for k, c in zip("uvw", range(3)):
+        v = np.asarray(U, float)[idx, c]
+        out["components"][k] = quantize(np.where(far, np.nan, v).reshape(shape[::-1]), "m/s")
+    return out
+
+
 def quantize(values: np.ndarray, unit: str = "") -> dict:
     """One byte per value between the finite values' extremes, 255 where a value is missing."""
     v = np.asarray(values, float)
@@ -91,12 +115,15 @@ def surface_block(X, tris, values: dict, units: dict, max_vertices: int = 2500) 
 
 def write(out_dir: str | Path, kind: str, title: str, about: str, fields: list | None = None,
           frames: list | None = None, curves: dict | None = None, scalars: dict | None = None,
-          mesh: dict | None = None, surface: dict | None = None, units: dict | None = None) -> str:
+          mesh: dict | None = None, surface: dict | None = None, units: dict | None = None,
+          volume: dict | None = None) -> str:
     doc = {"format": "wobbl-playback", "version": 1, "kind": kind, "title": title, "about": about,
            "units": units or {}, "fields": fields or [], "frames": frames or [], "series": curves or {},
            "scalars": {k: {"value": _r(v[0]), "unit": v[1]} for k, v in (scalars or {}).items()}}
     if mesh:
         doc["mesh"], doc["surface"] = mesh, surface or {}
+    if volume:
+        doc["volume"] = volume
     text = json.dumps(doc, separators=(",", ":"))
     if len(text) > LIMIT:
         raise ValueError(f"playback.json would be {len(text) / 1000:.0f} kB, over the {LIMIT / 1000:.0f} kB limit")

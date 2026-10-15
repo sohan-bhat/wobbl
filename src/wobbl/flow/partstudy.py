@@ -417,6 +417,7 @@ def _playback(o, g, p, s, fine, out, fl):
     field = playback.grid_field("flow", x, y, {"u": uu, "v": vv, "speed": mag},
                                 {"u": "m/s", "v": "m/s", "speed": "m/s"}, nx=160, ny=ny, unit="mm", plane=plane,
                                 spacing=h)
+    vol = _volume(g, p, s, fine)
     hist = np.asarray(fine["history"])
     step = max(1, len(hist) // 200)
     frames = []
@@ -446,5 +447,25 @@ def _playback(o, g, p, s, fine, out, fl):
         scal["frequency"] = (o.values.get("frequency_Hz", 0.0), "Hz")
     playback.write(out, "partflow", f"{fl.name} {'around' if s.mode == 'external' else 'through'} "
                                     f"{Path(o.part).stem}", about, [field], frames=frames, curves=curves,
-                   scalars=scal, mesh=mesh_b, surface=surf,
+                   scalars=scal, mesh=mesh_b, surface=surf, volume=vol,
                    units={"length": "mm", "velocity": "m/s", "pressure": "Pa", "time": "s"})
+
+
+def _volume(g, p, s, fine) -> dict | None:
+    """The solved velocity in 3D around and through the part, in the part's coordinates, so the scene can trace
+    streamlines from the inlet through every gap instead of one plane."""
+    from scipy.spatial import cKDTree
+
+    from . import playback
+
+    f = fine["fields"]
+    pts, U = f["C"] * 1e3, np.asarray(f["U"], float)
+    if len(pts) < 8:
+        return None
+    if s.mode in ("external", "ducted"):
+        pts, U = pts @ p.R + (g.lo + g.hi) / 2, U @ p.R
+    near, _ = cKDTree(pts).query(pts, k=2)
+    pad = 0.25 * (g.hi - g.lo) + 1e-6
+    lo = np.maximum(g.lo - pad, pts.min(0))
+    hi = np.minimum(g.hi + pad, pts.max(0))
+    return playback.volume_field(pts, U, near[:, 1], lo, hi)

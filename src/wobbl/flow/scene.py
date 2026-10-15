@@ -1,7 +1,8 @@
 """Flow runs as 3D scenes for the viewer, written through wobbl.viz.Scene from the run's own playback.json.
 
-A steady run shows the part's surface coloured by wall pressure with streamlines traced through the velocity in the
-plane through the middle, a glow running along each at its local speed. An unsteady run (DES or LES) shows the part
+A steady run shows the part's surface coloured by wall pressure with streamlines traced through the solved velocity
+in 3D from the inlet and through the fluid around the part (or, for an older run without it, in the plane through
+the middle), a glow running along each at its local speed. An unsteady run (DES or LES) shows the part
 with particles carried through the saved frames of the swinging wake. Lengths are mm.
 """
 from __future__ import annotations
@@ -94,6 +95,96 @@ def trace(pl: Plane, seeds: np.ndarray, steps: int = 140) -> list[tuple[np.ndarr
     return paths
 
 
+class Volume:
+    """The velocity in 3D on a regular grid (playback's volume block), sampled trilinearly, in mm and m/s."""
+
+    def __init__(self, d: dict):
+        g = d["grid"]
+        self.lo, self.hi = np.array(g["lo"], float), np.array(g["hi"], float)
+        self.n = np.array(g["n"], int)
+        self.U = np.stack([decode(d["components"][k]) for k in "uvw"])      # 3 x nz x ny x nx
+
+    def sample(self, P) -> np.ndarray:
+        """Velocity at points (k x 3), NaN outside the fluid."""
+        P = np.atleast_2d(P)
+        c = (P - self.lo) / (self.hi - self.lo) * (self.n - 1)
+        out = np.array([map_coordinates(u, c[:, ::-1].T, order=1, mode="constant", cval=np.nan) for u in self.U]).T
+        inside = np.all((c >= 0) & (c <= self.n - 1), axis=1)
+        out[~inside] = np.nan
+        return out
+
+    def fluid(self) -> np.ndarray:
+        """Grid points with fluid, as points (k x 3) and their speeds."""
+        ok = np.isfinite(self.U).all(0)
+        iz, iy, ix = np.nonzero(ok)
+        P = self.lo + np.c_[ix, iy, iz] / (self.n - 1) * (self.hi - self.lo)
+        return P, np.linalg.norm(self.U[:, iz, iy, ix].T, axis=1)
+
+    def seeds(self, n_in: int = 48, n_mid: int = 36, around=None) -> tuple[np.ndarray, np.ndarray]:
+        """Seeds on the inlet face, spread over the fluid there, and seeds among the fluid cells around the part
+        (inside its box when around gives one) so every gap gets a line. Returns (inlet seeds, inner seeds)."""
+        P, sp = self.fluid()
+        if not len(P):
+            return np.zeros((0, 3)), np.zeros((0, 3))
+        U = self.sample(P)
+        flow = np.nanmean(U, axis=0)
+        flow = flow / (np.linalg.norm(flow) or 1.0)
+        along = P @ flow
+        moving = sp > 0.15 * np.percentile(sp, 90)
+        inlet = moving & (along <= along.min() + 0.08 * np.ptp(along))
+        rng = np.random.default_rng(3)
+        a = P[inlet]
+        a = a[rng.choice(len(a), min(n_in, len(a)), replace=False)] if len(a) else a
+        inner = moving.copy()
+        if around is not None:
+            lo, hi = np.asarray(around[0], float), np.asarray(around[1], float)
+            inner &= np.all((P >= lo) & (P <= hi), axis=1)
+        b = P[inner]
+        b = b[rng.choice(len(b), min(n_mid, len(b)), replace=False)] if len(b) else b
+        return a, b
+
+
+def trace3d(vol: Volume, seeds, steps: int = 400, both: bool = False) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Streamlines through the 3D velocity by midpoint steps of half a grid cell, until they leave the fluid. With
+    both, each line runs back upstream from its seed as well, so a seed between fins shows where its air came from."""
+    h = 0.5 * float(np.min((vol.hi - vol.lo) / (vol.n - 1)))
+
+    def run(p, sign):
+        pts, spd = [], []
+        for _ in range(steps):
+            u = vol.sample(p)[0]
+            m = float(np.linalg.norm(u))
+            if not np.isfinite(m) or m < 1e-9:
+                break
+            pts.append(p)
+            spd.append(m)
+            um = vol.sample(p + sign * 0.5 * h * u / m)[0]
+            mm = float(np.linalg.norm(um))
+            if not np.isfinite(mm) or mm < 1e-9:
+                break
+            p = p + sign * h * um / mm
+        return pts, spd
+
+    out = []
+    for p in np.atleast_2d(seeds):
+        fw, sf = run(np.asarray(p, float), 1.0)
+        if both:
+            bw, sb = run(np.asarray(p, float), -1.0)
+            fw, sf = bw[::-1][:-1] + fw, sb[::-1][:-1] + sf
+        if len(fw) > 6:
+            out.append((np.array(fw), np.array(sf)))
+    return out
+
+
+def streamlines(pb: dict, around=None) -> list[tuple[np.ndarray, np.ndarray]]:
+    """3D streamlines from a playback's volume block: from the inlet, and through the fluid around the part."""
+    if not pb.get("volume"):
+        return []
+    vol = Volume(pb["volume"])
+    a, b = vol.seeds(around=around)
+    return trace3d(vol, a) + trace3d(vol, b, both=True)
+
+
 def _seeds(pl: Plane, n: int = 22) -> np.ndarray:
     """Seeds on the upstream edge of the grid across the fluid there, and a few more inside on the slower side."""
     ys = np.linspace(pl.y0, pl.y1, n + 2)[1:-1]
@@ -104,7 +195,8 @@ def _seeds(pl: Plane, n: int = 22) -> np.ndarray:
 def _scene(pb: dict, o: dict):
     from ..viz import Scene
     return Scene(pb.get("title", "Flow"), domain="flow", question=o.get("question", ""), length="mm",
-                 source="Streamlines follow the velocity the solver computed in the plane through the middle.")
+                 source="Streamlines follow the velocity the solver computed, in 3D when the run kept it and "
+                        "otherwise in the plane through the middle.")
 
 
 def _mesh(s, pb: dict):
@@ -127,7 +219,7 @@ def _build(pb: dict, o: dict):
     _mesh(s, pb)
     if pb.get("frames"):
         return _wake(s, pb, pl, k)
-    lines = trace(pl, _seeds(pl))
+    lines = streamlines(pb) or trace(pl, _seeds(pl))
     if not lines:
         return None
     sp = np.concatenate([w for _, w in lines])

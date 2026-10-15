@@ -180,14 +180,15 @@ def fan_sink(out: Path) -> Path | None:
 
 def cooled(out: Path) -> Path | None:
     """A part cooled by a fluid run through it, as a scene: the part see through and colored by its solved
-    temperature, with streamlines traced through the fluid's solved velocity in the plane through its middle."""
+    temperature, with streamlines traced through the fluid's solved velocity in 3D from the inlet and through the
+    fluid around the part, or in the plane through its middle for a run that kept only that."""
     out = Path(out)
     p = next((q for q in (out / "heat" / "fields.npz", out / "fields.npz") if q.exists()), None)
     o = read(out, "outcome.json") or {}
     pb = read(out, "playback.json") or {}
     if p is None or not pb.get("fields"):
         return None
-    from ...flow.scene import Plane, _seeds, trace
+    from ...flow.scene import Plane, _seeds, streamlines, trace
     d = np.load(p)
     X, tris, T = d["X"], d["tris"], d["T"]
     limit = (o.get("values") or {}).get("limit_C")
@@ -209,10 +210,15 @@ def cooled(out: Path) -> Path | None:
     fluid = np.argwhere(np.isfinite(pl.u) & (np.hypot(pl.u, pl.v) > 0))
     pick = fluid[np.linspace(0, len(fluid) - 1, min(36, len(fluid))).astype(int)] if len(fluid) else fluid
     seeds = np.c_[pl.x0 + pick[:, 1] / (pl.nx - 1) * (pl.x1 - pl.x0), pl.y0 + pick[:, 0] / (pl.ny - 1) * (pl.y1 - pl.y0)]
-    lines = trace(pl, np.vstack([_seeds(pl, 12), seeds]), steps=600)
+    lines = streamlines(pb, around=(X.min(0), X.max(0)))
+    if lines:
+        s.head["source"] = s.head["source"].replace("in the plane through the middle of the flow",
+                                                    "in 3D from the inlet and through the fluid around the part")
+    else:
+        lines = trace(pl, np.vstack([_seeds(pl, 12), seeds]), steps=600)
     if not lines:                        # nothing to see through to, so the part is drawn solid
         m.opacity = 1.0
-        s.note("The flow's middle plane holds too little fluid to trace streamlines, so the part shows alone.")
+        s.note("The flow holds too little fluid to trace streamlines, so the part shows alone.")
     if lines:
         top = float(max(w.max() for _, w in lines))
         span = pl.x1 - pl.x0
