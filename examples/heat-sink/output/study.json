@@ -1,0 +1,22 @@
+{
+ "part": "../heatsink.py",
+ "material": "6063-t5",
+ "power": 15000.0,
+ "heat_faces": "bottom and box 17.5,17.5,-1,42.5,42.5,0.5",
+ "films": [
+  {
+   "h": 0.006,
+   "t_inf": 40.0,
+   "faces": "all",
+   "text": "6 W/m2K @ all"
+  }
+ ],
+ "fixed": [],
+ "ambient": 40.0,
+ "initial": null,
+ "duration": 0.0,
+ "limit": 85.0,
+ "emissivity": 0.85,
+ "question": "Will a 15 W chip stay under 85 C on this heat sink without a fan?",
+ "quality": "normal"
+}

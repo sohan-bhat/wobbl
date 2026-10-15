@@ -1,0 +1,33 @@
+{
+ "domain": "part",
+ "analysis": "heat",
+ "spec": {
+  "thing": "heatsink.py",
+  "kind": "parametric",
+  "question": "Will a 15 W chip stay under 85 C on this heat sink without a fan?",
+  "options": {
+   "power": [
+    "15 W"
+   ],
+   "heat-faces": [
+    "bottom and box 17.5,17.5,-1,42.5,42.5,0.5"
+   ],
+   "film": [
+    "6 W/m2K @ all"
+   ],
+   "ambient": [
+    "40 C"
+   ],
+   "radiation": [
+    "0.85"
+   ],
+   "limit": [
+    "85 C"
+   ],
+   "material": [
+    "6063-t5"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

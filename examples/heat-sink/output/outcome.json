@@ -96,7 +96,7 @@
      30.0,
      0.0
     ],
-    "t_solve": 6.929396
+    "t_solve": 23.767793
    },
    {
     "level": 1,
@@ -109,7 +109,7 @@
      29.444444,
      0.0
     ],
-    "t_solve": 20.215646
+    "t_solve": 31.04775
    },
    {
     "level": 2,
@@ -122,7 +122,7 @@
      29.917012,
      0.0
     ],
-    "t_solve": 46.999602
+    "t_solve": 99.263548
    }
   ],
   "lumped_C": 68.077964,
@@ -147,6 +147,14 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 101.157439,
- "solver": "CalculiX 2.23"
+ "t_total": 226.277058,
+ "solver": "CalculiX 2.23",
+ "criteria": [
+  {
+   "name": "temperature",
+   "value": "t_max_C",
+   "limit": 85.0,
+   "sense": "max"
+  }
+ ]
 }

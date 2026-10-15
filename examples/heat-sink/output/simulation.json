@@ -1,0 +1,54 @@
+{
+ "thing": "heatsink.py",
+ "question": "Will a 15 W chip stay under 85 C on this heat sink without a fan?",
+ "plan": {
+  "thing": "heatsink.py",
+  "question": "Will a 15 W chip stay under 85 C on this heat sink without a fan?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "heat"
+  ],
+  "reasons": [
+   {
+    "decided": "heatsink.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics heat, as asked",
+    "override": "--physics heat"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "environment": {
+   "ambient": "40 C",
+   "cooling": [
+    "6 W/m2K @ all"
+   ]
+  },
+  "loads": [
+   "15 W of heat"
+  ]
+ },
+ "steps": [
+  {
+   "analysis": "heat",
+   "domain": "part",
+   "verdict": "ok",
+   "headline": "Hottest point reaches 70.3 C (limit 85 C) at (30, 29.9, 0) mm at steady state.",
+   "confidence": "high",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": []
+  }
+ ]
+}
