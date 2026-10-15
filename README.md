@@ -165,6 +165,7 @@ reads works as a flag, such as `--power "12 W"` or `--rpm 6000`.
 | a part (STEP, STL, BREP, IGES, parametric Python) | strength, heat, vibration, buckling, fatigue, plasticity, drops, composite layups, crack growth, contact, bolted joints, CFD and cooling, casting, printing and molding, submodels |
 | a finished result folder | its verdict, the same study with changes, fatigue, crack growth, a submodel |
 | a circuit (netlist, KiCad schematic, words) | every part against its ratings, operating point, transient, frequency response, tolerances |
+| a printed circuit board (`.kicad_pcb` or Gerber files) | trace impedance, inductance, capacitance and crosstalk of each net, which can feed back into its circuit |
 | a mechanism (spec, URDF, MJCF, words) | motor torque, kinematics, collisions, stability, contact and dynamics in MuJoCo |
 | a flight (body in words, rocket or motor spec) | trajectory, solid motor ballistics |
 | a fluid case (pipe, body in a stream, prop, hull, OpenFOAM case) | pressure drop, drag, thrust and hover, hull resistance, CFD |
@@ -606,13 +607,13 @@ where the two servo idealizations disagree, a load cell in service and coupons.
 
 ## Circuits
 
-`wobbl circuit` (and `wobbl simulate` with a netlist, a schematic or words) takes any circuit:
+`wobbl simulate` takes any circuit, whether it is a netlist, a schematic or words:
 
 ```sh
-wobbl circuit board.kicad_sch --set J2.load=2A        # a KiCad schematic, with a load on a connector
-wobbl circuit amp.cir --probe "v(out)"                 # a SPICE netlist
-wobbl circuit "a 555 flashing a blue LED at 5 Hz from a 12 V supply"
-wobbl circuit led --set supply=5V --set resistor=47 --set led=blue   # the templates stay as shortcuts
+wobbl simulate board.kicad_sch --set J2.load=2A     # a KiCad schematic, with a load on a connector
+wobbl simulate amp.cir --probe "v(out)"             # a SPICE netlist
+wobbl simulate "a 555 flashing a blue LED at 5 Hz from a 12 V supply"
+wobbl simulate led --set supply=5V --set resistor=47 --set led=blue   # the templates stay as shortcuts
 ```
 
 A KiCad schematic is traced the way eeschema connects it, symbols map onto parts by
@@ -637,24 +638,28 @@ engineer wrote down for them before they ran (`tests/test_circuit_generality.py`
 
 ## Validation
 
-Sixty three cases with known answers run through the same pipeline you get. Every
+Ninety five cases with known answers run through the same pipeline you get. Every
 case passes its tolerance, and every case whose reference is exact for the
 modeled setup lands within 2%.
 
-| Group | Cases | Largest error |
+| Domain | Cases | Examples |
 |---|---|---|
-| Textbook and benchmark strength (Timoshenko, Kirsch, Lame, NAFEMS LE1 and LE10, torsion, self weight, a cantilever on an elastic root) | 9 | 1.54%, plate with a hole |
-| Real parts against converged reference models | 5 | 4.26%, PLA bracket with a 6 mm fillet |
-| Heat (slab conduction, lumped cooling, a bar whose end jumps to 120 C) | 3 | 0.85%, the bar against the erfc solution |
-| Circuits (LED, RC, buck ripple, and netlists through the general study: a divider, a diode, an RC corner, an op amp stage, an LM317 and a 555) | 9 | 7.70%, buck ripple against an ideal formula that ignores switch and diode drops |
-| Motion (free fall, drag fall, a throw, a constant thrust rocket's burnout speed and altitude, parachute descent) | 6 | 0.0000014%, the rocket's burnout altitude |
-| Combustion (methane flame against Turns, LOX and LH2 c* and Isp against NASA CEA, KNSU c* against PROPEP) | 4 | 0.05%, the LOX and LH2 c* |
-| Solid motors (steady Kn against the closed form, a neutral grain's web time, two MIT static fires) | 4 | 9.26%, the impulse of the O3800 static fire, whose peak pressure came out 7% low |
-| Battery (a charged LiCoO2 18650's runaway onset against Hu et al. and Hatchard's oven tests) | 1 | 0.62%, 155.96 C against 155 C |
-| Uncertainty and calibration (a cantilever's mean and spread of deflection against lognormal propagation, Ishigami Sobol indices, two calibrations from synthetic data) | 5 | 0.97%, a film coefficient from a cooling curve |
-| Mechanisms (a pendulum's large swing, a four bar's sweep, a two link arm's holding torque, a gear train's output speed, an elastic and a half elastic collision) | 6 | 0.05%, the struck ball's speed after the half elastic hit |
-| Buckling, vibration and fatigue (Euler's column, a cantilever's first three bending frequencies, a simply supported plate's first three modes, a sine peak on a tip mass, a force swept through resonance, Shigley's fatigue example) | 6 | 2.28%, Shigley's example, where the book reads f off a chart |
-| Crack growth (a center and an edge crack against Tada, a surface crack against Newman and Raju, Paris life against its closed form, the turn of a crack at 45 degrees) | 5 | 3.45%, the surface crack, where Newman and Raju's fit is good to 5% |
+| Strength | 14 | cantilever, plate with a hole, thick vessel, NAFEMS LE1 and LE10, torsion, self weight, and five real parts |
+| Heat | 3 | a slab into convection, an aluminum cube cooling in air, a bar whose end jumps to 120 C |
+| Circuits | 9 | LED, RC, buck ripple, a divider, a diode, an op amp stage, an LM317 and a 555 |
+| Motion | 6 | a ball dropped with and without air, a throw, a rocket at constant thrust, a parachute |
+| Mechanisms | 6 | a pendulum, a four bar's sweep, a two link arm, a gear train, elastic and inelastic collisions |
+| Uncertainty and calibration | 5 | a cantilever's scatter, Ishigami Sobol indices, two calibrations from synthetic data |
+| Crack growth | 5 | center and edge cracks against Tada, a surface crack against Newman and Raju, Paris life |
+| Manufacturing | 5 | a freezing front, aluminum freezing in sand, a gated disk, a two layer strip, ABS warping |
+| Vibration | 4 | a strip's bending frequencies, a plate's modes, a tip mass shaken and pushed through resonance |
+| Combustion | 4 | stoichiometric methane in air, LOX and LH2 c* and Isp against NASA CEA, KNSU c* |
+| Solid motors | 4 | a steady Kn against the closed form, tube and end burners, two MIT static fires |
+| Chemistry | 13 | water's bond, angle and vibrations, CO2 vibrations, heats of formation, two lattice constants, liquid argon |
+| Plasticity | 2 | a steel cantilever past yield, a thick tube under internal pressure |
+| Board | 2 | a 50 ohm microstrip on FR4, an RG-58 coax cross section |
+| Sound | 2 | rectangular room modes, an expansion chamber muffler |
+| Other | 11 | one each for buckling, fatigue, a battery's runaway, contact, a bolted joint, magnetics, electrostatics, an antenna, a drop, a shell and a composite |
 
 The full table is [on the website](https://sohan-bhat.github.io/wobbl/validation/). Run it yourself with
 `wobbl validate`, which takes about 30 minutes.
@@ -706,14 +711,16 @@ Each folder has a `run.sh` that regenerates its outputs.
 
 - Materials are linear elastic, so Wobbl reports whether yield is reached but not
   what happens after, and large deflection is checked with a nonlinear re-solve.
-- Impact is not modeled yet. Buckling is linear, with knockdowns from test data
-  standing in for imperfections, vibration is linear with one damping ratio for
-  every mode, and fatigue covers crack initiation by the stress life method.
-- Contact is limited to rigid walls the part can push on but not pull, and bolted
-  joints are modeled as clamped holes without preload.
-- Each study uses one material, and assemblies of touching bodies are bonded.
-- Thin walls are slow, since 2 to 3 mm shells on 100 mm parts need large
-  tetrahedral meshes and take several minutes, and shell elements are on the roadmap.
+- A drop is one landing on a floor. Its peak force rests on a contact spring set by
+  Hertz theory, so quote it as an estimate. Buckling is linear, with knockdowns from
+  test data standing in for imperfections, vibration is linear with one damping ratio
+  for every mode, and fatigue covers crack initiation by the stress life method.
+- Contact between bodies is its own physics, run with `--physics contact`. Bolted
+  joints take their preload from the torque, 70% of proof load unless
+  you say otherwise, and are checked as VDI 2230 does.
+- Each study uses one material.
+- A thin walled part goes to a shell model on its midsurface inside the strength
+  study, checked against a coarse solid, and `--shell` asks for that outright.
 - Printed plastics are treated as isotropic at 100 percent infill, with a layer
   strength knockdown when you give the print direction.
 - Motion is a point mass in a vertical plane over a flat Earth, so it has no roll,
@@ -729,8 +736,6 @@ Each folder has a `run.sh` that regenerates its outputs.
   servos that follow their move as a well tuned controller would and motors on a
   straight torque speed line, with a rotor inertia assumed where datasheets give none.
   A hobby servo's continuous rating is taken as a third of its stall torque.
-
-Shell elements and bolt preload come next in 0.2, then CFD with OpenFOAM in 0.3.
 
 ## Contributing
 
