@@ -95,5 +95,6 @@ def test_clamped_disk_matches_plate_theory(tmp_path):
     D = E * t ** 3 / (12 * (1 - nu ** 2))
     assert o.max_disp_mm == pytest.approx(q * a ** 4 / (64 * D), rel=0.03)
     names = {c.name: c.status for c in o.checks}
-    assert names["force balance"] == "pass" and names["solid cross check"] in ("pass", "warn")
+    cross = next(c for c in o.checks if c.name == "solid cross check")   # a 1 mm wall is thin enough to skip it by size
+    assert names["force balance"] == "pass" and (cross.status in ("pass", "warn") or cross.detail.get("skipped") == "size")
     assert (tmp_path / "out" / "report.html").exists() and not (tmp_path / "out" / "work").exists()
