@@ -86,6 +86,9 @@ def run_motor(spec: MotorSpec, out_dir: str | Path, cb=None, render: bool = True
     files = write_curves(spec, b, out)
     from . import playback
     files["playback"] = playback.motor(spec, b, case_vals, out)
+    cb("sweep", "the burn again across the design input")
+    from .motor_sweep import write as write_sweep
+    write_sweep(out, spec, b.dt)
     values["files"] = files
     imgs = {}
     if render:
