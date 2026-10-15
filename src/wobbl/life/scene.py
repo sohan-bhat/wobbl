@@ -157,7 +157,7 @@ def fatigue(out: Path, source: str, peak: float, blocks: list, curve, model: str
         s = Scene(title, domain="fatigue", question=question)
         s.timeline(cyc[keep], unit="cycles", label="cycles", seconds=8.0, between="interpolated")
         part = s.mesh(X, tris, name="part")
-        part.color_by("fatigue damage", np.minimum(d_total, 2.0), scale=share, colormap="inferno", range=[0, 1],
+        part.color_by("fatigue damage", np.minimum(d_total, 2.0), scale=share, colormap="heat", range=[0, 1],
                       limit=1.0, limit_label="a crack starts")
         s.readout("damage at the peak", dmg[keep], digits=3, limit=1.0)
         if dmg[-1] >= 1:
