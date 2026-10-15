@@ -173,11 +173,12 @@ def six_bolt_flanges(o):
 
 
 def shaft_clamp(o):
-    """A split collar on a shaft along y, its halves meeting on the plane z = 0 and drawn together by two bolts."""
-    o.addCylinder(0, 0, 0, 0, 80, 0, 10)
-    for z0, z1 in ((-20.0, 0.0), (0.0, 20.0)):
+    """A split collar on a square shaft along y, its halves meeting on the plane z = 0 and drawn together by two
+    bolts. The shaft has flats so that the clamp and the faces that touch it can be meshed to match."""
+    o.addBox(-10, 0, -10, 20, 80, 20)
+    for z0, z1, p0, p1 in ((-20.0, 0.0, -10.0, 0.0), (0.0, 20.0, 0.0, 10.0)):
         h = o.addBox(-20, 25, z0, 40, 30, z1 - z0)
-        o.cut([(3, h)], [(3, o.addCylinder(0, 20, 0, 0, 40, 0, 10))])
+        o.cut([(3, h)], [(3, o.addBox(-10, 24, p0, 20, 32, p1 - p0))])
         for x in (-15, 15):
             o.cut([(3, h)], [(3, o.addCylinder(x, 40, z0 - 1, 0, 0, z1 - z0 + 2, 3.3))])
 
