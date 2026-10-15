@@ -375,7 +375,12 @@ def weld_lines(mesh: Mesh, t_fill: np.ndarray, angle: float = 135.0) -> np.ndarr
         d = u[els] @ u[els].T
         if d.min() < cos_a:
             weld.append(i)
-    return _connected(mesh, np.array(weld, dtype=int))
+    weld = np.array(weld, dtype=int)
+    # right at the gate the fill time is nearly flat and the gradients around its corners point every way, which
+    # is a melt that has not formed a front yet and not two fronts meeting
+    if len(weld):
+        weld = weld[t_fill[weld] > 0.02 * np.nanmax(np.where(np.isfinite(t_fill), t_fill, np.nan))]
+    return _connected(mesh, weld)
 
 
 def _connected(mesh: Mesh, weld: np.ndarray, reach: float = 2.5) -> np.ndarray:

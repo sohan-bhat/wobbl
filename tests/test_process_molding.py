@@ -78,7 +78,7 @@ def test_weld_line_forms_behind_a_hole_and_the_gate_goes_in_the_middle(tmp_path)
     first = weld[np.argsort(res.t_fill[weld])[:max(1, len(weld) // 2)]]
     behind = mesh.X[first]
     assert (behind[:, 0] >= 40).mean() > 0.5
-    assert np.abs(behind[:, 1] - 20).max() < 10
+    assert np.abs(behind[:, 1] - 20).max() < 10, np.round(behind, 1).tolist()
     g = H.infer_gate(hm, np.unique(mesh.tris[:, :3]))
     assert abs(mesh.X[g, 0] - 40) < 15
 
