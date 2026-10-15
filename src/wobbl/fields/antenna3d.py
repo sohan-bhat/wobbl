@@ -243,13 +243,12 @@ def invf(p: dict, work: Path) -> Built:
     hi = max(hi, 3 * w)                                                              # arm height over the ground
     gx = value(p, "ground", 0.6 * lam * 1e3, "length") if p.get("ground") else 0.5 * lam
     gy = 0.45 * lam
-    sx = 0.1 * arm
     fx = value(p, "feed", 0.0, "length") if p.get("feed") else 0.2 * arm        # feed stub distance from the short
     gap = max(w / 2, 0.4e-3)
-    board_x = max(gx, arm + 2 * w) + 0.0
+    board_x = max(gx, arm + 2 * w)
     board_y = gy + hi + w + 3e-3
-    x0 = -board_x / 2                       # the short is at the left end of the arm
-    ax0 = x0 + 0.5 * (board_x - arm) if gx >= arm else x0
+    x0 = -board_x / 2
+    ax0 = x0 + 0.5 * (board_x - arm)                  # the arm is centered on the board
     T = h * 1e3
     sc = _scene([("box", "board", (x0 * 1e3, -gy * 1e3, 0), ((x0 + board_x) * 1e3, (board_y - gy) * 1e3, T))], work, "board")
     z = h
