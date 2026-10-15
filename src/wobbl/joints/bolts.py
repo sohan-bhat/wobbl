@@ -593,6 +593,7 @@ def _interface(mesh, pairs, asm, ln: BoltLine, fr, lines: list[BoltLine],
         whole = float(w[w > 0] @ pres_all[w > 0])
         if totals and cp.name in totals and whole > 0:
             force *= max(totals[cp.name], 0.0) / whole
+        force = force if np.isfinite(force) else 0.0
         row = (force, area,
                float(ww[touching & (tau >= 0.95 * cp.mu * p)].sum()) / max(area, 1e-30) if cp.mu > 0 else 0.0,
                float(ww[~touching].sum()) / max(float(ww.sum()), 1e-30))
