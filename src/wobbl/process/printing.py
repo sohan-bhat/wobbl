@@ -128,14 +128,14 @@ def run_print_warp(study: W.WarpStudy, out_dir: str | Path, progress=None, keep:
     scales = LEVELS["fast" if study.quality == "fast" else "normal"]
     h0 = base_size(prep, study, feats.thickness_typical)
     say("budget", "meshing coarsely to predict the cost of the mesh levels")
-    pilots = [build_mesh(prep, Sizing(h=h0 * scales[0] * f_p, curvature=c_p)) for f_p, c_p in bud.PILOTS]
-    pilot = pilots[0]
-    bfit = bud.fit(bud.PRINT, (pilots[0].n_nodes, pilots[1].n_nodes), h0, scales, study.budget, bool(study.mesh_size))
+    found = bud.pilots(lambda f_p, c_p: build_mesh(prep, Sizing(h=h0 * scales[0] * f_p, curvature=c_p)).X)
+    pilot = found[0].mesh
+    bfit = bud.fit(bud.PRINT, found, h0, scales, study.budget, bool(study.mesh_size))
     say("budget", bud.note(bfit).split(". The budget")[0])
     f_r, c_r = bfit.factor, bfit.curvature
     tried = []
     if str(study.build).strip().lower() == "auto":
-        for name, d in candidates(feats, pilot.X):
+        for name, d in candidates(feats, pilot):
             say("orient", f"trying {name}")
             R = W.to_build_frame(d)
             try:
@@ -313,7 +313,7 @@ def warp_fixes(study, fil, t_env, flat, tol, tried, prep, feats, eps_max, out, s
     if not tried and str(study.build).lower() != "auto":
         best = None
         here = W.build_direction(study.build)
-        for name, d in candidates(feats, pilot.X):
+        for name, d in candidates(feats, pilot):
             if np.dot(d, here) > 0.999:
                 continue
             try:

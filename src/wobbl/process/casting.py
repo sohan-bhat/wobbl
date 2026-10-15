@@ -319,12 +319,12 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
     scales = LEVELS["fast" if study.quality == "fast" else "normal"]
     band = 0.6 * math.sqrt(alpha * t_est)
     say("budget", "meshing coarsely to predict the cost of the mesh levels")
-    pilots = [build(prep, study.risers, study.chills, margin, h * scales[0] * f_p, max(h_mold, 3.0 * h * scales[0] * f_p),
-                    band, c_p) for f_p, c_p in bud.PILOTS]
+    found = bud.pilots(lambda f_p, c_p: build(prep, study.risers, study.chills, margin, h * scales[0] * f_p,
+                                             max(h_mold, 3.0 * h * scales[0] * f_p), band, c_p).X)
     searching = study.auto_risers and not study.risers
     # besides its levels the study freezes the first one again at half the step, and finds its risers on two
     # coarse meshes when none were given
-    bfit = bud.fit(bud.CASTING, (len(pilots[0].X), len(pilots[1].X)), h, scales, study.budget, bool(study.mesh_size),
+    bfit = bud.fit(bud.CASTING, found, h, scales, study.budget, bool(study.mesh_size),
                    extra=lambda n: bud.CASTING.solve(n) * 1.5 + (2 * bud.CASTING.level(n / 2.7) if searching else 0.0))
     say("budget", bud.note(bfit).split(". The budget")[0])
     f_r, c_r = bfit.factor, min(bfit.curvature, 12)

@@ -164,8 +164,8 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
     freeze = {"alpha": resin.diffusivity * 1e6, "ratio": H.frozen_skin_ratio(resin, melt, mold)}
     scales = LEVELS["fast" if study.quality == "fast" else "normal"]
     say("budget", "meshing coarsely to predict the cost of the mesh levels")
-    pilots = [build_mesh(prep, Sizing(h=h0 * scales[0] * f_p, order=1, curvature=c_p)) for f_p, c_p in bud.PILOTS]
-    bfit = bud.fit(bud.MOLDING, (pilots[0].n_nodes, pilots[1].n_nodes), h0, scales, study.budget,
+    found = bud.pilots(lambda f_p, c_p: build_mesh(prep, Sizing(h=h0 * scales[0] * f_p, order=1, curvature=c_p)).X)
+    bfit = bud.fit(bud.MOLDING, found, h0, scales, study.budget,
                    bool(study.mesh_size), extra=lambda n: 2 * bud.MOLDING.solve(n))
     say("budget", bud.note(bfit).split(". The budget")[0])
     f_r, c_r = bfit.factor, bfit.curvature

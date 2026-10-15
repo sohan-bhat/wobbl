@@ -85,7 +85,33 @@ def hhmm(s: float) -> str:
 
 
 CURVE_POWER = 1.5          # nodes against elements per circle, from a truss meshed at 4, 8 and 16 (1.4 to 1.8)
-PILOTS = [(3.0, 4), (2.0, 4)]
+PILOTS = [(3.0, 4), (2.0, 4), (1.4, 4), (1.0, 6)]    # tried in this order until two of them mesh
+
+
+@dataclass
+class Pilot:
+    factor: float
+    curvature: int
+    nodes: float
+    mesh: object = None
+
+
+def pilots(mesh_at) -> list[Pilot]:
+    """Two coarse meshes of the part, the first rungs of PILOTS that mesh at all. A mesher can fail on a very coarse
+    size next to a thin wall, so a rung that fails is skipped and the next finer one is tried."""
+    got, err = [], None
+    for f, c in PILOTS:
+        try:
+            m = mesh_at(f, c)
+        except Exception as e:  # noqa: BLE001  the mesher says why in its own words
+            err = e
+            continue
+        got.append(Pilot(f, c, float(len(getattr(m, "X", m))), m))
+        if len(got) == 2:
+            break
+    if not got:
+        raise err
+    return got
 
 
 def size_power(n_a: float, n_b: float, h_a: float, h_b: float) -> float:
@@ -100,19 +126,21 @@ def grow(n_ref: float, h_ref: float, curv_ref: int, h: float, curv: int, power: 
     return n_ref * max((h_ref / h) ** power, (curv / curv_ref) ** CURVE_POWER, 1.0)
 
 
-def fit(law: CostLaw, pilot_nodes: tuple[float, float], h_base: float, scales: list[float], budget: float,
+def fit(law: CostLaw, found: list[Pilot], h_base: float, scales: list[float], budget: float,
         fixed_size: bool = False, extra=None) -> Fit:
     """The finest rung whose first MIN_LEVELS levels are predicted to fit the budget. The levels run at h_base times
-    each of scales times the rung's size factor, and the pilots were meshed at the PILOTS rungs on the first scale.
+    each of scales times the rung's size factor, and the pilots were meshed at their own rungs on the first scale.
     extra(nodes of the first level) gives the seconds the study spends beyond its levels, such as the check that
     reruns the first level with a finer step."""
-    (f_a, c_a), (f_b, c_b) = PILOTS
-    h_a, h_b = h_base * scales[0] * f_a, h_base * scales[0] * f_b
-    a = size_power(pilot_nodes[0], pilot_nodes[1], h_a, h_b)
+    ref = found[-1]
+    h_b = h_base * scales[0] * ref.factor
+    a = 1.5
+    if len(found) == 2:
+        a = size_power(found[0].nodes, ref.nodes, h_base * scales[0] * found[0].factor, h_b)
     rungs = RUNGS[:1] if fixed_size else RUNGS
     best = None
     for k, (f, c) in enumerate(rungs):
-        nodes = [grow(pilot_nodes[1], h_b, c_b, h_base * s * f, c, a) for s in scales[:MIN_LEVELS]]
+        nodes = [grow(ref.nodes, h_b, ref.curvature, h_base * s * f, c, a) for s in scales[:MIN_LEVELS]]
         sec = sum(law.level(n) for n in nodes) + (extra(nodes[0]) if extra else 0.0)
         best = Fit(k, f, c, nodes, sec, budget, kept=fixed_size, power=a)
         if sec <= budget:

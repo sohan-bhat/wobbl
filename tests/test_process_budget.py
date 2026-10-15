@@ -8,27 +8,46 @@ import pytest
 from wobbl.process import budget as B
 
 
+def _pil(a, b):
+    return [B.Pilot(3.0, 4, a), B.Pilot(2.0, 4, b)]
+
+
+def test_a_pilot_that_fails_to_mesh_is_skipped():
+    tried = []
+
+    def mesh_at(f, c):
+        tried.append((f, c))
+        if f > 2.5:
+            raise RuntimeError("a segment and a facet intersect")
+        return [0] * int(100 * f)
+
+    got = B.pilots(mesh_at)
+    assert tried[0] == (3.0, 4) and [p.factor for p in got] == [2.0, 1.4]
+    with pytest.raises(RuntimeError):
+        B.pilots(lambda f, c: (_ for _ in ()).throw(RuntimeError("no mesh")))
+
+
 def test_a_cheap_part_keeps_the_finest_rung_and_two_levels():
-    f = B.fit(B.PRINT, (400, 600), 5.0, [1.4, 1.0], B.DEFAULT_BUDGET)
+    f = B.fit(B.PRINT, _pil(400, 600), 5.0, [1.4, 1.0], B.DEFAULT_BUDGET)
     assert f.rung == 0 and not f.over and len(f.nodes) == B.MIN_LEVELS
     assert f.seconds <= f.budget
 
 
 def test_a_costly_part_gives_up_curves_first_and_then_size():
     # a slender truss: the curved tubes set the node count, whatever the element size
-    f = B.fit(B.PRINT, (12000, 12300), 12.0, [1.4, 1.0], B.DEFAULT_BUDGET)
+    f = B.fit(B.PRINT, _pil(12000, 12300), 12.0, [1.4, 1.0], B.DEFAULT_BUDGET)
     assert f.rung > 0 and f.curvature < B.RUNGS[0][1] and f.seconds <= f.budget
-    tight = B.fit(B.PRINT, (12000, 12300), 12.0, [1.4, 1.0], 20.0)
+    tight = B.fit(B.PRINT, _pil(12000, 12300), 12.0, [1.4, 1.0], 20.0)
     assert tight.over and tight.rung == len(B.RUNGS) - 1 and len(tight.nodes) == B.MIN_LEVELS
 
 
 def test_a_set_mesh_size_is_not_coarsened():
-    f = B.fit(B.PRINT, (12000, 12300), 12.0, [1.4, 1.0], 20.0, fixed_size=True)
+    f = B.fit(B.PRINT, _pil(12000, 12300), 12.0, [1.4, 1.0], 20.0, fixed_size=True)
     assert f.rung == 0 and f.kept and not f.over
 
 
 def test_a_bigger_budget_never_picks_a_coarser_rung():
-    rungs = [B.fit(B.CASTING, (3000, 4000), 3.0, [1.0, 0.72], b).rung for b in (30, 100, 300, 1000, 3000)]
+    rungs = [B.fit(B.CASTING, _pil(3000, 4000), 3.0, [1.0, 0.72], b).rung for b in (30, 100, 300, 1000, 3000)]
     assert rungs == sorted(rungs, reverse=True)
 
 
@@ -40,7 +59,7 @@ def test_node_growth_follows_the_size_the_pilots_measured():
 
 
 def test_the_note_says_what_was_given_up():
-    f = B.fit(B.PRINT, (12000, 12300), 12.0, [1.4, 1.0], B.DEFAULT_BUDGET)
+    f = B.fit(B.PRINT, _pil(12000, 12300), 12.0, [1.4, 1.0], B.DEFAULT_BUDGET)
     text = B.note(f)
     assert "coarsened" in text and "elements round each curve" in text and "\u2014" not in text
 
