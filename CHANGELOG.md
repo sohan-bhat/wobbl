@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+**Budgets, flow scenes and crack views**
+- Drops predict their own run time from the mesh they would march before they solve. The
+  mesh is coarsened rung by rung to fit a 600 s budget, with what was given up stated in
+  the assumptions. `wobbl estimate` prices drops the same way.
+- Crack growth writes its 3D view during the run, with the loads and supports on the
+  part's faces and a timeline of cycles, rather than after the last step.
+- The crack generality test places the I beam crack at either end fillet and absorbs
+  mesh rounding. A wall is measured from just inside an edge, so a crack at a rounded
+  tip is no longer taken for a thin wall.
+- Every flow run writes a 3D scene, with streamlines through a plane flow or particles
+  through a wake's frames, on the part colored by wall pressure.
+- Scale resolving runs are priced from their cells and the part's length, with three
+  cells across its thinnest extent. A run predicted over `--budget-minutes` is refused,
+  and RANS is offered as the quick pass. The energy of a scale resolving run is read
+  from symmetric tensor fields one row per cell.
+- IDDES shedding is validated on the cylinder at Re 3900, and its run time cost is
+  quoted from measured 3D runs.
+- The CAD flow core is proven on sixteen varied parts, and cold plate and fan heat sink
+  examples are added.
+- A sand cast pulley example is checked for shrinkage porosity.
+- Weld lines in molding are judged where the fronts meet first, and isolated weld line
+  nodes are dropped, so the line does not depend on the mesher.
+
 **Bluff body drag**
 - External flow drag is judged against published references. A sphere meets Clift,
   Grace and Weber's curve, a cylinder across the stream meets Sucker and Brauer's
