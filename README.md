@@ -701,7 +701,7 @@ Each folder has a `run.sh` that regenerates its outputs.
 - [CLI reference](https://sohan-bhat.github.io/wobbl/guides/cli/) with every command and option
 - [Agents and MCP](https://sohan-bhat.github.io/wobbl/guides/agents/) with what `wobbl setup` registers, the tools and the skill
 - [How it checks itself](https://sohan-bhat.github.io/wobbl/guides/results/checks/), every check and what sets the confidence
-- [Validation](https://sohan-bhat.github.io/wobbl/validation/), the 25 cases and their setups
+- [Validation](https://sohan-bhat.github.io/wobbl/validation/), the 95 cases and their setups
 - [Bake-off](https://sohan-bhat.github.io/wobbl/validation/bakeoff/), a coding agent on its own versus Wobbl
 - [Contributing](https://sohan-bhat.github.io/wobbl/get-started/contributing/), with the architecture and how a new solver plugs in
 - [Publishing](docs/publishing.md), the release steps for PyPI
