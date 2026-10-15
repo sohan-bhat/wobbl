@@ -77,3 +77,46 @@ def test_cost_grows_with_the_mesh():
     b = wavecost.cost(40_000, 7, 4, True)[1]
     assert 4 < b / a < 12
     assert math.isclose(wavecost.assess(8_000, "fast", 5, 2, 0).unknowns, 8_000 * wavecost.UNKNOWNS_PER_NODE, rel_tol=1e-6)
+
+
+# --- antennas that arrive as files ----------------------------------------------------------------
+def test_port_text_is_two_points_in_mm():
+    p = antenna3d.parse_port("1,2,3:1,2,4.5:0.4")
+    assert p.a == pytest.approx((1e-3, 2e-3, 3e-3)) and p.b[2] == pytest.approx(4.5e-3) and p.width == pytest.approx(0.4e-3)
+    with pytest.raises(ValueError, match="two points"):
+        antenna3d.parse_port("1,2,3")
+
+
+def test_a_step_dipole_finds_its_own_feed_gap(tmp_path):
+    antenna3d._scene([("cyl", "arm one", (0, 0, -30), (0, 0, -0.5), 0.5), ("cyl", "arm two", (0, 0, 0.5), (0, 0, 30), 0.5)],
+                     tmp_path / "geo", "dipole")
+    b = antenna3d.from_step(tmp_path / "geo" / "dipole.step", {"frequency": "2.4GHz"}, tmp_path / "w")
+    a, c = np.asarray(b.setup.port.a), np.asarray(b.setup.port.b)
+    assert abs(a[2]) < 1e-3 and abs(c[2]) < 1e-3 and 0 < np.linalg.norm(c - a) < 2e-3
+    assert len(b.setup.metals) == 2 and not b.setup.dielectrics
+    with pytest.raises(ValueError, match="frequency"):
+        antenna3d.from_step(tmp_path / "geo" / "dipole.step", {}, tmp_path / "w2")
+
+
+def test_a_kicad_trace_antenna_becomes_sheets_a_board_and_a_port(tmp_path):
+    import sys
+    from pathlib import Path
+
+    ex = Path(__file__).resolve().parents[1] / "examples" / "antenna-pcb"
+    sys.path.insert(0, str(ex))
+    try:
+        from make_board import build
+    finally:
+        sys.path.remove(str(ex))
+    pcb = tmp_path / "ifa.kicad_pcb"
+    pcb.write_text(build())
+    b = antenna3d.from_board(pcb, {"frequency": "2.4GHz"}, tmp_path / "w")
+    s = b.setup
+    assert {"antenna_F_Cu", "ground_F_Cu", "ground_B_Cu"} <= set(s.sheets)
+    assert list(s.dielectrics) == ["board"] and s.dielectrics["board"][0] == pytest.approx(4.4)
+    gap = np.linalg.norm(np.asarray(s.port.b) - np.asarray(s.port.a))
+    assert 0.3e-3 < gap < 1e-3                       # the 0.6 mm between the feed pad and the pour
+    fd = wave3d.feed(b.scene, s)                     # both ends land on different copper
+    assert fd["gap"] == pytest.approx(gap, rel=0.05)
+    with pytest.raises(ValueError, match="feed"):
+        antenna3d.from_board(pcb, {"frequency": "2.4GHz", "feed": "NOPE"}, tmp_path / "w2")

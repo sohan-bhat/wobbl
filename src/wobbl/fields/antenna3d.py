@@ -277,3 +277,204 @@ def build(kind: str, p: dict, work: Path) -> Built:
     if kind not in BUILD:
         raise ParamError(f"unknown antenna '{kind}'. Use {', '.join(BUILD)}")
     return BUILD[kind](dict(p), Path(work))
+
+
+# --- antennas that arrive as files ---------------------------------------------------------------------
+DIELECTRIC_NAME = r"substrate|\bboard\b|pcb|fr-?4|dielectric|laminate|radome|rogers|ro4350|ptfe|ceramic"
+FILE_KEYS = {"frequency", "span", "points", "tolerance", "impedance", "tx_power", "sensitivity", "rx_gain", "losses",
+             "environment", "distance", "reliability", "heights", "floors", "budget", "quality", "port", "feed",
+             "ground", "dielectric", "er", "loss_tangent", "layer"}
+
+
+def _xyz(text: str, what: str) -> tuple:
+    try:
+        v = [float(x) for x in text.replace(";", ",").split(",")]
+        if len(v) != 3:
+            raise ValueError
+    except ValueError:
+        raise ParamError(f"{what} is three numbers in mm, for example 12,0,-1") from None
+    return tuple(x * 1e-3 for x in v)
+
+
+def parse_port(text: str) -> Port:
+    """'x,y,z:x,y,z' in mm, the two points across the feed gap, with an optional ':width' in mm at the end."""
+    parts = [t for t in str(text).split(":") if t.strip()]
+    if len(parts) not in (2, 3):
+        raise ParamError("the port is two points across the feed gap in mm, as 'x,y,z:x,y,z'")
+    width = float(parts[2]) * 1e-3 if len(parts) == 3 else 0.0
+    return Port(_xyz(parts[0], "a port point"), _xyz(parts[1], "a port point"), width)
+
+
+def auto_port(scene, metals: list[str], f0: float) -> Port:
+    """The feed gap of a model with no port given: the narrowest gap between two conductors, each end taken on the
+    face of the nearer box, moved onto the metal by the solver. Refused when the nearest two are far apart."""
+    bodies = [b for b in scene.bodies if b.name in metals]
+    best = None
+    for i, a in enumerate(bodies):
+        for c in bodies[i + 1:]:
+            gap = [max(a.bbox[j] - c.bbox[j + 3], c.bbox[j] - a.bbox[j + 3], 0.0) for j in range(3)]
+            g = float(np.linalg.norm(gap))
+            if best is None or g < best[0]:
+                best = (g, a, c)
+    lam = C0 / f0
+    if best is None or best[0] > lam / 15:
+        raise ParamError("the model has no feed gap Wobbl can find (two conductors within a fifteenth of a "
+                         "wavelength). Give the feed with --set port=x,y,z:x,y,z in mm, the two points across it")
+    _, a, c = best
+    ca, cc = np.array(a.center), np.array(c.center)
+    lo = np.maximum(a.bbox[:3], c.bbox[:3])
+    hi = np.minimum(a.bbox[3:], c.bbox[3:])
+    mid = np.where(lo <= hi, 0.5 * (lo + hi), np.where(np.array(a.bbox[3:]) < np.array(c.bbox[:3]),
+                   0.5 * (np.array(a.bbox[3:]) + np.array(c.bbox[:3])), 0.5 * (np.array(a.bbox[:3]) + np.array(c.bbox[3:]))))
+    d = cc - ca
+    d = d / max(np.linalg.norm(d), 1e-30)
+    g = max(best[0], 1e-4)
+    return Port(tuple(mid - d * g / 2), tuple(mid + d * g / 2))
+
+
+def from_step(path, p: dict, work: Path) -> Built:
+    """A CAD model as an antenna: every body is a conductor except those named like a board or a radome (or listed
+    in dielectric as 'name: fr4' or 'name: er=3.5'), and the feed is the port given or the narrowest gap."""
+    import re
+
+    from .scene import load
+
+    check_known(p, FILE_KEYS, "antenna")
+    f0 = value(p, "frequency", 0, "frequency") if p.get("frequency") else 0.0
+    if f0 <= 0:
+        raise ParamError("give the working frequency, for example --set frequency=2.4GHz")
+    sc = load([str(path)], Path(work) / "scene")
+    diel: dict = {}
+    listed = p.get("dielectric")
+    if listed:
+        items = listed if isinstance(listed, (list, tuple)) else [listed]
+        for it in items:
+            name, _, mat = str(it).partition(":")
+            d = get_dielectric((mat or name).strip())
+            diel[name.strip() if mat else None] = (float(d.epsr), d.loss_tangent, d.name)
+    metals, dielectrics = [], {}
+    for b in sc.bodies:
+        if b.name in diel:
+            dielectrics[b.name] = diel[b.name]
+        elif re.search(DIELECTRIC_NAME, b.name, re.I):
+            d = diel.get(None) or (float(get_dielectric("fr4").epsr), get_dielectric("fr4").loss_tangent, "FR4 laminate")
+            dielectrics[b.name] = d
+        else:
+            metals.append(b.name)
+    if not metals:
+        raise ParamError(f"every body of the model looks like a dielectric ({', '.join(b.name for b in sc.bodies)}). "
+                         "Name the conductors apart or list the dielectrics with --set dielectric='name: fr4'")
+    port = parse_port(p["port"]) if p.get("port") else auto_port(sc, metals, f0)
+    s = _setup(p, f0, port=port, metals=metals, dielectrics=dielectrics)
+    notes = [f"'{n}' is a conductor." for n in metals[:6]] + \
+            [f"'{n}' is a dielectric, relative permittivity {v[0]:g}." for n, v in dielectrics.items()]
+    if not p.get("port"):
+        notes.append("The feed is the narrowest gap between two conductors. Give --set port=x,y,z:x,y,z to feed "
+                     "somewhere else.")
+    return Built("cad", sc, s, Path(path).stem, notes=notes, dims={"bodies": len(sc.bodies)})
+
+
+def _track_polygon(t, z: float) -> np.ndarray:
+    a, b = np.asarray(t.start, float), np.asarray(t.end, float)
+    d = b - a
+    n = np.hypot(*d)
+    u = d / n if n > 0 else np.array([1.0, 0.0])
+    v = np.array([-u[1], u[0]]) * t.width / 2
+    a, b = a - u * t.width / 2, b + u * t.width / 2
+    return np.array([[*(a - v), z], [*(b - v), z], [*(b + v), z], [*(a + v), z]])
+
+
+def _pad_polygon(pad, z: float) -> np.ndarray:
+    import math as m
+
+    w, h = pad.size
+    if pad.shape == "circle":
+        ang = np.linspace(0, 2 * m.pi, 16, endpoint=False)
+        pts = np.c_[w / 2 * np.cos(ang), h / 2 * np.sin(ang)]
+    else:
+        pts = np.array([[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]])
+    a = m.radians(pad.angle_deg)
+    rot = np.array([[m.cos(a), -m.sin(a)], [m.sin(a), m.cos(a)]])
+    pts = pts @ rot.T + np.asarray(pad.at)
+    return np.c_[pts, np.full(len(pts), z)]
+
+
+def from_board(path, p: dict, work: Path) -> Built:
+    """A KiCad or Gerber board's trace antenna: the copper of the antenna net and of the ground nets as sheets at
+    their layers' heights, the board as a dielectric slab, and a port from the antenna net's pad nearest the ground
+    to the ground copper under or beside it."""
+    import re
+
+    from .pcb import read_board
+    from .pcb.graph import infer_nets
+    from .pcbfield import GROUND
+    from .wave3d import closest_on_polygon
+
+    check_known(p, FILE_KEYS, "antenna")
+    f0 = value(p, "frequency", 0, "frequency") if p.get("frequency") else 0.0
+    if f0 <= 0:
+        raise ParamError("give the working frequency, for example --set frequency=2.4GHz")
+    board = read_board(path)
+    if not board.nets or all(not n for n in board.nets):
+        infer_nets(board)
+    nets = [n for n in board.nets if n]
+    ant = p.get("feed") or next((n for n in nets if re.search(r"(?i)ant|rf|feed|radio", n)), None)
+    if ant is None or ant not in nets:
+        raise ParamError(f"say which net is the antenna with --set feed=NET. The board's nets are {', '.join(nets[:12])}")
+    gnd = [n for n in nets if GROUND.match(n)]
+    if not gnd:
+        raise ParamError("the board has no ground net (GND, VSS and the like), so there is nothing to feed the antenna "
+                         "against")
+    st = board.stackup
+    sheets: dict[str, list] = {}
+    notes: list[str] = []
+    for role, group in (("antenna", [ant]), ("ground", gnd)):
+        for net in group:
+            for layer in st.names():
+                it = board.items_on(layer)
+                polys = [_track_polygon(t, st.layer(layer).z_mid) for t in it.tracks if t.net == net]
+                polys += [_pad_polygon(q, st.layer(layer).z_mid) for q in it.pads if q.net == net]
+                for zn in it.zones:
+                    if zn.net == net:
+                        for outer, holes in zn.polygons:
+                            polys.append(np.c_[outer, np.full(len(outer), st.layer(layer).z_mid)])
+                            if holes:
+                                notes.append(f"A hole in the {net} pour on {layer} was filled, which the solver does "
+                                             "not model.")
+                if polys:
+                    sheets.setdefault(f"{role}_{layer.replace('.', '_')}", []).extend(polys)
+    if not any(k.startswith("antenna") for k in sheets):
+        raise ParamError(f"net {ant} has no copper on the board")
+    allp = np.vstack([q[:, :2] for ps in sheets.values() for q in ps] + [np.vstack(board.outline)] if board.outline
+                     else [q[:, :2] for ps in sheets.values() for q in ps])
+    lo, hi = allp.min(0), allp.max(0)
+    c = 0.5 * (lo + hi)
+    sheets = {k: [q - np.array([c[0], c[1], 0.0]) for q in ps] for k, ps in sheets.items()}
+    T = st.board_thickness
+    er = float(st.er_between(st.names()[0], st.names()[-1])) if len(st.names()) > 1 else float(st.dielectrics[0].er)
+    tand = float(np.mean([d.loss_tangent for d in st.dielectrics]))
+    sc = _scene([("box", "board", (-(hi[0] - lo[0]) / 2 * 1e3, -(hi[1] - lo[1]) / 2 * 1e3, 0),
+                  ((hi[0] - lo[0]) / 2 * 1e3, (hi[1] - lo[1]) / 2 * 1e3, T * 1e3))], work, "board")
+    # the port: the antenna pad nearest any ground copper, to the nearest ground point
+    pads = [(q, st.layer(l).z_mid) for l in st.names() for q in board.items_on(l).pads if q.net == ant]
+    ground = [q for k, ps in sheets.items() if k.startswith("ground") for q in ps]
+    if not pads or not ground:
+        raise ParamError("the antenna net has no pad to feed, or the ground has no copper")
+    best = None
+    for q, z in pads:
+        a = np.array([q.at[0] - c[0], q.at[1] - c[1], z])
+        for gp in ground:
+            d, pt = closest_on_polygon(gp, a)
+            if best is None or d < best[0]:
+                best = (d, a, pt, q)
+    d, a, pt, q = best
+    if d > 0.08 * C0 / f0:
+        raise ParamError(f"the antenna's nearest pad ({q.name or 'unnamed'}) is {d * 1e3:.3g} mm from ground, too far "
+                         "to be a feed gap. Give the feed with --set port=x,y,z:x,y,z in mm")
+    port = parse_port(p["port"]) if p.get("port") else Port(tuple(a), tuple(pt), min(q.size) if min(q.size) > 0 else 0.0)
+    s = _setup(p, f0, port=port, dielectrics={"board": (er, tand, "board laminate")}, sheets=sheets)
+    notes += [f"The antenna is net {ant}. Ground is {', '.join(gnd)}.",
+              f"The board is a slab of relative permittivity {er:g} and loss tangent {tand:g}, {T * 1e3:.3g} mm "
+              f"thick ({st.source}).", "Vias are not modeled and copper is a perfect conductor of zero thickness."]
+    return Built("board", sc, s, f"{Path(str(path)).stem} trace antenna", notes=notes,
+                 dims={"board_x": hi[0] - lo[0], "board_y": hi[1] - lo[1], "thickness": T, "er": er})

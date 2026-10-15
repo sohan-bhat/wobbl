@@ -265,6 +265,68 @@ register(Analysis(
     example='wobbl simulate buck.kicad_pcb "how hard does the switch node ring?" --netlist buck.cir'))
 
 
+# --- antennas in files ----------------------------------------------------------------------------
+FREQUENCY = re.compile(r"(\d+(?:\.\d+)?)\s*([gmk]?hz)\b", re.I)
+ANTENNA_WORDS = (r"\bantennas?\b", r"\bs11\b", r"return loss", r"\bvswr\b", r"\bradiat", r"\bgain\b",
+                 r"\bdipole\b", r"\bmonopole\b", r"\bpatch\b", r"\bloop\b", r"inverted[- ]?f", r"\bmeander",
+                 r"radiation pattern", r"\bresonat\w*", r"\b\d+(?:\.\d+)?\s*[gm]hz\b")
+ANTENNA_OPTS = (Option("frequency", "Working frequency, e.g. 2.4GHz (read from the question when it names one)"),
+                Option("port", "The feed gap as two points in mm, x,y,z:x,y,z, when it is not the narrowest gap "
+                               "between two conductors"),
+                Option("budget", "Longest the solve may be predicted to take, e.g. 20min", "15 min"), QUALITY)
+
+
+def _antenna_params(job, extra: tuple = ()) -> dict:
+    f = job.value("frequency")
+    if not f:
+        m = FREQUENCY.search(job.focus)
+        if not m:
+            raise ValueError("say the antenna's working frequency, for example 'at 2.4 GHz' in the question or "
+                             "--frequency 2.4GHz")
+        f = f"{m.group(1)} {m.group(2)}"
+        job.assume(f"the working frequency is {f}, read from the question", f"--frequency {m.group(1)}{m.group(2)}")
+    params = {"frequency": f, "quality": _quality(job)}
+    for k in ("port", "budget") + extra:
+        v = job.values(k) if k == "dielectric" else job.value(k)
+        if v:
+            params[k] = v
+    return params
+
+
+def antenna_part(job):
+    from .radiate import run_file
+
+    if job.path is None:
+        raise ValueError(f"file not found: {job.thing}")
+    params = _antenna_params(job, ("dielectric",))
+    job.ready()
+    return run_file(job.path, params, job.out, job.question, log=job.log)
+
+
+def antenna_board(job):
+    from .radiate import run_file
+
+    if job.path is None:
+        raise ValueError(f"file not found: {job.thing}")
+    params = _antenna_params(job, ("feed",))
+    job.ready()
+    return run_file(job.path, params, job.out, job.question, log=job.log)
+
+
+register(Analysis(
+    "part", "antenna", "Resonance, S11, impedance, gain and pattern of an antenna in any CAD, from a 3D full wave solve",
+    antenna_part, kinds=PART_KINDS, keywords=ANTENNA_WORDS, aliases=("radiation", "s11", "rf"),
+    options=ANTENNA_OPTS + (Option("dielectric", "A body that is not metal, as 'name: fr4' or 'name: er=3.5'",
+                                   multiple=True),),
+    example='wobbl simulate inverted_f.step "does it resonate at 2.4 GHz, and what is its S11?" --port 12,0,0:12,0.6,0'))
+
+register(Analysis(
+    "board", "antenna", "Resonance, S11, gain and pattern of a trace antenna on the board, from a 3D full wave solve",
+    antenna_board, keywords=ANTENNA_WORDS, aliases=("radiation", "s11", "rf"),
+    options=ANTENNA_OPTS + (Option("feed", "The net that is the antenna (default one named ANT, RF or FEED)"),),
+    example='wobbl simulate ifa.kicad_pcb "does the trace antenna resonate at 2.4 GHz?" --feed ANT'))
+
+
 # --- devices in words -------------------------------------------------------------------------
 NUM = r"(\d+(?:\.\d+)?)"
 READ = {

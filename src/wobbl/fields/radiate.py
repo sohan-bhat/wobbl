@@ -17,6 +17,7 @@ a scenario's name.
 from __future__ import annotations
 
 import re
+import shutil
 from dataclasses import dataclass, field
 
 # what a question asks for that only a field solve over the real geometry answers
@@ -121,25 +122,46 @@ def run_radiate(kind: str, params: dict, out_dir, question: str = "", keep: bool
     """An antenna from its dimensions, solved in 3D. The geometry is built from the dimensions (the defaults are
     first guesses from the frequency), the study is planned against its time budget, and the report holds the
     solver's own checks and a comparison with the simple model of the same antenna."""
-    import shutil
     from pathlib import Path
 
-    from . import antenna3d, wave3d
-    from .params import text
+    from . import antenna3d
 
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    p = dict(params)
-    q = quality or text(p, "quality", "normal")
     log("mesh", f"building the {_name(kind)}")
     shutil.rmtree(out / "geometry", ignore_errors=True)
-    built = antenna3d.build(kind, p, out / "geometry")
+    built = antenna3d.build(kind, dict(params), out / "geometry")
+    return solve_built(built, params, out, question, keep, log, why, quality)
+
+
+def run_file(path, params: dict, out_dir, question: str = "", keep: bool = False,
+             log=lambda stage, detail="": None, quality: str = ""):
+    """An antenna that arrives as a CAD model (STEP, IGES, STL) or a printed circuit board (KiCad or Gerber)."""
+    from pathlib import Path
+
+    from . import antenna3d
+
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(out / "geometry", ignore_errors=True)
+    path = Path(path)
+    board = path.is_dir() or path.suffix.lower() in (".kicad_pcb", ".kicad_pro", ".zip", ".gbr", ".gtl", ".gbl")
+    log("mesh", f"reading {path.name}")
+    built = (antenna3d.from_board if board else antenna3d.from_step)(path, dict(params), out / "geometry")
+    why = [f"the antenna is the geometry in {path.name}, which no closed form describes"]
+    return solve_built(built, params, out, question, keep, log, why, quality)
+
+
+def solve_built(built, params: dict, out, question: str, keep: bool, log, why, quality: str = ""):
+    from . import wave3d
+    from .params import text
+
+    q = quality or text(params, "quality", "normal")
     notes = [f"Solved in 3D. {r[:1].upper() + r[1:]}." for r in (why or [])]
     notes += built.notes
     try:
-        o = wave3d.run(built.scene, built.setup, out, question, q, log=log, title=built.title, keep=keep,
-                       budget=_budget(p), compare=compare_with_models(built), notes=notes)
+        return wave3d.run(built.scene, built.setup, out, question, q, log=log, title=built.title, keep=keep,
+                          budget=_budget(params), compare=compare_with_models(built), notes=notes)
     finally:
         if not keep:
             shutil.rmtree(out / "geometry", ignore_errors=True)
-    return o
