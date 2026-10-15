@@ -1,0 +1,51 @@
+{
+ "thing": "motor.toml",
+ "question": "Will this 54 mm KNSB motor hold its casing, and what thrust curve does it give?",
+ "plan": {
+  "thing": "motor.toml",
+  "question": "Will this 54 mm KNSB motor hold its casing, and what thrust curve does it give?",
+  "domain": "flight",
+  "kind": "motor",
+  "analyses": [
+   "motor"
+  ],
+  "reasons": [
+   {
+    "decided": "motor.toml is a .toml file, read as a flight (motor)",
+    "override": "--domain flight"
+   },
+   {
+    "decided": "physics motor from \"casing\"",
+    "override": "--physics motor"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "flight",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "marginal",
+ "situation": {
+  "objects": [
+   "test stand"
+  ],
+  "environment": {
+   "ambient": "1 atm"
+  }
+ },
+ "steps": [
+  {
+   "analysis": "motor",
+   "domain": "flight",
+   "verdict": "marginal",
+   "headline": "Peak chamber pressure 4.14 MPa against a casing that yields at 16.8 MPa, a safety factor of 4.07 (target 2). J602 motor, 1238 N s over 2.06 s at 120 s Isp.",
+   "confidence": "medium",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-motor/examples/knsb-motor/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-motor/examples/knsb-motor/output/report.html",
+   "assumptions": []
+  }
+ ]
+}

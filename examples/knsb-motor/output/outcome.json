@@ -257,6 +257,20 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 24.206073,
- "solver": "Wobbl internal ballistics (Runge-Kutta, scipy) and Cantera 3.2.0"
+ "t_total": 50.468375,
+ "solver": "Wobbl internal ballistics (Runge-Kutta, scipy) and Cantera 3.2.0",
+ "criteria": [
+  {
+   "name": "casing safety factor",
+   "value": "safety_factor",
+   "limit": 1.0,
+   "sense": "min"
+  },
+  {
+   "name": "port to throat",
+   "value": "port_throat",
+   "limit": 1.0,
+   "sense": "min"
+  }
+ ]
 }

@@ -1,0 +1,11 @@
+{
+ "domain": "flight",
+ "analysis": "motor",
+ "spec": {
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-motor/examples/knsb-motor/motor.toml",
+  "kind": "motor",
+  "question": "Will this 54 mm KNSB motor hold its casing, and what thrust curve does it give?",
+  "options": {}
+ },
+ "wobbl": "0.1.1"
+}
