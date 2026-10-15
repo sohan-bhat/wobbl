@@ -3,54 +3,54 @@
  "part": "../enclosure.py",
  "material": "Polycarbonate",
  "question": "Does the PC shell survive a 120 N thumb press, and how far does the top dent?",
- "measure": "von Mises stress",
- "governing_MPa": 8.765468,
+ "measure": "von Mises stress (shell model)",
+ "governing_MPa": 9.773422,
  "governing_xyz": [
-  23.821141,
-  12.823346,
-  25.0
+  23.92813,
+  12.025437,
+  26.5
  ],
- "governing_where": "on face 29 at (23.8, 12.8, 25)",
+ "governing_where": "in the wall under face 2 at (23.9, 12, 26.5)",
  "allowable_MPa": 62,
- "safety_factor": 7.07321,
+ "safety_factor": 6.343735,
  "target_sf": 2.0,
  "verdict": "holds",
- "headline": "Peak 8.77 MPa on face 29 at (23.8, 12.8, 25), safety factor 7.07 against yield (target 2). Confidence is medium.",
- "max_disp_mm": 0.216953,
+ "headline": "Peak 9.77 MPa in the wall under face 2 at (23.9, 12, 26.5), safety factor 6.34 against yield (target 2). Confidence is medium.",
+ "max_disp_mm": 0.230334,
  "max_disp_xyz": [
-  21.446599,
-  10.076192,
-  26.764751
+  22.087979,
+  9.394881,
+  26.5
  ],
  "confidence": "medium",
  "confidence_reasons": [
-  "singularities: excluded from the answer: 20.6 MPa at a sharp inside corner (the 7 mm boss (face 35)) (a sharp corner: singular in theory, so the value depends on the mesh: 15.2 -> 20.8 -> 20.6 MPa); 18.2 MPa at a sharp inside corner (face 29) (a sharp corner: singular in theory, so the value depends on the mesh: 13.1 -> 18 -> 18.2 MPa); 9.85 MPa at a sharp inside corner (face 21) (a sharp corner: singular in theory, so the value depends on the mesh: 9.33 -> 9.55 -> 9.85 MPa). Wobbl reports the stress 2 mm or more away from these spots"
+  "solid cross check: a coarse solid (21,774 nodes) gives 0.208 mm of deflection against the shell's 0.222 mm (+6%), and 8.32 MPa within 6 mm of the shell's governing point against 9.7 MPa (+17%), both on first meshes. The shell idealization moves the answer that much here, so read the shell numbers with that margin"
  ],
  "checks": [
   {
    "name": "mesh convergence",
    "status": "pass",
-   "summary": "von Mises stress settled: 8.67 -> 8.82 -> 8.77 MPa over 3 meshes, last change 0.6%",
+   "summary": "von Mises stress settled: 9.7 -> 9.53 -> 9.77 MPa over 3 meshes, last change 2.5%",
    "detail": {
     "values": [
-     8.671782,
-     8.817955,
-     8.765468
+     9.702822,
+     9.528264,
+     9.773422
     ],
-    "last_change": 0.005988,
+    "last_change": 0.025084,
     "tolerance": 0.03,
     "stopped_by": "converged",
     "max_displacement": [
-     0.212618,
-     0.217537,
-     0.216953
+     0.221799,
+     0.227438,
+     0.230334
     ]
    }
   },
   {
    "name": "force balance",
    "status": "pass",
-   "summary": "reactions balance the loads to 1.7e-05% (forces) and 3.6e-06% (moments)",
+   "summary": "reactions balance the loads to 3.6e-10% (forces; shell supports also hold rotations, whose reaction moments are not compared)",
    "detail": {
     "applied_N": [
      0.0,
@@ -58,145 +58,55 @@
      -120.0
     ],
     "reaction_N": [
-     -1e-06,
      -0.0,
-     120.00002
+     -0.0,
+     120.0
     ],
-    "force_error": 0.0,
-    "moment_error": 0.0
+    "force_error": 0.0
    }
   },
   {
    "name": "hand calculation",
    "status": "skip",
-   "summary": "no simple beam model applies (the governing point is not between the fixtures and the load, so no single section carries it)",
+   "summary": "no simple beam model applies (the part is not slender)",
    "detail": {}
   },
   {
    "name": "singularities",
-   "status": "warn",
-   "summary": "excluded from the answer: 20.6 MPa at a sharp inside corner (the 7 mm boss (face 35)) (a sharp corner: singular in theory, so the value depends on the mesh: 15.2 -> 20.8 -> 20.6 MPa); 18.2 MPa at a sharp inside corner (face 29) (a sharp corner: singular in theory, so the value depends on the mesh: 13.1 -> 18 -> 18.2 MPa); 9.85 MPa at a sharp inside corner (face 21) (a sharp corner: singular in theory, so the value depends on the mesh: 9.33 -> 9.55 -> 9.85 MPa). Wobbl reports the stress 2 mm or more away from these spots",
+   "status": "info",
+   "summary": "excluded from the answer: 10.4 MPa at (34.5, 22.2, 26.5), within 3 mm of a support, boss joint or rigid attachment, where the idealization sets the stress. Wobbl reports the stress away from these spots",
    "detail": {
-    "spots": [
-     {
-      "id": 1,
-      "xyz": [
-       35.357,
-       21.961,
-       24.622
-      ],
-      "kind": "corner",
-      "zone": null,
-      "detail": "at a sharp inside corner (the 7 mm boss (face 35))",
-      "face": 35,
-      "radius": 1.63433,
-      "values": [
-       15.2143,
-       20.7508,
-       20.6233
-      ],
-      "sizes": [
-       0.9165,
-       0.4445,
-       0.4494
-      ],
-      "singular": true,
-      "converged": true,
-      "change": -0.006144,
-      "excluded": true
-     },
-     {
-      "id": 2,
-      "xyz": [
-       37.769,
-       19.697,
-       25.0
-      ],
-      "kind": "corner",
-      "zone": null,
-      "detail": "at a sharp inside corner (face 29)",
-      "face": 29,
-      "radius": 1.986605,
-      "values": [
-       13.0917,
-       17.9873,
-       18.1587
-      ],
-      "sizes": [
-       0.932,
-       0.4957,
-       0.4699
-      ],
-      "singular": true,
-      "converged": true,
-      "change": 0.009533,
-      "excluded": true
-     },
-     {
-      "id": 3,
-      "xyz": [
-       25.302,
-       27.0,
-       24.609
-      ],
-      "kind": "corner",
-      "zone": null,
-      "detail": "at a sharp inside corner (face 21)",
-      "face": 21,
-      "radius": 1.771269,
-      "values": [
-       9.3266,
-       9.5493,
-       9.8546
-      ],
-      "sizes": [
-       1.015,
-       1.0327,
-       1.0193
-      ],
-      "singular": true,
-      "converged": false,
-      "change": 0.031967,
-      "excluded": true
-     },
-     {
-      "id": 4,
-      "xyz": [
-       20.517,
-       27.0,
-       24.611
-      ],
-      "kind": "corner",
-      "zone": null,
-      "detail": "at a sharp inside corner (face 21)",
-      "face": 21,
-      "radius": 1.876929,
-      "values": [
-       9.0404,
-       9.0807,
-       9.887
-      ],
-      "sizes": [
-       1.0767,
-       1.0462,
-       1.0159
-      ],
-      "singular": true,
-      "converged": false,
-      "change": 0.088798,
-      "excluded": true
-     }
-    ]
+    "value": 10.418796,
+    "radius_mm": 3.0
+   }
+  },
+  {
+   "name": "shell model",
+   "status": "pass",
+   "summary": "the shell holds 92% of the part's material and 4 bosses as beams bring it to 100%; 17 rim or edge faces are not walls",
+   "detail": {
+    "share": 1.003515
+   }
+  },
+  {
+   "name": "solid cross check",
+   "status": "warn",
+   "summary": "a coarse solid (21,774 nodes) gives 0.208 mm of deflection against the shell's 0.222 mm (+6%), and 8.32 MPa within 6 mm of the shell's governing point against 9.7 MPa (+17%), both on first meshes. The shell idealization moves the answer that much here, so read the shell numbers with that margin",
+   "detail": {
+    "solid_disp_mm": 0.20836,
+    "shell_disp_mm": 0.221799,
+    "solid_stress_MPa": 8.317722,
+    "shell_stress_MPa": 9.702822,
+    "solid_nodes": 21774
    }
   },
   {
    "name": "units and sanity",
    "status": "pass",
-   "summary": "part 112 mm across, peak strain 0.0037, max deflection 0.217 mm (0.19% of size): all plausible",
+   "summary": "part 112 mm across, peak strain 0.0042, max deflection 0.23 mm (0.21% of size): all plausible",
    "detail": {
     "diag_mm": 111.731822,
-    "strain": 0.00373,
-    "deflection_ratio": 0.001942
+    "deflection_ratio": 0.002061
    }
   }
  ],
@@ -204,291 +114,146 @@
   "Linear elastic material and small deflections (no yielding redistribution, no buckling).",
   "Polycarbonate: E 2350 MPa, Poisson 0.37, von Mises vs yield 62 MPa (Covestro Makrolon 2405 datasheet).",
   "Loads are static and applied all at once; no impact, vibration or fatigue.",
+  "Walls are shells on their midsurface with the thickness the CAD gives at each point; stress is taken on both faces. Through the thickness stress under a load and at sharp inside corners is not modeled.",
+  "Fixed faces hold the walls they touch against moving and turning.",
+  "4 bosses are beams with their own round or pipe section, joined to the wall they meet by a stiff spider over their outline; their own weight is left out.",
+  "Rims, edges and chunky features that are not walls are left out of the shell, so their stiffness and stress are not in the model; the solid cross check shows what that costs.",
   "Molded part treated as isotropic and uniform; weld lines and the area near the gate can be weaker than the datasheet.",
-  "Fixed faces are perfectly rigid; real mounts flex a little, which lowers peak stress next to them.",
-  "Contact between separate parts, friction and preload are not modeled."
+  "Points within 3 mm of supports, boss joints and rigid attachments are left out of the answer."
  ],
  "hotspots": [
   {
    "id": 1,
+   "kind": "support",
+   "detail": "at a support, boss joint or rigid attachment",
    "xyz": [
-    35.357,
-    21.961,
-    24.622
+    34.488435,
+    22.249761,
+    26.5
    ],
-   "kind": "corner",
-   "zone": null,
-   "detail": "at a sharp inside corner (the 7 mm boss (face 35))",
-   "face": 35,
-   "radius": 1.63433,
    "values": [
-    15.2143,
-    20.7508,
-    20.6233
+    10.418796
    ],
-   "sizes": [
-    0.9165,
-    0.4445,
-    0.4494
-   ],
-   "singular": true,
-   "converged": true,
-   "change": -0.006144,
    "excluded": true
-  },
-  {
-   "id": 2,
-   "xyz": [
-    37.769,
-    19.697,
-    25.0
-   ],
-   "kind": "corner",
-   "zone": null,
-   "detail": "at a sharp inside corner (face 29)",
-   "face": 29,
-   "radius": 1.986605,
-   "values": [
-    13.0917,
-    17.9873,
-    18.1587
-   ],
-   "sizes": [
-    0.932,
-    0.4957,
-    0.4699
-   ],
-   "singular": true,
-   "converged": true,
-   "change": 0.009533,
-   "excluded": true
-  },
-  {
-   "id": 3,
-   "xyz": [
-    25.302,
-    27.0,
-    24.609
-   ],
-   "kind": "corner",
-   "zone": null,
-   "detail": "at a sharp inside corner (face 21)",
-   "face": 21,
-   "radius": 1.771269,
-   "values": [
-    9.3266,
-    9.5493,
-    9.8546
-   ],
-   "sizes": [
-    1.015,
-    1.0327,
-    1.0193
-   ],
-   "singular": true,
-   "converged": false,
-   "change": 0.031967,
-   "excluded": true
-  },
-  {
-   "id": 4,
-   "xyz": [
-    20.517,
-    27.0,
-    24.611
-   ],
-   "kind": "corner",
-   "zone": null,
-   "detail": "at a sharp inside corner (face 21)",
-   "face": 21,
-   "radius": 1.876929,
-   "values": [
-    9.0404,
-    9.0807,
-    9.887
-   ],
-   "sizes": [
-    1.0767,
-    1.0462,
-    1.0159
-   ],
-   "singular": true,
-   "converged": false,
-   "change": 0.088798,
-   "excluded": true
-  },
-  {
-   "id": 5,
-   "xyz": [
-    23.985,
-    13.167,
-    25.0
-   ],
-   "kind": "feature",
-   "zone": null,
-   "detail": "on face 29",
-   "face": 29,
-   "radius": 1.611656,
-   "values": [
-    8.6718,
-    8.818,
-    8.7655
-   ],
-   "sizes": [
-    1.0744,
-    0.5557,
-    0.2664
-   ],
-   "singular": false,
-   "converged": true,
-   "change": -0.005952,
-   "excluded": false
   }
  ],
  "levels": [
   {
    "level": 0,
-   "n_nodes": 114014,
-   "n_elems": 61252,
-   "h_global": 2.7,
-   "h_min": 0.716663,
-   "t_mesh": 9.985874,
-   "t_solve": 42.445181,
-   "governing": 8.671782,
+   "n_nodes": 6165,
+   "n_elems": 3038,
+   "h_global": 3.724394,
+   "h_min": 3.724394,
+   "t_mesh": 0.0,
+   "t_solve": 8.08193,
+   "governing": 9.702822,
    "governing_xyz": [
-    23.984987,
-    13.167415,
-    25.0
+    24.273971,
+    14.135383,
+    26.5
    ],
-   "raw_max": 15.214326,
+   "on_post": false,
+   "raw_max": 9.702822,
    "raw_max_xyz": [
-    35.356697,
-    21.960634,
-    24.621867
+    24.273971,
+    14.135383,
+    26.5
    ],
-   "max_disp": 0.212618,
+   "max_disp": 0.221799,
    "max_disp_xyz": [
-    21.025923,
-    9.649344,
-    26.252334
+    21.524522,
+    10.221577,
+    26.5
    ],
    "reaction": [
-    2e-06,
-    -3e-06,
-    119.999999
+    -0.0,
+    -0.0,
+    120.0
    ],
    "applied": [
     0.0,
     0.0,
     -120.0
    ],
-   "reaction_moment": [
-    1827.266774,
-    -3005.494177,
-    -1.8e-05
-   ],
-   "applied_moment": [
-    -1827.266948,
-    3005.494277,
-    0.0
-   ],
-   "wall_iterations": 0
+   "expanded_nodes": 14553
   },
   {
    "level": 1,
-   "n_nodes": 142571,
-   "n_elems": 78982,
-   "h_global": 2.295,
-   "h_min": 0.428105,
-   "t_mesh": 7.308112,
-   "t_solve": 66.201993,
-   "governing": 8.817955,
+   "n_nodes": 9295,
+   "n_elems": 4590,
+   "h_global": 2.607076,
+   "h_min": 2.607076,
+   "t_mesh": 0.0,
+   "t_solve": 12.217829,
+   "governing": 9.528264,
    "governing_xyz": [
-    23.625979,
-    12.723739,
-    25.0
+    25.056756,
+    13.506692,
+    26.5
    ],
-   "raw_max": 20.750833,
+   "on_post": false,
+   "raw_max": 9.528264,
    "raw_max_xyz": [
-    35.933931,
-    21.119813,
-    25.0
+    25.056756,
+    13.506692,
+    26.5
    ],
-   "max_disp": 0.217537,
+   "max_disp": 0.227438,
    "max_disp_xyz": [
-    21.657784,
-    9.535969,
-    26.47536
+    22.264304,
+    9.193392,
+    26.5
    ],
    "reaction": [
-    -3e-06,
-    -1.4e-05,
-    119.999964
+    -0.0,
+    0.0,
+    120.0
    ],
    "applied": [
     0.0,
     0.0,
     -120.0
    ],
-   "reaction_moment": [
-    1798.811737,
-    -3004.147736,
-    -0.00054
-   ],
-   "applied_moment": [
-    -1798.812522,
-    3004.147595,
-    0.0
-   ],
-   "wall_iterations": 0
+   "expanded_nodes": 21604
   },
   {
    "level": 2,
-   "n_nodes": 165845,
-   "n_elems": 93721,
-   "h_global": 1.95075,
-   "h_min": 0.266425,
-   "t_mesh": 7.414758,
-   "t_solve": 87.283989,
-   "governing": 8.765468,
+   "n_nodes": 17785,
+   "n_elems": 8812,
+   "h_global": 1.862197,
+   "h_min": 1.862197,
+   "t_mesh": 0.0,
+   "t_solve": 19.298893,
+   "governing": 9.773422,
    "governing_xyz": [
-    23.821141,
-    12.823346,
-    25.0
+    23.92813,
+    12.025437,
+    26.5
    ],
-   "raw_max": 20.623343,
+   "on_post": false,
+   "raw_max": 10.418796,
    "raw_max_xyz": [
-    35.45404,
-    21.453219,
-    25.0
+    34.488435,
+    22.249761,
+    26.5
    ],
-   "max_disp": 0.216953,
+   "max_disp": 0.230334,
    "max_disp_xyz": [
-    21.446599,
-    10.076192,
-    26.764751
+    22.087979,
+    9.394881,
+    26.5
    ],
    "reaction": [
-    -1e-06,
     -0.0,
-    120.00002
+    -0.0,
+    120.0
    ],
    "applied": [
     0.0,
     0.0,
     -120.0
    ],
-   "reaction_moment": [
-    1801.859465,
-    -3006.888367,
-    -7e-05
-   ],
-   "applied_moment": [
-    -1801.85933,
-    3006.887907,
-    0.0
-   ],
-   "wall_iterations": 0
+   "expanded_nodes": 40832
   }
  ],
  "loads": [
@@ -3016,48 +2781,29 @@
  },
  "notes": [
   "Built from enclosure.py with wall=3, length=90, width=60, height=28, corner=6, boss=7.",
-  "A coarser first mesh folded on the thin walls, so the study starts from the finer one (114,014 nodes).",
-  "Thin walls need a large first mesh (114,014 nodes), so this study takes longer than usual."
+  "The shell model holds 92% of the part's material in 21 wall faces.",
+  "17 faces that are rims, edges or chunky features such as bosses are not walls and are left out of the shell."
  ],
  "imperial": false,
- "mass_kg": 0.048545,
+ "mass_kg": 0.048777,
  "beam": null,
- "fixes": [
-  {
-   "kind": "fillet",
-   "title": "Round the sharp inside corner to a 1.5 mm radius",
-   "summary": "Stress piles up in the sharp inside corner. A fillet of 1.5 mm (about half the 3 mm wall) spreads it out.",
-   "params": {
-    "radius": 1.499999,
-    "point": [
-     35.356697,
-     21.960634,
-     24.621867
-    ],
-    "face": null
-   },
-   "auto": true
-  },
-  {
-   "kind": "material",
-   "title": "Switch to PLA (3D printed)",
-   "summary": "Stress stays about the same for the same shape and load, so PLA (3D printed) (50 MPa) gives safety factor 5.70. It is 1.5x as stiff, so deflection scales by 0.671. Other options: PETG (3D printed) (5.36), ABS (3D printed) (3.76).",
-   "params": {
-    "material": "pla",
-    "safety_factor": 5.704202
-   },
-   "auto": true
-  }
- ],
+ "fixes": [],
  "images": {
   "stress": "images/stress.png",
-  "zoom": "images/zoom.png",
   "safety": "images/safety.png",
   "deformed": "images/deformed.png",
   "convergence": "images/convergence.png"
  },
  "report": "report.html",
  "workdir": ".",
- "t_total": 270.098744,
- "solver": "CalculiX 2.23"
+ "t_total": 82.766779,
+ "solver": "CalculiX 2.23",
+ "criteria": [
+  {
+   "name": "stress",
+   "value": "governing_MPa",
+   "limit": 62.0,
+   "sense": "max"
+  }
+ ]
 }

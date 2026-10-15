@@ -11,16 +11,15 @@ bosses, held at its rim. A thumb presses 120 N on a 16 mm patch near one corner.
 
 | Result | Value |
 |---|---|
-| Peak stress away from sharp corners | 8.77 MPa on the top skin under the press, safety factor 7.1 against PC's 62 MPa yield |
-| Dent under the thumb | 0.22 mm |
-| Mesh convergence | 8.67, 8.82, 8.77 MPa over three meshes (114k to 166k nodes) |
-| Equilibrium | reactions balance the 120 N to 0.00002% |
+| Peak stress | 9.77 MPa in the top wall under the press, safety factor 6.3 against PC's 62 MPa yield |
+| Dent under the thumb | 0.23 mm |
+| Mesh convergence | 9.70, 9.53, 9.77 MPa over three meshes |
+| Equilibrium | reactions balance the 120 N to 4e-10% |
 
-Confidence is medium because the bosses meet the underside of the top with no fillet, and Wobbl
-flags those sharp corners as singular. One boss root reads 15.2, 20.8 and 20.6 MPa over the
-three meshes, a value the mesh sets rather than the part. The shell holds this press with a wide
-margin either way, but a 0.5 to 1 mm fillet at the boss roots is the cheap change that makes the
-corner stress finite and trustworthy.
+Wobbl solves the walls as shells, with the four bosses as beams, which carries all of the part's
+material. A coarse solid model run beside it gives 0.208 mm of dent and 8.3 MPa near the same
+spot, 6% and 17% from the shell, so confidence is medium and the numbers carry that margin. The
+shell holds this press with a wide margin either way.
 
-Thin walls on a box need over 100k nodes per mesh, so the study takes about four and a half
-minutes on a 2018 six core laptop.
+Thin walls on a box need over 100k nodes per mesh, so the study takes about a minute and a half
+on a 2018 six core laptop.

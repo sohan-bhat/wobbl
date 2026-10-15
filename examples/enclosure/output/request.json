@@ -1,0 +1,24 @@
+{
+ "domain": "part",
+ "analysis": "stress",
+ "spec": {
+  "thing": "enclosure.py",
+  "kind": "parametric",
+  "question": "Does the PC shell survive a 120 N thumb press, and how far does the top dent?",
+  "options": {
+   "budget": [
+    "600"
+   ],
+   "material": [
+    "pc"
+   ],
+   "load": [
+    "120 N down @ top and within 8 of 25,15,28"
+   ],
+   "fix": [
+    "fixed z=min"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

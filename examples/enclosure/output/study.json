@@ -22,7 +22,8 @@
    "kind": "fixed",
    "faces": "z=min",
    "text": "fixed z=min",
-   "dofs": "xyz"
+   "dofs": "xyz",
+   "stiffness": 0.0
   }
  ],
  "target_sf": null,
@@ -36,5 +37,6 @@
  "mesh_size": null,
  "print_direction": null,
  "assumptions": [],
- "params": {}
+ "params": {},
+ "shell": true
 }

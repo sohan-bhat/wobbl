@@ -1,28 +1,29 @@
-HOLDS. Peak 8.77 MPa on face 29 at (23.8, 12.8, 25), safety factor 7.07 against yield (target 2). Confidence is medium.
+HOLDS. Peak 9.77 MPa in the wall under face 2 at (23.9, 12, 26.5), safety factor 6.34 against yield (target 2). Confidence is medium.
 
-Confidence: medium. singularities: excluded from the answer: 20.6 MPa at a sharp inside corner (the 7 mm boss (face 35)) (a sharp corner: singular in theory, so the value depends on the mesh: 15.2 -> 20.8 -> 20.6 MPa); 18.2 MPa at a sharp inside corner (face 29) (a sharp corner: singular in theory, so the value depends on the mesh: 13.1 -> 18 -> 18.2 MPa); 9.85 MPa at a sharp inside corner (face 21) (a sharp corner: singular in theory, so the value depends on the mesh: 9.33 -> 9.55 -> 9.85 MPa). Wobbl reports the stress 2 mm or more away from these spots
-Max deflection 0.217 mm at (21.4, 10.1, 26.8).
-Material Polycarbonate, limit 62 MPa; mass 48.55 g.
+Confidence: medium. solid cross check: a coarse solid (21,774 nodes) gives 0.208 mm of deflection against the shell's 0.222 mm (+6%), and 8.32 MPa within 6 mm of the shell's governing point against 9.7 MPa (+17%), both on first meshes. The shell idealization moves the answer that much here, so read the shell numbers with that margin
+Max deflection 0.23 mm at (22.1, 9.39, 26.5).
+Material Polycarbonate, limit 62 MPa; mass 48.78 g.
 Loads: 120 N down @ top and within 8 of 25,15,28. Fixtures: fixed z=min.
 
 Checks:
-  [pass] mesh convergence: von Mises stress settled: 8.67 -> 8.82 -> 8.77 MPa over 3 meshes, last change 0.6%
-  [pass] force balance: reactions balance the loads to 1.7e-05% (forces) and 3.6e-06% (moments)
-  [skip] hand calculation: no simple beam model applies (the governing point is not between the fixtures and the load, so no single section carries it)
-  [warn] singularities: excluded from the answer: 20.6 MPa at a sharp inside corner (the 7 mm boss (face 35)) (a sharp corner: singular in theory, so the value depends on the mesh: 15.2 -> 20.8 -> 20.6 MPa); 18.2 MPa at a sharp inside corner (face 29) (a sharp corner: singular in theory, so the value depends on the mesh: 13.1 -> 18 -> 18.2 MPa); 9.85 MPa at a sharp inside corner (face 21) (a sharp corner: singular in theory, so the value depends on the mesh: 9.33 -> 9.55 -> 9.85 MPa). Wobbl reports the stress 2 mm or more away from these spots
-  [pass] units and sanity: part 112 mm across, peak strain 0.0037, max deflection 0.217 mm (0.19% of size): all plausible
+  [pass] mesh convergence: von Mises stress settled: 9.7 -> 9.53 -> 9.77 MPa over 3 meshes, last change 2.5%
+  [pass] force balance: reactions balance the loads to 3.6e-10% (forces; shell supports also hold rotations, whose reaction moments are not compared)
+  [skip] hand calculation: no simple beam model applies (the part is not slender)
+  [info] singularities: excluded from the answer: 10.4 MPa at (34.5, 22.2, 26.5), within 3 mm of a support, boss joint or rigid attachment, where the idealization sets the stress. Wobbl reports the stress away from these spots
+  [pass] shell model: the shell holds 92% of the part's material and 4 bosses as beams bring it to 100%; 17 rim or edge faces are not walls
+  [warn] solid cross check: a coarse solid (21,774 nodes) gives 0.208 mm of deflection against the shell's 0.222 mm (+6%), and 8.32 MPa within 6 mm of the shell's governing point against 9.7 MPa (+17%), both on first meshes. The shell idealization moves the answer that much here, so read the shell numbers with that margin
+  [pass] units and sanity: part 112 mm across, peak strain 0.0042, max deflection 0.23 mm (0.21% of size): all plausible
 
 Assumptions:
   - Linear elastic material and small deflections (no yielding redistribution, no buckling).
   - Polycarbonate: E 2350 MPa, Poisson 0.37, von Mises vs yield 62 MPa (Covestro Makrolon 2405 datasheet).
   - Loads are static and applied all at once; no impact, vibration or fatigue.
+  - Walls are shells on their midsurface with the thickness the CAD gives at each point; stress is taken on both faces. Through the thickness stress under a load and at sharp inside corners is not modeled.
+  - Fixed faces hold the walls they touch against moving and turning.
+  - 4 bosses are beams with their own round or pipe section, joined to the wall they meet by a stiff spider over their outline; their own weight is left out.
+  - Rims, edges and chunky features that are not walls are left out of the shell, so their stiffness and stress are not in the model; the solid cross check shows what that costs.
   - Molded part treated as isotropic and uniform; weld lines and the area near the gate can be weaker than the datasheet.
-  - Fixed faces are perfectly rigid; real mounts flex a little, which lowers peak stress next to them.
-  - Contact between separate parts, friction and preload are not modeled.
+  - Points within 3 mm of supports, boss joints and rigid attachments are left out of the answer.
 
-Suggested fixes:
-  - Stress piles up in the sharp inside corner. A fillet of 1.5 mm (about half the 3 mm wall) spreads it out.
-  - Stress stays about the same for the same shape and load, so PLA (3D printed) (50 MPa) gives safety factor 5.70. It is 1.5x as stiff, so deflection scales by 0.671. Other options: PETG (3D printed) (5.36), ABS (3D printed) (3.76).
-
-Images: stress: images/stress.png, zoom: images/zoom.png, safety: images/safety.png, deformed: images/deformed.png, convergence: images/convergence.png
+Images: stress: images/stress.png, safety: images/safety.png, deformed: images/deformed.png, convergence: images/convergence.png
 Report: report.html

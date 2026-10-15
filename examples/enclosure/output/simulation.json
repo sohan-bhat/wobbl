@@ -1,0 +1,52 @@
+{
+ "thing": "enclosure.py",
+ "question": "Does the PC shell survive a 120 N thumb press, and how far does the top dent?",
+ "plan": {
+  "thing": "enclosure.py",
+  "question": "Does the PC shell survive a 120 N thumb press, and how far does the top dent?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "stress"
+  ],
+  "reasons": [
+   {
+    "decided": "enclosure.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics stress, as asked",
+    "override": "--physics stress"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "supports": [
+   "fixed z=min"
+  ],
+  "loads": [
+   "120 N down @ top and within 8 of 25,15,28"
+  ],
+  "material": "pc"
+ },
+ "steps": [
+  {
+   "analysis": "stress",
+   "domain": "part",
+   "verdict": "holds",
+   "headline": "Peak 9.77 MPa in the wall under face 2 at (23.9, 12, 26.5), safety factor 6.34 against yield (target 2). Confidence is medium.",
+   "confidence": "medium",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": []
+  }
+ ]
+}
