@@ -275,6 +275,34 @@ def build_assembly_mesh(asm: Assembly, sizing: Sizing, timeout: float | None = N
     raise MeshError(f"gmsh could not mesh the assembly ({'; '.join(errors[:3])})")
 
 
+# the ten nodes of a CalculiX second order tet in (L2, L3, L4) space: four corners, then the middles of 01, 12, 20, 03, 13, 23
+_TET10_POINTS = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], [.5, 0, 0], [.5, .5, 0], [0, .5, 0], [0, 0, .5],
+                          [.5, 0, .5], [0, .5, .5]], float)
+
+
+def inverted_elements(X: np.ndarray, tets: np.ndarray) -> int:
+    """Count second order tets whose Jacobian is not positive at one of their ten nodes. Curving the sides of a coarse
+    element on a tight curve can turn it inside out, which the solver refuses."""
+    u = _TET10_POINTS
+    L = np.column_stack([1 - u.sum(1), u])                       # barycentric coordinates at each node
+    # dN/d(L2, L3, L4) of the ten shape functions at each node, with L1 = 1 - L2 - L3 - L4
+    d = np.zeros((10, 10, 3))
+    for k in range(3):
+        dL = np.zeros((10, 4))
+        dL[:, k + 1] = 1.0
+        dL[:, 0] = -1.0
+        for c in range(4):
+            d[:, c, k] = (4 * L[:, c] - 1) * dL[:, c]
+        for j, (a, b) in enumerate(((0, 1), (1, 2), (2, 0), (0, 3), (1, 3), (2, 3))):
+            d[:, 4 + j, k] = 4 * (dL[:, a] * L[:, b] + L[:, a] * dL[:, b])
+    bad = 0
+    for lo in range(0, len(tets), 20000):
+        P = X[tets[lo:lo + 20000]]                                # (n, 10, 3)
+        J = np.einsum("pck,nci->npik", d, P)                       # (n, nodes, xyz, local)
+        bad += int((np.linalg.det(J) <= 0).any(axis=1).sum())
+    return bad
+
+
 def _mesh(prep: PreparedGeometry, sizing: Sizing, curved: bool, n_bodies: int) -> Mesh:
     t0 = time.time()
     with gmsh_session() as gmsh:
@@ -326,6 +354,8 @@ def _mesh(prep: PreparedGeometry, sizing: Sizing, curved: bool, n_bodies: int) -
     tets = lut[raw][:, GMSH_TO_CCX_TET10]
     if flat_elements(X, tets):
         raise MeshError("the mesher left flat elements")
+    if tets.shape[1] == 10 and (bad := inverted_elements(X, tets)):
+        raise MeshError(f"curving the sides left {bad} second order elements inside out")
     tris, E, F, key = _boundary(tets, X, 2)
     nn = len(X)
     tri_surf = np.full(len(tris), -1, np.int64)
