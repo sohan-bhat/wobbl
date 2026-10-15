@@ -1,0 +1,23 @@
+MARGINAL. buck_tight.kicad_pcb has 5 routed nets on 2 layers, with trace impedances from 60.2 to 113 ohm. The longest, VIN, runs 21.7 mm with 7.87 nH, 2.17 pF and 5.33 mohm. The worst crosstalk is 0.1% between G and GND over 0.6 mm at a 1 ns edge. In buck.cir the layout raises the peak across D1 from 13.2 V on the schematic alone to 31.3 V, ringing at 79.4 MHz.
+
+Confidence: high. passed mesh convergence, closed form, connectivity
+nets: 5
+impedance: 60.2 to 113 ohm
+worst crosstalk: 0.1%
+sections solved: 3
+
+Checks:
+  [pass] mesh convergence: the most used trace's impedance moved from 60.2 to 60.2 ohm on a finer mesh (0.021%)
+  [pass] closed form: the most used trace, a microstrip on F.Cu, is 60.2 ohm and the closed form for its average dielectric gives 60.3 ohm (0.12% apart, the field solve keeps each layer of the stackup)
+  [pass] connectivity: every net's pads are joined by its copper
+
+Assumptions:
+  - Stackup: kicad stackup.
+  - Quasi static TEM cross sections of each trace with its planes; solder mask, plating and surface roughness are left out, and loss is only the DC resistance of the copper.
+  - Crosstalk is for a 1 ns edge on the aggressor.
+  - KiCad 8 board, file format version 20240108.
+  - Parasitics joined 5 of 6 pad connections and 4 net capacitances to the schematic buck.cir, each pad hanging off its net's main chip pad through the copper between them.
+  - The parts are modeled as the netlist gives them. Ideal switches and diodes without reverse recovery ring longer than real ones, whose losses damp the ringing.
+
+Images: board: images/board.png, ringing: images/ringing.png
+Report: report.html

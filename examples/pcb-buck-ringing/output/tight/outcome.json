@@ -1,0 +1,282 @@
+{
+ "domain": "board",
+ "part": "buck_tight.kicad_pcb",
+ "question": "how hard does the switch node ring with this layout?",
+ "verdict": "marginal",
+ "headline": "buck_tight.kicad_pcb has 5 routed nets on 2 layers, with trace impedances from 60.2 to 113 ohm. The longest, VIN, runs 21.7 mm with 7.87 nH, 2.17 pF and 5.33 mohm. The worst crosstalk is 0.1% between G and GND over 0.6 mm at a 1 ns edge. In buck.cir the layout raises the peak across D1 from 13.2 V on the schematic alone to 31.3 V, ringing at 79.4 MHz.",
+ "metrics": [
+  [
+   "nets",
+   "5"
+  ],
+  [
+   "impedance",
+   "60.2 to 113 ohm"
+  ],
+  [
+   "worst crosstalk",
+   "0.1%"
+  ],
+  [
+   "sections solved",
+   "3"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed mesh convergence, closed form, connectivity"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "the most used trace's impedance moved from 60.2 to 60.2 ohm on a finer mesh (0.021%)",
+   "detail": {}
+  },
+  {
+   "name": "closed form",
+   "status": "pass",
+   "summary": "the most used trace, a microstrip on F.Cu, is 60.2 ohm and the closed form for its average dielectric gives 60.3 ohm (0.12% apart, the field solve keeps each layer of the stackup)",
+   "detail": {}
+  },
+  {
+   "name": "connectivity",
+   "status": "pass",
+   "summary": "every net's pads are joined by its copper",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Stackup: kicad stackup.",
+  "Quasi static TEM cross sections of each trace with its planes; solder mask, plating and surface roughness are left out, and loss is only the DC resistance of the copper.",
+  "Crosstalk is for a 1 ns edge on the aggressor.",
+  "KiCad 8 board, file format version 20240108.",
+  "Parasitics joined 5 of 6 pad connections and 4 net capacitances to the schematic buck.cir, each pad hanging off its net's main chip pad through the copper between them.",
+  "The parts are modeled as the netlist gives them. Ideal switches and diodes without reverse recovery ring longer than real ones, whose losses damp the ringing."
+ ],
+ "values": {
+  "nets": {
+   "VIN": {
+    "length_m": 0.0217,
+    "z0_min": 60.197105,
+    "z0_max": 60.197105,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.005332,
+    "delay_s": 0.0,
+    "vias": 0,
+    "no_plane": 0,
+    "connected": true,
+    "pads": [
+     "J1.1",
+     "C1.1",
+     "S1.1"
+    ],
+    "ground": false
+   },
+   "SW": {
+    "length_m": 0.0166,
+    "z0_min": 60.197105,
+    "z0_max": 60.197105,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.004079,
+    "delay_s": 0.0,
+    "vias": 0,
+    "no_plane": 0,
+    "connected": true,
+    "pads": [
+     "S1.2",
+     "D1.2",
+     "L1.1"
+    ],
+    "ground": false
+   },
+   "VOUT": {
+    "length_m": 0.0179,
+    "z0_min": 60.197105,
+    "z0_max": 60.197105,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.004398,
+    "delay_s": 0.0,
+    "vias": 0,
+    "no_plane": 0,
+    "connected": true,
+    "pads": [
+     "L1.2",
+     "C2.1",
+     "R1.1"
+    ],
+    "ground": false
+   },
+   "GND": {
+    "length_m": 0.0096,
+    "z0_min": 82.905023,
+    "z0_max": 82.905023,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.004718,
+    "delay_s": 0.0,
+    "vias": 6,
+    "no_plane": 0.0096,
+    "connected": true,
+    "pads": [
+     "J1.2",
+     "C1.2",
+     "S1.4",
+     "D1.1",
+     "C2.2",
+     "R1.2"
+    ],
+    "ground": true
+   },
+   "G": {
+    "length_m": 0.0091,
+    "z0_min": 113.43057,
+    "z0_max": 113.43057,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.01118,
+    "delay_s": 0.0,
+    "vias": 0,
+    "no_plane": 0,
+    "connected": true,
+    "pads": [
+     "S1.3"
+    ],
+    "ground": false
+   }
+  },
+  "pairs": [
+   {
+    "nets": [
+     "G",
+     "GND"
+    ],
+    "length_m": 0.0006,
+    "spacing_m": 0.0007,
+    "next": 0.001034,
+    "fext": 1.1e-05,
+    "kb": 0.145369,
+    "kf": 0.002993,
+    "layer": "F.Cu"
+   }
+  ],
+  "vias": 6,
+  "sections": [
+   {
+    "layer": "F.Cu",
+    "width_mm": 2.0,
+    "below": "B.Cu",
+    "above": null,
+    "z0": 60.197105,
+    "l": 0.0,
+    "c": 0.0,
+    "delay": 0.0,
+    "eps_eff": 3.265962,
+    "solved": true,
+    "nodes": 1007
+   },
+   {
+    "layer": "F.Cu",
+    "width_mm": 1.0,
+    "below": null,
+    "above": null,
+    "z0": 82.905023,
+    "l": 0.0,
+    "c": 0.0,
+    "delay": 0.0,
+    "eps_eff": 3.108118,
+    "solved": true,
+    "nodes": 910
+   },
+   {
+    "layer": "F.Cu",
+    "width_mm": 0.4,
+    "below": "B.Cu",
+    "above": null,
+    "z0": 113.43057,
+    "l": 1e-06,
+    "c": 0.0,
+    "delay": 0.0,
+    "eps_eff": 2.967921,
+    "solved": true,
+    "nodes": 951
+   }
+  ],
+  "parasitics": "parasitics.json",
+  "circuit": {
+   "parts": [
+    {
+     "part": "D1",
+     "ideal_V": 13.218995,
+     "board_V": 31.296184,
+     "ring_Hz": 79440450.684852
+    },
+    {
+     "part": "L1",
+     "ideal_V": 8.181919,
+     "board_V": 18.145902
+    },
+    {
+     "part": "S1",
+     "ideal_V": 12.347061,
+     "board_V": 18.946218
+    },
+    {
+     "part": "CS1",
+     "ideal_V": 12.347061,
+     "board_V": 18.946218
+    },
+    {
+     "part": "C1",
+     "ideal_V": 12.0,
+     "board_V": 12.001765
+    },
+    {
+     "part": "V1",
+     "ideal_V": 12.0,
+     "board_V": 12.0
+    },
+    {
+     "part": "VG",
+     "ideal_V": 5.0,
+     "board_V": 5.0
+    },
+    {
+     "part": "C2",
+     "ideal_V": 5.054443,
+     "board_V": 5.044358
+    },
+    {
+     "part": "R1",
+     "ideal_V": 5.054443,
+     "board_V": 5.038271
+    }
+   ],
+   "step_s": 0.0
+  },
+  "_figures": [
+   [
+    "board",
+    "Traces colored by impedance"
+   ],
+   [
+    "ringing",
+    "The worst part with and without the board"
+   ]
+  ]
+ },
+ "images": {
+  "board": "images/board.png",
+  "ringing": "images/ringing.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 206.005087,
+ "solver": "GetDP cross sections with gmsh",
+ "criteria": []
+}

@@ -250,6 +250,33 @@
   turn of a crack at 45 degrees, a run over the strength and fatigue examples
   it was not tuned for, and the bracket crack example.
 
+**Magnetic, electric, sound and board fields on your own geometry**
+- `wobbl simulate` runs fields on any CAD file and on real boards. Each body of
+  a STEP, IGES, BREP, STL or parametric part gets a material from `--assign`
+  lines such as `plunger: steel 1010`, `coil: coil 800 turns 0.6 A`, `magnet:
+  n42 +z`, `electrode: conductor 5 kV`, `spacer: ptfe` or `box: rigid`, or from
+  its name and the question, every guess shown with its override.
+- Magnetics solve the vector potential on the edges of a 3D mesh with nonlinear
+  steel, magnets in any direction and coils of any shape, whose current follows
+  the winding's own path. The force and torque on a body come from the Maxwell
+  stress tensor and are checked by virtual work on a stretched mesh, by action
+  and reaction across all bodies and by the energy balance.
+- Electrostatics give the capacitance matrix, the peak field per region and a
+  breakdown margin, with charge, reciprocity and energy checks. Sound finds the
+  modes of the air in a room or inside an enclosure, cut out of the CAD, and
+  the level a vibrating body makes in free air.
+- A KiCad (4 to 10) or Gerber board is read with its stackup, tracks, vias,
+  pads and pours. Every net's traces are solved as cross sections over the
+  planes really under them, coupled neighbors give crosstalk, and the result
+  writes `parasitics.json` for the circuit run of the same board. Given its
+  netlist, the board study runs it with and without the layout.
+- The parametric solenoid, plates, trace, dipole and room studies stay for
+  devices described in words, and the old field commands are hidden aliases.
+- GetDP installs itself the first time a field study runs (11 MB download,
+  26 MB kept). Every run writes `playback.json` with the fields on a slice.
+- A generality run over 14 real boards and varied CAD scenes, and examples of a
+  solenoid actuator, a buck converter's layout on two boards and a speaker box.
+
 ## 0.1.1 (2026-10-13)
 
 **Heat**

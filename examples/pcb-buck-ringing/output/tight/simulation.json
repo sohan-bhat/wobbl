@@ -1,0 +1,56 @@
+{
+ "thing": "buck_tight.kicad_pcb",
+ "question": "how hard does the switch node ring with this layout?",
+ "plan": {
+  "thing": "buck_tight.kicad_pcb",
+  "question": "how hard does the switch node ring with this layout?",
+  "domain": "board",
+  "kind": "kicad",
+  "analyses": [
+   "parasitics"
+  ],
+  "reasons": [
+   {
+    "decided": "buck_tight.kicad_pcb is a .kicad_pcb file, read as a board (kicad)",
+    "override": "--domain board"
+   },
+   {
+    "decided": "physics parasitics from \"ring\"",
+    "override": "--physics parasitics"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "board",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "marginal",
+ "situation": {
+  "objects": [
+   {
+    "board": "buck_tight",
+    "layers": [
+     "F.Cu",
+     "B.Cu"
+    ],
+    "nets": 5,
+    "thickness_mm": 1.58
+   }
+  ]
+ },
+ "steps": [
+  {
+   "analysis": "parasitics",
+   "domain": "board",
+   "verdict": "marginal",
+   "headline": "buck_tight.kicad_pcb has 5 routed nets on 2 layers, with trace impedances from 60.2 to 113 ohm. The longest, VIN, runs 21.7 mm with 7.87 nH, 2.17 pF and 5.33 mohm. The worst crosstalk is 0.1% between G and GND over 0.6 mm at a 1 ns edge. In buck.cir the layout raises the peak across D1 from 13.2 V on the schematic alone to 31.3 V, ringing at 79.4 MHz.",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/pcb-buck-ringing/output/tight",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/pcb-buck-ringing/output/tight/report.html",
+   "assumptions": []
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+MARGINAL. buck_loose.kicad_pcb has 5 routed nets on 2 layers, with trace impedances from 82.9 to 113 ohm. The longest, SW, runs 39.6 mm with 19.3 nH, 2.81 pF and 19.5 mohm. In buck.cir the layout raises the peak across D1 from 13.2 V on the schematic alone to 31.5 V, ringing at 168 MHz.
+
+Confidence: medium. return path: 4 nets run mostly over no plane (VIN, SW, VOUT, G), so their return current takes whatever copper is near and their impedance is only a bound
+nets: 5
+impedance: 82.9 to 113 ohm
+worst crosstalk: none found
+sections solved: 3
+
+Checks:
+  [pass] mesh convergence: the most used trace's impedance moved from 82.9 to 82.9 ohm on a finer mesh (0.026%)
+  [pass] connectivity: every net's pads are joined by its copper
+  [warn] return path: 4 nets run mostly over no plane (VIN, SW, VOUT, G), so their return current takes whatever copper is near and their impedance is only a bound
+
+Assumptions:
+  - Stackup: kicad stackup.
+  - Quasi static TEM cross sections of each trace with its planes; solder mask, plating and surface roughness are left out, and loss is only the DC resistance of the copper.
+  - Crosstalk is for a 1 ns edge on the aggressor.
+  - KiCad 8 board, file format version 20240108.
+  - Parasitics joined 9 of 11 pad connections and 4 net capacitances to the schematic buck.cir, each pad hanging off its net's main chip pad through the copper between them.
+  - The parts are modeled as the netlist gives them. Ideal switches and diodes without reverse recovery ring longer than real ones, whose losses damp the ringing.
+
+Suggested fixes:
+  - Put a ground pour under VIN: A plane right under the trace gives the return current a path next to it, which sets its impedance and cuts its loop inductance.
+  - Put a ground pour under SW: A plane right under the trace gives the return current a path next to it, which sets its impedance and cuts its loop inductance.
+
+Images: board: images/board.png, ringing: images/ringing.png
+Report: report.html

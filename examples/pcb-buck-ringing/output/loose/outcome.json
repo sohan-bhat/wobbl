@@ -1,0 +1,281 @@
+{
+ "domain": "board",
+ "part": "buck_loose.kicad_pcb",
+ "question": "how hard does the switch node ring with this layout?",
+ "verdict": "marginal",
+ "headline": "buck_loose.kicad_pcb has 5 routed nets on 2 layers, with trace impedances from 82.9 to 113 ohm. The longest, SW, runs 39.6 mm with 19.3 nH, 2.81 pF and 19.5 mohm. In buck.cir the layout raises the peak across D1 from 13.2 V on the schematic alone to 31.5 V, ringing at 168 MHz.",
+ "metrics": [
+  [
+   "nets",
+   "5"
+  ],
+  [
+   "impedance",
+   "82.9 to 113 ohm"
+  ],
+  [
+   "worst crosstalk",
+   "none found"
+  ],
+  [
+   "sections solved",
+   "3"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "return path: 4 nets run mostly over no plane (VIN, SW, VOUT, G), so their return current takes whatever copper is near and their impedance is only a bound"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "the most used trace's impedance moved from 82.9 to 82.9 ohm on a finer mesh (0.026%)",
+   "detail": {}
+  },
+  {
+   "name": "connectivity",
+   "status": "pass",
+   "summary": "every net's pads are joined by its copper",
+   "detail": {}
+  },
+  {
+   "name": "return path",
+   "status": "warn",
+   "summary": "4 nets run mostly over no plane (VIN, SW, VOUT, G), so their return current takes whatever copper is near and their impedance is only a bound",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Stackup: kicad stackup.",
+  "Quasi static TEM cross sections of each trace with its planes; solder mask, plating and surface roughness are left out, and loss is only the DC resistance of the copper.",
+  "Crosstalk is for a 1 ns edge on the aggressor.",
+  "KiCad 8 board, file format version 20240108.",
+  "Parasitics joined 9 of 11 pad connections and 4 net capacitances to the schematic buck.cir, each pad hanging off its net's main chip pad through the copper between them.",
+  "The parts are modeled as the netlist gives them. Ideal switches and diodes without reverse recovery ring longer than real ones, whose losses damp the ringing."
+ ],
+ "values": {
+  "nets": {
+   "VIN": {
+    "length_m": 0.0347,
+    "z0_min": 82.905023,
+    "z0_max": 82.905023,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.017053,
+    "delay_s": 0.0,
+    "vias": 0,
+    "no_plane": 0.0347,
+    "connected": true,
+    "pads": [
+     "J1.1",
+     "C1.1",
+     "S1.1"
+    ],
+    "ground": false
+   },
+   "SW": {
+    "length_m": 0.0396,
+    "z0_min": 82.905023,
+    "z0_max": 82.905023,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.019461,
+    "delay_s": 0.0,
+    "vias": 0,
+    "no_plane": 0.0396,
+    "connected": true,
+    "pads": [
+     "S1.2",
+     "D1.2",
+     "L1.1"
+    ],
+    "ground": false
+   },
+   "VOUT": {
+    "length_m": 0.0359,
+    "z0_min": 82.905023,
+    "z0_max": 82.905023,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.017642,
+    "delay_s": 0.0,
+    "vias": 0,
+    "no_plane": 0.0359,
+    "connected": true,
+    "pads": [
+     "L1.2",
+     "C2.1",
+     "R1.1"
+    ],
+    "ground": false
+   },
+   "GND": {
+    "length_m": 0.123,
+    "z0_min": 82.903771,
+    "z0_max": 82.905023,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.060446,
+    "delay_s": 0.0,
+    "vias": 6,
+    "no_plane": 0.123,
+    "connected": true,
+    "pads": [
+     "J1.2",
+     "C1.2",
+     "S1.4",
+     "D1.1",
+     "C2.2",
+     "R1.2"
+    ],
+    "ground": true
+   },
+   "G": {
+    "length_m": 0.0131,
+    "z0_min": 113.43057,
+    "z0_max": 113.43057,
+    "l_H": 0.0,
+    "c_F": 0.0,
+    "r_ohm": 0.016094,
+    "delay_s": 0.0,
+    "vias": 0,
+    "no_plane": 0.0131,
+    "connected": true,
+    "pads": [
+     "S1.3"
+    ],
+    "ground": false
+   }
+  },
+  "pairs": [],
+  "vias": 6,
+  "sections": [
+   {
+    "layer": "F.Cu",
+    "width_mm": 1.0,
+    "below": null,
+    "above": null,
+    "z0": 82.905023,
+    "l": 0.0,
+    "c": 0.0,
+    "delay": 0.0,
+    "eps_eff": 3.108118,
+    "solved": true,
+    "nodes": 910
+   },
+   {
+    "layer": "B.Cu",
+    "width_mm": 1.0,
+    "below": null,
+    "above": null,
+    "z0": 82.903771,
+    "l": 0.0,
+    "c": 0.0,
+    "delay": 0.0,
+    "eps_eff": 3.108176,
+    "solved": true,
+    "nodes": 917
+   },
+   {
+    "layer": "F.Cu",
+    "width_mm": 0.4,
+    "below": null,
+    "above": null,
+    "z0": 113.43057,
+    "l": 1e-06,
+    "c": 0.0,
+    "delay": 0.0,
+    "eps_eff": 2.967921,
+    "solved": true,
+    "nodes": 951
+   }
+  ],
+  "parasitics": "parasitics.json",
+  "circuit": {
+   "parts": [
+    {
+     "part": "D1",
+     "ideal_V": 13.211158,
+     "board_V": 31.504319,
+     "ring_Hz": 168051732.477263
+    },
+    {
+     "part": "S1",
+     "ideal_V": 12.365241,
+     "board_V": 28.218197
+    },
+    {
+     "part": "CS1",
+     "ideal_V": 12.365241,
+     "board_V": 28.218197
+    },
+    {
+     "part": "L1",
+     "ideal_V": 8.174044,
+     "board_V": 23.350493
+    },
+    {
+     "part": "C1",
+     "ideal_V": 12.0,
+     "board_V": 12.000071
+    },
+    {
+     "part": "V1",
+     "ideal_V": 12.0,
+     "board_V": 12.0
+    },
+    {
+     "part": "VG",
+     "ideal_V": 5.0,
+     "board_V": 5.0
+    },
+    {
+     "part": "C2",
+     "ideal_V": 5.054478,
+     "board_V": 4.999361
+    },
+    {
+     "part": "R1",
+     "ideal_V": 5.054478,
+     "board_V": 4.924488
+    }
+   ],
+   "step_s": 0.0
+  },
+  "_figures": [
+   [
+    "board",
+    "Traces colored by impedance"
+   ],
+   [
+    "ringing",
+    "The worst part with and without the board"
+   ]
+  ]
+ },
+ "images": {
+  "board": "images/board.png",
+  "ringing": "images/ringing.png"
+ },
+ "fixes": [
+  {
+   "kind": "plane",
+   "title": "Put a ground pour under VIN",
+   "summary": "A plane right under the trace gives the return current a path next to it, which sets its impedance and cuts its loop inductance.",
+   "auto": false
+  },
+  {
+   "kind": "plane",
+   "title": "Put a ground pour under SW",
+   "summary": "A plane right under the trace gives the return current a path next to it, which sets its impedance and cuts its loop inductance.",
+   "auto": false
+  }
+ ],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 115.994271,
+ "solver": "GetDP cross sections with gmsh",
+ "criteria": []
+}
