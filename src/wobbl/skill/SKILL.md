@@ -82,6 +82,8 @@ foam, grass, or layer:E=5,t=10 in MPa and mm), orientation (worst by default, wh
 landing, or all, corners, edges, flat, or a direction such as -z), mass for a battery or board, and watch for
 where the accelerometer sits. It answers with the peak stress away from the contact patch, the safety factor,
 the g at the accelerometer filtered at 10 kHz and the worst landing, checked by momentum and energy.
+A drop predicts its own run time from its mesh before it solves and coarsens the mesh to fit a 600 s budget,
+and the assumptions say what was given up. The budget is not a flag.
 A composite part runs as
 `wobbl simulate arm.step "is it strong enough?" --physics composite --layup "[0/±45/90]s" --fix "x=min" --load "40 N +z @ x=max"`
 with plies listed from the inner face out and a ply material of t300-5208, im7-8552, as4-3501-6 or
@@ -127,7 +129,9 @@ or on a finished result, as in `wobbl simulate wobbl-out/bracket "how long until
 It grows the front step by step with a fresh mesh each time and integrates the NASGRO equation along it.
 The crack is the damage tolerance flaw at the most stressed point unless `--crack` gives one, such as
 `"through 1.27 mm at hole d=8"`, and `--r-ratio` or `--spectrum` give the cycles. Quote the nominal life
-with B10, B1 and the inspection interval, never one part's failure cycle.
+with B10, B1 and the inspection interval, never one part's failure cycle. Its 3D view shows the crack growing
+through the part on a timeline of cycles, with the loads and supports on the part's faces. `--budget` sets the
+seconds the crack path may take (1200 by default).
 A part can also be checked against how it will be made. A 3D print runs as
 `wobbl simulate lid.step "will it warp when I print it in ABS?" --print-direction auto`, with the plastic
 (abs, asa, petg, pla, pc), bed and chamber temperatures, infill and layer height read from the question or a
@@ -190,7 +194,9 @@ pressure. Wobbl models given designs only and gives no guidance on making or han
 `wobbl simulate apcsf_10x4.7 "can a 1.2 kg quad with 4 rotors hover?"`. Pipes follow Darcy Weisbach on the
 Moody chart, drag comes from published curves (a result near the drag crisis comes back with low
 confidence), props from their measured UIUC curves checked with blade element momentum theory, and hulls
-from Holtrop and Mennen.
+from Holtrop and Mennen. Every flow run writes a 3D scene, with streamlines through a plane flow or particles
+through a wake, on the part colored by wall pressure. A scale resolving run (`--turbulence des`) is priced from
+its cells before it starts, and when its predicted time is over `--budget-minutes` Wobbl offers RANS instead.
 
 **Fields.** Magnetic, electric and sound fields run on the user's own CAD, and board effects on their own
 board, all with GetDP, fetched the first time (an 11 MB download). Say what each body is with `--assign`:
