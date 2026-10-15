@@ -8,7 +8,7 @@ mesh nodes: 137,258
 
 Checks:
   [pass] mesh convergence: temperature rise at the hottest point settled: 37.1 -> 36.9 -> 37 C over 3 meshes, last change 0.4%
-  [pass] energy balance: heat in 30 W, heat out through the surfaces 30 W (3.9e-07% apart)
+  [pass] energy balance: heat in 30 W, heat out through the surfaces 30 W (1.1e-07% apart)
   [warn] hand calculation: heat balance on a uniform skin gives 69.2 C; the FEA skin averages 72.6 C (12% of the rise). Biot 0.00013: the part is nearly isothermal
   [pass] units and sanity: temperatures between 70.7 and 77 C; radiation is off, it could shed up to about 11.6 W at this temperature (pass --radiation 0.9 for painted or plastic surfaces)
 

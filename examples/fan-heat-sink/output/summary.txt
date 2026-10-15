@@ -10,18 +10,18 @@ flow: 232 L/min
 Checks:
   [pass] mesh quality: 102,204 cells, worst non orthogonality 37 degrees and skewness 0.39
   [fail] grid convergence: pressure drop 3.539 -> 3.868 -> 4.045 Pa over 3 grids, grid convergence index 32% (observed order 2, extrapolated 4.473 Pa), so the grid is too coarse for this answer
-  [pass] iterative convergence: pressure drop swings 0.0063% over the last fifth of 153 iterations
-  [pass] mass conservation: in 0.00387 m3/s, out 0.00387 m3/s (9.5e-06% apart)
+  [pass] iterative convergence: pressure drop swings 0.0061% over the last fifth of 153 iterations
+  [pass] mass conservation: in 0.00387 m3/s, out 0.00387 m3/s (2.1e-05% apart)
   [warn] residuals: largest final residual 0.0032 (k), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly
   [warn] wall resolution: y+ on the walls averages 6.53, at most 11.3, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent
   [pass] flow regime: Re 6361 on the inlet's hydraulic diameter, turbulent
   [info] hand calculation: a straight smooth duct of the same 60 mm hydraulic diameter and 60 mm length loses 0.0634 Pa by Colebrook, and the part loses 4.05 Pa, 63.86 times that, the rest from turns, junctions and changes of section
   [warn] operating point: the curve gives 3.58 Pa at 232 L/min, and the fine grid needs 4.05 Pa there (13% apart), so the coarse grid's fit set the flow a little off
   [pass] mesh convergence: temperature rise at the hottest point settled: 37.1 -> 36.9 -> 37 C over 3 meshes, last change 0.4%
-  [pass] energy balance: heat in 30 W, heat out through the surfaces 30 W (3.9e-07% apart)
+  [pass] energy balance: heat in 30 W, heat out through the surfaces 30 W (1.1e-07% apart)
   [warn] hand calculation: heat balance on a uniform skin gives 69.2 C; the FEA skin averages 72.6 C (12% of the rise). Biot 0.00013: the part is nearly isothermal
   [pass] units and sanity: temperatures between 70.7 and 77 C; radiation is off, it could shed up to about 11.6 W at this temperature (pass --radiation 0.9 for painted or plastic surfaces)
-  [info] lumped estimate: the wetted area of 331 cm2 at the mean 29.8 W/(m2 K) puts a part at one temperature at 73.9 C, and the FEA's hottest point is 77 C
+  [info] lumped estimate: the wetted area of 331 cm2 at the mean 29.8 W/(m2 K) puts a part at one temperature at 73.8 C, and the FEA's hottest point is 77 C
   [info] heat transfer correlation: Gnielinski's correlation for a straight tube gives 9.35 W/(m2 K) at Re 6361 on the 60 mm hydraulic diameter, and the CFD averages 29.8 W/(m2 K) over the wetted faces, which include entrance regions and turns that raise it
 
 Assumptions:

@@ -51,9 +51,9 @@
    "summary": "pressure drop 3.539 -> 3.868 -> 4.045 Pa over 3 grids, grid convergence index 32% (observed order 2, extrapolated 4.473 Pa), so the grid is too coarse for this answer",
    "detail": {
     "values_fine_to_coarse": [
-     4.045375,
-     3.867987,
-     3.539099
+     4.04536,
+     3.868037,
+     3.539058
     ],
     "sizes": [
      0.021388,
@@ -61,21 +61,21 @@
      0.040218
     ],
     "order": 2.0,
-    "extrapolated": 4.47291,
-    "gci_fine": 0.317055,
+    "extrapolated": 4.472739,
+    "gci_fine": 0.31694,
     "kind": "monotone"
    }
   },
   {
    "name": "iterative convergence",
    "status": "pass",
-   "summary": "pressure drop swings 0.0063% over the last fifth of 153 iterations",
+   "summary": "pressure drop swings 0.0061% over the last fifth of 153 iterations",
    "detail": {}
   },
   {
    "name": "mass conservation",
    "status": "pass",
-   "summary": "in 0.00387 m3/s, out 0.00387 m3/s (9.5e-06% apart)",
+   "summary": "in 0.00387 m3/s, out 0.00387 m3/s (2.1e-05% apart)",
    "detail": {
     "in": 0.003875,
     "out": 0.003875,
@@ -90,31 +90,31 @@
     "fields": {
      "Ux": {
       "first": 1.0,
-      "last": 0.000108
+      "last": 0.000106
      },
      "Uy": {
-      "first": 0.995743,
-      "last": 0.000705
+      "first": 0.995777,
+      "last": 0.000711
      },
      "Uz": {
-      "first": 0.994426,
-      "last": 0.000318
+      "first": 0.994431,
+      "last": 0.000312
      },
      "p": {
       "first": 1.0,
       "last": 7e-06
      },
      "omega": {
-      "first": 0.018321,
-      "last": 0.000689
+      "first": 0.01833,
+      "last": 0.000694
      },
      "k": {
       "first": 1.0,
-      "last": 0.003211
+      "last": 0.003182
      },
      "T": {
       "first": 1.0,
-      "last": 0.002921
+      "last": 0.002877
      }
     },
     "tolerance": 0.001,
@@ -128,9 +128,9 @@
    "detail": {
     "patches": {
      "walls": {
-      "min": 0.227393,
-      "max": 11.273805,
-      "mean": 6.533767
+      "min": 0.225927,
+      "max": 11.273818,
+      "mean": 6.53376
      }
     },
     "treatment": "wall functions"
@@ -141,7 +141,7 @@
    "status": "pass",
    "summary": "Re 6361 on the inlet's hydraulic diameter, turbulent",
    "detail": {
-    "re": 6360.737119
+    "re": 6360.741524
    }
   },
   {
@@ -151,7 +151,7 @@
    "detail": {
     "straight_Pa": 0.063352,
     "length_m": 0.06,
-    "ratio": 63.856025
+    "ratio": 63.855713
    }
   },
   {
@@ -160,17 +160,17 @@
    "summary": "the curve gives 3.58 Pa at 232 L/min, and the fine grid needs 4.05 Pa there (13% apart), so the coarse grid's fit set the flow a little off",
    "detail": {
     "flow": 0.003875,
-    "dp": 3.578945,
-    "a": 193.402771,
-    "b": 188444.52748,
+    "dp": 3.578933,
+    "a": 193.400833,
+    "b": 188443.974647,
     "trial": [
      [
       0.001652,
-      0.833636
+      0.833631
      ],
      [
       0.00354,
-      3.045555
+      3.045541
      ]
     ],
     "curve": [
@@ -195,37 +195,37 @@
  ],
  "values": {
   "mode": "ducted",
-  "re": 6360.737119,
+  "re": 6360.741524,
   "model": "rans",
   "cells": 102204,
   "fluid": "air",
   "levels": [
    {
     "cells": 102204,
-    "value": 4.045375,
+    "value": 4.04536,
     "iterations": 153,
-    "t_mesh": 172.271724,
-    "t_solve": 353.938924
+    "t_mesh": 96.829426,
+    "t_solve": 297.931123
    },
    {
     "cells": 60726,
-    "value": 3.867987,
-    "iterations": 153,
-    "t_mesh": 131.540215,
-    "t_solve": 234.30411
+    "value": 3.868037,
+    "iterations": 154,
+    "t_mesh": 63.031151,
+    "t_solve": 230.766185
    },
    {
     "cells": 15372,
-    "value": 3.539099,
-    "iterations": 156,
-    "t_mesh": 25.266609,
-    "t_solve": 74.621905
+    "value": 3.539058,
+    "iterations": 157,
+    "t_mesh": 13.021933,
+    "t_solve": 46.979633
    }
   ],
-  "dp_Pa": 4.045375,
-  "dp_static_Pa": 4.123972,
+  "dp_Pa": 4.04536,
+  "dp_static_Pa": 4.123968,
   "flow_m3_s": 0.003875,
-  "velocity_m_s": 1.793953,
+  "velocity_m_s": 1.793954,
   "split": {
    "xmax": 1.0
   },
@@ -233,7 +233,7 @@
   "hydraulic_diameter_m": 0.06,
   "operating_point": {
    "flow_m3_s": 0.003875,
-   "dp_Pa": 3.578945
+   "dp_Pa": 3.578933
   }
  },
  "images": {
@@ -246,7 +246,7 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 656.75013,
+ "t_total": 509.527641,
  "solver": "OpenFOAM v2412, snappyHexMesh and simpleFoam",
  "criteria": []
 }

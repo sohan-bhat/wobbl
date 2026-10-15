@@ -33,11 +33,11 @@
    "summary": "temperature rise at the hottest point settled: 37.1 -> 36.9 -> 37 C over 3 meshes, last change 0.4%",
    "detail": {
     "values": [
-     37.0688,
-     36.9199,
-     37.05
+     37.0669,
+     36.9181,
+     37.0481
     ],
-    "last_change": 0.003511,
+    "last_change": 0.003509,
     "tolerance": 0.02,
     "stopped_by": ""
    }
@@ -45,7 +45,7 @@
   {
    "name": "energy balance",
    "status": "pass",
-   "summary": "heat in 30 W, heat out through the surfaces 30 W (3.9e-07% apart)",
+   "summary": "heat in 30 W, heat out through the surfaces 30 W (1.1e-07% apart)",
    "detail": {
     "in_W": 30.0,
     "out_W": 30.0
@@ -56,8 +56,8 @@
    "status": "warn",
    "summary": "heat balance on a uniform skin gives 69.2 C; the FEA skin averages 72.6 C (12% of the rise). Biot 0.00013: the part is nearly isothermal",
    "detail": {
-    "lumped_surface_C": 69.15298,
-    "fea_surface_C": 72.630734,
+    "lumped_surface_C": 69.151212,
+    "fea_surface_C": 72.628903,
     "biot": 0.000129
    }
   },
@@ -77,7 +77,7 @@
   "Contact resistance between parts and internal airflow are not modeled."
  ],
  "values": {
-  "t_max_C": 77.05,
+  "t_max_C": 77.0481,
   "hot_xyz": [
    30.0,
    29.917012,
@@ -89,43 +89,43 @@
     "level": 0,
     "n_nodes": 34756,
     "h": 3.233166,
-    "t_max": 77.0688,
-    "t_min": 70.7002,
+    "t_max": 77.0669,
+    "t_min": 70.6984,
     "xyz": [
      30.082988,
      30.0,
      0.0
     ],
-    "t_solve": 4.816117
+    "t_solve": 2.401842
    },
    {
     "level": 1,
     "n_nodes": 69076,
     "h": 2.263216,
-    "t_max": 76.9199,
-    "t_min": 70.6844,
+    "t_max": 76.9181,
+    "t_min": 70.6829,
     "xyz": [
      29.829764,
      30.555556,
      0.0
     ],
-    "t_solve": 10.47518
+    "t_solve": 5.720627
    },
    {
     "level": 2,
     "n_nodes": 137258,
     "h": 1.616583,
-    "t_max": 77.05,
-    "t_min": 70.7075,
+    "t_max": 77.0481,
+    "t_min": 70.706,
     "xyz": [
      30.0,
      29.917012,
      0.0
     ],
-    "t_solve": 34.028747
+    "t_solve": 22.206889
    }
   ],
-  "lumped_C": 69.15298,
+  "lumped_C": 69.151212,
   "time_over_limit_s": null,
   "_figures": [
    [
@@ -147,7 +147,7 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 78.112576,
+ "t_total": 46.010965,
  "solver": "CalculiX 2.23",
  "criteria": []
 }

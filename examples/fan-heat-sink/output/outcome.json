@@ -52,9 +52,9 @@
    "summary": "pressure drop 3.539 -> 3.868 -> 4.045 Pa over 3 grids, grid convergence index 32% (observed order 2, extrapolated 4.473 Pa), so the grid is too coarse for this answer",
    "detail": {
     "values_fine_to_coarse": [
-     4.045375,
-     3.867987,
-     3.539099
+     4.04536,
+     3.868037,
+     3.539058
     ],
     "sizes": [
      0.021388,
@@ -62,21 +62,21 @@
      0.040218
     ],
     "order": 2.0,
-    "extrapolated": 4.47291,
-    "gci_fine": 0.317055,
+    "extrapolated": 4.472739,
+    "gci_fine": 0.31694,
     "kind": "monotone"
    }
   },
   {
    "name": "iterative convergence",
    "status": "pass",
-   "summary": "pressure drop swings 0.0063% over the last fifth of 153 iterations",
+   "summary": "pressure drop swings 0.0061% over the last fifth of 153 iterations",
    "detail": {}
   },
   {
    "name": "mass conservation",
    "status": "pass",
-   "summary": "in 0.00387 m3/s, out 0.00387 m3/s (9.5e-06% apart)",
+   "summary": "in 0.00387 m3/s, out 0.00387 m3/s (2.1e-05% apart)",
    "detail": {
     "in": 0.003875,
     "out": 0.003875,
@@ -91,31 +91,31 @@
     "fields": {
      "Ux": {
       "first": 1.0,
-      "last": 0.000108
+      "last": 0.000106
      },
      "Uy": {
-      "first": 0.995743,
-      "last": 0.000705
+      "first": 0.995777,
+      "last": 0.000711
      },
      "Uz": {
-      "first": 0.994426,
-      "last": 0.000318
+      "first": 0.994431,
+      "last": 0.000312
      },
      "p": {
       "first": 1.0,
       "last": 7e-06
      },
      "omega": {
-      "first": 0.018321,
-      "last": 0.000689
+      "first": 0.01833,
+      "last": 0.000694
      },
      "k": {
       "first": 1.0,
-      "last": 0.003211
+      "last": 0.003182
      },
      "T": {
       "first": 1.0,
-      "last": 0.002921
+      "last": 0.002877
      }
     },
     "tolerance": 0.001,
@@ -129,9 +129,9 @@
    "detail": {
     "patches": {
      "walls": {
-      "min": 0.227393,
-      "max": 11.273805,
-      "mean": 6.533767
+      "min": 0.225927,
+      "max": 11.273818,
+      "mean": 6.53376
      }
     },
     "treatment": "wall functions"
@@ -142,7 +142,7 @@
    "status": "pass",
    "summary": "Re 6361 on the inlet's hydraulic diameter, turbulent",
    "detail": {
-    "re": 6360.737119
+    "re": 6360.741524
    }
   },
   {
@@ -152,7 +152,7 @@
    "detail": {
     "straight_Pa": 0.063352,
     "length_m": 0.06,
-    "ratio": 63.856025
+    "ratio": 63.855713
    }
   },
   {
@@ -161,17 +161,17 @@
    "summary": "the curve gives 3.58 Pa at 232 L/min, and the fine grid needs 4.05 Pa there (13% apart), so the coarse grid's fit set the flow a little off",
    "detail": {
     "flow": 0.003875,
-    "dp": 3.578945,
-    "a": 193.402771,
-    "b": 188444.52748,
+    "dp": 3.578933,
+    "a": 193.400833,
+    "b": 188443.974647,
     "trial": [
      [
       0.001652,
-      0.833636
+      0.833631
      ],
      [
       0.00354,
-      3.045555
+      3.045541
      ]
     ],
     "curve": [
@@ -192,11 +192,11 @@
    "summary": "temperature rise at the hottest point settled: 37.1 -> 36.9 -> 37 C over 3 meshes, last change 0.4%",
    "detail": {
     "values": [
-     37.0688,
-     36.9199,
-     37.05
+     37.0669,
+     36.9181,
+     37.0481
     ],
-    "last_change": 0.003511,
+    "last_change": 0.003509,
     "tolerance": 0.02,
     "stopped_by": ""
    }
@@ -204,7 +204,7 @@
   {
    "name": "energy balance",
    "status": "pass",
-   "summary": "heat in 30 W, heat out through the surfaces 30 W (3.9e-07% apart)",
+   "summary": "heat in 30 W, heat out through the surfaces 30 W (1.1e-07% apart)",
    "detail": {
     "in_W": 30.0,
     "out_W": 30.0
@@ -215,8 +215,8 @@
    "status": "warn",
    "summary": "heat balance on a uniform skin gives 69.2 C; the FEA skin averages 72.6 C (12% of the rise). Biot 0.00013: the part is nearly isothermal",
    "detail": {
-    "lumped_surface_C": 69.15298,
-    "fea_surface_C": 72.630734,
+    "lumped_surface_C": 69.151212,
+    "fea_surface_C": 72.628903,
     "biot": 0.000129
    }
   },
@@ -229,9 +229,9 @@
   {
    "name": "lumped estimate",
    "status": "info",
-   "summary": "the wetted area of 331 cm2 at the mean 29.8 W/(m2 K) puts a part at one temperature at 73.9 C, and the FEA's hottest point is 77 C",
+   "summary": "the wetted area of 331 cm2 at the mean 29.8 W/(m2 K) puts a part at one temperature at 73.8 C, and the FEA's hottest point is 77 C",
    "detail": {
-    "uniform_C": 73.851166
+    "uniform_C": 73.849235
    }
   },
   {
@@ -239,8 +239,8 @@
    "status": "info",
    "summary": "Gnielinski's correlation for a straight tube gives 9.35 W/(m2 K) at Re 6361 on the 60 mm hydraulic diameter, and the CFD averages 29.8 W/(m2 K) over the wetted faces, which include entrance regions and turns that raise it",
    "detail": {
-    "correlation_W_m2K": 9.348827,
-    "cfd_W_m2K": 29.752513
+    "correlation_W_m2K": 9.348833,
+    "cfd_W_m2K": 29.754397
    }
   }
  ],
@@ -263,37 +263,37 @@
  ],
  "values": {
   "mode": "ducted",
-  "re": 6360.737119,
+  "re": 6360.741524,
   "model": "rans",
   "cells": 102204,
   "fluid": "air",
   "levels": [
    {
     "cells": 102204,
-    "value": 4.045375,
+    "value": 4.04536,
     "iterations": 153,
-    "t_mesh": 172.271724,
-    "t_solve": 353.938924
+    "t_mesh": 96.829426,
+    "t_solve": 297.931123
    },
    {
     "cells": 60726,
-    "value": 3.867987,
-    "iterations": 153,
-    "t_mesh": 131.540215,
-    "t_solve": 234.30411
+    "value": 3.868037,
+    "iterations": 154,
+    "t_mesh": 63.031151,
+    "t_solve": 230.766185
    },
    {
     "cells": 15372,
-    "value": 3.539099,
-    "iterations": 156,
-    "t_mesh": 25.266609,
-    "t_solve": 74.621905
+    "value": 3.539058,
+    "iterations": 157,
+    "t_mesh": 13.021933,
+    "t_solve": 46.979633
    }
   ],
-  "dp_Pa": 4.045375,
-  "dp_static_Pa": 4.123972,
+  "dp_Pa": 4.04536,
+  "dp_static_Pa": 4.123968,
   "flow_m3_s": 0.003875,
-  "velocity_m_s": 1.793953,
+  "velocity_m_s": 1.793954,
   "split": {
    "xmax": 1.0
   },
@@ -301,117 +301,117 @@
   "hydraulic_diameter_m": 0.06,
   "operating_point": {
    "flow_m3_s": 0.003875,
-   "dp_Pa": 3.578945
+   "dp_Pa": 3.578933
   },
-  "t_max_C": 77.05,
+  "t_max_C": 77.0481,
   "limit_C": 85.0,
-  "h_mean_W_m2K": 29.752513,
-  "fluid_rise_C": 6.827346,
-  "film_C": 43.413673,
+  "h_mean_W_m2K": 29.754397,
+  "fluid_rise_C": 6.827341,
+  "film_C": 43.413671,
   "power_W": 30.0,
   "faces": {
    "2": {
-    "h_W_m2K": 34.384881,
+    "h_W_m2K": 34.38289,
     "wetted_mm2": 765.873193
    },
    "3": {
-    "h_W_m2K": 9.71095,
+    "h_W_m2K": 9.763606,
     "wetted_mm2": 765.873193
    },
    "6": {
-    "h_W_m2K": 11.698582,
+    "h_W_m2K": 11.697199,
     "wetted_mm2": 348.749988
    },
    "7": {
-    "h_W_m2K": 11.945687,
+    "h_W_m2K": 11.948748,
     "wetted_mm2": 348.749928
    },
    "8": {
-    "h_W_m2K": 11.831122,
+    "h_W_m2K": 11.860414,
     "wetted_mm2": 348.750012
    },
    "9": {
-    "h_W_m2K": 11.996348,
+    "h_W_m2K": 12.003846,
     "wetted_mm2": 348.749976
    },
    "10": {
-    "h_W_m2K": 12.013097,
+    "h_W_m2K": 12.011942,
     "wetted_mm2": 348.749976
    },
    "11": {
-    "h_W_m2K": 11.790719,
+    "h_W_m2K": 11.827489,
     "wetted_mm2": 348.750012
    },
    "12": {
-    "h_W_m2K": 11.937165,
+    "h_W_m2K": 11.936812,
     "wetted_mm2": 348.749928
    },
    "13": {
-    "h_W_m2K": 11.679814,
+    "h_W_m2K": 11.678331,
     "wetted_mm2": 348.749988
    },
    "15": {
-    "h_W_m2K": 27.041388,
+    "h_W_m2K": 27.040672,
     "wetted_mm2": 1800.35994
    },
    "16": {
-    "h_W_m2K": 32.228652,
+    "h_W_m2K": 32.229854,
     "wetted_mm2": 1800.35994
    },
    "17": {
-    "h_W_m2K": 32.494032,
+    "h_W_m2K": 32.495728,
     "wetted_mm2": 1800.35994
    },
    "19": {
-    "h_W_m2K": 33.053027,
+    "h_W_m2K": 33.053995,
     "wetted_mm2": 1800.35994
    },
    "20": {
-    "h_W_m2K": 32.464942,
+    "h_W_m2K": 32.465837,
     "wetted_mm2": 1800.35994
    },
    "22": {
-    "h_W_m2K": 32.629648,
+    "h_W_m2K": 32.628227,
     "wetted_mm2": 1800.35994
    },
    "23": {
-    "h_W_m2K": 32.551651,
+    "h_W_m2K": 32.550859,
     "wetted_mm2": 1800.35994
    },
    "25": {
-    "h_W_m2K": 32.687128,
+    "h_W_m2K": 32.687573,
     "wetted_mm2": 1800.35994
    },
    "26": {
-    "h_W_m2K": 32.68507,
+    "h_W_m2K": 32.685047,
     "wetted_mm2": 1800.35994
    },
    "28": {
-    "h_W_m2K": 32.555376,
+    "h_W_m2K": 32.553786,
     "wetted_mm2": 1800.35994
    },
    "29": {
-    "h_W_m2K": 32.624924,
+    "h_W_m2K": 32.624365,
     "wetted_mm2": 1800.35994
    },
    "31": {
-    "h_W_m2K": 32.463602,
+    "h_W_m2K": 32.466362,
     "wetted_mm2": 1800.35994
    },
    "32": {
-    "h_W_m2K": 33.049766,
+    "h_W_m2K": 33.052211,
     "wetted_mm2": 1800.35994
    },
    "34": {
-    "h_W_m2K": 32.515862,
+    "h_W_m2K": 32.513946,
     "wetted_mm2": 1800.35994
    },
    "35": {
-    "h_W_m2K": 32.232758,
+    "h_W_m2K": 32.230937,
     "wetted_mm2": 1800.35994
    },
    "37": {
-    "h_W_m2K": 27.042865,
+    "h_W_m2K": 27.04043,
     "wetted_mm2": 1800.35994
    }
   },
@@ -441,7 +441,7 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 750.098372,
+ "t_total": 564.448999,
  "solver": "OpenFOAM v2412, snappyHexMesh and simpleFoam and CalculiX 2.23",
  "criteria": [
   {
