@@ -63,7 +63,7 @@ def build(out: Path) -> Path | None:
         if cells:
             s.head["title"] = f"The {len(cells)} cell pack heating up"
         m = s.mesh(X, tris, name="part", keep=[int(np.argmax(T))], opacity=0.22 if cells else 1.0)
-        rng = (min(H.min(), amb), max(tmax, limit or tmax))
+        rng = (min(H.min(), amb), tmax)
         m.color_by("temperature", H, unit="C", colormap="inferno", range=rng, limit=limit, limit_label="limit")
         for k, (c, ax, r, half, inside) in enumerate(cells):
             s.body("cylinder", [r, half], pos=c, quat=P.z_to(np.eye(3)[ax]), color="#5b6470",
@@ -90,12 +90,12 @@ def build(out: Path) -> Path | None:
                        between="exact", note="The rise above the air is exactly proportional to the power in this "
                                              "linear model, so every frame of the ramp is a steady result.")
             m.color_by("temperature", np.outer(ramp, T - amb) + amb, unit="C", colormap="inferno",
-                       range=(amb, max(tmax, limit or tmax)), limit=limit, limit_label="limit")
+                       range=(amb, tmax), limit=limit, limit_label="limit")
             s.readout("hottest", amb + ramp * (tmax - amb), unit="C", digits=4, limit=limit)
         else:
             s.note("Radiation or held temperatures make the result depend on the power in a nonlinear way, so this "
                    "is the steady result alone.")
-            m.color_by("temperature", T, unit="C", colormap="inferno", range=(amb, max(tmax, limit or tmax)),
+            m.color_by("temperature", T, unit="C", colormap="inferno", range=(amb, tmax),
                        limit=limit, limit_label="limit")
             s.readout("hottest", [tmax], unit="C", digits=4, limit=limit)
         s.label("hottest {hottest}", hot, kind="fail" if limit and tmax > limit else "peak")
@@ -144,7 +144,7 @@ def fan_sink(out: Path) -> Path | None:
     hot = int(np.argmax(T))
     m = s.mesh(X, tris, name="heat sink", keep=[hot])
     m.color_by("temperature", np.outer(ramp, T - air) + air, unit="C", colormap="inferno",
-               range=(air, max(tmax, limit or tmax)), limit=limit, limit_label="limit")
+               range=(air, tmax), limit=limit, limit_label="limit")
     s.readout("hottest", air + ramp * (tmax - air), unit="C", digits=4, limit=limit)
     s.readout("airflow", np.full(FRAMES, float((sc.get("airflow") or {}).get("value", 0))), unit="L/min", digits=4)
     s.label("hottest {hottest}", X[hot], kind="fail" if limit and tmax > limit else "peak")
