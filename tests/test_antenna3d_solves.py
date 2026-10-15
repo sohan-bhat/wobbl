@@ -114,7 +114,8 @@ def test_disk_patch_on_fr4_matches_an_independent_axisymmetric_solve(tmp_path):
 
     a, h, r_g = 0.038, 0.0016, 0.048
     f2 = np.linspace(2.15, 2.30, 7) * 1e9
-    z2 = _axisymmetric_disk_patch(4.4, a, h, f2, tmp_path / "axi") if (tmp_path / "axi").mkdir() is None else None
+    (tmp_path / "axi").mkdir()
+    z2 = _axisymmetric_disk_patch(4.4, a, h, f2, tmp_path / "axi")
     x = [z.imag for z in z2]
     i = next(j for j in range(len(x) - 1) if x[j] > 0 > x[j + 1])
     f_axi = f2[i] + (f2[i + 1] - f2[i]) * x[i] / (x[i] - x[i + 1])
