@@ -172,18 +172,7 @@ def run_limited(case: dict, out: Path, limit: float = LIMIT, keep: bool = False)
     if keep:
         cmd.append("--keep")
     t0 = time.time()
-    log = open(out / "case.log", "wb")
-    posix = os.name == "posix"
-    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-                            start_new_session=posix)
-    timed_out = False
-    try:
-        proc.wait(timeout=limit)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        _stop_group(proc)
-    finally:
-        log.close()
+    timed_out, code = run_group(cmd, limit, out / "case.log")
     if timed_out:
         row = {"id": case["id"], "part": case["part_id"], "source": case["source"], "process": case["process"],
                "ran": False, "ok": False, "timed_out": True, "seconds": round(time.time() - t0, 1),
@@ -194,10 +183,24 @@ def run_limited(case: dict, out: Path, limit: float = LIMIT, keep: bool = False)
         tail = (out / "case.log").read_text(errors="replace").strip().splitlines()[-3:]
         row = {"id": case["id"], "part": case["part_id"], "source": case["source"], "process": case["process"],
                "ran": False, "ok": False, "seconds": round(time.time() - t0, 1),
-               "error": f"the case process ended with exit code {proc.returncode} and no answer: " + " ".join(tail)}
+               "error": f"the case process ended with exit code {code} and no answer: " + " ".join(tail)}
     if not keep:
         shutil.rmtree(out, ignore_errors=True)
     return row
+
+
+def run_group(cmd: list[str], limit: float, log_path: Path) -> tuple[bool, int | None]:
+    """Run a command as the leader of a process group of its own, and stop the whole group if it outlives the limit.
+    Returns whether it timed out and its exit code."""
+    with open(log_path, "wb") as log:
+        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                                start_new_session=os.name == "posix")
+        try:
+            proc.wait(timeout=limit)
+        except subprocess.TimeoutExpired:
+            _stop_group(proc)
+            return True, proc.returncode
+    return False, proc.returncode
 
 
 def _stop_group(proc: subprocess.Popen) -> None:
