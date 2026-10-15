@@ -1,0 +1,250 @@
+{
+ "quality": "normal",
+ "note": "nothing here was tuned: each antenna is built from the frequency alone, or read from a file",
+ "rows": [
+  {
+   "antenna": "dipole",
+   "what": "0.47 wavelength wire dipole, 1 mm wire (lambda/120), centre fed, free space",
+   "working_frequency_GHz": 2.4,
+   "resonance_MHz": 2303,
+   "resonance_kind": "reactance zero",
+   "impedance_at_resonance_ohm": [
+    70.6,
+    0.0
+   ],
+   "impedance_at_2.4GHz_ohm": [
+    82.8,
+    23.6
+   ],
+   "s11_at_2.4GHz_dB": -10.5,
+   "bandwidth_below_minus10dB_MHz": 200,
+   "directivity_dBi": 2.26,
+   "gain_dBi": 2.26,
+   "efficiency": 1.0,
+   "peak_theta_deg": 90,
+   "peak_phi_deg": 80,
+   "beamwidth_3dB_elevation_cut_deg": 76.0,
+   "beamwidth_3dB_azimuth_cut_deg": 360.0,
+   "checks": {
+    "power balance": "pass",
+    "mesh convergence": "pass",
+    "boundary distance": "warn",
+    "closed form": "pass",
+    "run time": "info"
+   },
+   "unknowns": [
+    73450,
+    132123
+   ],
+   "predicted_minutes": 20.9,
+   "took_minutes": 25.9,
+   "peak_memory_GB": null,
+   "independent_reference": "axisymmetric solve of the same wire: resonance 2365 MHz, 72.8 ohm; thin half wave dipole: 73.1 ohm, 2.15 dBi",
+   "verdict": "fails",
+   "headline": "The dipole resonates at 2303 MHz (-4.0% from 2400 MHz), with 82.8 + j23.6 ohm and S11 of -10.5 dB against 50 ohm at 2400 MHz. Peak gain 2.26 dBi toward theta 90 and phi 80 degrees."
+  },
+  {
+   "antenna": "monopole",
+   "what": "0.24 wavelength monopole on a 1 wavelength round plate",
+   "working_frequency_GHz": 2.4,
+   "resonance_MHz": 2101,
+   "resonance_kind": "reactance zero",
+   "impedance_at_resonance_ohm": [
+    32.5,
+    0.0
+   ],
+   "impedance_at_2.4GHz_ohm": [
+    62.8,
+    37.7
+   ],
+   "s11_at_2.4GHz_dB": -9.5,
+   "bandwidth_below_minus10dB_MHz": 148,
+   "directivity_dBi": 3.25,
+   "gain_dBi": 3.25,
+   "efficiency": 1.0,
+   "peak_theta_deg": 45,
+   "peak_phi_deg": 70,
+   "beamwidth_3dB_elevation_cut_deg": 56.0,
+   "beamwidth_3dB_azimuth_cut_deg": 360.0,
+   "checks": {
+    "power balance": "pass",
+    "mesh convergence": "pass",
+    "boundary distance": "pass",
+    "closed form": "warn",
+    "run time": "info"
+   },
+   "unknowns": [
+    105282,
+    216158
+   ],
+   "predicted_minutes": 33.1,
+   "took_minutes": 62.0,
+   "peak_memory_GB": null,
+   "independent_reference": "axisymmetric solve with the same 1 wavelength plate: resonance about 2170 MHz (2313 MHz on an infinite plane)",
+   "verdict": "fails",
+   "headline": "The monopole resonates at 2101 MHz (-12.4% from 2400 MHz), with 62.8 + j37.7 ohm and S11 of -9.5 dB against 50 ohm at 2400 MHz. Peak gain 3.25 dBi toward theta 45 and phi 70 degrees."
+  },
+  {
+   "antenna": "patch",
+   "what": "rectangular patch on 1.6 mm FR4 sized by the transmission line model, probe fed at the inset",
+   "working_frequency_GHz": 2.4,
+   "resonance_MHz": 2221,
+   "resonance_kind": "resistance peak",
+   "impedance_at_resonance_ohm": [
+    14.0,
+    16.8
+   ],
+   "impedance_at_2.4GHz_ohm": [
+    1.1,
+    15.4
+   ],
+   "s11_at_2.4GHz_dB": -0.4,
+   "bandwidth_below_minus10dB_MHz": 0,
+   "directivity_dBi": 6.3,
+   "gain_dBi": 3.11,
+   "efficiency": 0.48,
+   "peak_theta_deg": 0,
+   "peak_phi_deg": 0,
+   "beamwidth_3dB_elevation_cut_deg": 92.0,
+   "beamwidth_3dB_azimuth_cut_deg": 360.0,
+   "checks": {
+    "power balance": "pass",
+    "mesh convergence": "pass",
+    "boundary distance": "pass",
+    "transmission line model": "warn",
+    "run time": "info"
+   },
+   "unknowns": [
+    84015,
+    162470
+   ],
+   "predicted_minutes": 24.8,
+   "took_minutes": 29.6,
+   "peak_memory_GB": null,
+   "independent_reference": "transmission line model: 2400 MHz (the solve is 7.5% below it, see docs/limits.md)",
+   "verdict": "fails",
+   "headline": "The antenna resonates at 2221 MHz (-7.5% from 2400 MHz), with 1.1 + j15.4 ohm and S11 of -0.4 dB against 50 ohm at 2400 MHz. Peak gain 3.11 dBi toward theta 0 and phi 0 degrees."
+  },
+  {
+   "antenna": "loop",
+   "what": "one wavelength circular wire loop, 1 mm wire, fed across a gap",
+   "working_frequency_GHz": 2.4,
+   "resonance_MHz": 2641,
+   "resonance_kind": "reactance zero",
+   "impedance_at_resonance_ohm": [
+    155.3,
+    0.0
+   ],
+   "impedance_at_2.4GHz_ohm": [
+    111.0,
+    -75.0
+   ],
+   "s11_at_2.4GHz_dB": -5.3,
+   "bandwidth_below_minus10dB_MHz": 0,
+   "directivity_dBi": 3.52,
+   "gain_dBi": 3.52,
+   "efficiency": 1.0,
+   "peak_theta_deg": 2,
+   "peak_phi_deg": 10,
+   "beamwidth_3dB_elevation_cut_deg": 82.0,
+   "beamwidth_3dB_azimuth_cut_deg": 130.0,
+   "checks": {
+    "power balance": "pass",
+    "mesh convergence": "pass",
+    "boundary distance": "warn",
+    "run time": "info"
+   },
+   "unknowns": [
+    96594,
+    164486
+   ],
+   "predicted_minutes": 35.2,
+   "took_minutes": 37.7,
+   "peak_memory_GB": 2.72,
+   "independent_reference": "a one wavelength loop has about 3.3 dBi of gain (Kraus)",
+   "verdict": "fails",
+   "headline": "The antenna resonates at 2641 MHz (+10.0% from 2400 MHz), with 111 - j75 ohm and S11 of -5.3 dB against 50 ohm at 2400 MHz. Peak gain 3.52 dBi toward theta 2 and phi 10 degrees."
+  },
+  {
+   "antenna": "invf",
+   "what": "inverted F trace on 1.6 mm FR4, built from the frequency alone",
+   "working_frequency_GHz": 2.4,
+   "resonance_MHz": 2130,
+   "resonance_kind": "reactance zero",
+   "impedance_at_resonance_ohm": [
+    69.6,
+    0.0
+   ],
+   "impedance_at_2.4GHz_ohm": [
+    48.2,
+    74.4
+   ],
+   "s11_at_2.4GHz_dB": -4.4,
+   "bandwidth_below_minus10dB_MHz": 134,
+   "directivity_dBi": 3.15,
+   "gain_dBi": 2.89,
+   "efficiency": 0.94,
+   "peak_theta_deg": 100,
+   "peak_phi_deg": 340,
+   "beamwidth_3dB_elevation_cut_deg": 56.0,
+   "beamwidth_3dB_azimuth_cut_deg": 302.0,
+   "checks": {
+    "power balance": "pass",
+    "mesh convergence": "pass",
+    "boundary distance": "pass",
+    "quarter wave estimate": "info",
+    "run time": "info"
+   },
+   "unknowns": [
+    124155,
+    226962
+   ],
+   "predicted_minutes": 41.2,
+   "took_minutes": 47.4,
+   "peak_memory_GB": 4.34,
+   "independent_reference": "none of the same shape was available",
+   "verdict": "fails",
+   "headline": "The antenna resonates at 2130 MHz (-11.3% from 2400 MHz), with 48.2 + j74.4 ohm and S11 of -4.4 dB against 50 ohm at 2400 MHz. Peak gain 2.89 dBi toward theta 100 and phi 340 degrees."
+  },
+  {
+   "antenna": "ifa-kicad",
+   "what": "inverted F trace read from a KiCad board (examples/antenna-pcb)",
+   "working_frequency_GHz": 2.4,
+   "resonance_MHz": 2648,
+   "resonance_kind": "reactance zero",
+   "impedance_at_resonance_ohm": [
+    36.9,
+    0.0
+   ],
+   "impedance_at_2.4GHz_ohm": [
+    42.5,
+    -45.0
+   ],
+   "s11_at_2.4GHz_dB": -7.1,
+   "bandwidth_below_minus10dB_MHz": 200,
+   "directivity_dBi": 2.46,
+   "gain_dBi": 1.96,
+   "efficiency": 0.89,
+   "peak_theta_deg": 32,
+   "peak_phi_deg": 80,
+   "beamwidth_3dB_elevation_cut_deg": 264.0,
+   "beamwidth_3dB_azimuth_cut_deg": 110.0,
+   "checks": {
+    "power balance": "pass",
+    "mesh convergence": "fail",
+    "boundary distance": "warn",
+    "run time": "info"
+   },
+   "unknowns": [
+    114115,
+    196723
+   ],
+   "predicted_minutes": 37.3,
+   "took_minutes": 44.3,
+   "peak_memory_GB": 3.07,
+   "independent_reference": "none of the same shape was available",
+   "verdict": "fails",
+   "headline": "The antenna resonates at 2648 MHz (+10.3% from 2400 MHz), with 42.5 - j45 ohm and S11 of -7.1 dB against 50 ohm at 2400 MHz. Peak gain 1.96 dBi toward theta 32 and phi 80 degrees."
+  }
+ ]
+}
