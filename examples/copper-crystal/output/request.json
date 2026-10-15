@@ -1,0 +1,18 @@
+{
+ "domain": "chemistry",
+ "analysis": "crystal",
+ "spec": {
+  "thing": "copper",
+  "kind": "element",
+  "question": "what is its crystal structure and how stiff is it?",
+  "options": {
+   "temperature": [
+    "298.15 K"
+   ],
+   "pressure": [
+    "101.325 kPa"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

@@ -1,0 +1,24 @@
+OK. 2 Al(s) + Fe2O3(s) -> Al2O3(s) + 2 Fe(s) releases 850.4 kJ per mole as written and goes forward on its own at 298 K (dG = -838.9 kJ, K = 10^147). Left to keep its own heat it reaches 3139 K, where boiling or melting holds it.
+
+Confidence: high. passed element and charge balance, data, adiabatic energy balance, equilibrium
+reaction enthalpy: -850.4 kJ
+Gibbs energy: -838.9 kJ
+equilibrium constant: K = 10^147
+adiabatic temperature: 3139 K
+
+Checks:
+  [pass] element and charge balance: Al, Fe, O and charge balance exactly
+  [pass] data: every species comes from NASA Glenn thermodynamic data
+  [pass] adiabatic energy balance: with the reaction complete and nothing dissociating, the products reach 3139 K (stopped at 3139 K, where a product changes phase and soaks up the rest of the heat). Cantera's full equilibrium did not converge here (its multiphase solver stopped short)
+  [pass] equilibrium: K is 10^147, so the reaction runs to completion
+
+Assumptions:
+  - Wobbl guessed: temperature not given: assumed 25 C (298.15 K).
+  - Wobbl guessed: pressure not given: assumed 1 atm.
+  - The products come from the named reaction 'thermite'.
+  - Standard states, 1 bar for gases and 1 mol/kg for species in water, with data from NASA Glenn thermodynamic data (JANAF and ATcT based).
+  - Gases are ideal.
+  - Thermodynamics says how far and with how much heat a reaction goes, not how fast. A reaction that can go may still need a spark, a catalyst or time.
+
+Images: gibbs: images/gibbs.png
+Report: report.html

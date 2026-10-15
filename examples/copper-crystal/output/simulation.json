@@ -1,0 +1,58 @@
+{
+ "thing": "copper",
+ "question": "what is its crystal structure and how stiff is it?",
+ "plan": {
+  "thing": "copper",
+  "question": "what is its crystal structure and how stiff is it?",
+  "domain": "chemistry",
+  "kind": "element",
+  "analyses": [
+   "crystal"
+  ],
+  "reasons": [
+   {
+    "decided": "domain chemistry, as asked",
+    "override": "--domain chemistry"
+   },
+   {
+    "decided": "physics crystal from \"crystal\"",
+    "override": "--physics crystal"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "chemistry",
+    "score": 8
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "environment": {
+   "temperature": "298.15 K",
+   "pressure": "101.325 kPa"
+  }
+ },
+ "steps": [
+  {
+   "analysis": "crystal",
+   "domain": "chemistry",
+   "verdict": "ok",
+   "headline": "Fcc copper by EMT: lattice constant 3.590 A, density 9.12 g/cm3, bulk modulus 133 GPa and cohesive energy 3.52 eV per atom. Measured, the lattice constant is 3.610 A.",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/copper-crystal/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/copper-crystal/output/report.html",
+   "assumptions": [
+    {
+     "assumed": "temperature not given: assumed 25 C (298.15 K)",
+     "override": "--temperature '298.15 K'"
+    },
+    {
+     "assumed": "pressure not given: assumed 1 atm",
+     "override": "--pressure '1 atm'"
+    }
+   ]
+  }
+ ]
+}

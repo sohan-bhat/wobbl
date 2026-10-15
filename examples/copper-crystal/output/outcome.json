@@ -1,0 +1,131 @@
+{
+ "domain": "chemistry",
+ "part": "copper",
+ "question": "what is its crystal structure and how stiff is it?",
+ "verdict": "ok",
+ "headline": "Fcc copper by EMT: lattice constant 3.590 A, density 9.12 g/cm3, bulk modulus 133 GPa and cohesive energy 3.52 eV per atom. Measured, the lattice constant is 3.610 A.",
+ "metrics": [
+  [
+   "lattice constant",
+   "3.590 A"
+  ],
+  [
+   "density",
+   "9.12 g/cm3"
+  ],
+  [
+   "bulk modulus",
+   "133 GPa"
+  ],
+  [
+   "cohesive energy",
+   "3.52 eV/atom"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed equation of state, reference data"
+ ],
+ "checks": [
+  {
+   "name": "equation of state",
+   "status": "pass",
+   "summary": "9 volumes from -17% to +19% around the measured one bracket the minimum, and the Birch-Murnaghan fit misses them by 0.82 meV",
+   "detail": {
+    "rms_eV": 0.000825
+   }
+  },
+  {
+   "name": "reference data",
+   "status": "pass",
+   "summary": "against measurements, lattice constant 3.59 A against 3.61 (0.6% apart); bulk modulus 133 GPa against 137 (2.9% apart); cohesive energy 3.52 eV/atom against 3.49 (0.8% apart) (the largest miss is 0.4 times EMT's typical error)",
+   "detail": {
+    "worst": 0.367146
+   }
+  }
+ ],
+ "assumptions": [
+  "Wobbl guessed: temperature not given: assumed 25 C (298.15 K).",
+  "Wobbl guessed: pressure not given: assumed 1 atm.",
+  "fcc copper at 0 K with the measured shape held as the volume changes, by EMT, good to about 1.5% in lattice constant and 20% in bulk modulus.",
+  "Zero point motion and thermal expansion are left out, which together make room temperature lattices about 0.5% larger."
+ ],
+ "values": {
+  "structure": "fcc copper",
+  "method": "EMT",
+  "atoms_in_cell": 4,
+  "atomic": [
+   {
+    "symbol": "Cu",
+    "name": "Copper",
+    "z": 29,
+    "mass": 63.55,
+    "config": "[Ar]4s1 3d10",
+    "electronegativity": 1.9,
+    "ionization_eV": 7.726,
+    "electron_affinity_eV": 1.228,
+    "radius_pm": 140.0,
+    "melting_K": 1357.77,
+    "boiling_K": 2835.0,
+    "density_g_cm3": 8.933,
+    "block": "Transition metal",
+    "oxidation_states": "+2, +1"
+   }
+  ],
+  "lattice_A": 3.590119,
+  "volume_A3": 46.272882,
+  "density_g_cm3": 9.122169,
+  "bulk_modulus_GPa": 132.989014,
+  "cohesive_eV_atom": 3.516816,
+  "energy_eV": -0.027263,
+  "eos": {
+   "V": [
+    39.075556,
+    40.976204,
+    42.937505,
+    44.960414,
+    47.045881,
+    49.19486,
+    51.408304,
+    53.687166,
+    56.032397
+   ],
+   "E": [
+    0.586447,
+    0.282092,
+    0.085728,
+    -0.012011,
+    -0.022726,
+    0.041964,
+    0.171779,
+    0.358316,
+    0.592493
+   ]
+  },
+  "measured": {
+   "lattice_A": 3.61,
+   "bulk_modulus_GPa": 137,
+   "cohesive_eV_atom": 3.49,
+   "density_g_cm3": 8.933
+  },
+  "_figures": [
+   [
+    "eos",
+    "Energy against volume, the equation of state"
+   ]
+  ],
+  "files": {
+   "playback": "playback.json"
+  }
+ },
+ "images": {
+  "eos": "images/eos.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 2.547261,
+ "solver": "EMT with ASE",
+ "criteria": []
+}

@@ -1,0 +1,20 @@
+OK. Fcc copper by EMT: lattice constant 3.590 A, density 9.12 g/cm3, bulk modulus 133 GPa and cohesive energy 3.52 eV per atom. Measured, the lattice constant is 3.610 A.
+
+Confidence: high. passed equation of state, reference data
+lattice constant: 3.590 A
+density: 9.12 g/cm3
+bulk modulus: 133 GPa
+cohesive energy: 3.52 eV/atom
+
+Checks:
+  [pass] equation of state: 9 volumes from -17% to +19% around the measured one bracket the minimum, and the Birch-Murnaghan fit misses them by 0.82 meV
+  [pass] reference data: against measurements, lattice constant 3.59 A against 3.61 (0.6% apart); bulk modulus 133 GPa against 137 (2.9% apart); cohesive energy 3.52 eV/atom against 3.49 (0.8% apart) (the largest miss is 0.4 times EMT's typical error)
+
+Assumptions:
+  - Wobbl guessed: temperature not given: assumed 25 C (298.15 K).
+  - Wobbl guessed: pressure not given: assumed 1 atm.
+  - fcc copper at 0 K with the measured shape held as the volume changes, by EMT, good to about 1.5% in lattice constant and 20% in bulk modulus.
+  - Zero point motion and thermal expansion are left out, which together make room temperature lattices about 0.5% larger.
+
+Images: eos: images/eos.png
+Report: report.html

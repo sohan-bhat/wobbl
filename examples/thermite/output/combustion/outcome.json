@@ -1,0 +1,164 @@
+{
+ "domain": "chemistry",
+ "part": "2 Al(s) + Fe2O3(s) -> Al2O3(s) + 2 Fe(s)",
+ "question": "how hot does it get thermite",
+ "verdict": "ok",
+ "headline": "2 Al(s) + Fe2O3(s) -> Al2O3(s) + 2 Fe(s) releases 850.4 kJ per mole as written and goes forward on its own at 298 K (dG = -838.9 kJ, K = 10^147). Left to keep its own heat it reaches 3139 K, where boiling or melting holds it.",
+ "metrics": [
+  [
+   "reaction enthalpy",
+   "-850.4 kJ"
+  ],
+  [
+   "Gibbs energy",
+   "-838.9 kJ"
+  ],
+  [
+   "equilibrium constant",
+   "K = 10^147"
+  ],
+  [
+   "adiabatic temperature",
+   "3139 K"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed element and charge balance, data, adiabatic energy balance, equilibrium"
+ ],
+ "checks": [
+  {
+   "name": "element and charge balance",
+   "status": "pass",
+   "summary": "Al, Fe, O and charge balance exactly",
+   "detail": {}
+  },
+  {
+   "name": "data",
+   "status": "pass",
+   "summary": "every species comes from NASA Glenn thermodynamic data",
+   "detail": {
+    "sources": [
+     "NASA Glenn thermodynamic data (JANAF and ATcT based)"
+    ]
+   }
+  },
+  {
+   "name": "adiabatic energy balance",
+   "status": "pass",
+   "summary": "with the reaction complete and nothing dissociating, the products reach 3139 K (stopped at 3139 K, where a product changes phase and soaks up the rest of the heat). Cantera's full equilibrium did not converge here (its multiphase solver stopped short)",
+   "detail": {}
+  },
+  {
+   "name": "equilibrium",
+   "status": "pass",
+   "summary": "K is 10^147, so the reaction runs to completion",
+   "detail": {
+    "log10K": 146.976622
+   }
+  }
+ ],
+ "assumptions": [
+  "The products come from the named reaction 'thermite'.",
+  "Standard states, 1 bar for gases and 1 mol/kg for species in water, with data from NASA Glenn thermodynamic data (JANAF and ATcT based).",
+  "Gases are ideal.",
+  "Thermodynamics says how far and with how much heat a reaction goes, not how fast. A reaction that can go may still need a spark, a catalyst or time."
+ ],
+ "values": {
+  "equation": "2 Al(s) + Fe2O3(s) -> Al2O3(s) + 2 Fe(s)",
+  "rule": "the named reaction 'thermite'",
+  "temperature_K": 298.15,
+  "pressure_Pa": 101325.0,
+  "dH_kJ": -850.388664,
+  "dS_J_K": -38.385747,
+  "dG_kJ": -838.943954,
+  "log10K": 146.976622,
+  "species": [
+   {
+    "species": "Al",
+    "phase": "s",
+    "coef": -2.0,
+    "H_kJ_mol": -0.0,
+    "S_J_molK": 28.299839,
+    "source": "NASA Glenn thermodynamic data (JANAF and ATcT based)",
+    "name": "AL(cr)",
+    "covers": true
+   },
+   {
+    "species": "Fe2O3",
+    "phase": "s",
+    "coef": -1.0,
+    "H_kJ_mol": -825.310843,
+    "S_J_molK": 87.397838,
+    "source": "NASA Glenn thermodynamic data (JANAF and ATcT based)",
+    "name": "Fe2O3(s)",
+    "covers": true
+   },
+   {
+    "species": "Al2O3",
+    "phase": "s",
+    "coef": 1.0,
+    "H_kJ_mol": -1675.699507,
+    "S_J_molK": 50.970081,
+    "source": "NASA Glenn thermodynamic data (JANAF and ATcT based)",
+    "name": "AL2O3(a)",
+    "covers": true
+   },
+   {
+    "species": "Fe",
+    "phase": "s",
+    "coef": 2.0,
+    "H_kJ_mol": -0.0,
+    "S_J_molK": 27.320844,
+    "source": "NASA Glenn thermodynamic data (JANAF and ATcT based)",
+    "name": "Fe(a)",
+    "covers": true
+   }
+  ],
+  "dH298_kJ": -850.388664,
+  "dG298_kJ": -838.943954,
+  "crossover_K": null,
+  "vapour_dH_kJ": null,
+  "reactant_mass_g": 213.640076,
+  "heat_kJ_per_kg": 3980.473515,
+  "gas_mol": 0,
+  "gas_L": 0.0,
+  "gas_from_condensed": false,
+  "adiabatic": {
+   "T_K": 3138.980695,
+   "rise_K": 2840.830695,
+   "kind": "complete",
+   "check": {
+    "name": "adiabatic energy balance",
+    "status": "pass",
+    "summary": "with the reaction complete and nothing dissociating, the products reach 3139 K (stopped at 3139 K, where a product changes phase and soaks up the rest of the heat). Cantera's full equilibrium did not converge here (its multiphase solver stopped short)",
+    "detail": {}
+   },
+   "plateau": true
+  },
+  "equilibrium": {
+   "extent": 1.0,
+   "log10K": 146.976622,
+   "how": "complete"
+  },
+  "_figures": [
+   [
+    "gibbs",
+    "Reaction Gibbs energy against temperature, below zero it goes forward"
+   ]
+  ],
+  "files": {
+   "playback": "playback.json"
+  }
+ },
+ "images": {
+  "gibbs": "images/gibbs.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 3.479271,
+ "solver": "Wobbl reaction thermochemistry on NASA Glenn and NBS data, equilibrium with Cantera",
+ "criteria": []
+}

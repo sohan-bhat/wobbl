@@ -1,0 +1,19 @@
+{
+ "domain": "chemistry",
+ "analysis": "combustion",
+ "spec": {
+  "thing": "thermite",
+  "kind": "reaction",
+  "question": "how much heat does it release and how hot does it get?",
+  "part": "how hot does it get thermite",
+  "options": {
+   "temperature": [
+    "298.15 K"
+   ],
+   "pressure": [
+    "101.325 kPa"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}
