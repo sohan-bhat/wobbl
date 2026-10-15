@@ -432,6 +432,21 @@ def _edges(h: int, w: int, covered: np.ndarray, feat: list[np.ndarray]) -> np.nd
     return edge.ravel()
 
 
+def _touching(x, y, T, mask: np.ndarray) -> np.ndarray:
+    """Indices of the triangles whose bounding box meets a marked pixel of the (h, w) mask. Not only the triangles
+    that win a pixel center are wanted: where the mesh is finer than the pixels, the triangles that fill the samples
+    between centers win none, and leaving them out punches holes in the picture."""
+    h, w = mask.shape
+    S = np.zeros((h + 1, w + 1), np.int32)
+    S[1:, 1:] = mask.cumsum(0).cumsum(1)
+    xs, ys = x[T], y[T]
+    x0 = np.clip(np.floor(xs.min(1)), 0, w).astype(np.int64)
+    x1 = np.clip(np.floor(xs.max(1)) + 1, 0, w).astype(np.int64)
+    y0 = np.clip(np.floor(ys.min(1)), 0, h).astype(np.int64)
+    y1 = np.clip(np.floor(ys.max(1)) + 1, 0, h).astype(np.int64)
+    return np.nonzero(S[y1, x1] - S[y0, x1] - S[y1, x0] + S[y0, x0] > 0)[0]
+
+
 def frame(size: tuple[int, int], cam: Camera, surf: Surface, values, lines: Lines | None = None,
           two_sided: bool = False, power: float = 30.0) -> Frame:
     """Rasterize a surface and interpolate its field and lighting, once for any number of looks.
@@ -487,11 +502,10 @@ def frame(size: tuple[int, int], cam: Camera, surf: Surface, values, lines: Line
     near[:-1] |= near[1:].copy()
     near[:, 1:] |= near[:, :-1].copy()
     near[:, :-1] |= near[:, 1:].copy()
-    near = near.ravel() & covered
     hit = np.zeros(sub.shape, bool)
     many_attr = np.zeros((0, 3), np.float32)
     if near.any():
-        cand = np.unique(tri[near])
+        cand = _touching(x, y, T, near)
         t2, v1, v2, _ = _rasterize(x * SS, y * SS, iz, T[cand], W, H)
         got = t2[sub]
         hit = got >= 0
