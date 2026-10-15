@@ -53,6 +53,7 @@ class WarpStudy:
     params: dict = field(default_factory=dict)
     mesh_size: float | None = None
     profile: dict = field(default_factory=dict)   # what a slicer file gave, for the assumptions
+    budget: float = 600.0              # s, what the mesh levels may be predicted to take (process.budget)
 
 
 def iso_flatness(size: float) -> float:

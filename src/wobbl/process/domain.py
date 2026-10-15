@@ -150,7 +150,7 @@ def print_warp(job):
                    job.number("brim") or prof.get("brim_mm") or 0.0, flat, job.question,
                    "fast" if job.quick else (job.value("quality") or "normal"), job.number("scale", 1.0) or 1.0,
                    dict(p.split("=", 1) for p in job.values("param") if "=" in p), job.number("mesh-size"),
-                   prof)
+                   prof, job.number("budget", 600.0) or 600.0)
     job.situate(environment={"printer": "enclosed" if chamber is not None else "open", "bed_C": bed,
                              "air_C": chamber if chamber is not None else ambient, "filament": f.name},
                 objects=["print bed"])
