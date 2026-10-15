@@ -37,6 +37,16 @@
   electric field on a slice through the feed played over one radio frequency cycle, and the radiation pattern as a
   translucent balloon colored by gain.
 
+**Contact and bolted joints**
+- `--mesh-size` now sets the element size of a contact or bolted joint study. It was read but never
+  passed on, so the mesh stayed at the automatic size.
+- Both levels are priced before they are solved and the mesh is coarsened to fit `--budget`
+  (1500 s by default). The second level is sized from what the first one really took.
+- A joint with several bolts reaches its checks, and the moment balance counts what the bolts hand to the
+  clamped parts. Faces that wrap round a shaft report their pressing force instead of a vector sum that
+  cancels, and a press fit of a hundredth of a millimetre is solved as an interference.
+- Second order meshes with inverted elements are refused, so the mesher falls back to straight sides.
+
 **Budgets, flow scenes and crack views**
 - Drops predict their own run time from the mesh they would march before they solve. The
   mesh is coarsened rung by rung to fit a 600 s budget, with what was given up stated in

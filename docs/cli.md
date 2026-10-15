@@ -22,7 +22,7 @@ formula, SMILES or an equation, or a sentence that describes it. `wobbl part.ste
 | `--list` | lists every domain, its physics and their options |
 | `--estimate`, `--background`, `--remote NAME` | predicts the cost, or runs it as a job here or on a remote |
 | `--quick`, `--json`, `--no-open`, `-o` | skips pictures and fixes, prints JSON, keeps the view closed, picks the folder |
-| `--budget SECONDS` | the time a strength study (300 s by default) or a crack growth study (1200 s) may take |
+| `--budget SECONDS` | the time a strength study (300 s by default), a crack growth study (1200 s) or the two meshes of a contact or bolted joint study (1500 s) may take |
 | `--budget-minutes MINUTES` | for CFD and cooling, the longest predicted time a scale resolving run may take before Wobbl offers RANS instead |
 
 Every run prints each guess with the option that overrides it and ends with the explicit command
@@ -31,6 +31,11 @@ that repeats it with nothing guessed, then opens the 3D view.
 A drop has its own time budget of 600 s, which is not a flag. Wobbl predicts the run from its mesh
 before it solves and coarsens the mesh to fit, and the assumptions say what was given up. A run
 that is still over its budget at the coarsest allowed mesh says so.
+
+Contact and bolted joints work the same way with `--budget`. Wobbl meshes the first level, predicts both
+levels from the node count, and coarsens the element size and the elements round each circle until both fit.
+The second level is then sized from what the first level really took. A `--mesh-size` you give is kept, and the
+prediction is only reported.
 
 Each analysis writes `request.json` beside `outcome.json`, so a result can be run again with nothing
 guessed. Where it has a 3D view it also writes `scene.wobbl`, which `wobbl view` opens with the
