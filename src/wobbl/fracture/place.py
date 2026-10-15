@@ -169,6 +169,14 @@ def _first(p, v, mesh, skip: float = 0.0) -> float:
     return float(t[0]) if len(t) else math.inf
 
 
+def _off_edge(o: np.ndarray, faces: list, inward: np.ndarray, size: float) -> np.ndarray:
+    """The point a wall measuring ray starts from. At an edge where a second face runs along the ray, such as the
+    tip of a rounded lug, the ray would lie in that face and graze its facets, so it starts a little inside it."""
+    if len(faces) == 2 and abs(float(faces[1] @ inward)) < 0.5:
+        return o - 0.3 * size * faces[1]
+    return o
+
+
 def _face_normals(mesh: Mesh, o: np.ndarray, radius: float) -> list[np.ndarray]:
     """Outward normals of the faces meeting at a surface point: one for a flat or curved face, two at an edge."""
     n, a, c = mesh.tri_geometry()
@@ -273,14 +281,17 @@ def auto_crack(spec: CrackSpec, unc: Uncracked, origin: int, features: PartFeatu
     mesh = unc.mesh
     o = mesh.X[origin]
     size = float(np.nanmin(mesh.node_sizes()[[origin]]))
-    inward = -_face_normals(mesh, o, 2.0 * size)[0]
+    faces = _face_normals(mesh, o, 2.0 * size)
+    inward = -faces[0]
+    # at an edge the ray along the wall can run inside the other face and graze it, so it starts a little inside
+    ray_from = _off_edge(o, faces, inward, size)
     normal = np.asarray(spec.normal, float) if spec.normal is not None else principal_direction(unc.S[origin])[1]
     normal = normal / np.linalg.norm(normal)
     hole = _hole_at(spec, features, o)
     toward = spec.toward
     if hole is not None:
         wall = 2.0 * hole[3]
-        ahead = _first(o, inward, mesh, skip=0.25 * size)
+        ahead = _first(ray_from, inward, mesh, skip=0.25 * size)
         a = min(HOLE_FLAW, 0.2 * ahead)
         if wall > HOLE_FLAW:
             shape, c = "corner", min(a, 0.4 * wall)
@@ -289,7 +300,7 @@ def auto_crack(spec: CrackSpec, unc: Uncracked, origin: int, features: PartFeatu
             shape, c = "through", None
             why = f"a {fmt(a)} mm crack through the {fmt(wall)} mm wall at the {fmt(2 * hole[2])} mm hole"
     else:
-        wall = _first(o, inward, mesh, skip=0.25 * size)
+        wall = _first(ray_from, inward, mesh, skip=0.25 * size)
         d = inward - (inward @ normal) * normal
         d = d / max(np.linalg.norm(d), 1e-12)
         w = np.cross(normal, d)
