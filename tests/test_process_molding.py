@@ -66,17 +66,21 @@ def test_weld_line_forms_behind_a_hole_and_the_gate_goes_in_the_middle(tmp_path)
         c = o.addCylinder(40, 20, -1, 0, 0, 4, 6)
         o.cut([(3, a)], [(3, c)])
 
-    mesh = _mesh(tmp_path, plate, 2.0)
-    hm = H.Mesh(mesh.X, mesh.tets, np.full(len(mesh.tets), 2.0))
-    gate = np.nonzero(mesh.X[:, 0] < 1e-6)[0]
-    res = H.fill(hm, H.Viscosity(m=2e4, n=0.35), H.FillSettings([gate], 80 * 40 * 2 / 1.0))
-    weld = H.weld_lines(hm, res.t_fill)
-    assert len(weld)
-    # the fronts split by the hole meet first past its upstream side, in the band the hole shadows. Where the last of
-    # the fill meets the far walls the fill time flattens and the mesh each platform's gmsh makes decides which
-    # nodes read as a weld, so the line is judged where the fronts meet first
-    # (the nodes on the side walls have gradients from one side only, so they are left out)
-    inner = weld[(mesh.X[weld, 1] > 3) & (mesh.X[weld, 1] < 37)]
+    # a weld line behind a 6 mm radius hole needs a few elements around it, and where the mesher puts the nodes
+    # decides which side of that limit a given size lands on, so the next sizes are tried when one is too coarse
+    for k, size in enumerate((1.6, 1.4, 1.8)):
+        (tmp_path / str(k)).mkdir()
+        mesh = _mesh(tmp_path / str(k), plate, size)
+        hm = H.Mesh(mesh.X, mesh.tets, np.full(len(mesh.tets), 2.0))
+        gate = np.nonzero(mesh.X[:, 0] < 1e-6)[0]
+        res = H.fill(hm, H.Viscosity(m=2e4, n=0.35), H.FillSettings([gate], 80 * 40 * 2 / 1.0))
+        weld = H.weld_lines(hm, res.t_fill)
+        # the fronts split by the hole meet first past its upstream side, in the band the hole shadows. Where the
+        # last of the fill meets the far walls the fill time flattens and the mesh decides which nodes read as a
+        # weld, and the nodes on the side walls have gradients from one side only, so both are left out
+        inner = weld[(mesh.X[weld, 1] > 3) & (mesh.X[weld, 1] < 37)]
+        if len(inner):
+            break
     assert len(inner)
     first = inner[np.argsort(res.t_fill[inner])[:max(1, len(inner) // 2)]]
     behind = mesh.X[first]
