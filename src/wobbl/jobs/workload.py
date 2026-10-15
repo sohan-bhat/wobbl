@@ -222,7 +222,8 @@ def _peak_rss() -> float:
 
 
 PLAN_COMMANDS = ("simulate", "jobs run-plan")
-SIZE_OPTIONS = ("quality", "mesh-size", "scale", "budget", "duration", "modes", "shell", "body")
+SIZE_OPTIONS = ("quality", "mesh-size", "scale", "budget", "duration", "modes", "shell", "body", "frequency", "port",
+                "feed", "set", "template")
 _pending: list[tuple[dict, Path | None, float, bool]] = []
 
 
@@ -425,11 +426,13 @@ def analysis_workload(a, thing: str, options: dict) -> Workload:
     for k in SIZE_OPTIONS:
         v = options.get(k)
         if v not in (None, [], ""):
-            params[k.replace("-", "_")] = v[-1] if isinstance(v, (list, tuple)) else v
+            params[k.replace("-", "_")] = v if k == "set" else (v[-1] if isinstance(v, (list, tuple)) else v)
     path = Path(thing).expanduser() if thing else None
     has = path is not None and len(thing) < 1024 and path.exists()
     if has:
         params["part"] = str(path)
+    if not has and a.key.endswith(".antenna"):
+        params["thing"] = thing
     command = analysis_command(a)
     if command not in REGISTRY and a.key in REGISTRY:
         command = a.key
@@ -506,6 +509,12 @@ def _run_plan_cost(w: Workload):
     return plan_cost(plan, options)
 
 
+def _antenna_cost(w):
+    from ..fields.radiate import estimate
+
+    return estimate(w)
+
+
 def _builtin():
     register("run", domain="strength", solves=1.0)
     register("thermal", domain="thermal", solves=1.0, dof=1)
@@ -514,6 +523,9 @@ def _builtin():
     register("plastic", domain="plastic", solves=25.0)
     register("drop", domain="drop", cost=drop_cost)
     register("jobs run-plan", domain="simulate", cost=_run_plan_cost)
+    register("antenna", domain="antenna", cost=_antenna_cost)
+    register("simulate part.antenna", domain="antenna", cost=_antenna_cost)
+    register("simulate board.antenna", domain="antenna", cost=_antenna_cost)
 
 
 _builtin()

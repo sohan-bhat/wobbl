@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 DEFAULT_BUDGET = 900.0            # s of wall time a study may be predicted to take before it gives something up
 REFUSE_OVER = 2.5                 # a study predicted this many times over budget at its coarsest is refused
 UNKNOWNS_PER_NODE = 7.1           # edge elements on tetrahedra, plus the absorbing sphere's surface unknowns
+AIR_CELLS = 0.84                  # nodes per far sized cell of air
+SKIN_CELLS = 1.57                 # nodes per cell of surface, with the graded mesh around it
 CPU_AT_100K = 175.0               # cpu seconds for one frequency (solve and field sampling) at 100 thousand unknowns
 EXPONENT = 1.4
 MESH_CPU_PER_NODE = 4.0e-3        # cpu seconds a node costs to mesh
@@ -56,6 +58,17 @@ class Plan:
         return {"quality": self.quality, "points": self.points, "refine": self.refine, "nodes": self.nodes,
                 "unknowns": self.unknowns, "solves": self.solves, "cpu_s": self.cpu, "seconds": self.seconds,
                 "memory_bytes": self.memory, "verify": self.verify, "gave_up": list(self.gave_up)}
+
+
+def nodes_from(inp: dict) -> float:
+    """The base mesh's node count from what sets its element sizes (wave3d.mesh_inputs): the air sphere's volume in
+    cells of the far size, and each surface's area in cells of its own size, with the refinement that grows around
+    it. Fit to the node counts of six patch meshes of the tests, to 7% or better on all of them."""
+    import math
+
+    air = 4 / 3 * math.pi * inp["R"] ** 3 / inp["far"] ** 3
+    skin = sum(a / (h * h) for a, h in inp["surfaces"])
+    return AIR_CELLS * air + SKIN_CELLS * skin
 
 
 def solve_cpu(unknowns: float) -> float:

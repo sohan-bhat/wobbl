@@ -165,3 +165,84 @@ def solve_built(built, params: dict, out, question: str, keep: bool, log, why, q
     finally:
         if not keep:
             shutil.rmtree(out / "geometry", ignore_errors=True)
+
+
+# --- pricing a study before it runs -----------------------------------------------------------------------
+_PRICED: dict = {}
+PARALLEL = 0.67                 # Amdahl fraction of a solve, from a speedup of 2 on 4 threads
+
+
+def estimate(w):
+    """The cost of an antenna command or a simulate analysis for 'wobbl estimate': a closed form or an axisymmetric
+    study is priced from what it has been measured to take, a 3D study from the mesh it would solve. Building that
+    mesh takes the seconds the first part of the study takes, the same way a drop is priced from its mesh."""
+    import tempfile
+    from pathlib import Path
+
+    from .. import estimate as E
+    from . import antenna3d, wave3d
+    from .params import text
+    from .wavecost import CostRefusal, DEFAULT_BUDGET, _t
+
+    p = w.params
+    solver = f"wobbl {w.command}"
+    sets = {}
+    for item in p.get("sets") or p.get("set") or ():
+        if "=" in item:
+            k, v = item.split("=", 1)
+            sets[k.strip()] = v.strip()
+    for k in ("frequency", "port", "feed", "budget", "quality"):
+        if p.get(k):
+            sets.setdefault(k, str(p[k]))
+    question = str(p.get("question") or "")
+    kind = p.get("template") or _kind_from_words(str(p.get("thing") or ""), question)
+    path = next((x for x in w.inputs if x.exists()), None)
+    if kind in (None, "link") and path is None:
+        return E.Cost(solver, "antenna", 1.0, 0.0, 5e7, 1e6, {}, ["A link budget is a closed form."])
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            if path is not None:
+                if not sets.get("frequency"):
+                    sets["frequency"] = "2.4GHz"
+                board = path.is_dir() or path.suffix.lower() in (".kicad_pcb", ".kicad_pro", ".zip")
+                built = (antenna3d.from_board if board else antenna3d.from_step)(path, dict(sets), tmp / "g")
+                way = ["the antenna is the geometry in the file"]
+                full = True
+            else:
+                from .radiate import route
+                r = route(kind, sets, question)
+                full, way = r.full_wave, r.reasons
+                if not full:
+                    secs = 90.0 if kind in ("dipole", "monopole") else 20.0
+                    word = ("the axisymmetric solve" if kind in ("dipole", "monopole") else
+                            "the transmission line model with one cross section solve")
+                    return E.Cost(solver, "antenna", secs, 0.5, 3e8, 5e6, {"route": r.mode},
+                                  [f"{word[:1].upper() + word[1:]} is enough for this question ({r.reasons[0]}), and "
+                                   f"takes about {_t(secs)}."])
+                built = antenna3d.build(kind, dict(sets), tmp / "g")
+            q = text(sets, "quality", "normal")
+            plan = wave3d.run(built.scene, built.setup, tmp / "o", question, q, budget=_budget(sets), plan_only=True)
+    except CostRefusal as e:
+        c = E.Cost(solver, "antenna", e.plan.cpu if e.plan else 0.0, PARALLEL, e.plan.memory if e.plan else 0.0, 5e7,
+                   {"refused": True}, [f"The study would be refused: {e}. {e.hint}"])
+        return c
+    basis = [f"A 3D full wave solve ({way[0]}), priced from its base mesh of {plan.nodes:,} nodes, about "
+             f"{plan.unknowns:,} unknowns a frequency and {plan.solves:.0f} frequency solves, predicted "
+             f"{_t(plan.seconds)} on this machine's threads against a budget of {_t(_budget(sets))}."]
+    if plan.gave_up:
+        basis.append("To fit the budget it gives up " + "; ".join(plan.gave_up) + ".")
+    return E.Cost(solver, "antenna", plan.cpu, PARALLEL, plan.memory, 5e7, {"nodes": plan.nodes, "unknowns": plan.unknowns,
+                                                                           "solves": plan.solves}, basis)
+
+
+def _kind_from_words(thing: str, question: str) -> str | None:
+    import re
+
+    t = f"{thing} {question}".lower()
+    for kind, rx in (("invf", r"inverted[- ]?f\b|\bifa\b|\bmeander|trace antenna"), ("loop", r"\bloop\b"),
+                     ("patch", r"\bpatch\b"), ("monopole", r"\bmonopole\b|\bwhip\b"), ("dipole", r"\bdipole\b"),
+                     ("link", r"\brange\b|\blink\b")):
+        if re.search(rx, t):
+            return kind
+    return None

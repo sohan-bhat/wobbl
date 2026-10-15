@@ -490,6 +490,27 @@ def _solve(msh, s: WaveSetup, f: float, fd: dict, sph: dict, d: Path, plane: dic
     return out
 
 
+def mesh_inputs(scene: Scene, s: WaveSetup, quality: str = "normal") -> dict:
+    """What sets the size of the base mesh, from the geometry alone: the air sphere's radius and far element size
+    and the area and element size of each conductor and dielectric surface. wavecost turns it into a node count
+    without meshing, which is how a study is priced before its mesh is worth building."""
+    k = QUALITY[quality]
+    freqs = _sweep(s, s.points)
+    lam_min, lam_max = C0 / max(freqs), C0 / min(freqs)
+    fd = feed(scene, s)
+    sheets = {**{n: [np.asarray(p, float) for p in ps] for n, ps in s.sheets.items()}, "port": [fd["poly"]]}
+    _, r_ext = _extent(scene, s, sheets)
+    R = r_ext + lam_max / 2
+    sizes = element_sizes(scene, s, lam_min, sheets, fd["gap"])
+    surf = []
+    for b in scene.bodies:
+        if b.name in sizes and (b.name in s.metals or b.name in s.dielectrics):
+            surf.append((b.area, sizes[b.name] * k))
+    for n, polys in sheets.items():
+        surf.append((sum(_polygon_area(p) for p in polys), sizes.get(n, lam_min / 20) * k))
+    return {"R": R, "far": min(lam_min / 10, R / 5) * k, "surfaces": surf}
+
+
 def _cpu() -> float:
     """CPU seconds this process and its children have used, which does not grow when the machine is busy."""
     import resource
@@ -656,14 +677,15 @@ def _sweep(s: WaveSetup, points: int) -> list[float]:
 
 def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: str = "normal",
         log=lambda stage, detail="": None, title: str = "", keep: bool = False, budget: float = 0.0,
-        compare=None, notes=()):
+        compare=None, notes=(), plan_only: bool = False):
     """Sweep the antenna's impedance, find its resonance and pattern, check the answer and write the report.
 
     budget is the wall time in seconds the study may be predicted to take (0 for no limit). The prediction comes from
     the base mesh before any frequency is solved. A study over its budget gives up frequencies, then mesh fineness,
     then its verification solves, and one far over refuses with a CostRefusal. compare(found) may return more checks
     against a reference the caller knows (found holds the resonance, the sweep and the working frequency's solve),
-    and notes are added to the report's assumptions."""
+    and notes are added to the report's assumptions. With plan_only the run stops after the plan and returns it, which
+    is how 'wobbl estimate' prices a study."""
     from dataclasses import replace
 
     from ..outcome_generic import GenericOutcome
@@ -704,8 +726,20 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
                 sz = {n: 0.7 * h for n, h in sz.items()}
 
     t_mesh = time.time()
+    guess = wavecost.assess(int(wavecost.nodes_from(mesh_inputs(scene, s, quality))), quality, len(freqs), s.refine,
+                            budget)
+    if plan_only:
+        shutil.rmtree(work, ignore_errors=True)
+        return guess
+    log("plan", f"about {guess.nodes:,} nodes and {guess.solves:.0f} frequency solves, predicted "
+                f"{wavecost._t(guess.seconds)} before meshing")
+    if guess.quality != quality or guess.points < len(freqs):
+        s = replace(s, points=guess.points, refine=guess.refine)
+        freqs = _sweep(s, guess.points)
+        quality, k = guess.quality, QUALITY[guess.quality]
     msh = make("base", k, R)
     plan = wavecost.assess(msh.n_nodes, quality, len(freqs), s.refine, budget)
+    plan.gave_up = guess.gave_up + [g for g in plan.gave_up if g not in guess.gave_up]
     log("plan", f"{msh.n_nodes:,} nodes, about {plan.solves:.0f} frequency solves, predicted {wavecost._t(plan.seconds)}"
                 + (f" (gave up {'; '.join(plan.gave_up)})" if plan.gave_up else ""))
     if plan.quality != quality or plan.points < len(freqs):
@@ -875,8 +909,9 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
     if sl is not None and np.isfinite(sl).any():
         emag = np.sqrt(np.sum(np.abs(sl[..., :3] + 1j * sl[..., 3:]) ** 2, axis=-1))
         edb = 20 * np.log10(np.maximum(emag, 1e-30))
-        top = float(np.nanpercentile(edb, 99.5))
-        images["field"] = plots.grid_map(out / "images" / "field.png", edb, pl, "|E|, dB V/m for 1 A",
+        top = float(np.nanpercentile(edb, 99.5)) if np.isfinite(edb).any() else float("nan")
+        if np.isfinite(top):
+            images["field"] = plots.grid_map(out / "images" / "field.png", edb, pl, "|E|, dB V/m for 1 A",
                                          f"field strength at {fmt(s.f0 / 1e6)} MHz on the plane {pl['normal']} = "
                                          f"{fmt(pl['at'] * 1e3)} mm", clim=(top - 50, top))
     values = {"freqs_Hz": fs, "z_ohm": [[z.real, z.imag] for z in Z], "s11_dB": [float(v) for v in s11],
