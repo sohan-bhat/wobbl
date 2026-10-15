@@ -191,3 +191,5 @@ def _playback(flow_out: Path, out: Path, tmax: float, watts: float, h_mean: floa
                            "h_mean": {"value": round(h_mean, 4), "unit": "W/m2K"},
                            "fluid_rise": {"value": round(rise, 4), "unit": "C"}})
     (out / "playback.json").write_text(json.dumps(doc, separators=(",", ":")))
+    from .scene import write as write_scene
+    write_scene(out)

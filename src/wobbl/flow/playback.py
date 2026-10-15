@@ -102,6 +102,8 @@ def write(out_dir: str | Path, kind: str, title: str, about: str, fields: list |
         raise ValueError(f"playback.json would be {len(text) / 1000:.0f} kB, over the {LIMIT / 1000:.0f} kB limit")
     path = Path(out_dir) / "playback.json"
     path.write_text(text)
+    from .scene import write as write_scene
+    write_scene(out_dir)
     return str(path)
 
 
