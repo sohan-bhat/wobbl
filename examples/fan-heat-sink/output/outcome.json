@@ -1,0 +1,257 @@
+{
+ "domain": "flow",
+ "part": "../heatsink.py",
+ "question": "Does a 30 W chip stay under 85 C on this heat sink with a small fan in a 40 C cabinet?",
+ "verdict": "ok",
+ "headline": "227 L/min through the fins gives 35.1 W/(m2 K), and the hottest point reaches 70.5 C against a limit of 85 C.",
+ "metrics": [
+  [
+   "max temperature",
+   "70.5 C"
+  ],
+  [
+   "limit",
+   "85 C"
+  ],
+  [
+   "airflow",
+   "227 L/min"
+  ],
+  [
+   "h on the fins",
+   "35.1 W/m2K"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "grid convergence: Nusselt number 15.29 -> 15.13 -> 14.98 over 3 grids, grid convergence index 2.3% (observed order 2, extrapolated 14.87), so expect about that much discretization error",
+  "Nusselt correlation: Stephan's correlation for developing flow between plates gives 13.7, the simulation 15 (9.7% apart)",
+  "the air is ducted through the fins with none going around them, so a sink without a shroud gets less"
+ ],
+ "checks": [
+  {
+   "name": "grid convergence",
+   "status": "warn",
+   "summary": "Nusselt number 15.29 -> 15.13 -> 14.98 over 3 grids, grid convergence index 2.3% (observed order 2, extrapolated 14.87), so expect about that much discretization error",
+   "detail": {
+    "values_fine_to_coarse": [
+     14.98304,
+     15.126093,
+     15.28762
+    ],
+    "sizes": [
+     0.011111,
+     0.016667,
+     0.025
+    ],
+    "order": 2.0,
+    "extrapolated": 14.868597,
+    "gci_fine": 0.022914,
+    "kind": "monotone"
+   }
+  },
+  {
+   "name": "mass conservation",
+   "status": "pass",
+   "summary": "in 0.00926 m3/s per unit depth, out 0.00926 m3/s per unit depth (0% apart)",
+   "detail": {
+    "in": 0.009259,
+    "out": 0.009259,
+    "error": 0.0
+   }
+  },
+  {
+   "name": "residuals",
+   "status": "pass",
+   "summary": "largest final residual 0.0001 (T), every field fell at least 4.0 orders, and the solver met its convergence target",
+   "detail": {
+    "fields": {
+     "Ux": {
+      "first": 1.0,
+      "last": 0.0
+     },
+     "Uy": {
+      "first": 0.372876,
+      "last": 0.0
+     },
+     "p": {
+      "first": 1.0,
+      "last": 0.0
+     },
+     "T": {
+      "first": 1.0,
+      "last": 0.000103
+     }
+    },
+    "tolerance": 1e-05,
+    "converged_flag": true
+   }
+  },
+  {
+   "name": "Nusselt correlation",
+   "status": "warn",
+   "summary": "Stephan's correlation for developing flow between plates gives 13.7, the simulation 15 (9.7% apart)",
+   "detail": {
+    "expected": 13.652965,
+    "got": 14.98304,
+    "error": 0.09742,
+    "tolerance": 0.05
+   }
+  },
+  {
+   "name": "heat sink model",
+   "status": "pass",
+   "summary": "Teertstra's plate fin model gives 13.2, the simulation 15 (14% apart)",
+   "detail": {
+    "expected": 13.156149,
+    "got": 14.98304,
+    "error": 0.138862,
+    "tolerance": 0.15
+   }
+  },
+  {
+   "name": "pressure drop",
+   "status": "pass",
+   "summary": "Shah and London's apparent friction gives 0.385, the simulation 0.385 (0.092% apart)",
+   "detail": {
+    "expected": 0.385037,
+    "got": 0.385393,
+    "error": 0.000924,
+    "tolerance": 0.15
+   }
+  },
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "temperature rise at the hottest point settled: 27 -> 26.9 -> 27 C over 3 meshes, last change 0.5%",
+   "detail": {
+    "values": [
+     27.017532,
+     26.866532,
+     26.997432
+    ],
+    "last_change": 0.004849,
+    "tolerance": 0.02,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "heat in 30 W, heat out through the surfaces 30 W (5.4e-07% apart)",
+   "detail": {
+    "in_W": 30.0,
+    "out_W": 30.0
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "heat balance on a uniform skin gives 65.9 C; the FEA skin averages 66.1 C (0.5% of the rise). Biot 0.00017: the part is nearly isothermal",
+   "detail": {
+    "lumped_surface_C": 65.940697,
+    "fea_surface_C": 66.052956,
+    "biot": 0.000168
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "temperatures between 64.2 and 70.5 C; radiation is off, it could shed up to about 8.31 W at this temperature (pass --radiation 0.9 for painted or plastic surfaces)",
+   "detail": {}
+  },
+  {
+   "name": "sink effectiveness",
+   "status": "info",
+   "summary": "fins of efficiency 0.94 shedding 30 W into 227 L/min of air put a sink at one temperature at 69.4 C, and the FEA spans 64.2 to 70.5 C",
+   "detail": {
+    "fin_efficiency": 0.937795,
+    "uniform_sink_C": 69.408977
+   }
+  },
+  {
+   "name": "operating point",
+   "status": "pass",
+   "summary": "the fan curve meets the sink at 227 L/min and 4.09 Pa, 80% of the fan's free flow",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "9 fins 1.5 mm thick and 30 mm tall, gaps of 5.81 mm, 60 mm along the flow.",
+  "The fan's air is ducted through the fins with none going around them, as with a shroud or a fan mounted on the end of the sink.",
+  "The fan curve is a straight line from its free flow to its shut off pressure.",
+  "Air at 40 C warms by 7 C through the sink, so the fins see air at 43.5 C on average.",
+  "One heat transfer coefficient from the gap's mean covers every fin and the base between them, the fin tips under the shroud and the outside of the base get 5 W/(m2 K).",
+  "Entry and exit losses at the fins come from Kays and London's contraction and expansion coefficients.",
+  "Aluminum 6063-T5: conductivity 209 W/(m K), specific heat 900 J/(kg K), density 2700 kg/m3.",
+  "Heat enters through bottom and box 17.5,17.5,-1,42.5,42.5,0.5.",
+  "Surrounding air or coolant at 43.5 C does not heat up.",
+  "Radiation is ignored (conservative).",
+  "Contact resistance between parts and internal airflow are not modeled."
+ ],
+ "values": {
+  "t_max_C": 70.4997,
+  "limit_C": 85.0,
+  "h_W_m2K": 35.121314,
+  "flow_m3_s": 0.003777,
+  "velocity_m_s": 2.707466,
+  "re": 1859.949691,
+  "dp_Pa": 4.086618,
+  "air_rise_C": 7.004537,
+  "nusselt": 14.98304,
+  "levels": [
+   {
+    "grid": [
+     90,
+     27
+    ],
+    "nu": 14.98304,
+    "dp": 0.385393,
+    "seconds": 17.978493
+   },
+   {
+    "grid": [
+     60,
+     18
+    ],
+    "nu": 15.126093,
+    "dp": 0.378419,
+    "seconds": 12.23404
+   },
+   {
+    "grid": [
+     40,
+     12
+    ],
+    "nu": 15.28762,
+    "dp": 0.367454,
+    "seconds": 11.054234
+   }
+  ],
+  "_figures": [
+   [
+    "temperature",
+    "Heat sink temperature with the hottest point marked"
+   ],
+   [
+    "air",
+    "Air between two fins, warming from the inlet on the left"
+   ],
+   [
+    "fan",
+    "Where the fan curve meets the heat sink"
+   ]
+  ]
+ },
+ "images": {
+  "temperature": "images/temperature.png",
+  "air": "images/air.png",
+  "fan": "images/fan.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 325.562211,
+ "solver": "OpenFOAM v2412 and CalculiX 2.23"
+}

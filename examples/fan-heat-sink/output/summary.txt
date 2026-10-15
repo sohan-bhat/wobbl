@@ -1,0 +1,37 @@
+OK. 227 L/min through the fins gives 35.1 W/(m2 K), and the hottest point reaches 70.5 C against a limit of 85 C.
+
+Confidence: medium. grid convergence: Nusselt number 15.29 -> 15.13 -> 14.98 over 3 grids, grid convergence index 2.3% (observed order 2, extrapolated 14.87), so expect about that much discretization error; Nusselt correlation: Stephan's correlation for developing flow between plates gives 13.7, the simulation 15 (9.7% apart); the air is ducted through the fins with none going around them, so a sink without a shroud gets less
+max temperature: 70.5 C
+limit: 85 C
+airflow: 227 L/min
+h on the fins: 35.1 W/m2K
+
+Checks:
+  [warn] grid convergence: Nusselt number 15.29 -> 15.13 -> 14.98 over 3 grids, grid convergence index 2.3% (observed order 2, extrapolated 14.87), so expect about that much discretization error
+  [pass] mass conservation: in 0.00926 m3/s per unit depth, out 0.00926 m3/s per unit depth (0% apart)
+  [pass] residuals: largest final residual 0.0001 (T), every field fell at least 4.0 orders, and the solver met its convergence target
+  [warn] Nusselt correlation: Stephan's correlation for developing flow between plates gives 13.7, the simulation 15 (9.7% apart)
+  [pass] heat sink model: Teertstra's plate fin model gives 13.2, the simulation 15 (14% apart)
+  [pass] pressure drop: Shah and London's apparent friction gives 0.385, the simulation 0.385 (0.092% apart)
+  [pass] mesh convergence: temperature rise at the hottest point settled: 27 -> 26.9 -> 27 C over 3 meshes, last change 0.5%
+  [pass] energy balance: heat in 30 W, heat out through the surfaces 30 W (5.4e-07% apart)
+  [pass] hand calculation: heat balance on a uniform skin gives 65.9 C; the FEA skin averages 66.1 C (0.5% of the rise). Biot 0.00017: the part is nearly isothermal
+  [pass] units and sanity: temperatures between 64.2 and 70.5 C; radiation is off, it could shed up to about 8.31 W at this temperature (pass --radiation 0.9 for painted or plastic surfaces)
+  [info] sink effectiveness: fins of efficiency 0.94 shedding 30 W into 227 L/min of air put a sink at one temperature at 69.4 C, and the FEA spans 64.2 to 70.5 C
+  [pass] operating point: the fan curve meets the sink at 227 L/min and 4.09 Pa, 80% of the fan's free flow
+
+Assumptions:
+  - 9 fins 1.5 mm thick and 30 mm tall, gaps of 5.81 mm, 60 mm along the flow.
+  - The fan's air is ducted through the fins with none going around them, as with a shroud or a fan mounted on the end of the sink.
+  - The fan curve is a straight line from its free flow to its shut off pressure.
+  - Air at 40 C warms by 7 C through the sink, so the fins see air at 43.5 C on average.
+  - One heat transfer coefficient from the gap's mean covers every fin and the base between them, the fin tips under the shroud and the outside of the base get 5 W/(m2 K).
+  - Entry and exit losses at the fins come from Kays and London's contraction and expansion coefficients.
+  - Aluminum 6063-T5: conductivity 209 W/(m K), specific heat 900 J/(kg K), density 2700 kg/m3.
+  - Heat enters through bottom and box 17.5,17.5,-1,42.5,42.5,0.5.
+  - Surrounding air or coolant at 43.5 C does not heat up.
+  - Radiation is ignored (conservative).
+  - Contact resistance between parts and internal airflow are not modeled.
+
+Images: temperature: images/temperature.png, air: images/air.png, fan: images/fan.png
+Report: report.html
