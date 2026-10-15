@@ -2,7 +2,7 @@
 every validation part and a set of parts built here, none of which the studies were tuned on.
 
     python -m wobbl.validation.process_generality OUT [--only id,id] [--process print,casting,molding] [--workers 2]
-                                                      [--limit 1800]
+                                                      [--limit 1800] [--source example]
 
 writes OUT/process_generality.json and prints one line per case. A case succeeds when the study runs to an answer
 and none of its own checks (mesh convergence, energy or volume balance, time step, hand calculation, units) fails.
@@ -231,6 +231,7 @@ def main(argv=None) -> int:
     ap.add_argument("out")
     ap.add_argument("--only", default="")
     ap.add_argument("--process", default="")
+    ap.add_argument("--source", default="", help="only cases whose part comes from here, such as example")
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--limit", type=float, default=LIMIT, help="seconds a case may run before it is killed")
     ap.add_argument("--one", default="", help="run one case id in this process and write row.json (used internally)")
@@ -243,7 +244,7 @@ def main(argv=None) -> int:
     ids = [x for x in a.only.split(",") if x]
     procs = [x for x in a.process.split(",") if x]
     cases = [c for c in CASES if (not ids or c["id"] in ids or c["part_id"] in ids)
-             and (not procs or c["process"] in procs)]
+             and (not procs or c["process"] in procs) and (not a.source or c["source"] == a.source)]
     rows: dict[str, dict] = {}
     lock = threading.Lock()
 
