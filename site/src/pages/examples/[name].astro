@@ -46,8 +46,8 @@ const first = ex.runs[0];
       ))}
     </div>
     <div class="ex-notes prose">
-      <h2>About this example</h2>
-      <Fragment set:html={notes} />
+      {notes.trim() && <h2>About this example</h2>}
+      {notes.trim() && <Fragment set:html={notes} />}
       <h2>Run it yourself</h2>
       <Term code={`git clone https://github.com/sohan-bhat/wobbl\ncd wobbl/examples/${ex.name} && ./run.sh`} />
       <p>The part, the script and every output are in <a href={repoUrl(`examples/${ex.name}`, true)}>examples/{ex.name}</a> on GitHub.</p>

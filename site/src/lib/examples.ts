@@ -157,6 +157,12 @@ function runFolders(rel: string): string[] {
 /** outcome.json as Python writes it, where a bare Infinity or NaN is read as null. */
 const json = (p: string) => JSON.parse(readFileSync(p, 'utf-8').replace(/(:\s*|\[\s*|,\s*)-?(?:Infinity|NaN)\b/g, '$1null'));
 
+/** The question of a wobbl simulate command, the quoted words after what it simulates. */
+const asked = (a: string[]) => {
+  const q = a[1] === 'simulate' && a[3] && !a[3].startsWith('-') ? a[3] : undefined;
+  return q && q[0].toUpperCase() + q.slice(1);
+};
+
 const read = (p: string) => (existsSync(p) ? readFileSync(p, 'utf-8') : '');
 
 function load(name: string): Example {
@@ -193,8 +199,9 @@ function load(name: string): Example {
     const folders = runFolders(rel);
     // a run that has not been published yet is listed with its question, and picks up its outputs on a later build
     if (!folders.length) {
-      const q = a[3] && !a[3].startsWith('-') ? a[3] : '';
-      const outcome: Outcome = { domain: opt(a, '--physics') ?? '', verdict: 'pending', headline: 'The run is on its way', confidence: 'pending', question: q };
+      const q = asked(a) ?? '';
+      const outcome: Outcome = { domain: opt(a, '--physics') ?? '', verdict: 'pending', headline: 'The run is on its way',
+        confidence: 'pending', question: q, metrics: [['the run lands on a later deploy', 'Soon']] };
       runs.push({ rel, question: q, command: shown, outcome, summary: '', report: null, fixes: [] });
       continue;
     }
@@ -203,7 +210,7 @@ function load(name: string): Example {
       const reportRel = `examples/${r}/report.html`;
       const has = existsSync(resolve(EX, r, 'report.html')) && (tracked === null || tracked.has(reportRel));
       runs.push({
-        rel: r, question: opt(a, '--question') ?? outcome.question ?? '', command: shown, outcome,
+        rel: r, question: opt(a, '--question') ?? asked(a) ?? outcome.question ?? '', command: shown, outcome,
         summary: read(resolve(EX, r, 'summary.txt')), report: has ? reportRel : null, fixes: [],
       });
     }

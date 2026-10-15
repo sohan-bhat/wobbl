@@ -76,7 +76,7 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
         <ul>{sugg.map((t) => <li>{t}</li>)}</ul>
       </div>
     )}
-    <details class="run-summary" data-pagefind-ignore="all"><summary>summary.txt</summary><Term code={run.summary} lang="text" label="summary.txt" /></details>
+    {run.summary && <details class="run-summary" data-pagefind-ignore="all"><summary>summary.txt</summary><Term code={run.summary} lang="text" label="summary.txt" /></details>}
     {run.report && <p class="run-files"><a href={url(run.report)} data-astro-reload data-astro-prefetch="false">Open the full report</a></p>}
   </div>
 </div>
