@@ -11,6 +11,7 @@ Monte Carlo sample count, and Wheeler retardation against a cycle by cycle refer
 from __future__ import annotations
 
 import math
+import os
 import shutil
 import time
 from dataclasses import replace
@@ -147,6 +148,7 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None, quick: b
                            ["life", "How lives spread over many parts"]]}
     values["playback"] = _playback(out, unc, res_path, curve, n_at, mc, insp, st, first, verdict, head, material,
                                    spectrum)
+    _scene(out, unc, st, features)
     o = GenericOutcome("fracture", str(Path(st.part).resolve()), st.question, verdict, head, metrics, level, reasons,
                        checks, assumptions, values, images, fixes, prep.notes + res_path.notes,
                        solver=unc.solver, t_total=time.time() - t0)
@@ -455,6 +457,28 @@ def _playback(out, unc, res_path, curve, n_at, mc, insp, st, first, verdict, hea
     except Exception:  # noqa: BLE001  the playback is a convenience, never a reason to fail
         return ""
     return "playback.json"
+
+
+def _scene(out: Path, unc, st, features) -> None:
+    """scene.wobbl from playback.json, with the loads and supports drawn on the part's own faces. A scene is a
+    convenience, so a failure here never costs the run its answer."""
+    import json
+    from types import SimpleNamespace
+
+    from ..structural.run import resolve_selections
+    from ..viz.adapters import fracture as view
+    from .place import structural_study
+
+    try:
+        pb = json.loads((out / "playback.json").read_text())
+        sst = structural_study(st)
+        _, _, info = resolve_selections(sst, features)
+        run = SimpleNamespace(mesh=unc.mesh, study=sst, selections=info)
+        o = {"question": st.question}
+        view.build(out, pb, run=run, outcome=o)
+    except Exception:  # noqa: BLE001
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
 
 
 def _assumptions(st, law: GrowthLaw, record, material, spectrum, scatter, first, start, flow, cpath,

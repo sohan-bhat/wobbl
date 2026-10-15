@@ -67,3 +67,38 @@ def test_drop_on_parts_nothing_was_tuned_for(build, thin, tmp_path):
     assert checks["momentum"] == "pass" and checks["energy"] in ("pass", "warn")
     assert np.isfinite(o.values["governing_MPa"]) and o.values["governing_MPa"] > 0
     assert (tmp_path / "out" / "playback.json").exists()
+
+
+def _inside(p, box):
+    return all(lo <= v <= hi for v, (lo, hi) in zip(p, box))
+
+
+@pytest.mark.slow
+@pytest.mark.solver
+@pytest.mark.parametrize("name", ["plate with hole", "L bracket fillet", "shaft shoulder", "lug", "I beam flange",
+                                  "tube"])
+def test_crack_growth_on_parts_nothing_was_tuned_for(name, tmp_path):
+    """Each part gets an automatic crack at its stress hot spot, K from the solved fronts, growth along a path and
+    a life or a critical length, with the run's own checks not failing and a scene that plays the crack."""
+    from fracture_parts import PARTS
+
+    from conftest import needs_ccx  # noqa: F401
+    from wobbl.fracture.api import run, study
+    from wobbl.viz.scene import load
+
+    build, load_s, fix, box = PARTS[name]
+    part = _write(tmp_path / "part.step", build)
+    st = study(str(part), "6061-t6", [load_s], [fix], "auto", steps=3, quality="fast", samples=1500, budget=900.0)
+    o = run(st, tmp_path / "out", lambda *a: None)
+    v = o.values
+    assert _inside(v["origin"], box), (v["origin"], v["where"])
+    k = np.asarray(v["k_table"]["k_mpa_sqrt_m"])
+    assert len(k) >= 2 and np.isfinite(k).all() and (k > 0).all()
+    assert v["steps"] >= 1
+    assert v["path_end"]
+    assert np.isfinite(v["nominal_cycles"]) or v["path_end"] == "the crack stopping below threshold"
+    assert not [c.name for c in o.checks if c.status == "fail"]
+    header, _ = load(tmp_path / "out" / "scene.wobbl")
+    kinds = {ob.get("name") for ob in header["objects"]}
+    assert {"part", "crack face", "fronts"} <= kinds
+    assert any(ob.get("prop") for ob in header["objects"]), "loads and supports drawn on the part"

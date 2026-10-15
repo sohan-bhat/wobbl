@@ -362,7 +362,8 @@ def _hole_at(spec: CrackSpec, features: PartFeatures, o: np.ndarray):
 def _describe(features: PartFeatures, mesh: Mesh, o: np.ndarray, hole) -> str:
     from ..structural.hotspots import nearest_face
 
-    at = f"({', '.join(f'{v:.3g}' for v in o)})"
+    tiny = 1e-4 * float(np.ptp(mesh.X, axis=0).max())
+    at = f"({', '.join(f'{(0.0 if abs(v) < tiny else v):.3g}' for v in o)})"
     if hole is not None:
         return f"at the edge of the {2 * hole[2]:.3g} mm hole at {at}"
     fid = nearest_face(mesh, o)
