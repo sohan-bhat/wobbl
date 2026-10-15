@@ -91,12 +91,18 @@ def print_plane(quantity: str, pl: dict, fname: str, step: str = "") -> str:
 def read_plane(path, pl: dict, comps: int = 1) -> np.ndarray:
     """The plane's grid (nv, nu, comps) with NaN where the point is outside the mesh (inside a conductor)."""
     out = np.full((pl["nv"], pl["nu"], comps), np.nan)
+    rows = []
     try:
-        rows = np.loadtxt(path, ndmin=2)
+        with open(path) as fh:
+            for ln in fh:              # a point on a conductor's surface can come back short, and is skipped
+                t = ln.split()
+                if len(t) >= 3 + comps:
+                    rows.append([float(x) for x in t[:3]] + [float(x) for x in t[-comps:]])
     except (OSError, ValueError):
         return out[..., 0] if comps == 1 else out
-    if rows.size == 0:
+    if not rows:
         return out[..., 0] if comps == 1 else out
+    rows = np.array(rows)
     xyz, vals = rows[:, :3], rows[:, -comps:]
     du = (pl["u1"] - pl["u0"]) / (pl["nu"] - 1)
     dv = (pl["v1"] - pl["v0"]) / (pl["nv"] - 1)

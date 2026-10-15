@@ -407,7 +407,10 @@ def _template_entry(physics: str):
         check_params(physics, kind, params)
         job.use("template", kind)
         job.ready()
-        return runner(physics)(kind, params, job.out, job.question, log=job.log)
+        ask = job.question
+        if physics == "antenna" and not Path(job.thing).exists():
+            ask = f"{job.thing}. {job.question}".strip(". ")      # where the antenna is told in the description decides the solver
+        return runner(physics)(kind, params, job.out, ask, log=job.log)
     entry.__name__ = f"{physics}_words"
     return entry
 

@@ -201,3 +201,13 @@ def test_the_recorded_generality_runs_balance_their_power():
     for r in d["rows"]:
         assert r["checks"]["power balance"] == "pass", r["antenna"]
         assert r["gain_dBi"] <= r["directivity_dBi"] + 1e-6 and r["peak_theta_deg"] >= 0
+
+
+def test_a_slice_with_short_rows_still_reads(tmp_path):
+    from wobbl.fields import pro3d
+
+    pl = {"normal": "y", "at": 0.0, "iu": 0, "iv": 2, "ik": 1, "u0": 0.0, "u1": 1.0, "v0": 0.0, "v1": 1.0, "nu": 2, "nv": 2}
+    (tmp_path / "s.txt").write_text("0 0 0 1 2 3 4 5 6\n1 0 0 1 2 3 4 5 6\n0 0 1 0 0 0\n1 0 1 9 8 7 6 5 4\n")
+    a = pro3d.read_plane(tmp_path / "s.txt", pl, comps=6)
+    assert a.shape == (2, 2, 6)
+    assert np.isnan(a[1, 0, 0]) and a[1, 1, 0] == 9 and a[0, 0, 5] == 6      # the short row left its point empty
