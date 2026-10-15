@@ -18,7 +18,7 @@ def boxes(scene) -> list[tuple]:
     for o in scene.objects:
         if o.kind != "body" or not o.prop or o.pos.ndim != 1 or o.opacity < 0.9:
             continue
-        s = o.size
+        s = list(o.size) + [0.0] * 3          # a sphere has one size, and every entry below is built
         half = {"box": s[:3], "cylinder": [s[0], s[0], s[1]], "hex": [s[0], s[0], s[1]],
                 "capsule": [s[0], s[0], s[1] + s[0]], "sphere": [s[0]] * 3}.get(o.shape)
         if half:
