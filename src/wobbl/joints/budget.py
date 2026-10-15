@@ -151,13 +151,19 @@ def second_level(plan: Plan, asm, make, t_first: float, n_first: int, iters_firs
     scale = min(max(t_first / max(modeled, 1e-9), 0.3), 6.0) if t_first > 0 else 1.0
     left = SLACK * (plan.budget - plan.spent)
     h0 = plan.h[0]
+    tried = []
     for q in (0.75, 0.82, FINEST):          # the ladder from the usual refinement to the least refinement
         sizing = make(h0, q, plan.curv)[1]
         mesh = mesh_fn(asm, sizing)
         cost = mesh_cost(mesh.n_nodes) + scale * solve_seconds(mesh.n_nodes, max(iters_first, 1), plan.pairs,
                                                                plan.iter_s)
+        tried.append((sizing, mesh, cost, q))
         if cost <= left:
             break
+    sizing, mesh, cost, q = tried[-1]
+    if mesh.n_nodes < 1.05 * n_first:
+        # a second mesh with no more nodes than the first says nothing about convergence, so take the finest tried
+        sizing, mesh, cost, q = max(tried, key=lambda t: t[1].n_nodes)
     plan.sizings[1], plan.h[1], plan.nodes[1], plan.seconds[1] = sizing, sizing.h, mesh.n_nodes, cost
     plan.notes = [plan.coarsened_note() if n.startswith("To fit the") else n for n in plan.notes]
     if cost > left and not plan.user_size:
