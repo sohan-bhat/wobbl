@@ -214,12 +214,12 @@ def _blockage(s, fine) -> Check:
 
 def _hand(g, p, s, fine) -> Check:
     if s.mode == "external":
-        cd = fine["cd"]
-        ok = 0.02 <= cd <= 2.5
-        return Check("hand calculation", "pass" if ok else "warn",
-                     f"drag coefficient {cd:.3g} on the frontal area, " + (
-                         "inside the 0.02 to 2.5 that bodies from a streamlined shape to a flat plate span" if ok else
-                         "outside the 0.02 to 2.5 that real bodies span, so check the speed and size"), {"cd": cd})
+        from . import bluff
+        tri = (g.xyz - (g.lo + g.hi) / 2) @ p.R.T * 1e-3
+        box_area = float((s.hi[1] - s.lo[1]) * (s.hi[2] - s.lo[2]))
+        cd = fine["cd"] / (1 + 2.5 * fine["cd"] * s.ref_area / box_area)      # Maskell, to compare with free air data
+        sh = bluff.classify(tri, s.ref_area)
+        return bluff.check(sh, s.speed * sh.width / s.nu, cd, s.unsteady)
     if s.mode == "internal":
         length = p.passage.volume * 1e-9 / s.ref_area
     elif s.mode == "volume":
@@ -260,13 +260,23 @@ def _outcome(st, g, p, s, levels, fl, op, checks, level, reasons, out):
               "levels": [{k: L[k] for k in ("cells", "value", "iterations", "t_mesh", "t_solve")} for L in levels]}
     fixes = []
     if s.mode == "external":
-        drag, lift, side = fine["drag"], fine["lift"], fine["side"]
+        drag, lift, side, cd = fine["drag"], fine["lift"], fine["side"], fine["cd"]
+        ref = next((c.detail for c in checks if c.name == "drag reference" and c.detail.get("use_reference")), None)
+        how = ""
+        if ref:
+            cd = ref["cd_reference"]
+            how = f", the published curve's, since the CFD value of {fine['cd']:.3g} failed its reference check"
+            drag = cd * 0.5 * s.rho * s.speed ** 2 * s.ref_area
+            fixes.append({"kind": "model", "title": "Trust the published curve for this body",
+                          "summary": f"The grid cannot resolve the boundary layer that decides where the flow "
+                                     f"separates, so the CFD drag of {fine['cd']:.3g} is a lower bound and the "
+                                     f"curve's {cd:.3g} is reported.", "auto": False})
         head = (f"At {fmt(s.speed)} m/s in {fl.name.lower()} the part feels {fmt(drag)} N of drag (drag coefficient "
-                f"{fine['cd']:.3g} on {fmt(s.ref_area * 1e4)} cm2 of frontal area), {fmt(lift)} N of lift and "
+                f"{cd:.3g}{how}, on {fmt(s.ref_area * 1e4)} cm2 of frontal area), {fmt(lift)} N of lift and "
                 f"{fmt(side)} N to the side, {regime} at Re {fmt(re_)}.")
         metrics = [("drag", f"{fmt(drag)} N"), ("lift", f"{fmt(lift)} N"), ("side force", f"{fmt(side)} N"),
-                   ("drag coefficient", f"{fine['cd']:.3g}"), ("frontal area", f"{fmt(s.ref_area * 1e4)} cm2")]
-        values.update(drag_N=drag, lift_N=lift, side_N=side, cd=fine["cd"], cl=fine["cl"], cs=fine["cs"],
+                   ("drag coefficient", f"{cd:.3g}"), ("frontal area", f"{fmt(s.ref_area * 1e4)} cm2")]
+        values.update(drag_N=drag, lift_N=lift, side_N=side, cd=cd, cd_cfd=fine["cd"], cl=fine["cl"], cs=fine["cs"],
                       frontal_area_m2=s.ref_area, speed_m_s=s.speed, length_m=s.ref_length,
                       direction=p.R[0].tolist(), up=p.R[2].tolist())
         if s.unsteady and fine.get("frequency"):
@@ -318,6 +328,10 @@ def _outcome(st, g, p, s, levels, fl, op, checks, level, reasons, out):
     if s.mode == "external":
         assumptions.append("The part is held still in a uniform stream with low turbulence, far from the ground, in "
                            "a box whose sides slip.")
+        if ref:
+            assumptions.append("The drag is the published curve's, not the CFD's. Steady and detached eddy runs on "
+                               "a grid without a resolved boundary layer keep the flow on a smooth round body "
+                               "attached too long, and measured here the drag falls as the grid refines.")
     o = GenericOutcome("flow", str(Path(st.part).resolve()), st.question, verdict, head, metrics, level, reasons,
                        checks, assumptions, values, {}, fixes, notes=list(g.notes))
     o.workdir = str(out)
