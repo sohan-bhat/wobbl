@@ -1,0 +1,28 @@
+{
+ "domain": "part",
+ "analysis": "stress",
+ "spec": {
+  "thing": "arm.py",
+  "kind": "parametric",
+  "question": "Is this printed arm strong enough at full throttle, with a safety factor of 3?",
+  "options": {
+   "target-sf": [
+    "3"
+   ],
+   "budget": [
+    "600"
+   ],
+   "material": [
+    "pa12"
+   ],
+   "load": [
+    "25 N up at 150,0,15 @ top and within 15 of 150,0,15 rigid",
+    "0.5 N*m +z at 150,0,15 @ top and within 15 of 150,0,15 rigid"
+   ],
+   "fix": [
+    "bolt holes d=3.2 and x<0"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

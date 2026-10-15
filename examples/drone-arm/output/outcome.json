@@ -84,12 +84,12 @@
     "area_mm2": 104.693285,
     "centroid": [
      25.812556,
-     -0.0,
+     0.0,
      9.813201
     ],
     "axial_N": 0.0,
     "bending_Nmm": 3144.690085,
-    "torsion_Nmm": 0.0,
+    "torsion_Nmm": -0.0,
     "nominal_peak_MPa": 6.688259,
     "nominal_at_point_MPa": 6.688259,
     "shear_from_torsion_MPa": 0.0,
@@ -415,8 +415,8 @@
    "n_elems": 10402,
    "h_global": 8.567308,
    "h_min": 1.046535,
-   "t_mesh": 1.692041,
-   "t_solve": 3.686938,
+   "t_mesh": 4.500289,
+   "t_solve": 9.501176,
    "governing": 9.442579,
    "governing_xyz": [
     43.88088,
@@ -463,8 +463,8 @@
    "n_elems": 12155,
    "h_global": 7.282212,
    "h_min": 1.046486,
-   "t_mesh": 1.589697,
-   "t_solve": 4.880738,
+   "t_mesh": 4.369476,
+   "t_solve": 13.593978,
    "governing": 9.532671,
    "governing_xyz": [
     25.699523,
@@ -511,8 +511,8 @@
    "n_elems": 12796,
    "h_global": 6.18988,
    "h_min": 1.047542,
-   "t_mesh": 1.582268,
-   "t_solve": 5.535444,
+   "t_mesh": 4.283372,
+   "t_solve": 14.86354,
    "governing": 9.464526,
    "governing_xyz": [
     25.812556,
@@ -2001,12 +2001,12 @@
   "area_mm2": 104.693285,
   "centroid": [
    25.812556,
-   -0.0,
+   0.0,
    9.813201
   ],
   "axial_N": 0.0,
   "bending_Nmm": 3144.690085,
-  "torsion_Nmm": 0.0,
+  "torsion_Nmm": -0.0,
   "nominal_peak_MPa": 6.688259,
   "nominal_at_point_MPa": 6.688259,
   "shear_from_torsion_MPa": 0.0,
@@ -2052,6 +2052,14 @@
  },
  "report": "report.html",
  "workdir": ".",
- "t_total": 71.938648,
- "solver": "CalculiX 2.23"
+ "t_total": 303.100695,
+ "solver": "CalculiX 2.23",
+ "criteria": [
+  {
+   "name": "stress",
+   "value": "governing_MPa",
+   "limit": 48.0,
+   "sense": "max"
+  }
+ ]
 }

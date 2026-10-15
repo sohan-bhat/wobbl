@@ -44,7 +44,8 @@
    "kind": "bolt",
    "faces": "holes d=3.2 and x<0",
    "text": "bolt holes d=3.2 and x<0",
-   "dofs": "xyz"
+   "dofs": "xyz",
+   "stiffness": 0.0
   }
  ],
  "target_sf": 3.0,
