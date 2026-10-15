@@ -69,14 +69,28 @@ def _molecule(pb: dict, o: dict):
         s.atoms(el, np.array(pick["frames"]), bonds=_bonds(pb), name=name)
         return s
     if vib:
-        a = max(vib, key=lambda v: v.get("intensity_km_mol") or 0)
-        s = _scene(f"{name}, its {a['name']} vibration", o,
-                   "The strongest IR mode, its swing enlarged so it shows. The frequency is computed.")
-        n = len(a["frames"])
-        s.timeline(np.linspace(0, a.get("period_fs") or 1.0, n), unit="fs", label="one period", seconds=3,
-                   between="interpolated")
-        s.atoms(el, np.array(a["frames"]), bonds=_bonds(pb), name=name)
-        s.note(f"Other modes in the file: {', '.join(v['name'] for v in vib if v is not a)}")
+        # every mode in turn, two swings each, so the whole spectrum plays as motion
+        vib = sorted(vib, key=lambda v: v.get("frequency_cm") or 0)
+        best = max(vib, key=lambda v: v.get("intensity_km_mol") or 0)
+        s = _scene(f"{name}, its vibrations", o, "Each mode's swing is enlarged so it shows. Frequencies and IR "
+                                                 "strengths are computed.")
+        P, freq, inten = [], [], []
+        for v in vib:
+            fr = np.array(v["frames"], float)
+            for rep in range(2):
+                P.append(fr)
+            freq += [v.get("frequency_cm") or 0] * (2 * len(fr))
+            inten += [v.get("intensity_km_mol") or 0] * (2 * len(fr))
+        P = np.concatenate(P)
+        t = np.arange(len(P), dtype=float)
+        s.timeline(t, unit="", label="frame", seconds=3.2 * len(vib), between="interpolated")
+        s.atoms(el, P, bonds=_bonds(pb), name=name)
+        s.readout("frequency", freq, unit="cm-1", digits=4)
+        s.readout("IR strength", inten, unit="km/mol", digits=3)
+        k = 0
+        for v in vib:
+            s.event(float(k), v["name"], "the strongest IR band" if v is best else "")
+            k += 2 * len(v["frames"])
         return s
     s = _scene(name, o, "The optimized structure.")
     s.atoms(el, pos, bonds=_bonds(pb), name=name)
@@ -124,25 +138,100 @@ def _crystal(pb: dict, o: dict):
 
 
 def _reaction(pb: dict, o: dict):
-    s = _scene(pb.get("equation") or "reaction", o, "Reactants on the left and products on the right, drawn from "
-                                                     "their structures, with the computed Gibbs energy through "
-                                                     "temperature.")
-    fr = pb["frames"]
-    s.timeline([f["T_K"] for f in fr], unit="K", label="temperature", seconds=6, between="interpolated")
-    s.readout("reaction Gibbs energy", [f["dG_kJ"] for f in fr], unit="kJ", digits=1, limit=0.0)
-    s.readout("log10 K", [f["log10K"] for f in fr], digits=2)
-    x = -6.0
-    for side, sign in (("reactants", -1), ("products", 1)):
-        x = 3.0 if sign > 0 else -14.0
-        for sp in pb.get(side, []):
-            if not sp.get("atoms"):
+    """The reaction happening in its vessel. A reaction with a liquid or a solution runs in a beaker, its gas
+    rising as bubbles in proportion to how far it has gone and the liquid warming or cooling by the run's
+    adiabatic change; an all solid charge burns in a crucible, a front running down through it from the top, the
+    burned part at the run's adiabatic temperature. The timeline is how far the reaction has gone, not clock time,
+    since the run solves the thermochemistry and not the rate."""
+    from ..viz.adapters.common import lathe
+    from ..viz import props as P
+    T0 = float((pb.get("conditions") or {}).get("T_K") or 298.15)
+    ext = float(pb.get("equilibrium_extent") or 1.0)
+    adi = pb.get("adiabatic") or {}
+    rise = float(adi.get("rise_K") if adi.get("rise_K") is not None else (adi.get("T_K") or T0) - T0)
+    T_end = float(adi.get("T_K") or T0 + rise)
+    dH = float((pb.get("energies") or {}).get("dH_kJ") or 0.0)
+    gas = float(pb.get("gas_L") or 0.0)
+    phases = {sp.get("phase") for sp in pb.get("reactants", [])}
+    wet = bool(phases & {"aq", "l"})
+    n = 90
+    prog = np.linspace(0, 1, n) * ext
+    s = _scene(pb.get("equation") or "reaction", o,
+               "The timeline is the share of the reaction done, not clock time. Gas, heat and temperature at each "
+               "point are the run's totals times that share.")
+    s.head["length"] = "mm"
+    s.timeline(prog * 100, unit="%", label="reacted", seconds=9, between="interpolated")
+    lo, hi = sorted([T0, T_end])
+    hi = hi if hi - lo > 1 else lo + 1
+    rng = np.random.default_rng(11)
+    if wet:
+        R, H, fill = 40.0, 110.0, 70.0
+        glass = lathe([(R * 0.96, 2), (R, 0), (R, H), (R * 0.96, H), (R * 0.96, 2)], 40)
+        s.mesh(*glass, name="beaker", color="#cfe3f0", opacity=0.22, prop=True)
+        liq = lathe([(0, 2.5), (R * 0.95, 2.5), (R * 0.95, fill), (0, fill)], 40)
+        L = s.mesh(*liq, name="solution", color="#9cc6e0", opacity=0.55)
+        d = max(abs(rise), 0.5)
+        L.color_by("temperature", np.outer(T0 + rise * prog / max(ext, 1e-9), np.ones(len(liq[0]))), unit="K",
+                   colormap="coolwarm", range=(T0 - d, T0 + d))
+        solid = next((sp for sp in pb.get("reactants", []) if sp.get("phase") == "s"), None)
+        if solid is not None:
+            heap = lathe([(0, 2.5), (R * 0.55, 2.5), (0, 14)], 30)
+            m = s.mesh(*heap, name=solid.get("name") or solid["formula"], color="#f2f0ea")
+            m.deform(np.c_[np.zeros(len(heap[0])), np.zeros(len(heap[0])), -(heap[0][:, 2] - 2.5) * 0.95],
+                     scale=prog / max(ext, 1e-9))
+        if gas > 0:
+            k = 260
+            born = np.sort(rng.uniform(0, 1, k)) * ext            # gas comes off in step with the reaction
+            life = 0.12 * ext
+            r = R * 0.8 * np.sqrt(rng.uniform(0, 1, k))
+            a = rng.uniform(0, 2 * np.pi, k)
+            pos = np.full((n, k, 3), np.nan)
+            for f, p in enumerate(prog):
+                age = (p - born) / life
+                live = (age >= 0) & (age <= 1)
+                pos[f, live, 0] = r[live] * np.cos(a[live]) + np.sin(age[live] * 9 + a[live]) * 2
+                pos[f, live, 1] = r[live] * np.sin(a[live])
+                pos[f, live, 2] = 4 + age[live] * (fill - 6)
+            gas_name = next((sp["formula"] for sp in pb.get("products", []) if sp.get("phase") == "g"), "gas")
+            s.points(pos, color="#eef6ff", size=2.6, name=f"{gas_name} bubbles")
+            s.readout(f"{gas_name} given off", gas * prog, unit="L/mol", digits=3)
+        s.camera(target=[0, 0, H * 0.4], direction=(0.3, -1, 0.45), distance=H * 3.0)
+    else:
+        R, H = 30.0, 60.0
+        cru = lathe([(R * 1.25, H + 4), (R * 1.15, H + 4), (R * 0.95 + 2, 0), (R * 0.75, -6), (R * 0.95 + 8, -6),
+                     (R * 1.35, H + 4)], 36)
+        s.mesh(*cru, name="crucible", color="#7a6a5e", opacity=0.45, prop=True)
+        # the charge in rings, so the front can pass ring by ring
+        prof = [(0.0, 0.0)] + [(R * (0.95 + 0.35 * z / H), z) for z in np.linspace(0, H, 24)] + [(0.0, H)]
+        X, T = lathe(prof, 36)
+        front = H * (1 - prog / max(ext, 1e-9))
+        width = H * 0.06
+        burned = np.clip((X[None, :, 2] - front[:, None]) / width + 0.5, 0, 1)
+        temp = T0 + (T_end - T0) * burned
+        ch = s.mesh(X, T, name="charge", color="#8c5a3c")
+        ch.color_by("temperature", temp, unit="K", colormap="inferno", range=(lo, hi))
+        disc = s.body("cylinder", [R * 1.1, 0.6], pos=np.c_[np.zeros(n), np.zeros(n), front], color="#fff1c0",
+                      name="reaction front", opacity=0.85)
+        disc.light(np.where((prog > 0) & (prog < ext * 0.999), 1.0, 0.0))
+        disc.show(1e-6, ext * 100 * 0.999)
+        k = 120
+        pos = np.full((n, k, 3), np.nan)
+        start = rng.uniform(0, 1, k)
+        v = np.c_[rng.normal(0, 0.5, k), rng.normal(0, 0.5, k), rng.uniform(1.5, 3, k)]
+        for f, p in enumerate(prog):
+            if not 0 < p < ext * 0.999:
                 continue
-            el = [a["element"] for a in sp["atoms"]]
-            p = np.array(sp["positions"], float)
-            width = float(np.ptp(p[:, 0])) if len(p) > 1 else 1.0
-            s.atoms(el, p + np.array([x + width / 2, 0.0, 0.0]), bonds=_bonds(sp),
-                    name=f"{sp.get('coef', 1):g} {sp['formula']}({sp.get('phase', '')})")
-            x += width + 3.0
+            age = (start + f * 0.13) % 1
+            pos[f] = np.c_[v[:, 0] * age * H * 0.6, v[:, 1] * age * H * 0.6,
+                           H + 3 + v[:, 2] * age * H * 0.5 - 9.8 * age ** 2 * H * 0.08]
+        s.points(pos, color="#ffc04a", size=1.2, name="sparks")
+        s.label("front {temperature at the front}", [R * 1.4, 0, 0], kind="peak", follow=disc)
+        s.readout("temperature at the front", np.where(prog > 0, T_end, T0), unit="K", digits=4)
+        s.camera(target=[0, 0, H * 0.45], direction=(0.4, -1, 0.5), distance=H * 4.2)
+    s.ground(-6 if not wet else 0, size=400, grid=20)
+    s.readout("heat given off", -dH * prog, unit="kJ/mol", digits=4)
+    s.readout("temperature change", rise * prog / max(ext, 1e-9), unit="K", digits=3)
+    s.event(ext * 100, "equilibrium", f"{ext * 100:.3g}% reacted")
     return s
 
 

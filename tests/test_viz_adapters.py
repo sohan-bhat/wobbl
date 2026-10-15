@@ -238,3 +238,50 @@ def test_motor_grains_regress_in_a_cutaway(tmp_path, shape, extra):
     if shape == "star":
         assert np.ptp(r[0]) > 2                           # and its outline is not a circle
     assert {r["name"] for r in h["readouts"]} >= {"thrust", "chamber pressure", "hoop stress"}
+
+
+def test_flame_on_a_burner_for_any_fuel(tmp_path):
+    frames = [{"phi": p, "T_K": 1500 + 600 * (1 - abs(p - 1.05)),
+               "x": {"N2": 0.7, "CO2": 0.1, "H2O": 0.15, "CO": 0.01 * p, "NO": 0.001 / p, "O2": 0.03 * (2 - p)}}
+              for p in np.linspace(0.6, 1.6, 9)]
+    pb = {"manifest": {"kind": "flame", "operating_frame": 4}, "frames": frames,
+          "flame": {"fuel": "CH4", "oxidizer": "air", "reactant_T_K": 300}}
+    (tmp_path / "playback.json").write_text(json.dumps(pb))
+    outcome(tmp_path, "chemistry")
+    assert build_scene(tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    assert {"burner", "flame", "unburned cone", "burned gas"} <= _names(h)
+    assert {"flame temperature", "CO", "NO"} <= {r["name"] for r in h["readouts"]}
+    gas = next(o for o in h["objects"] if o.get("name") == "burned gas")
+    assert "C" in gas["el"] and "N" in gas["el"]
+
+
+def _species(formula, phase, el):
+    return {"formula": formula, "phase": phase, "coef": 1, "atoms": [{"element": e} for e in el],
+            "positions": [[i * 1.2, 0, 0] for i in range(len(el))], "bonds": []}
+
+
+@pytest.mark.parametrize("wet", [True, False])
+def test_reaction_runs_in_its_vessel(tmp_path, wet):
+    from wobbl.chem.scene import write
+    if wet:
+        re = [_species("HCl", "aq", "HCl"), _species("CaCO3", "s", ["Ca", "C", "O", "O", "O"])]
+        pr = [_species("CO2", "g", ["C", "O", "O"]), _species("H2O", "l", ["H", "H", "O"])]
+        extra = {"gas_L": 24.0, "adiabatic": {"rise_K": 3.0}}
+    else:
+        re = [_species("Mg", "s", ["Mg"]), _species("CuO", "s", ["Cu", "O"])]
+        pr = [_species("MgO", "s", ["Mg", "O"]), _species("Cu", "s", ["Cu"])]
+        extra = {"gas_L": 0.0, "adiabatic": {"T_K": 2600.0, "rise_K": 2300.0}}
+    pb = {"manifest": {"kind": "reaction"}, "equation": "a -> b", "reactants": re, "products": pr,
+          "energies": {"dH_kJ": -300.0}, "conditions": {"T_K": 298.15}, "equilibrium_extent": 1.0,
+          "frames": [{"T_K": 300, "dG_kJ": -1, "log10K": 1}], **extra}
+    (tmp_path / "playback.json").write_text(json.dumps(pb))
+    outcome(tmp_path, "chemistry")
+    assert write(tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    names = _names(h)
+    if wet:
+        assert {"beaker", "solution", "CO2 bubbles"} <= names
+    else:
+        assert {"crucible", "charge", "reaction front", "sparks"} <= names
+    assert h["timeline"]["unit"] == "%" and h["timeline"]["frames"] > 30
