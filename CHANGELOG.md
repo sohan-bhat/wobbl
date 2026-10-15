@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+**Motor drive questions through simulate**
+- `wobbl simulate` answers whether a motor can drive a mechanism: the torque, speed,
+  current and power it takes, whether it stalls or runs hot, and a quick return linkage's
+  time ratio. It reads a four bar linkage, a new slider crank, a spec that describes a
+  linkage, or a URDF or MJCF joint behind a servo, and picks the drive analysis from
+  words like current, stall, rpm or "can the motor drive it".
+- Every run checks MuJoCo's torque against virtual work, T = sum(F . v) / w, from the
+  weights, loads, dampers and springs, and the slider crank against its closed form.
+  The wiper example matches the old `wobbl mechanism fourbar` numbers exactly.
+- Playback shows the linkage moving with live torque against the motor's limit, speed,
+  current and electrical power.
+
 **Budgets, flow scenes and crack views**
 - Drops predict their own run time from the mesh they would march before they solve. The
   mesh is coarsened rung by rung to fit a 600 s budget, with what was given up stated in
