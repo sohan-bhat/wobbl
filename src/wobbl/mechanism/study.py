@@ -217,6 +217,7 @@ def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome")
     t = P["t"]
     keep = np.arange(len(t))
     geoms = run.model_info["geoms"]
+    slides = set(run.model_info.get("slides", [])) | {j.name for j in mech.joints if j.kind == "slide"}
     drives = run.model_info.get("drives") or {d.joint: d.at_joint for d in mech.drives if d.motor is not None}
 
     def at(series):
@@ -240,15 +241,16 @@ def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome")
                            "quat": r(quat[0], 4) if fixed else [r(q, 4) for q in quat]})
         series = {}
         for c, j in enumerate(run.joints):
-            s = {"angle": {"unit": "rad", "values": r(at(run.q[:, c]), 4)},
-                 "speed": {"unit": "rad/s", "values": r(at(run.v[:, c]), 4)},
-                 "torque": {"unit": "N m", "values": r(at(run.tau[:, c]), 4)}}
+            sl = j in slides
+            s = {"angle": {"unit": "m" if sl else "rad", "values": r(at(run.q[:, c]), 4)},
+                 "speed": {"unit": "m/s" if sl else "rad/s", "values": r(at(run.v[:, c]), 4)},
+                 "torque": {"unit": "N" if sl else "N m", "values": r(at(run.tau[:, c]), 4)}}
             if j in drives:
                 need = at(run.tau_need[:, c])
                 w = at(run.v[:, c])
                 lim = [drives[j].limit(float(wi))[1 if ni >= 0 else 0] for wi, ni in zip(w, need)]
-                s["needed"] = {"unit": "N m", "values": r(need, 4)}
-                s["limit"] = {"unit": "N m", "values": r(lim, 4),
+                s["needed"] = {"unit": "N" if sl else "N m", "values": r(need, 4)}
+                s["limit"] = {"unit": "N" if sl else "N m", "values": r(lim, 4),
                               "note": "the motor's torque at that speed, in the direction the joint needs it"}
             series[j] = s
         extra = {}
@@ -257,7 +259,7 @@ def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome")
         for j, mot in drives.items():
             c = run.joints.index(j)
             w_j = at(run.v[:, c])
-            slide = j in {x.name for x in mech.joints if x.kind == "slide"}
+            slide = j in slides
             extra[f"{j} speed"] = {"unit": "mm/s" if slide else "rpm",
                                    "values": r(w_j * (1000 if slide else 60 / (2 * math.pi)), 3)}
             amps = mot.current(at(run.tau[:, c]))

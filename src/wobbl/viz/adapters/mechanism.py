@@ -50,12 +50,17 @@ def build(out: Path, pb: dict | None = None) -> Path | None:
         if "needed" in j and shown < 3:
             need = np.asarray(j["needed"]["values"], float)
             lim = np.abs(np.asarray(j.get("limit", {}).get("values", need), float))
-            s.readout(f"{name} needs", np.abs(need), unit="N m", digits=3, limit=lim)
-            s.readout(f"{name} motor gives", lim, unit="N m", digits=3)
+            unit = j["needed"].get("unit", "N m")
+            s.readout(f"{name} needs", np.abs(need), unit=unit, digits=3, limit=lim)
+            s.readout(f"{name} motor gives", lim, unit=unit, digits=3)
             shown += 1
     for name, j in list(pb.get("joints", {}).items())[:4]:
         if "needed" not in j and shown < 4 and np.ptp(j["angle"]["values"]) > 1e-3:
-            s.readout(f"{name} angle", np.degrees(np.asarray(j["angle"]["values"], float)), unit="deg", digits=3)
+            v = np.asarray(j["angle"]["values"], float)
+            if j["angle"].get("unit") == "m":
+                s.readout(f"{name} position", v * 1000, unit="mm", digits=3)
+            else:
+                s.readout(f"{name} angle", np.degrees(v), unit="deg", digits=3)
             shown += 1
     for name, ser in pb.get("series", {}).items():
         if len(s.readouts) < 7:
