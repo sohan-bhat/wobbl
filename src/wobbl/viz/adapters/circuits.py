@@ -62,7 +62,7 @@ def build(out: Path) -> Path | None:
     T = s.t
     bd = pl["board"]
     W, H = bd["width"] * PITCH, bd["height"] * PITCH
-    B.bench(s, [W / 2 - 30, -H / 2 - 10, -8.5], W / 2 + 70, H / 2 + 45)
+    B.bench(s, [W / 2, -H / 2 + 8, -8.5], max(W / 2 + 40, 21.0 * len(ins) + 30), H / 2 + 52)
     rows = bd["rows"]
     B.breadboard(s, W, H, np.array([xy(2.2 + c - 1, y, 0.03) for c in range(1, bd["cols"] + 1)
                                     for y in rows.values()]))
@@ -107,7 +107,8 @@ def build(out: Path) -> Path | None:
             hot.append((p, mid, top, heat))
 
     for i, inst in enumerate(ins):
-        instrument(s, inst, i, F["leads"][i] if i < len(F["leads"]) else [], peak, paths, speeds)
+        instrument(s, inst, i, F["leads"][i] if i < len(F["leads"]) else [], peak, paths, speeds,
+                   x=W / 2 + 42.0 * (i - (len(ins) - 1) / 2))
 
     live = [k for k, v in enumerate(speeds) if float(np.max(np.abs(v))) > 1e-9]
     if live:
@@ -136,8 +137,8 @@ def build(out: Path) -> Path | None:
     verdict(s, o)
     used = np.array([xy(q["x"], q["y"]) for p in parts for q in p.get("pins", [])] or [[W / 2, -H / 2, 0]])
     lo, hi = used.min(0), used.max(0)
-    s.camera(target=(lo + hi) / 2 + [-10, 0, 4], direction=(-0.2, -0.8, 0.85),
-             distance=max(float(np.linalg.norm(hi - lo)) * 1.6, 120.0),
+    s.camera(target=(lo + hi) / 2 + [0, 14, 4], direction=(-0.2, -0.8, 0.85),
+             distance=max(float(np.linalg.norm(hi - lo)) * 1.8, 165.0),
              presets=[{"name": "top", "target": [W / 2, -H / 2, 0], "dir": [0, -0.08, 1], "dist": W * 1.3},
                       {"name": "close", "target": [W / 2, -H / 2, 4], "dir": [0.3, -0.7, 0.6], "dist": W * 0.6}])
     return s.save(out)
@@ -178,13 +179,14 @@ def place(s, p, pins, cur, heat, question: str = "") -> tuple:
     return bd, top
 
 
-def instrument(s, inst, i, leads, peak, paths, speeds):
-    """A bench supply, generator or meter in front of the board, its leads arching to their holes."""
-    at = np.array([-26.0 - 42.0 * i, -14.0, 0.0])
+def instrument(s, inst, i, leads, peak, paths, speeds, x: float = 0.0):
+    """A bench supply, generator or meter behind the board facing the view, its leads arching over to their holes.
+    Its reading sits just above its own case, so it stays clear of the readouts in the corner."""
+    at = np.array([x, 30.0, 0.0])
     tips = B.supply(s, at, inst["name"], posts=2,
                     display={"generator": "#ffb347", "meter": "#9ad0ff", "current": "#9ad0ff"}.get(inst["kind"], "#7cf29a"))
     read_ = "  ".join(f"{v} {u}" for v, u in inst.get("readings", []))
-    s.label(f"{inst['name']} {read_}".strip(), at + [0, 0, 28], kind="note")
+    s.label(f"{inst['name']} {read_}".strip(), at + [0, -13.0, 21.0], kind="note")
     for j, ld in enumerate(inst.get("leads", [])):
         post = tips[0 if ld.get("post") == "+" else 1]
         hole = xy(ld["x"], ld["y"], 0.4)
