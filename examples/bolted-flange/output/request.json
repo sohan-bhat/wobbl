@@ -1,0 +1,36 @@
+{
+ "domain": "part",
+ "analysis": "bolts",
+ "spec": {
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/joints2/examples/bolted-flange/flange.py",
+  "kind": "parametric",
+  "question": "Do four M8 bolts at 20 N m keep this flange closed under a 30 kN pull?",
+  "options": {
+   "playback": [
+    "true"
+   ],
+   "bolt": [
+    "M8 8.8 torque 20 N*m"
+   ],
+   "quality": [
+    "fast"
+   ],
+   "material": [
+    "mild-steel"
+   ],
+   "load": [
+    "30 kN +z @ body 2 and top"
+   ],
+   "fix": [
+    "fixed body 1 and bottom"
+   ],
+   "friction": [
+    "0.15"
+   ],
+   "nut-factor": [
+    "0.2"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

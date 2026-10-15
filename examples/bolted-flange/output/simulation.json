@@ -1,0 +1,61 @@
+{
+ "thing": "flange.py",
+ "question": "Do four M8 bolts at 20 N m keep this flange closed under a 30 kN pull?",
+ "plan": {
+  "thing": "flange.py",
+  "question": "Do four M8 bolts at 20 N m keep this flange closed under a 30 kN pull?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "bolts"
+  ],
+  "reasons": [
+   {
+    "decided": "flange.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics bolts, as asked",
+    "override": "--physics bolts"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "supports": [
+   "fixed body 1 and bottom"
+  ],
+  "loads": [
+   "30 kN +z @ body 2 and top"
+  ],
+  "material": "mild-steel"
+ },
+ "steps": [
+  {
+   "analysis": "bolts",
+   "domain": "part",
+   "verdict": "holds",
+   "headline": "4 M8 8.8 bolts tightened to 12.5 kN (20 N m of torque with a nut factor of 0.2 (T = K F d)). Under the load the worst bolt carries 12.6 kN, 59% of its proof load, and 4.41 kN of clamp is left at the interface. It holds without opening or slipping. Confidence is medium.",
+   "confidence": "medium",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/joints2/examples/bolted-flange/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/joints2/examples/bolted-flange/output/report.html",
+   "assumptions": [
+    {
+     "assumed": "friction coefficient between the clamped parts not given, so Wobbl assumed 0.15",
+     "override": "--friction 0.15"
+    },
+    {
+     "assumed": "nut factor K in T = K F d not given, so Wobbl assumed 0.2",
+     "override": "--nut-factor 0.2"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+HOLDS. 4 M8 8.8 bolts tightened to 12.5 kN (20 N m of torque with a nut factor of 0.2 (T = K F d)). Under the load the worst bolt carries 12.6 kN, 59% of its proof load, and 4.41 kN of clamp is left at the interface. It holds without opening or slipping. Confidence is medium.
+
+Confidence: medium. contact convergence: least clamp force left at an interface 4669 -> 4413 N over two meshes, last change 5.8% (of the preload when it is near zero)
+worst bolt: 12.6 kN
+proof use: 59%
+least clamp: 4.41 kN
+slip safety: no shear
+preload: 12.5 kN
+
+Checks:
+  [pass] mesh convergence: force in the most loaded bolt settled: 12604 -> 12602 N over 2 meshes, last change 0.0%
+  [warn] contact convergence: least clamp force left at an interface 4669 -> 4413 N over two meshes, last change 5.8% (of the preload when it is near zero)
+  [pass] force balance: reactions balance the loads to 5.1e-06% (forces) and 9.7e-06% (moments)
+  [pass] preload: after tightening the bolts carry 12.5, 12.5, 12.5, 12.5 kN against the 12.5, 12.5, 12.5, 12.5 kN asked, within 5.6e-05%
+  [info] clamped stiffness: the parts under M8 8.8 at (-31.8, -31.8, 28) squeeze by 0.526 um per kN in the FEA against 0.923 um per kN through VDI 2230's cone (tan phi 0.512, outside diameter 29.9 mm), -43%. The cone is a hand model; the FEA follows the real shape
+  [info] hand calculation: VDI 2230 gives M8 8.8 at (-31.8, -31.8, 28) 7500 N of the pull and 1086 N more bolt force (load factor 0.145); the FEA bolt gains 102 N (0.09x). Less, because the load enters the parts away from the head and nut, nearer the interface (VDI's load introduction factor below 1); the FEA follows where the load really enters, so it governs
+  [pass] bolt strength: the most loaded bolt, M8 8.8 at (31.8, -31.8, 28), carries 12.6 kN, 344 MPa on its 36.6 mm2 stress area, 59% of the 580 MPa proof stress
+  [pass] tightening: while tightening, tension and thread torque together reach 57% of the yield stress of M8 8.8 (VDI 2230 allows 90%)
+  [pass] separation: 4.41 kN of the 12.7 kN clamp is left at the interface under M8 8.8 at (31.8, -31.8, 28), where VDI 2230 has 6.09 kN and the joint opening at 14.6 kN of pull on that bolt
+  [pass] head pressure: the head and nut press 296 MPa on the Mild steel (ASTM A36), against about 480 MPa it takes before it sinks (1.2 times its tensile strength, near VDI 2230's limiting surface pressures)
+  [pass] thread stripping: a standard nut's thread shears at 2.1 times the load that breaks M8 8.8, so the bolt would break first
+
+Assumptions:
+  - Wobbl guessed: friction coefficient between the clamped parts not given, so Wobbl assumed 0.15.
+  - Wobbl guessed: nut factor K in T = K F d not given, so Wobbl assumed 0.2.
+  - 20 n m of torque with a nut factor of 0.2 (t = k f d) gives 12.5 kn. Torque tightening scatters the preload by about 25% either way, so a torque wrench reading is not a measured preload.
+  - M8 8.8: stress area 36.6 mm2, proof stress 580 MPa, yield 640 MPa (ISO 898-1); head and nut bear on a 11.6 mm ring (ISO 4014 and ISO 4032).
+  - Each bolt is a spring with VDI 2230's stiffness of head, thread and nut, between rigid rings under its head and nut, with the bending and shear stiffness of its core. The shank does not touch the hole, so once the parts slide nothing but friction and the bolt's bending holds them.
+  - The clamped parts touch through penalty contact with friction 0.15 (VDI 2230 lists 0.1 to 0.23 for dry steel and 0.1 to 0.28 for aluminum). Embedding of the surfaces, which loses a few percent of preload, is not modeled.
+  - The hand calculation shares the load between bolts as a rigid flange would and takes it into the joint at the head and nut (load introduction factor 1), which overstates the bolt's extra load and understates the load that opens the joint.
+  - Materials are linear elastic and deflections small.
+
+Images: stress: images/stress.png, pressure: images/pressure.png, playback: playback.json
+Report: report.html

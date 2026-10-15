@@ -1,0 +1,503 @@
+{
+ "domain": "bolt",
+ "part": "../flange.py",
+ "question": "Do four M8 bolts at 20 N m keep this flange closed under a 30 kN pull?",
+ "verdict": "holds",
+ "headline": "4 M8 8.8 bolts tightened to 12.5 kN (20 N m of torque with a nut factor of 0.2 (T = K F d)). Under the load the worst bolt carries 12.6 kN, 59% of its proof load, and 4.41 kN of clamp is left at the interface. It holds without opening or slipping. Confidence is medium.",
+ "metrics": [
+  [
+   "worst bolt",
+   "12.6 kN"
+  ],
+  [
+   "proof use",
+   "59%"
+  ],
+  [
+   "least clamp",
+   "4.41 kN"
+  ],
+  [
+   "slip safety",
+   "no shear"
+  ],
+  [
+   "preload",
+   "12.5 kN"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "contact convergence: least clamp force left at an interface 4669 -> 4413 N over two meshes, last change 5.8% (of the preload when it is near zero)"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "force in the most loaded bolt settled: 12604 -> 12602 N over 2 meshes, last change 0.0%",
+   "detail": {
+    "values": [
+     12603.864077,
+     12602.108711
+    ],
+    "last_change": 0.000139,
+    "tolerance": 0.05,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "contact convergence",
+   "status": "warn",
+   "summary": "least clamp force left at an interface 4669 -> 4413 N over two meshes, last change 5.8% (of the preload when it is near zero)",
+   "detail": {
+    "clamp": [
+     4669.385786,
+     4412.581943
+    ]
+   }
+  },
+  {
+   "name": "force balance",
+   "status": "pass",
+   "summary": "reactions balance the loads to 5.1e-06% (forces) and 9.7e-06% (moments)",
+   "detail": {
+    "applied_N": [
+     0.0,
+     0.0,
+     30000.0
+    ],
+    "reaction_N": [
+     -0.000519,
+     0.001197,
+     -29999.999185
+    ],
+    "force_error": 0.0,
+    "moment_error": 0.0
+   }
+  },
+  {
+   "name": "preload",
+   "status": "pass",
+   "summary": "after tightening the bolts carry 12.5, 12.5, 12.5, 12.5 kN against the 12.5, 12.5, 12.5, 12.5 kN asked, within 5.6e-05%",
+   "detail": {
+    "error": 1e-06
+   }
+  },
+  {
+   "name": "clamped stiffness",
+   "status": "info",
+   "summary": "the parts under M8 8.8 at (-31.8, -31.8, 28) squeeze by 0.526 um per kN in the FEA against 0.923 um per kN through VDI 2230's cone (tan phi 0.512, outside diameter 29.9 mm), -43%. The cone is a hand model; the FEA follows the real shape",
+   "detail": {
+    "fea": 1e-06,
+    "vdi": 1e-06
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "info",
+   "summary": "VDI 2230 gives M8 8.8 at (-31.8, -31.8, 28) 7500 N of the pull and 1086 N more bolt force (load factor 0.145); the FEA bolt gains 102 N (0.09x). Less, because the load enters the parts away from the head and nut, nearer the interface (VDI's load introduction factor below 1); the FEA follows where the load really enters, so it governs",
+   "detail": {
+    "fea_N": 101.526925,
+    "vdi_N": 1085.759895
+   }
+  },
+  {
+   "name": "bolt strength",
+   "status": "pass",
+   "summary": "the most loaded bolt, M8 8.8 at (31.8, -31.8, 28), carries 12.6 kN, 344 MPa on its 36.6 mm2 stress area, 59% of the 580 MPa proof stress",
+   "detail": {
+    "proof_use": 0.593516
+   }
+  },
+  {
+   "name": "tightening",
+   "status": "pass",
+   "summary": "while tightening, tension and thread torque together reach 57% of the yield stress of M8 8.8 (VDI 2230 allows 90%)",
+   "detail": {
+    "use": 0.566195
+   }
+  },
+  {
+   "name": "separation",
+   "status": "pass",
+   "summary": "4.41 kN of the 12.7 kN clamp is left at the interface under M8 8.8 at (31.8, -31.8, 28), where VDI 2230 has 6.09 kN and the joint opening at 14.6 kN of pull on that bolt",
+   "detail": {
+    "clamp_N": 4412.581943
+   }
+  },
+  {
+   "name": "head pressure",
+   "status": "pass",
+   "summary": "the head and nut press 296 MPa on the Mild steel (ASTM A36), against about 480 MPa it takes before it sinks (1.2 times its tensile strength, near VDI 2230's limiting surface pressures)",
+   "detail": {
+    "pressure_MPa": 295.729592,
+    "limit_MPa": 480.0
+   }
+  },
+  {
+   "name": "thread stripping",
+   "status": "pass",
+   "summary": "a standard nut's thread shears at 2.1 times the load that breaks M8 8.8, so the bolt would break first",
+   "detail": {
+    "strip_safety": 2.100772
+   }
+  }
+ ],
+ "assumptions": [
+  "Wobbl guessed: friction coefficient between the clamped parts not given, so Wobbl assumed 0.15.",
+  "Wobbl guessed: nut factor K in T = K F d not given, so Wobbl assumed 0.2.",
+  "20 n m of torque with a nut factor of 0.2 (t = k f d) gives 12.5 kn. Torque tightening scatters the preload by about 25% either way, so a torque wrench reading is not a measured preload.",
+  "M8 8.8: stress area 36.6 mm2, proof stress 580 MPa, yield 640 MPa (ISO 898-1); head and nut bear on a 11.6 mm ring (ISO 4014 and ISO 4032).",
+  "Each bolt is a spring with VDI 2230's stiffness of head, thread and nut, between rigid rings under its head and nut, with the bending and shear stiffness of its core. The shank does not touch the hole, so once the parts slide nothing but friction and the bolt's bending holds them.",
+  "The clamped parts touch through penalty contact with friction 0.15 (VDI 2230 lists 0.1 to 0.23 for dry steel and 0.1 to 0.28 for aluminum). Embedding of the surfaces, which loses a few percent of preload, is not modeled.",
+  "The hand calculation shares the load between bolts as a rigid flange would and takes it into the joint at the head and nut (load introduction factor 1), which overstates the bolt's extra load and understates the load that opens the joint.",
+  "Materials are linear elastic and deflections small."
+ ],
+ "values": {
+  "bolts": [
+   {
+    "label": "M8 8.8 at (-31.8, -31.8, 28)",
+    "preload_target": 12500.0,
+    "preload": 12499.992995,
+    "force": 12601.51992,
+    "path": [
+     3125.008337,
+     6249.998332,
+     9374.995663,
+     12499.992995,
+     12511.053452,
+     12524.003174,
+     12540.795626,
+     12565.649556,
+     12601.51992
+    ],
+    "delta_P_fea": 1e-06,
+    "clamp": 5566.567451,
+    "clamp_preload": 12369.15536,
+    "contact_area_mm2": 721.93946,
+    "sliding_share": 0.693426,
+    "open_share": 0.694495,
+    "how": "20 N m of torque with a nut factor of 0.2 (T = K F d) gives 12.5 kN",
+    "clamp_length": 28.0,
+    "outer": 29.890619,
+    "hole": 8.999962
+   },
+   {
+    "label": "M8 8.8 at (31.8, -31.8, 28)",
+    "preload_target": 12500.0,
+    "preload": 12499.996663,
+    "force": 12602.108711,
+    "path": [
+     3124.997332,
+     6249.990995,
+     9374.993829,
+     12499.996663,
+     12511.167175,
+     12524.131571,
+     12541.839308,
+     12566.73359,
+     12602.108711
+    ],
+    "delta_P_fea": 1e-06,
+    "clamp": 4412.581943,
+    "clamp_preload": 12678.027933,
+    "contact_area_mm2": 696.354374,
+    "sliding_share": 0.740949,
+    "open_share": 0.6851,
+    "how": "20 N m of torque with a nut factor of 0.2 (T = K F d) gives 12.5 kN",
+    "clamp_length": 28.0,
+    "outer": 29.850693,
+    "hole": 8.999975
+   },
+   {
+    "label": "M8 8.8 at (-31.8, 31.8, 28)",
+    "preload_target": 12500.0,
+    "preload": 12500.000332,
+    "force": 12602.101374,
+    "path": [
+     3125.006503,
+     6250.003834,
+     9374.993829,
+     12500.000332,
+     12511.148832,
+     12524.177427,
+     12541.490803,
+     12566.166811,
+     12602.101374
+    ],
+    "delta_P_fea": 1e-06,
+    "clamp": 5698.060327,
+    "clamp_preload": 12653.235088,
+    "contact_area_mm2": 738.998489,
+    "sliding_share": 0.696081,
+    "open_share": 0.66836,
+    "how": "20 N m of torque with a nut factor of 0.2 (T = K F d) gives 12.5 kN",
+    "clamp_length": 28.0,
+    "outer": 29.908308,
+    "hole": 8.999969
+   },
+   {
+    "label": "M8 8.8 at (31.8, 31.8, 28)",
+    "preload_target": 12500.0,
+    "preload": 12500.002166,
+    "force": 12601.259458,
+    "path": [
+     3125.002834,
+     6250.000166,
+     9375.004834,
+     12500.002166,
+     12511.066292,
+     12523.828922,
+     12540.872664,
+     12565.418442,
+     12601.259458
+    ],
+    "delta_P_fea": 1e-06,
+    "clamp": 4729.730279,
+    "clamp_preload": 12299.491618,
+    "contact_area_mm2": 711.10566,
+    "sliding_share": 0.793783,
+    "open_share": 0.693454,
+    "how": "20 N m of torque with a nut factor of 0.2 (T = K F d) gives 12.5 kN",
+    "clamp_length": 28.0,
+    "outer": 29.948384,
+    "hole": 8.999962
+   }
+  ],
+  "vdi": [
+   {
+    "bolt": "M8 8.8",
+    "clamp_length": 28.0,
+    "outer_diameter": 29.890619,
+    "delta_S": 5e-06,
+    "delta_P": 1e-06,
+    "tan_phi": 0.51236,
+    "phi": 0.144768,
+    "preload": 12499.992995,
+    "axial": 7500.009253,
+    "shear": 0.0,
+    "bolt_force": 13585.75289,
+    "clamp_force": 6085.743637,
+    "separation_load": 14615.905602,
+    "slip_capacity": 912.861546,
+    "slip_safety": Infinity,
+    "bolt_stress": 371.108809,
+    "proof_use": 0.639843,
+    "torsion_use": 0.566194,
+    "head_pressure": 318.815078,
+    "strip_safety": 2.100772
+   },
+   {
+    "bolt": "M8 8.8",
+    "clamp_length": 28.0,
+    "outer_diameter": 29.850693,
+    "delta_S": 5e-06,
+    "delta_P": 1e-06,
+    "tan_phi": 0.512156,
+    "phi": 0.144801,
+    "preload": 12499.996663,
+    "axial": 7499.99439,
+    "shear": 0.0,
+    "bolt_force": 13586.004528,
+    "clamp_force": 6086.010138,
+    "separation_load": 14616.479857,
+    "slip_capacity": 912.901521,
+    "slip_safety": Infinity,
+    "bolt_stress": 371.115683,
+    "proof_use": 0.639855,
+    "torsion_use": 0.566195,
+    "head_pressure": 318.820984,
+    "strip_safety": 2.100772
+   },
+   {
+    "bolt": "M8 8.8",
+    "clamp_length": 28.0,
+    "outer_diameter": 29.908308,
+    "delta_S": 5e-06,
+    "delta_P": 1e-06,
+    "tan_phi": 0.512451,
+    "phi": 0.144753,
+    "preload": 12500.000332,
+    "axial": 7500.00561,
+    "shear": 0.0,
+    "bolt_force": 13585.649029,
+    "clamp_force": 6085.643418,
+    "separation_load": 14615.662003,
+    "slip_capacity": 912.846513,
+    "slip_safety": Infinity,
+    "bolt_stress": 371.105972,
+    "proof_use": 0.639838,
+    "torsion_use": 0.566195,
+    "head_pressure": 318.812641,
+    "strip_safety": 2.100772
+   },
+   {
+    "bolt": "M8 8.8",
+    "clamp_length": 28.0,
+    "outer_diameter": 29.948384,
+    "delta_S": 5e-06,
+    "delta_P": 1e-06,
+    "tan_phi": 0.512656,
+    "phi": 0.14472,
+    "preload": 12500.002166,
+    "axial": 7499.990747,
+    "shear": 0.0,
+    "bolt_force": 13585.398305,
+    "clamp_force": 6085.407558,
+    "separation_load": 14615.093598,
+    "slip_capacity": 912.811134,
+    "slip_safety": Infinity,
+    "bolt_stress": 371.099123,
+    "proof_use": 0.639826,
+    "torsion_use": 0.566195,
+    "head_pressure": 318.806757,
+    "strip_safety": 2.100772
+   }
+  ],
+  "levels": [
+   {
+    "level": 0,
+    "n_nodes": 3936,
+    "h": 21.251158,
+    "bolt_force": 12603.864077,
+    "clamp_force": 4669.385786,
+    "increments": 9,
+    "iterations": 58,
+    "t_solve": 236.996472,
+    "predicted_s": 285.7
+   },
+   {
+    "level": 1,
+    "n_nodes": 5464,
+    "h": 15.938368,
+    "bolt_force": 12602.108711,
+    "clamp_force": 4412.581943,
+    "increments": 9,
+    "iterations": 60,
+    "t_solve": 483.374943,
+    "predicted_s": 363.0
+   }
+  ],
+  "proof_use": 0.593516,
+  "least_clamp_N": 4412.581943,
+  "slip_safety": Infinity,
+  "load_steps": [
+   0.25,
+   0.5,
+   0.75,
+   1.0,
+   1.2,
+   1.4,
+   1.6,
+   1.8,
+   2.0
+  ],
+  "_figures": [
+   [
+    "pressure",
+    "Contact pressure between the clamped parts under the load"
+   ],
+   [
+    "stress",
+    "von Mises stress under the load"
+   ]
+  ],
+  "_tables": [
+   [
+    "Bolts",
+    [
+     "bolt",
+     "preload kN",
+     "under load kN",
+     "clamp left kN",
+     "VDI clamp kN",
+     "VDI separation kN",
+     "slip safety"
+    ],
+    [
+     [
+      "M8 8.8 at (-31.8, -31.8, 28)",
+      "12.5",
+      "12.6",
+      "5.57",
+      "6.09",
+      "14.6",
+      "no shear"
+     ],
+     [
+      "M8 8.8 at (31.8, -31.8, 28)",
+      "12.5",
+      "12.6",
+      "4.41",
+      "6.09",
+      "14.6",
+      "no shear"
+     ],
+     [
+      "M8 8.8 at (-31.8, 31.8, 28)",
+      "12.5",
+      "12.6",
+      "5.7",
+      "6.09",
+      "14.6",
+      "no shear"
+     ],
+     [
+      "M8 8.8 at (31.8, 31.8, 28)",
+      "12.5",
+      "12.6",
+      "4.73",
+      "6.09",
+      "14.6",
+      "no shear"
+     ]
+    ]
+   ]
+  ],
+  "budget": {
+   "budget_s": 1500.0,
+   "predicted_s": 648.7,
+   "predicted_nodes": [
+    3936,
+    5464
+   ],
+   "element_mm": [
+    21.251,
+    15.938
+   ],
+   "coarsened_by": 2.0,
+   "elements_per_circle": 6,
+   "user_mesh_size": false,
+   "measured_s": 790.6
+  }
+ },
+ "images": {
+  "stress": "images/stress.png",
+  "pressure": "images/pressure.png",
+  "playback": "playback.json"
+ },
+ "fixes": [],
+ "notes": [
+  "Built from flange.py with diameter=120, thickness=14, bore=50, pcd=90, holes=4, hole=9.",
+  "The 50 mm hole through parts 1, 2 is taken as a bore, not a bolt hole; name it in a bolt to put one there.",
+  "To fit the 1500 s budget the mesh was coarsened (element size 21.3 mm and 6 elements round each circle), with about 3,936 nodes on the first mesh and 5,464 on the second. A larger --budget keeps a finer mesh."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 790.603428,
+ "solver": "CalculiX 2.23",
+ "criteria": [
+  {
+   "name": "bolt proof use",
+   "value": "proof_use",
+   "limit": 1.0,
+   "sense": "max"
+  },
+  {
+   "name": "clamp left",
+   "value": "least_clamp_N",
+   "limit": 0.0,
+   "sense": "min"
+  }
+ ]
+}
