@@ -68,6 +68,23 @@ def transmission_angle(t3, t4):
     return mu
 
 
+# --- slider crank -------------------------------------------------------------------------------------------
+def slider_x(crank: float, rod: float, offset: float, theta):
+    """Slider position along its line for a crank angle, with the line ``offset`` above the crank's pivot:
+    r cos(t) + sqrt(l^2 - (r sin(t) - e)^2). Nan where the rod cannot reach."""
+    t = np.asarray(theta, float)
+    inside = rod * rod - (crank * np.sin(t) - offset) ** 2
+    return crank * np.cos(t) + np.sqrt(np.where(inside >= 0, inside, np.nan))
+
+
+def slider_ratio(crank: float, rod: float, offset: float, theta):
+    """Slider speed over crank speed, dx/dt: -r sin(t) - r cos(t) (r sin(t) - e) / sqrt(l^2 - (r sin(t) - e)^2)."""
+    t = np.asarray(theta, float)
+    u = crank * np.sin(t) - offset
+    root = np.sqrt(np.where(rod * rod - u * u >= 0, rod * rod - u * u, np.nan))
+    return -crank * np.sin(t) - crank * np.cos(t) * u / root
+
+
 # --- gear trains --------------------------------------------------------------------------------------------
 def gear_train(stages: list[tuple[int, int]], efficiency: float) -> tuple[float, float]:
     """Overall ratio (input turns per output turn) and efficiency of meshes in series."""

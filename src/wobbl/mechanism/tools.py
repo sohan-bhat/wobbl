@@ -29,7 +29,8 @@ def _unit(m) -> str:
     return f"{m.group(1)} {u}"
 
 
-KINDS = (("pendulum", r"\bpendulum\b"), ("fourbar", r"four.?bar|linkage|wiper|\bcrank\b|\brocker\b"),
+KINDS = (("pendulum", r"\bpendulum\b"),
+         ("slider", r"slider.?crank|crank.?slider|\bpiston\b|connecting rod|scotch yoke"), ("fourbar", r"four.?bar|linkage|wiper|\bcrank\b|\brocker\b"),
          ("gears", r"\bgears?\b|gearbox|gear train|\bteeth\b|gear ratio"),
          ("tip", r"tip(?:s|ping)? over|topple|fall over|knock(?:ed)? over|\bstable\b"),
          ("impact", r"\bimpact\b|collid|collision|\bhits?\b|dropped onto|drop onto|peak force"),
@@ -77,6 +78,19 @@ def read_for(kind: str, q: str) -> tuple[dict, list[str]]:
         t = re.search(r"(\d+(?:\.\d+)?)\s*n\s*\*?\s*m\b", low)
         if t:
             p["load"] = f"{t.group(1)} N*m"
+    elif kind == "slider":
+        m = re.search(r"(\d+(?:\.\d+)?)\s*rpm", low)
+        if m:
+            p["speed"] = f"{m.group(1)} rpm"
+        lens = re.findall(r"(\d+(?:\.\d+)?)\s*mm", low)
+        if len(lens) >= 2:
+            p.update(dict(zip(("crank", "rod"), (f"{x} mm" for x in lens[:2]))))
+        else:
+            guesses.append("crank and rod lengths not both given, so Wobbl assumed a 40 mm crank and a 150 mm rod "
+                           "(override with --set crank=... rod=...)")
+        f = re.search(r"(\d+(?:\.\d+)?)\s*n\b", low)
+        if f:
+            p["load"] = f"{f.group(1)} N"
     elif kind == "gears":
         stages = re.findall(r"(\d+)\s*[:/]\s*(\d+)", low)
         if stages:

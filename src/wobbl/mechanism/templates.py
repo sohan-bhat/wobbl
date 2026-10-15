@@ -56,7 +56,7 @@ def _motor(p: Params, key: str, fallback: str | None):
     name = p.get(key)
     if p.given("stall_torque") and key in ("motor", "servo"):
         d = {"stall_torque": p.get("stall_torque"), "no_load_speed": p.get("no_load_speed") or "inf"}
-        for k in ("continuous_torque", "no_load_current", "stall_current"):
+        for k in ("continuous_torque", "no_load_current", "stall_current", "voltage"):
             if p.given(k):
                 d[k] = p.get(k)
         return motor_from(d)
@@ -181,7 +181,8 @@ def arm(raw: dict) -> Built:
 
 # --- four bar linkage ---------------------------------------------------------------------------------------
 FOURBAR = {"ground": "120 mm", "crank": "30 mm", "coupler": "125 mm", "rocker": "45 mm", "motor": None,
-           "stall_torque": None, "no_load_speed": None, "continuous_torque": None, "speed": "45 rpm",
+           "stall_torque": None, "no_load_speed": None, "continuous_torque": None, "no_load_current": None,
+           "stall_current": None, "voltage": None, "speed": "45 rpm",
            "load": "0 N*m", "link_mass": "auto", "start": "0 deg", "turns": 2, "sweep": None, "timestep": "0.5 ms"}
 
 
@@ -229,6 +230,61 @@ def fourbar(raw: dict) -> Built:
     return Built(m, "fourbar", p.used, {"lengths": (d, a, b, c), "grashof": cls, "full_turn": full,
                                         "start": (t2_0, t3, t4), "motor": motor, "speed": speed, "load": load,
                                         "sweep": sweep, "turns": turns})
+
+
+# --- slider crank -------------------------------------------------------------------------------------------
+SLIDER = {"crank": "40 mm", "rod": "150 mm", "offset": "0 mm", "motor": None, "stall_torque": None,
+          "no_load_speed": None, "continuous_torque": None, "no_load_current": None, "stall_current": None,
+          "voltage": None, "speed": "60 rpm", "load": "0 N", "load_kind": "drag", "link_mass": "auto",
+          "slider_mass": "100 g", "start": "0 deg", "turns": 2, "timestep": "0.5 ms"}
+
+
+def slider(raw: dict) -> Built:
+    """A crank turning a connecting rod that pushes a slider along a straight line, as in an engine, a press or
+    a pump. The load is a force on the slider, a drag that opposes its motion or a constant push one way."""
+    p = Params(raw, SLIDER)
+    a, b, e = (p.get(k, Q.length) for k in ("crank", "rod", "offset"))
+    motor = _motor(p, "motor", None)
+    speed = p.get("speed", Q.speed)
+    load = p.get("load", lambda v: Q.number(str(v).lower().replace("newtons", "").replace("n", "").strip()))
+    kind = str(p.get("load_kind")).lower()
+    if kind not in ("drag", "constant"):
+        raise SpecError("load_kind is drag (opposes the slider's motion) or constant (a steady push toward the crank)")
+    t0 = p.get("start", Q.angle)
+    turns = p.get("turns", Q.number)
+    lm = p.get("link_mass")
+    masses = ([L * 0.4 for L in (a, b)] if str(lm).strip().lower() == "auto" else
+              Q.listed(lm, Q.mass) if "," in str(lm) else [Q.mass(lm)] * 2)
+    ms = p.get("slider_mass", Q.mass)
+    if b <= a + abs(e):
+        raise SpecError(f"a {b * 1000:g} mm rod cannot turn a {a * 1000:g} mm crank all the way round with a "
+                        f"{abs(e) * 1000:g} mm offset, since it must be longer than crank plus offset")
+    x0 = float(T.slider_x(a, b, e, t0))
+    phi = math.atan2(e - a * math.sin(t0), x0 - a * math.cos(t0))
+    m = Mechanism("slider crank", timestep=p.get("timestep", Q.time), gravity=(0.0, 0.0, -T.G))
+    m.bodies.append(Body("crank", euler=(0, 0, t0), fromto=(0, 0, 0, a, 0, 0), radius=0.004, mass=masses[0],
+                         collide=False))
+    m.bodies.append(Body("rod", "crank", (a, 0, 0), (0, 0, phi - t0), fromto=(0, 0, 0, b, 0, 0), radius=0.003,
+                         mass=masses[1], collide=False))
+    m.bodies.append(Body("slider", "world", (x0, e, 0), shape="box", size=(0.03, 0.02, 0.02), center=(0.0, 0.0, 0.0),
+                         mass=ms, collide=False, color="0.29 0.56 0.85 1"))
+    m.joints += [Joint("crank", "crank"), Joint("rod", "rod"),
+                 Joint("slider", "slider", kind="slide", axis=(1.0, 0.0, 0.0))]
+    m.loops.append(Loop("rod", "slider", (b, 0, 0)))
+    if load:
+        m.loads.append(Load("slider", load, kind))
+    w_est = motor.no_load_speed if motor is not None and math.isfinite(motor.no_load_speed) else speed
+    if motor is not None:
+        m.drives.append(Drive("crank", motor, "voltage"))
+        m.joint("crank").armature = motor.rotor_inertia()
+        m.duration = turns * 2 * math.pi / w_est * 1.3 + 0.3
+    else:
+        m.drives.append(Drive("crank", None, "servo"))
+        m.spin = {"crank": (speed, 0.3)}
+        m.duration = turns * 2 * math.pi / speed + 0.3
+    p.done()
+    return Built(m, "slider", p.used, {"lengths": (a, b, e), "start": (t0, phi, x0), "motor": motor, "speed": speed,
+                                       "load": load, "load_kind": kind, "turns": turns, "slider_mass": ms})
 
 
 # --- gear train ---------------------------------------------------------------------------------------------
@@ -417,8 +473,8 @@ def tip(raw: dict) -> Built:
                                     "accel": acc, "friction": mu, "hand": hand, "base": (bw, bd)})
 
 
-TEMPLATES = {"pendulum": pendulum, "arm": arm, "fourbar": fourbar, "gears": gears, "impact": impact, "tip": tip}
-_ALIASES = {"four-bar": "fourbar", "linkage": "fourbar", "wiper": "fourbar", "gear": "gears", "gearbox": "gears",
+TEMPLATES = {"pendulum": pendulum, "arm": arm, "fourbar": fourbar, "slider": slider, "gears": gears, "impact": impact, "tip": tip}
+_ALIASES = {"four-bar": "fourbar", "linkage": "fourbar", "wiper": "fourbar", "slider-crank": "slider", "crank-slider": "slider", "gear": "gears", "gearbox": "gears",
             "robot-arm": "arm", "collision": "impact", "drop": "impact", "tipping": "tip", "stability": "tip"}
 
 

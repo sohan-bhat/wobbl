@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import difflib
 import math
+import re
 from dataclasses import dataclass, replace
 
 from . import quantities as Q
@@ -31,6 +32,7 @@ class Motor:
     curve: str = "line"                 # line (DC motor), box (a torque limit and a speed limit, as in URDF)
     no_load_current: float = 0.0        # A, for the most efficient operating point
     stall_current: float = 0.0
+    voltage: float = 0.0                # V of the supply the rating is quoted at
     source: str = ""
 
     @property
@@ -81,6 +83,29 @@ class Motor:
         share = i0 / i_s if i0 > 0 and i_s > 0 else 0.05
         return self.stall_torque * (math.sqrt(share) - share) / (1 - share)
 
+    def currents(self) -> tuple[float, float, str]:
+        """No load and stall current in amps, and where they come from. A datasheet value is used as given. Without
+        one, a brushed motor's torque constant is its supply voltage over its no load speed, so it draws
+        Ts w0 / V at stall, with a no load current of 5% of that, typical of small brushed motors. Returns zeros
+        when neither the currents nor the voltage is known."""
+        if self.stall_current > 0:
+            i0 = self.no_load_current or 0.05 * self.stall_current
+            return i0, self.stall_current, "the datasheet"
+        if self.voltage > 0 and math.isfinite(self.no_load_speed) and self.curve != "box":
+            i_s = self.stall_torque * self.no_load_speed / self.voltage
+            return 0.05 * i_s, i_s, f"a torque constant of {self.voltage:g} V over the no load speed"
+        return 0.0, 0.0, ""
+
+    def current(self, tau):
+        """Current in amps at an output torque (arrays work), linear in torque for a brushed motor, or None when
+        the motor's currents are not known."""
+        import numpy as np
+
+        i0, i_s, _ = self.currents()
+        if i_s <= 0:
+            return None
+        return i0 + (i_s - i0) * np.minimum(np.abs(np.asarray(tau, float)) / self.stall_torque, 1.5)
+
     def geared(self, ratio: float, efficiency: float = 1.0) -> "Motor":
         """The same motor seen through a reduction of ``ratio`` with the given efficiency."""
         return replace(self, key=f"{self.key} x{ratio:g}", name=f"{self.name} through {ratio:g}:1",
@@ -98,12 +123,12 @@ class Motor:
 
 def _servo(key, name, kgcm, s60, grams, volts, source="manufacturer datasheet"):
     return Motor(key, f"{name} at {volts:g} V", kgcm * Q.KGF_CM, math.radians(60) / s60, mass=grams / 1000,
-                 source=source)
+                 voltage=volts, source=source)
 
 
 def _dxl(key, name, nm, rpm, grams, volts):
     return Motor(key, f"{name} at {volts:g} V", nm, rpm * 2 * math.pi / 60, mass=grams / 1000,
-                 source="ROBOTIS e-Manual")
+                 voltage=volts, source="ROBOTIS e-Manual")
 
 
 # ratings at the output shaft, at the voltage named
@@ -119,7 +144,7 @@ CATALOG = {m.key: m for m in [
     _dxl("xl430", "ROBOTIS Dynamixel XL430-W250", 1.5, 61, 57.2, 12),
     _dxl("xm430", "ROBOTIS Dynamixel XM430-W350", 4.1, 46, 82, 12),
     Motor("fa-130", "Mabuchi FA-130RA at 3 V", 25.5 * Q.KGF_CM / 1000, 9100 * 2 * math.pi / 60, mass=0.018,
-          no_load_current=0.15, stall_current=2.2, source="Mabuchi datasheet FA-130RA-2270"),
+          no_load_current=0.15, stall_current=2.2, voltage=3.0, source="Mabuchi datasheet FA-130RA-2270"),
 ]}
 _ALIASES = {"mg995": "mg996r", "sg-90": "sg90", "mg-996r": "mg996r", "ds-3218": "ds3218", "ax12": "ax-12a",
             "xl430-w250": "xl430", "xm430-w350": "xm430", "fa130": "fa-130", "130": "fa-130"}
@@ -155,9 +180,9 @@ def motor_from(d) -> Motor:
         vals["continuous_torque"] = Q.torque(d.pop("continuous_torque"))
     if "mass" in d:
         vals["mass"] = Q.mass(d.pop("mass"))
-    for k in ("no_load_current", "stall_current"):
+    for k in ("no_load_current", "stall_current", "voltage"):
         if k in d:
-            vals[k] = Q.number(d.pop(k))
+            vals[k] = Q.number(re.sub(r"[a-zA-Z\s]", "", str(d.pop(k))))
     if "curve" in d:
         vals["curve"] = str(d.pop("curve"))
     name = str(d.pop("name", ""))
