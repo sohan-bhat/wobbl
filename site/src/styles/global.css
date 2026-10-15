@@ -574,6 +574,9 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .run-label { margin: 0 0 10px; font: 500 12px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .run-ask { margin: 0; padding-left: 16px; border-left: 3px solid var(--yellow); font-size: clamp(1.15rem, 1.05rem + 0.45vw, 1.4rem); line-height: 1.4; color: var(--fg); text-wrap: pretty; }
 .run-step .term { margin-top: 0; }
+/* a run's command wraps inside its box at every width, each continued line hung under the first */
+.run-step .term pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.run-step .term .ln { padding-left: 2ch; text-indent: -2ch; }
 .run-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .run-checks li { display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); background: var(--bg-2); font: 500 13px/1.3 var(--mono); color: var(--fg); }
 .run-checks .st { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--holds); }
@@ -655,7 +658,8 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 /* A run's live 3D scene, played in Wobbl's viewer. Before it loads, and on a card waiting for a free
    live view, it holds its place with the title or a still of its first frame. */
 .scene { position: relative; min-width: 0; background: #0e0f11; }
-.scene:not(.is-live) { aspect-ratio: 16 / 10; min-height: 260px; border: 1px solid var(--line); }
+.scene:not(.is-live) { aspect-ratio: 4 / 3; border: 1px solid var(--line); }
+@media (min-width: 720px) { .scene:not(.is-live):not(.scene-card) { aspect-ratio: 16 / 10; } }
 .scene-card:not(.is-live), .scene-card { aspect-ratio: 4 / 3; min-height: 0; border: 0; border-bottom: 1px solid var(--line); overflow: hidden; }
 .scene-host { display: block; }
 .scene.is-live .scene-wait, .scene.is-live .scene-still { display: none; }

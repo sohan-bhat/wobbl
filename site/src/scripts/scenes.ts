@@ -1,6 +1,7 @@
 // Plays each run's scene.wobbl live in Wobbl's viewer. A scene loads when it comes near the screen and plays
 // while it is on screen. Only a few WebGL views run at once (two on a phone): the rest show a still of
-// their own first frame, and take a live view back when one frees up.
+// their own first frame, and take a live view back when one frees up. A view that scrolls away keeps
+// running state and camera until a scene on screen needs its context.
 type View = { pause(): void; play(): void; dispose(): void; frames: number };
 declare global { interface Window { WobblView?: { mount(el: Element, o: Record<string, unknown>): Promise<View | null> } } }
 
@@ -96,7 +97,6 @@ async function start(s: Slot) {
     if (m) m.textContent = `The 3D scene did not load. ${(e as Error).message}.`;
   }
   s.busy = false;
-  if (!s.seen) release(s);
   schedule();
 }
 
@@ -105,6 +105,8 @@ function schedule() {
   const want = [...slots.values()].filter((s) => s.seen && !s.view && !s.busy && !s.el.classList.contains('is-broken'));
   want.sort((a, b) => Number(card(a)) - Number(card(b)));
   for (const s of want) {
+    // a live view off screen keeps its place and camera until a scene on screen needs its context
+    if (live() >= LIMIT) { const idle = [...slots.values()].find((o) => o.view && !o.seen); if (idle) release(idle); }
     if (live() < LIMIT) start(s);
     else if (!s.el.classList.contains('has-still')) poster(s).then(schedule);
   }
@@ -115,7 +117,6 @@ const io = new IntersectionObserver((list) => {
     const s = slots.get(e.target as HTMLElement);
     if (!s) continue;
     s.seen = e.isIntersecting;
-    if (!s.seen && s.view) release(s);
   }
   schedule();
 }, { rootMargin: '120px 0px' });
