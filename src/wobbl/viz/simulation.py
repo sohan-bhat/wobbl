@@ -96,6 +96,10 @@ def simulation_view(path) -> Path | None:
         if not rd or st.get("error"):
             continue
         rdir = Path(rd) if Path(rd).is_absolute() else (out / rd)
+        # the step's folder beside the page, or the page's own folder, wins, so a moved or copied run shows its own
+        here = next((p for p in (out / Path(rd).name, out) if p.name == Path(rd).name and (p / "outcome.json").exists()),
+                    None)
+        rdir = here or rdir
         if not rdir.exists():
             continue
         if not (rdir / FILE).exists() or (rdir / "report.html").exists():

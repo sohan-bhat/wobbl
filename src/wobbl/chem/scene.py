@@ -229,7 +229,7 @@ def _reaction(pb: dict, o: dict):
         s.readout("temperature at the front", np.where(prog > 0, T_end, T0), unit="K", digits=4)
         s.camera(target=[0, 0, H * 0.45], direction=(0.4, -1, 0.5), distance=H * 4.2)
     s.ground(-6 if not wet else 0, size=400, grid=20)
-    s.readout("heat given off", -dH * prog, unit="kJ/mol", digits=4)
+    s.readout("heat given off" if dH <= 0 else "heat taken in", abs(dH) * prog, unit="kJ/mol", digits=4)
     s.readout("temperature change", rise * prog / max(ext, 1e-9), unit="K", digits=3)
     s.event(ext * 100, "equilibrium", f"{ext * 100:.3g}% reacted")
     return s
