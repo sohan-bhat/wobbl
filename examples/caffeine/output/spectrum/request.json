@@ -1,0 +1,19 @@
+{
+ "domain": "chemistry",
+ "analysis": "spectrum",
+ "spec": {
+  "thing": "caffeine",
+  "kind": "molecule",
+  "question": "what does its structure and IR spectrum look like?",
+  "part": "IR spectrum look like caffeine",
+  "options": {
+   "temperature": [
+    "298.15 K"
+   ],
+   "pressure": [
+    "101.325 kPa"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

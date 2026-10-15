@@ -1,0 +1,645 @@
+{
+ "domain": "chemistry",
+ "part": "caffeine",
+ "question": "IR spectrum look like caffeine",
+ "verdict": "ok",
+ "headline": "caffeine (C8H10N4O2, 194.19 g/mol), by GFN2-xTB: its strongest IR band is at 1712 cm-1, the C=O stretch, its dipole is 3.98 D, dissolving in water is worth -43.9 kJ/mol. At 298 K its entropy is 470.8 J/(mol K) and its heat capacity 211.0 J/(mol K).",
+ "metrics": [
+  [
+   "dipole",
+   "3.98 D"
+  ],
+  [
+   "strongest IR band",
+   "1712 cm-1"
+  ],
+  [
+   "HOMO-LUMO gap",
+   "3.40 eV"
+  ],
+  [
+   "entropy at 298 K",
+   "470.8 J/(mol K)"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed geometry convergence, minimum, SCF convergence"
+ ],
+ "checks": [
+  {
+   "name": "geometry convergence",
+   "status": "pass",
+   "summary": "GFN2-xTB stopped after 18 steps with the largest force at 0.0029 eV/A, under the 0.003 eV/A it aims for",
+   "detail": {
+    "fmax": 0.002905,
+    "steps": 18
+   }
+  },
+  {
+   "name": "minimum",
+   "status": "pass",
+   "summary": "all 66 frequencies are real, so the structure is a true minimum, after following 1 imaginary mode downhill",
+   "detail": {
+    "followed": 1
+   }
+  },
+  {
+   "name": "SCF convergence",
+   "status": "pass",
+   "summary": "all 612 GFN2-xTB single points converged within 300 iterations",
+   "detail": {
+    "calls": 612
+   }
+  },
+  {
+   "name": "thermochemistry",
+   "status": "info",
+   "summary": "ideal gas at 298 K and 101 kPa with a rotational symmetry number of 1, and 4 soft modes under 100 cm-1 treated as hindered rotors",
+   "detail": {
+    "sigma": 1
+   }
+  }
+ ],
+ "assumptions": [
+  "caffeine as RDKit ETKDG distance geometry relaxed with MMFF94, the lowest of 1 conformers, refined with GFN2-xTB, good to about 0.02 A in bond lengths, 2.5 degrees in angles and 8% in frequencies.",
+  "One molecule in the gas phase unless a solvent is named, and a solvent is a continuum (ALPB) rather than explicit molecules.",
+  "Thermochemistry treats the molecule as an ideal gas, a rigid rotor and harmonic oscillators, with modes under 100 cm-1 blended into free rotors.",
+  "The HOMO-LUMO gap from GFN2-xTB is a trend only, often off by over 1 eV, so it is not an optical gap."
+ ],
+ "values": {
+  "name": "caffeine",
+  "formula": "C8H10N4O2",
+  "charge": 0,
+  "multiplicity": 1,
+  "atoms": 24,
+  "structure_source": "RDKit ETKDG distance geometry relaxed with MMFF94, the lowest of 1 conformers",
+  "temperature_K": 298.15,
+  "pressure_Pa": 101325.0,
+  "conformers": [
+   {
+    "energy_kJ_mol": 0.0,
+    "population": 1.0
+   }
+  ],
+  "positions": [
+   [
+    3.31984,
+    -0.070113,
+    -0.383788
+   ],
+   [
+    1.982028,
+    -0.254142,
+    -0.875857
+   ],
+   [
+    1.593833,
+    -0.662079,
+    -2.097431
+   ],
+   [
+    0.287206,
+    -0.73057,
+    -2.240115
+   ],
+   [
+    -0.206281,
+    -0.345211,
+    -1.042914
+   ],
+   [
+    0.824534,
+    -0.039664,
+    -0.16544
+   ],
+   [
+    0.590912,
+    0.39836,
+    1.176782
+   ],
+   [
+    1.434021,
+    0.685234,
+    2.007884
+   ],
+   [
+    -0.776093,
+    0.466424,
+    1.44962
+   ],
+   [
+    -1.832149,
+    0.168511,
+    0.595824
+   ],
+   [
+    -2.980914,
+    0.272667,
+    0.966006
+   ],
+   [
+    -1.512263,
+    -0.246529,
+    -0.679518
+   ],
+   [
+    -2.558046,
+    -0.574638,
+    -1.623252
+   ],
+   [
+    -1.173134,
+    0.898461,
+    2.779973
+   ],
+   [
+    3.872485,
+    -1.01009,
+    -0.425129
+   ],
+   [
+    3.845096,
+    0.676403,
+    -0.981696
+   ],
+   [
+    3.258368,
+    0.269741,
+    0.649078
+   ],
+   [
+    2.286072,
+    -0.907314,
+    -2.878126
+   ],
+   [
+    -3.514061,
+    -0.403392,
+    -1.132944
+   ],
+   [
+    -2.468064,
+    -1.618231,
+    -1.92402
+   ],
+   [
+    -2.464593,
+    0.05606,
+    -2.506787
+   ],
+   [
+    -1.780623,
+    1.800212,
+    2.709582
+   ],
+   [
+    -1.762901,
+    0.1186,
+    3.260641
+   ],
+   [
+    -0.26572,
+    1.093896,
+    3.346363
+   ]
+  ],
+  "symbols": [
+   "C",
+   "N",
+   "C",
+   "N",
+   "C",
+   "C",
+   "C",
+   "O",
+   "N",
+   "C",
+   "O",
+   "N",
+   "C",
+   "C",
+   "H",
+   "H",
+   "H",
+   "H",
+   "H",
+   "H",
+   "H",
+   "H",
+   "H",
+   "H"
+  ],
+  "bonds": [
+   [
+    0,
+    1,
+    1.0
+   ],
+   [
+    1,
+    2,
+    1.5
+   ],
+   [
+    2,
+    3,
+    1.5
+   ],
+   [
+    3,
+    4,
+    1.5
+   ],
+   [
+    4,
+    5,
+    1.5
+   ],
+   [
+    5,
+    6,
+    1.0
+   ],
+   [
+    6,
+    7,
+    2.0
+   ],
+   [
+    6,
+    8,
+    1.0
+   ],
+   [
+    8,
+    9,
+    1.0
+   ],
+   [
+    9,
+    10,
+    2.0
+   ],
+   [
+    9,
+    11,
+    1.0
+   ],
+   [
+    11,
+    12,
+    1.0
+   ],
+   [
+    8,
+    13,
+    1.0
+   ],
+   [
+    5,
+    1,
+    1.5
+   ],
+   [
+    11,
+    4,
+    1.0
+   ],
+   [
+    0,
+    14,
+    1.0
+   ],
+   [
+    0,
+    15,
+    1.0
+   ],
+   [
+    0,
+    16,
+    1.0
+   ],
+   [
+    2,
+    17,
+    1.0
+   ],
+   [
+    12,
+    18,
+    1.0
+   ],
+   [
+    12,
+    19,
+    1.0
+   ],
+   [
+    12,
+    20,
+    1.0
+   ],
+   [
+    13,
+    21,
+    1.0
+   ],
+   [
+    13,
+    22,
+    1.0
+   ],
+   [
+    13,
+    23,
+    1.0
+   ]
+  ],
+  "energy_eV": -1147.082576,
+  "energy_Eh": -42.154507,
+  "dipole_D": 3.977116,
+  "charges": [
+   -0.0622,
+   0.0017,
+   0.0877,
+   -0.2823,
+   0.1223,
+   -0.0391,
+   0.2642,
+   -0.4413,
+   -0.1154,
+   0.3136,
+   -0.4401,
+   -0.0754,
+   -0.051,
+   -0.0417,
+   0.0659,
+   0.0659,
+   0.1045,
+   0.0558,
+   0.0937,
+   0.0714,
+   0.0722,
+   0.0696,
+   0.0698,
+   0.0903
+  ],
+  "homo_eV": -10.588625,
+  "lumo_eV": -7.191972,
+  "gap_eV": 3.396653,
+  "method": "GFN2-xTB",
+  "frequencies_cm": [
+   36.1,
+   68.1,
+   84.4,
+   90.8,
+   103.0,
+   127.4,
+   151.9,
+   202.5,
+   236.4,
+   272.2,
+   282.8,
+   334.5,
+   364.5,
+   385.0,
+   405.2,
+   430.4,
+   465.2,
+   575.7,
+   580.9,
+   637.1,
+   649.3,
+   666.4,
+   690.7,
+   727.6,
+   795.1,
+   812.2,
+   926.5,
+   989.9,
+   1033.8,
+   1052.9,
+   1072.7,
+   1106.8,
+   1108.9,
+   1111.9,
+   1136.8,
+   1199.1,
+   1233.3,
+   1248.2,
+   1283.7,
+   1322.2,
+   1361.9,
+   1381.4,
+   1386.1,
+   1400.6,
+   1435.3,
+   1438.3,
+   1439.6,
+   1449.8,
+   1451.7,
+   1466.0,
+   1467.4,
+   1469.7,
+   1524.9,
+   1578.0,
+   1712.3,
+   1732.8,
+   2992.7,
+   3002.0,
+   3004.4,
+   3004.6,
+   3015.9,
+   3019.3,
+   3036.1,
+   3042.1,
+   3044.3,
+   3175.1
+  ],
+  "frequency_scale": 1.0,
+  "ir_km_mol": [
+   0.1,
+   0.85,
+   0.34,
+   0.52,
+   0.9,
+   9.23,
+   10.78,
+   8.23,
+   2.93,
+   0.64,
+   0.05,
+   10.1,
+   0.13,
+   18.98,
+   17.5,
+   2.28,
+   3.42,
+   2.89,
+   11.73,
+   1.33,
+   0.04,
+   42.71,
+   56.59,
+   10.23,
+   1.06,
+   3.64,
+   4.2,
+   47.08,
+   57.38,
+   12.34,
+   24.53,
+   0.32,
+   0.67,
+   0.24,
+   20.97,
+   9.79,
+   39.21,
+   47.66,
+   31.76,
+   91.48,
+   37.61,
+   8.09,
+   23.11,
+   3.53,
+   9.86,
+   17.13,
+   5.48,
+   136.71,
+   17.58,
+   33.28,
+   18.15,
+   3.02,
+   142.95,
+   214.79,
+   996.35,
+   482.77,
+   13.05,
+   10.85,
+   22.87,
+   11.85,
+   21.04,
+   14.33,
+   4.46,
+   1.13,
+   1.06,
+   2.53
+  ],
+  "mode_labels": [
+   "N-C-H bend",
+   "H-C-H bend",
+   "H-C-H bend",
+   "N-C-H bend",
+   "H-C-H bend",
+   "N-C-H bend",
+   "H-C-H bend",
+   "C-N-C bend",
+   "N-C-H bend",
+   "C-N-C bend",
+   "N-C-H bend",
+   "C-N-C bend",
+   "N-C-H bend",
+   "C-C-O bend",
+   "C-N-C bend",
+   "C-C-N bend",
+   "N-C-N bend",
+   "C-N-C bend",
+   "N-C-H bend",
+   "C-N-C bend",
+   "H-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "O-C-N bend",
+   "C-N-C bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "C-N stretch",
+   "N-C-H bend",
+   "C-N stretch",
+   "C-N stretch",
+   "C-N-C bend",
+   "H-C-H bend",
+   "N-C-H bend",
+   "N-C-H bend",
+   "C:N stretch",
+   "H-C-H bend",
+   "H-C-H bend",
+   "H-C-H bend",
+   "H-C-H bend",
+   "H-C-H bend",
+   "H-C-H bend",
+   "H-C-H bend",
+   "N-C-H bend",
+   "C-N stretch",
+   "C=O stretch",
+   "C=O stretch",
+   "C-H stretch",
+   "C-H stretch",
+   "C-H stretch",
+   "C-H stretch",
+   "C-H stretch",
+   "C-H stretch",
+   "C-H stretch",
+   "C-H stretch",
+   "C-H stretch",
+   "C-H stretch"
+  ],
+  "thermo": {
+   "T_K": 298.15,
+   "P_Pa": 101325.0,
+   "zpe_kJ_mol": 478.712568,
+   "H_corr_kJ_mol": 516.532298,
+   "S_J_molK": 470.809566,
+   "G_corr_kJ_mol": 376.160426,
+   "Cp_J_molK": 211.015539,
+   "symmetry_number": 1,
+   "parts": {
+    "S_translation": 174.457445,
+    "S_rotation": 130.737695,
+    "S_vibration": 165.614427,
+    "S_electronic": 0.0,
+    "Cp_translation": 20.786157,
+    "Cp_rotation": 12.471694,
+    "Cp_vibration": 177.757689
+   }
+  },
+  "G_total_eV": -1143.183948,
+  "solvation_kJ_mol": -43.901883,
+  "solvent": "water",
+  "_figures": [
+   [
+    "ir",
+    "Infrared spectrum from GFN2-xTB, broadened by 20 cm-1"
+   ]
+  ],
+  "files": {
+   "playback": "playback.json"
+  },
+  "resolved": [
+   "'caffeine' is caffeine (C8H10N4O2), from Wobbl's table of common substances"
+  ],
+  "physics": "spectrum",
+  "phases": {}
+ },
+ "images": {
+  "ir": "images/ir.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 22.407508,
+ "solver": "GFN2-xTB with tblite , RDKit conformers and ASE",
+ "criteria": []
+}

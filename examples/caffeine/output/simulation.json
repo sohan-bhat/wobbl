@@ -1,0 +1,76 @@
+{
+ "thing": "caffeine",
+ "question": "what does its structure and IR spectrum look like?",
+ "plan": {
+  "thing": "caffeine",
+  "question": "what does its structure and IR spectrum look like?",
+  "domain": "chemistry",
+  "kind": "molecule",
+  "analyses": [
+   "structure",
+   "spectrum"
+  ],
+  "reasons": [
+   {
+    "decided": "domain chemistry, as asked",
+    "override": "--domain chemistry"
+   },
+   {
+    "decided": "physics structure from \"structure\", spectrum from \"IR\"",
+    "override": "--physics structure,spectrum"
+   },
+   {
+    "decided": "structure answers \"what does its structure caffeine\"",
+    "override": ""
+   },
+   {
+    "decided": "spectrum answers \"IR spectrum look like caffeine\"",
+    "override": ""
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "chemistry",
+    "score": 8
+   }
+  ],
+  "focus": {
+   "structure": "what does its structure caffeine",
+   "spectrum": "IR spectrum look like caffeine"
+  }
+ },
+ "verdict": "pass",
+ "situation": {
+  "environment": {
+   "temperature": "298.15 K",
+   "pressure": "101.325 kPa"
+  }
+ },
+ "steps": [
+  {
+   "analysis": "structure",
+   "domain": "chemistry",
+   "verdict": "ok",
+   "headline": "caffeine (C8H10N4O2, 194.19 g/mol), by GFN2-xTB: its strongest IR band is at 1712 cm-1, the C=O stretch, its dipole is 3.98 D, dissolving in water is worth -43.9 kJ/mol. At 298 K its entropy is 470.8 J/(mol K) and its heat capacity 211.0 J/(mol K).",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/caffeine/output/structure",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/caffeine/output/structure/report.html",
+   "assumptions": [
+    {
+     "assumed": "temperature not given: assumed 25 C (298.15 K)",
+     "override": "--temperature '298.15 K'"
+    }
+   ]
+  },
+  {
+   "analysis": "spectrum",
+   "domain": "chemistry",
+   "verdict": "ok",
+   "headline": "caffeine (C8H10N4O2, 194.19 g/mol), by GFN2-xTB: its strongest IR band is at 1712 cm-1, the C=O stretch, its dipole is 3.98 D, dissolving in water is worth -43.9 kJ/mol. At 298 K its entropy is 470.8 J/(mol K) and its heat capacity 211.0 J/(mol K).",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/caffeine/output/spectrum",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/caffeine/output/spectrum/report.html",
+   "assumptions": []
+  }
+ ]
+}

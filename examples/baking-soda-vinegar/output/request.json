@@ -1,0 +1,18 @@
+{
+ "domain": "chemistry",
+ "analysis": "reaction",
+ "spec": {
+  "thing": "baking soda and vinegar",
+  "kind": "reaction",
+  "question": "how much gas does it make and does it get warm or cold?",
+  "options": {
+   "temperature": [
+    "298.15 K"
+   ],
+   "pressure": [
+    "101.325 kPa"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

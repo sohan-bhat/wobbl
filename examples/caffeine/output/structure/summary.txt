@@ -1,0 +1,23 @@
+OK. caffeine (C8H10N4O2, 194.19 g/mol), by GFN2-xTB: its strongest IR band is at 1712 cm-1, the C=O stretch, its dipole is 3.98 D, dissolving in water is worth -43.9 kJ/mol. At 298 K its entropy is 470.8 J/(mol K) and its heat capacity 211.0 J/(mol K).
+
+Confidence: high. passed geometry convergence, minimum, SCF convergence
+dipole: 3.98 D
+strongest IR band: 1712 cm-1
+HOMO-LUMO gap: 3.40 eV
+entropy at 298 K: 470.8 J/(mol K)
+
+Checks:
+  [pass] geometry convergence: GFN2-xTB stopped after 18 steps with the largest force at 0.0029 eV/A, under the 0.003 eV/A it aims for
+  [pass] minimum: all 66 frequencies are real, so the structure is a true minimum, after following 1 imaginary mode downhill
+  [pass] SCF convergence: all 612 GFN2-xTB single points converged within 300 iterations
+  [info] thermochemistry: ideal gas at 298 K and 101 kPa with a rotational symmetry number of 1, and 4 soft modes under 100 cm-1 treated as hindered rotors
+
+Assumptions:
+  - Wobbl guessed: temperature not given: assumed 25 C (298.15 K).
+  - caffeine as RDKit ETKDG distance geometry relaxed with MMFF94, the lowest of 1 conformers, refined with GFN2-xTB, good to about 0.02 A in bond lengths, 2.5 degrees in angles and 8% in frequencies.
+  - One molecule in the gas phase unless a solvent is named, and a solvent is a continuum (ALPB) rather than explicit molecules.
+  - Thermochemistry treats the molecule as an ideal gas, a rigid rotor and harmonic oscillators, with modes under 100 cm-1 blended into free rotors.
+  - The HOMO-LUMO gap from GFN2-xTB is a trend only, often off by over 1 eV, so it is not an optical gap.
+
+Images: ir: images/ir.png
+Report: report.html

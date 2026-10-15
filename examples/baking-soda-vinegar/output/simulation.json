@@ -1,0 +1,62 @@
+{
+ "thing": "baking soda and vinegar",
+ "question": "how much gas does it make and does it get warm or cold?",
+ "plan": {
+  "thing": "baking soda and vinegar",
+  "question": "how much gas does it make and does it get warm or cold?",
+  "domain": "chemistry",
+  "kind": "reaction",
+  "analyses": [
+   "reaction"
+  ],
+  "reasons": [
+   {
+    "decided": "domain chemistry, as asked",
+    "override": "--domain chemistry"
+   },
+   {
+    "decided": "physics reaction from \"gas\"",
+    "override": "--physics reaction"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "chemistry",
+    "score": 9
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "environment": {
+   "temperature": "298.15 K",
+   "pressure": "101.325 kPa",
+   "solvent": "water"
+  },
+  "objects": [
+   "beaker"
+  ]
+ },
+ "steps": [
+  {
+   "analysis": "reaction",
+   "domain": "chemistry",
+   "verdict": "ok",
+   "headline": "CH3COOH(aq) + NaHCO3(s) -> CH3COONa(aq) + H2O(l) + CO2(g) takes in 31.1 kJ per mole as written and goes forward on its own at 298 K (dG = -13.3 kJ, K = 214). At equilibrium 99.5% of it reacts at 1.01 bar. In 1201 g of vinegar at 5% it cools the solution by 6.2 K. It gives off 24.5 L of gas per mole at 298 K and 101 kPa.",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/baking-soda-vinegar/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/baking-soda-vinegar/output/report.html",
+   "assumptions": [
+    {
+     "assumed": "temperature not given: assumed 25 C (298.15 K)",
+     "override": "--temperature '298.15 K'"
+    },
+    {
+     "assumed": "pressure not given: assumed 1 atm",
+     "override": "--pressure '1 atm'"
+    }
+   ]
+  }
+ ]
+}

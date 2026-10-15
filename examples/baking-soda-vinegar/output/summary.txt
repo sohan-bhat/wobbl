@@ -1,0 +1,23 @@
+OK. CH3COOH(aq) + NaHCO3(s) -> CH3COONa(aq) + H2O(l) + CO2(g) takes in 31.1 kJ per mole as written and goes forward on its own at 298 K (dG = -13.3 kJ, K = 214). At equilibrium 99.5% of it reacts at 1.01 bar. In 1201 g of vinegar at 5% it cools the solution by 6.2 K. It gives off 24.5 L of gas per mole at 298 K and 101 kPa.
+
+Confidence: high. passed element and charge balance, data, equilibrium
+reaction enthalpy: 31.1 kJ
+Gibbs energy: -13.3 kJ
+equilibrium constant: K = 214
+temperature change: -6.2 K
+
+Checks:
+  [pass] element and charge balance: C, H, Na, O and charge balance exactly
+  [pass] data: every species comes from NASA Glenn thermodynamic data and NBS tables
+  [pass] equilibrium: at equilibrium 99.5% of the reactants have reacted, where the reaction quotient matches K = 10^2.33 to 1e-14 in its logarithm
+
+Assumptions:
+  - Wobbl guessed: temperature not given: assumed 25 C (298.15 K).
+  - Wobbl guessed: pressure not given: assumed 1 atm.
+  - The products come from an acid on a carbonate.
+  - Standard states, 1 bar for gases and 1 mol/kg for species in water, with data from NASA Glenn thermodynamic data (JANAF and ATcT based) and NBS tables (Wagman et al. 1982).
+  - Species in water are ideal, with activity equal to molality, which holds for dilute solutions.
+  - Thermodynamics says how far and with how much heat a reaction goes, not how fast. A reaction that can go may still need a spark, a catalyst or time.
+
+Images: gibbs: images/gibbs.png
+Report: report.html

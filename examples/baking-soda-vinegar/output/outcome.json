@@ -1,0 +1,165 @@
+{
+ "domain": "chemistry",
+ "part": "CH3COOH(aq) + NaHCO3(s) -> CH3COONa(aq) + H2O(l) + CO2(g)",
+ "question": "how much gas does it make and does it get warm or cold?",
+ "verdict": "ok",
+ "headline": "CH3COOH(aq) + NaHCO3(s) -> CH3COONa(aq) + H2O(l) + CO2(g) takes in 31.1 kJ per mole as written and goes forward on its own at 298 K (dG = -13.3 kJ, K = 214). At equilibrium 99.5% of it reacts at 1.01 bar. In 1201 g of vinegar at 5% it cools the solution by 6.2 K. It gives off 24.5 L of gas per mole at 298 K and 101 kPa.",
+ "metrics": [
+  [
+   "reaction enthalpy",
+   "31.1 kJ"
+  ],
+  [
+   "Gibbs energy",
+   "-13.3 kJ"
+  ],
+  [
+   "equilibrium constant",
+   "K = 214"
+  ],
+  [
+   "temperature change",
+   "-6.2 K"
+  ]
+ ],
+ "confidence": "high",
+ "confidence_reasons": [
+  "passed element and charge balance, data, equilibrium"
+ ],
+ "checks": [
+  {
+   "name": "element and charge balance",
+   "status": "pass",
+   "summary": "C, H, Na, O and charge balance exactly",
+   "detail": {}
+  },
+  {
+   "name": "data",
+   "status": "pass",
+   "summary": "every species comes from NASA Glenn thermodynamic data and NBS tables",
+   "detail": {
+    "sources": [
+     "NASA Glenn thermodynamic data (JANAF and ATcT based)",
+     "NBS tables (Wagman et al. 1982)"
+    ]
+   }
+  },
+  {
+   "name": "equilibrium",
+   "status": "pass",
+   "summary": "at equilibrium 99.5% of the reactants have reacted, where the reaction quotient matches K = 10^2.33 to 1e-14 in its logarithm",
+   "detail": {
+    "residual": 0.0
+   }
+  }
+ ],
+ "assumptions": [
+  "Wobbl guessed: temperature not given: assumed 25 C (298.15 K).",
+  "Wobbl guessed: pressure not given: assumed 1 atm.",
+  "The products come from an acid on a carbonate.",
+  "Standard states, 1 bar for gases and 1 mol/kg for species in water, with data from NASA Glenn thermodynamic data (JANAF and ATcT based) and NBS tables (Wagman et al. 1982).",
+  "Species in water are ideal, with activity equal to molality, which holds for dilute solutions.",
+  "Thermodynamics says how far and with how much heat a reaction goes, not how fast. A reaction that can go may still need a spark, a catalyst or time."
+ ],
+ "values": {
+  "equation": "CH3COOH(aq) + NaHCO3(s) -> CH3COONa(aq) + H2O(l) + CO2(g)",
+  "rule": "an acid on a carbonate",
+  "temperature_K": 298.15,
+  "pressure_Pa": 101325.0,
+  "dH_kJ": 31.103871,
+  "dS_J_K": 148.924972,
+  "dG_kJ": -13.298109,
+  "log10K": 2.329728,
+  "species": [
+   {
+    "species": "CH3COOH",
+    "phase": "aq",
+    "coef": -1.0,
+    "H_kJ_mol": -485.76,
+    "S_J_molK": 178.7,
+    "source": "NBS tables (Wagman et al. 1982)",
+    "name": "vinegar(aq)",
+    "covers": true
+   },
+   {
+    "species": "NaHCO3",
+    "phase": "s",
+    "coef": -1.0,
+    "H_kJ_mol": -950.81,
+    "S_J_molK": 101.7,
+    "source": "NBS tables (Wagman et al. 1982)",
+    "name": "sodium bicarbonate(s)",
+    "covers": true
+   },
+   {
+    "species": "CH3COONa",
+    "phase": "aq",
+    "coef": 1.0,
+    "H_kJ_mol": -726.13,
+    "S_J_molK": 145.6,
+    "source": "NBS tables (Wagman et al. 1982)",
+    "name": "sodium acetate as 1 Na+ + 1 C2H3O2-",
+    "covers": true
+   },
+   {
+    "species": "H2O",
+    "phase": "l",
+    "coef": 1.0,
+    "H_kJ_mol": -285.828371,
+    "S_J_molK": 69.938705,
+    "source": "NASA Glenn thermodynamic data (JANAF and ATcT based)",
+    "name": "H2O(L)",
+    "covers": true
+   },
+   {
+    "species": "CO2",
+    "phase": "g",
+    "coef": 1.0,
+    "H_kJ_mol": -393.507758,
+    "S_J_molK": 213.786267,
+    "source": "NASA Glenn thermodynamic data (JANAF and ATcT based)",
+    "name": "CO2",
+    "covers": true
+   }
+  ],
+  "dH298_kJ": 31.103871,
+  "dG298_kJ": -13.298109,
+  "crossover_K": null,
+  "vapour_dH_kJ": null,
+  "reactant_mass_g": 144.057769,
+  "heat_kJ_per_kg": -215.912488,
+  "gas_mol": 1.0,
+  "gas_L": 24.465404,
+  "gas_from_condensed": true,
+  "adiabatic": {
+   "rise_K": -6.189639,
+   "solution_g": 1201.04,
+   "basis": "1201 g of vinegar at 5%",
+   "kind": "solution"
+  },
+  "equilibrium": {
+   "extent": 0.995302,
+   "log10K": 2.329728,
+   "how": "activities"
+  },
+  "_figures": [
+   [
+    "gibbs",
+    "Reaction Gibbs energy against temperature, below zero it goes forward"
+   ]
+  ],
+  "files": {
+   "playback": "playback.json"
+  }
+ },
+ "images": {
+  "gibbs": "images/gibbs.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 5.927433,
+ "solver": "Wobbl reaction thermochemistry on NASA Glenn and NBS data, equilibrium with Cantera",
+ "criteria": []
+}
