@@ -21,5 +21,4 @@ material. A coarse solid model run beside it gives 0.208 mm of dent and 8.3 MPa 
 spot, 6% and 17% from the shell, so confidence is medium and the numbers carry that margin. The
 shell holds this press with a wide margin either way.
 
-Thin walls on a box need over 100k nodes per mesh, so the study takes about a minute and a half
-on a 2018 six core laptop.
+The study takes about a minute and a half on a 2018 six core laptop.
