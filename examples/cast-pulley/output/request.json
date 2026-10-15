@@ -1,0 +1,21 @@
+{
+ "domain": "part",
+ "analysis": "casting",
+ "spec": {
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a4f2acd6793533012/examples/cast-pulley/pulley.py",
+  "kind": "parametric",
+  "question": "Will the hub of this sand cast aluminum pulley shrink and leave porosity?",
+  "options": {
+   "material": [
+    "a356"
+   ],
+   "alloy": [
+    "a356"
+   ],
+   "mold": [
+    "sand"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

@@ -1,0 +1,203 @@
+{
+ "domain": "casting",
+ "part": "../pulley.py",
+ "question": "Will the hub of this sand cast aluminum pulley shrink and leave porosity?",
+ "verdict": "marginal",
+ "headline": "Freezes sound in 2.2 min, fed throughout by the risers, which freeze at 2.24 min, with at most 0.466% Niyama porosity.",
+ "metrics": [
+  [
+   "freezes in",
+   "2.2 min"
+  ],
+  [
+   "shrinkage pockets",
+   "0"
+  ],
+  [
+   "worst porosity",
+   "0.466%"
+  ],
+  [
+   "riser time ratio",
+   "1.02"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "process estimate: freezing times follow the latent heat (321 to 500 kJ/kg between sources, up to 40% on time) and the mold's heat uptake, which varies about 20% with sand and compaction"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "time for 99% of the casting to freeze settled: 127 -> 130 s over 2 meshes, last change 1.9%",
+   "detail": {
+    "values": [
+     127.248367,
+     129.715066
+    ],
+    "last_change": 0.019016,
+    "tolerance": 0.05,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "time step",
+   "status": "pass",
+   "summary": "half the time step moves the freezing time from 127 to 127 s (0.13%)",
+   "detail": {
+    "change": 0.001277
+   }
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "the cooling metal and sand give up 278 kJ, the rest of the mold takes it in and 0.00822 kJ leaves its outside, closing to 4.7e-07%",
+   "detail": {
+    "stored_J": -8.223583,
+    "lost_J": 8.222274,
+    "supplied_J": 0.0,
+    "moved_J": 277609.463822,
+    "error": 0.0
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "info",
+   "summary": "Chvorinov's rule with modulus V/A = 3.58 mm and mold constant 611 s/cm2 gives 1.31 min, and the casting freezes in 2.2 min here (1.68x), a spread that comes from a shape far from compact, which a single modulus cannot capture",
+   "detail": {
+    "chvorinov_s": 78.311784,
+    "ratio": 1.684166
+   }
+  },
+  {
+   "name": "feeding",
+   "status": "pass",
+   "summary": "every part of the casting freezes before the metal on its path back to a riser does, so liquid can reach it as it shrinks",
+   "detail": {}
+  },
+  {
+   "name": "riser",
+   "status": "warn",
+   "summary": "the risers freeze at 2.24 min, 1.02x the casting, and by hand the riser's modulus is 1.50x the casting's against the rule of thumb of 1.2x",
+   "detail": {
+    "time_ratio": 1.018172,
+    "modulus_ratio": 1.496421
+   }
+  },
+  {
+   "name": "porosity",
+   "status": "warn",
+   "summary": "the dimensionless Niyama criterion gives at most 0.466% shrinkage porosity, at (-4.48, 7.07, -6.66) mm, with 5.8% of the casting over 0.1%",
+   "detail": {
+    "max_pct": 0.465879,
+    "share_over_0.1pct": 0.058481
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "poured at 720 C into silica sand, bonded at 25 C, a 151 cm3 casting frozen after 2.2 min",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Wobbl guessed: no riser given, so Wobbl places risers over the hot spots by the modulus rule and checks them.",
+  "No risers were given, so Wobbl placed 1 over the hot spots of a coarse freeze without them, each sized by the modulus rule: riser d=25 h=37.5 at -3.1,6.3,21.",
+  "Aluminum A356 (Al-7Si-0.3Mg): liquidus 616 C, solidus 551 C, latent heat 403 kJ/kg, 151 W/(m K), 963 J/(kg K), 2670 kg/m3, shrinkage on freezing 5.57%. Sources: liquidus, freezing range, shrinkage and Niyama data from Carlson and Beckermann 2009; latent heat 403 kJ/kg as quoted for A356.0 by the ABM 2015 thermal analysis study (measured values run from 321 to 500 kJ/kg); density, conductivity and specific heat from MatWeb A356.0-T6; Scheil curve with k = 0.13 and the Al-Si eutectic at 577 C.",
+  "Silica sand, bonded: 0.5 W/(m K), 1600 kg/m3, 1050 J/(kg K), 26.5 mm thick around the part, its outside cooled at 10 W/(m2 K) to 25 C. Sources: 0.5 W/(m K) and 1600 kg/m3 as in common foundry cost models (laser flash measurements give 0.34 to 0.4 W/(m K)); 1050 J/(kg K) is the 25 to 1300 C mean measured for silica sand in J. Japan Foundrymen's Society 49 (1977) 747.",
+  "The cavity fills at once with metal at 720 C, so the gating and the cooling while it fills are not modeled.",
+  "Metal and mold touch perfectly throughout. The air gap that opens as the casting shrinks slows cooling late in freezing, so real freezing times run somewhat longer.",
+  "Shrinkage is fed only along paths of metal that freezes later. Gas porosity from hydrogen is not modeled, which assumes well degassed metal.",
+  "Risers are blind cylinders sitting on the casting and poured at the same temperature. The part is cast the way it is drawn, with +z up.",
+  "Porosity comes from the dimensionless Niyama criterion of Carlson and Beckermann (2009), with the thermal gradient and cooling rate taken 10% of the freezing range above the solidus."
+ ],
+ "values": {
+  "process": "casting",
+  "t_casting_s": 131.890026,
+  "t_riser_s": 134.286746,
+  "chvorinov_s": 78.311784,
+  "modulus_mm": 3.579971,
+  "pour_C": 720.0,
+  "alloy": "a356",
+  "mold": "sand",
+  "risers": [
+   "riser d=25 h=37.5 at -3.1,6.3,21"
+  ],
+  "risers_placed": true,
+  "pockets": [],
+  "porosity_max_pct": 0.465879,
+  "porosity_xyz": [
+   -4.480549,
+   7.073827,
+   -6.655706
+  ],
+  "last_xyz": [
+   -3.001673,
+   6.323761,
+   21.0
+  ],
+  "levels": [
+   {
+    "nodes": 73135,
+    "t_casting_s": 129.183798,
+    "t99_s": 127.248367,
+    "steps": 401
+   },
+   {
+    "nodes": 145386,
+    "t_casting_s": 131.890026,
+    "t99_s": 129.715066,
+    "steps": 413
+   }
+  ],
+  "_figures": [
+   [
+    "freezing",
+    "Time to freeze, cut through the last spot to freeze"
+   ],
+   [
+    "porosity",
+    "Shrinkage porosity from the Niyama criterion, cut through its worst spot"
+   ],
+   [
+    "curves",
+    "Solid fraction of the casting and risers over time"
+   ]
+  ]
+ },
+ "images": {
+  "freezing": "images/freezing.png",
+  "porosity": "images/porosity.png",
+  "curves": "images/curves.png"
+ },
+ "fixes": [
+  {
+   "kind": "riser",
+   "title": "Make the riser about 1.1x wider",
+   "summary": "The risers freeze at 1.02x the casting's time and should outlast it by 1.2x. Freezing time grows with the square of the modulus, so a riser about 1.1x the diameter, or an insulating sleeve, gives that margin.",
+   "auto": false
+  },
+  {
+   "kind": "gradient",
+   "title": "Steepen the freezing toward the riser",
+   "summary": "Porosity of 0.466% at (-4.48, 7.07, -6.66) mm comes from a shallow thermal gradient late in freezing. Taper the section so it thickens toward the riser, or chill the far end, so that region freezes in a clear order.",
+   "auto": false
+  }
+ ],
+ "notes": [
+  "Built from pulley.py with rim_od=120, rim_wall=8, rim_width=24, web=6, hub_od=40, hub_length=36, bore=14."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 3369.43933,
+ "solver": "Wobbl enthalpy solver (scipy), 145,386 nodes",
+ "criteria": [
+  {
+   "name": "porosity",
+   "value": "porosity_max_pct",
+   "limit": 1.0,
+   "sense": "max"
+  }
+ ]
+}

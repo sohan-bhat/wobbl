@@ -1,0 +1,35 @@
+MARGINAL. Freezes sound in 2.2 min, fed throughout by the risers, which freeze at 2.24 min, with at most 0.466% Niyama porosity.
+
+Confidence: medium. process estimate: freezing times follow the latent heat (321 to 500 kJ/kg between sources, up to 40% on time) and the mold's heat uptake, which varies about 20% with sand and compaction
+freezes in: 2.2 min
+shrinkage pockets: 0
+worst porosity: 0.466%
+riser time ratio: 1.02
+
+Checks:
+  [pass] mesh convergence: time for 99% of the casting to freeze settled: 127 -> 130 s over 2 meshes, last change 1.9%
+  [pass] time step: half the time step moves the freezing time from 127 to 127 s (0.13%)
+  [pass] energy balance: the cooling metal and sand give up 278 kJ, the rest of the mold takes it in and 0.00822 kJ leaves its outside, closing to 4.7e-07%
+  [info] hand calculation: Chvorinov's rule with modulus V/A = 3.58 mm and mold constant 611 s/cm2 gives 1.31 min, and the casting freezes in 2.2 min here (1.68x), a spread that comes from a shape far from compact, which a single modulus cannot capture
+  [pass] feeding: every part of the casting freezes before the metal on its path back to a riser does, so liquid can reach it as it shrinks
+  [warn] riser: the risers freeze at 2.24 min, 1.02x the casting, and by hand the riser's modulus is 1.50x the casting's against the rule of thumb of 1.2x
+  [warn] porosity: the dimensionless Niyama criterion gives at most 0.466% shrinkage porosity, at (-4.48, 7.07, -6.66) mm, with 5.8% of the casting over 0.1%
+  [pass] units and sanity: poured at 720 C into silica sand, bonded at 25 C, a 151 cm3 casting frozen after 2.2 min
+
+Assumptions:
+  - Wobbl guessed: no riser given, so Wobbl places risers over the hot spots by the modulus rule and checks them.
+  - No risers were given, so Wobbl placed 1 over the hot spots of a coarse freeze without them, each sized by the modulus rule: riser d=25 h=37.5 at -3.1,6.3,21.
+  - Aluminum A356 (Al-7Si-0.3Mg): liquidus 616 C, solidus 551 C, latent heat 403 kJ/kg, 151 W/(m K), 963 J/(kg K), 2670 kg/m3, shrinkage on freezing 5.57%. Sources: liquidus, freezing range, shrinkage and Niyama data from Carlson and Beckermann 2009; latent heat 403 kJ/kg as quoted for A356.0 by the ABM 2015 thermal analysis study (measured values run from 321 to 500 kJ/kg); density, conductivity and specific heat from MatWeb A356.0-T6; Scheil curve with k = 0.13 and the Al-Si eutectic at 577 C.
+  - Silica sand, bonded: 0.5 W/(m K), 1600 kg/m3, 1050 J/(kg K), 26.5 mm thick around the part, its outside cooled at 10 W/(m2 K) to 25 C. Sources: 0.5 W/(m K) and 1600 kg/m3 as in common foundry cost models (laser flash measurements give 0.34 to 0.4 W/(m K)); 1050 J/(kg K) is the 25 to 1300 C mean measured for silica sand in J. Japan Foundrymen's Society 49 (1977) 747.
+  - The cavity fills at once with metal at 720 C, so the gating and the cooling while it fills are not modeled.
+  - Metal and mold touch perfectly throughout. The air gap that opens as the casting shrinks slows cooling late in freezing, so real freezing times run somewhat longer.
+  - Shrinkage is fed only along paths of metal that freezes later. Gas porosity from hydrogen is not modeled, which assumes well degassed metal.
+  - Risers are blind cylinders sitting on the casting and poured at the same temperature. The part is cast the way it is drawn, with +z up.
+  - Porosity comes from the dimensionless Niyama criterion of Carlson and Beckermann (2009), with the thermal gradient and cooling rate taken 10% of the freezing range above the solidus.
+
+Suggested fixes:
+  - Make the riser about 1.1x wider: The risers freeze at 1.02x the casting's time and should outlast it by 1.2x. Freezing time grows with the square of the modulus, so a riser about 1.1x the diameter, or an insulating sleeve, gives that margin.
+  - Steepen the freezing toward the riser: Porosity of 0.466% at (-4.48, 7.07, -6.66) mm comes from a shallow thermal gradient late in freezing. Taper the section so it thickens toward the riser, or chill the far end, so that region freezes in a clear order.
+
+Images: freezing: images/freezing.png, porosity: images/porosity.png, curves: images/curves.png
+Report: report.html
