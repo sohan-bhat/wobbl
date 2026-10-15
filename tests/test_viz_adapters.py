@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from wobbl.viz.adapters import build_scene
 from wobbl.viz.scene import load
@@ -162,6 +163,7 @@ def test_thrown_ball_is_drawn_at_its_size(tmp_path):
     X = array(h, blob, ball["pos"])
     assert 0.15 < np.ptp(X[:, 0]) < 0.3
 
+
 def test_antenna_wave_plays_one_cycle(tmp_path):
     from wobbl.fields import playback as fp
     r, z = np.meshgrid(np.linspace(0, 1, 18), np.linspace(0, 1, 14))
@@ -195,3 +197,44 @@ def test_heat_pack_draws_its_cells(tmp_path):
     cells = [o for o in h["objects"] if o.get("name", "").startswith("cell ")]
     assert len(cells) == 4 and all("field" in c for c in cells)
     assert h["title"] == "The 4 cell pack heating up"
+
+
+MOTOR = """
+name = "t"
+propellant = "knsb"
+[[grain]]
+shape = "{shape}"
+diameter = "38 mm"
+length = "60 mm"
+count = 2
+{extra}
+[nozzle]
+throat = "8 mm"
+exit = "20 mm"
+[casing]
+material = "6061-t6"
+outer_diameter = "44 mm"
+wall = "2 mm"
+length = "130 mm"
+target_sf = 2
+"""
+
+
+@pytest.mark.parametrize("shape,extra", [("star", 'points = 5\npoint_length = "6 mm"\npoint_width = "3 mm"'),
+                                         ("tube", 'core = "12 mm"')])
+def test_motor_grains_regress_in_a_cutaway(tmp_path, shape, extra):
+    from wobbl.chem.motor import run_motor
+    from wobbl.chem.spec import read_spec
+    from wobbl.viz.scene import array
+    run_motor(read_spec(MOTOR.format(shape=shape, extra=extra)), tmp_path, render=False)
+    assert build_scene(tmp_path)
+    h, blob = load(tmp_path / "scene.wobbl")
+    names = _names(h)
+    assert {"casing", "grain", "grain 2", "burning port", "nozzle", "exhaust"} <= names
+    port = next(o for o in h["objects"] if o.get("name") == "burning port")
+    d = array(h, blob, port["deform"]["frames"])
+    r = np.hypot(*(array(h, blob, port["pos"])[None, :, :2] + d[:, :, :2]).transpose(2, 0, 1))
+    assert r[-1].mean() > r[0].mean() + 3                 # the port has grown
+    if shape == "star":
+        assert np.ptp(r[0]) > 2                           # and its outline is not a circle
+    assert {r["name"] for r in h["readouts"]} >= {"thrust", "chamber pressure", "hoop stress"}

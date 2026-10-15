@@ -38,6 +38,9 @@ def build_scene(out_dir: str | Path):
     if kind == "mechanism":
         from . import mechanism
         return mechanism.build(out, pb)
+    if kind == "solid-motor":
+        from . import motor
+        return motor.build(out, pb, o)
     if kind in CHEM:
         from . import chem
         return chem.build(out, pb)

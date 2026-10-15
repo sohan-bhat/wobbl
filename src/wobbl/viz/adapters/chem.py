@@ -26,74 +26,8 @@ MOLECULES = {
 def build(out: Path, pb: dict) -> Path | None:
     kind = pb.get("manifest", {}).get("kind") or pb.get("kind")
     o = read(out, "outcome.json") or {}
-    fn = {"solid-motor": motor, "flame": flame, "cell-runaway": runaway, "nozzle": nozzle}.get(kind)
+    fn = {"flame": flame, "cell-runaway": runaway, "nozzle": nozzle}.get(kind)
     return fn(out, pb, o) if fn else None
-
-
-def _grain(R, r, z0, z1, seg=40):
-    return lathe([(r, z0), (R, z0), (R, z1), (r, z1), (r, z0)], seg)
-
-
-def motor(out, pb, o):
-    m, fr = pb["motor"], pb["frames"]
-    t = np.array([f["t"] for f in fr], float)
-    Pm = np.array([f["P_MPa"] for f in fr], float)
-    Fn = np.array([f["F_N"] for f in fr], float)
-    s = Scene(f"{m.get('name', 'Motor')} burning on a test stand", domain="motor", question=o.get("question", ""),
-              length="mm", source="Each grain's port grows and its ends burn back as the run's regression says.")
-    s.timeline(t, unit="s", label="time", seconds=max(5, min(3 * t[-1], 12)), between="interpolated")
-    case = m.get("casing") or {}
-    Ro = (case.get("outer_mm") or max(g["diameter_mm"] for g in pb["grain_types"]) + 4) / 2
-    Ri = (case.get("inner_mm") or Ro * 2 - 3) / 2
-    L = case.get("length_mm") or sum(g["length_mm"] for g in pb["grains"])
-    X, T = lathe([(Ri, 0), (Ro, 0), (Ro, L), (Ri, L)], 48)
-    shell = s.mesh(X, T, name="casing", color="#b9bdc4", opacity=0.3, smooth=True)
-    py = case.get("yield_pressure_MPa")
-    if py:
-        shell.color_by("chamber pressure over yield pressure", np.outer(Pm / py, np.ones(len(X))), colormap="heat",
-                       range=(0, 1), limit=1, limit_label="yield")
-    for slot in pb["grains"]:
-        g = pb["grain_types"][slot["type"]]
-        z0, L0 = slot["z_mm"], slot["length_mm"]
-        R = g["diameter_mm"] / 2
-        core0 = (g.get("core_mm") or [0])[0] / 2
-        Xg, Tg = _grain(R, max(core0, 0.5), z0, z0 + L0)
-        U = np.zeros((len(t), len(Xg), 3))
-        rad = np.hypot(Xg[:, 0], Xg[:, 1])
-        inner = rad < (core0 + R) / 2
-        for k in range(len(t)):
-            core = (g.get("core_mm") or [core0 * 2] * len(t))[k] / 2
-            now = (g.get("length_now_mm") or [L0] * len(t))[k]
-            shrink = (L0 - now) / 2
-            if core > core0 and inner.any():
-                U[k, inner, :2] = Xg[inner, :2] / np.maximum(rad[inner], 1e-9)[:, None] * (core - core0)
-            U[k, :, 2] = np.where(Xg[:, 2] < z0 + L0 / 2, shrink, -shrink)
-        gm = s.mesh(Xg, Tg, name="grain", color="#d8c08a")
-        gm.deform(U)
-    s.notes = [n for n in s.notes if not n.startswith("Deformation")]
-    noz = m.get("nozzle", {})
-    rt, re_ = noz.get("throat_mm", Ri * 0.4) / 2, noz.get("exit_mm", Ri) / 2
-    Xn, Tn = lathe([(Ro, 0), (Ri * 0.95, -Ri * 0.4), (rt, -Ri * 0.7), (re_, -Ri * 0.7 - (re_ - rt) / np.tan(0.26))], 40)
-    s.mesh(Xn, Tn, name="nozzle", color="#8d939b")
-    plume_len = Fn / max(Fn.max(), 1e-9) * L * 0.8
-    zt = -Ri * 0.7 - (re_ - rt) / np.tan(0.26)
-    pl = s.body("cone", [re_ * 1.3, L * 0.4], pos=[0, 0, zt - L * 0.4],
-                quat=[0, 1, 0, 0], color="#ff9a3c", name="exhaust", prop=True, opacity=0.55)
-    pl.light(np.clip(plume_len / max(plume_len.max(), 1e-9), 0, 1))
-    s.note("The exhaust is drawn for the eye, glowing with the thrust; the motor fires downward on its stand.")
-    s.body("box", [Ro * 2.2, Ro * 2.2, 4], pos=[0, 0, L + 4], color=P.STEEL, name="test stand", prop=True)
-    s.readout("chamber pressure", Pm, unit="MPa", digits=3, limit=py / (case.get("target_sf") or 1) if py else None)
-    s.readout("thrust", Fn, unit="N", digits=4)
-    s.readout("Kn", [f["kn"] for f in fr], digits=3)
-    s.readout("propellant left", [f["propellant_kg"] for f in fr], unit="kg", digits=3)
-    k = int(np.argmax(Pm))
-    s.event(float(t[k]), "peak pressure", f"{Pm[k]:.3g} MPa")
-    on = np.nonzero(Fn > 0.05 * Fn.max())[0]
-    if len(on):
-        s.event(float(t[on[-1]]), "burnout")
-    verdict(s, o)
-    s.camera(target=[0, 0, L * 0.3], direction=(1, -0.9, 0.25), distance=L * 2.6)
-    return s.save(out)
 
 
 def _place(counts: dict, order: list, slots: np.ndarray, rng) -> dict:
