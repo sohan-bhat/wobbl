@@ -1,0 +1,781 @@
+{
+ "items": 48,
+ "succeeded": 30,
+ "ran": 44,
+ "timed_out": 4,
+ "quality": "fast",
+ "limit_s": 1500,
+ "by_process": {
+  "print": {
+   "cases": 16,
+   "passed": 15,
+   "ran": 16,
+   "timed_out": 0
+  },
+  "casting": {
+   "cases": 16,
+   "passed": 7,
+   "ran": 15,
+   "timed_out": 1
+  },
+  "molding": {
+   "cases": 16,
+   "passed": 8,
+   "ran": 13,
+   "timed_out": 3
+  }
+ },
+ "rows": [
+  {
+   "id": "drone-arm-print",
+   "part": "drone-arm",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 2.12 mm off flat, over the 0.8 mm tolerance, with a corner lifting 2.07 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1645,
+   "seconds": 298.4
+  },
+  {
+   "id": "drone-arm-casting",
+   "part": "drone-arm",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": false,
+   "verdict": "marginal",
+   "confidence": "low",
+   "headline": "Freezes sound in 1.01 min, fed throughout by the risers, which freeze at 1.04 min, with at most 0.88% Niyama porosity.",
+   "failed_checks": [
+    "mesh convergence: time for 99% of the casting to freeze not converged: 46.8 -> 59.5 s, last change 21.4%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 1086,
+   "seconds": 1024.1
+  },
+  {
+   "id": "drone-arm-molding",
+   "part": "drone-arm",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": false,
+   "verdict": "ok",
+   "confidence": "low",
+   "headline": "Fills in 0.83 s from the gate at (69, 8, 13.2) mm at 0.96 to 1.04 MPa against a 150 MPa machine.",
+   "failed_checks": [
+    "mesh convergence: pressure at the switch to packing not converged: 0.827 -> 0.96 MPa, last change 13.9%. The number is not reliable yet; run with --quality fine or a longer --budget",
+    "time step: filling twice as much per step moves the switch pressure from 0.827 to 1.32 MPa (60%)"
+   ],
+   "warned": [],
+   "size_kb": 840,
+   "seconds": 548.0
+  },
+  {
+   "id": "carbon-arm-print",
+   "part": "carbon-arm",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 7.37 mm off flat, over the 1.2 mm tolerance, with a corner lifting 7.37 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1556,
+   "seconds": 325.4
+  },
+  {
+   "id": "carbon-arm-casting",
+   "part": "carbon-arm",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": false,
+   "verdict": "marginal",
+   "confidence": "low",
+   "headline": "Freezes sound in 0.0293 min, fed throughout by the risers, which freeze at 0.0447 min, with at most 0.139% Niyama porosity.",
+   "failed_checks": [
+    "mesh convergence: time for 99% of the casting to freeze not converged: 0.849 -> 1.13 s, last change 24.9%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 2555,
+   "seconds": 1404.9
+  },
+  {
+   "id": "carbon-arm-molding",
+   "part": "carbon-arm",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": false,
+   "verdict": "ok",
+   "confidence": "low",
+   "headline": "Fills in 2.18 s from the gate at (207, -10.3, -5.16) mm at 14.7 to 19.4 MPa against a 150 MPa machine, with 3 weld lines.",
+   "failed_checks": [
+    "time step: filling twice as much per step moves the switch pressure from 15 to 17.1 MPa (14%)"
+   ],
+   "warned": [
+    "volume balance"
+   ],
+   "size_kb": 790,
+   "seconds": 730.2
+  },
+  {
+   "id": "enclosure-print",
+   "part": "enclosure",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Comes off the bed 0.187 mm out of flat against a 0.4 mm tolerance.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 2128,
+   "seconds": 401.0
+  },
+  {
+   "id": "enclosure-casting",
+   "part": "enclosure",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": false,
+   "verdict": "marginal",
+   "confidence": "low",
+   "headline": "Freezes sound in 0.438 min, fed throughout by the risers, which freeze at 0.51 min, with at most 0.478% Niyama porosity.",
+   "failed_checks": [
+    "mesh convergence: time for 99% of the casting to freeze not converged: 20.5 -> 25.3 s, last change 19.2%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 1712,
+   "seconds": 597.0
+  },
+  {
+   "id": "enclosure-molding",
+   "part": "enclosure",
+   "source": "example",
+   "process": "molding",
+   "ran": false,
+   "ok": false,
+   "timed_out": true,
+   "seconds": 1500.1,
+   "error": "timed out after 1500 s and was stopped"
+  },
+  {
+   "id": "heat-sink-print",
+   "part": "heat-sink",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 0.44 mm off flat, over the 0.4 mm tolerance, with a corner lifting 0.44 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1840,
+   "seconds": 710.3
+  },
+  {
+   "id": "heat-sink-casting",
+   "part": "heat-sink",
+   "source": "example",
+   "process": "casting",
+   "ran": false,
+   "ok": false,
+   "timed_out": true,
+   "seconds": 1500.1,
+   "error": "timed out after 1500 s and was stopped"
+  },
+  {
+   "id": "heat-sink-molding",
+   "part": "heat-sink",
+   "source": "example",
+   "process": "molding",
+   "ran": false,
+   "ok": false,
+   "timed_out": true,
+   "seconds": 1500.1,
+   "error": "timed out after 1500 s and was stopped"
+  },
+  {
+   "id": "motor-mount-print",
+   "part": "motor-mount",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 0.482 mm off flat, over the 0.4 mm tolerance, with a corner lifting 0.482 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1766,
+   "seconds": 284.3
+  },
+  {
+   "id": "motor-mount-casting",
+   "part": "motor-mount",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Freezes sound in 0.583 min, fed throughout by the risers, which freeze at 0.591 min, with at most 2.3% Niyama porosity.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1967,
+   "seconds": 1118.0
+  },
+  {
+   "id": "motor-mount-molding",
+   "part": "motor-mount",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Fills in 0.566 s from the gate at (0.591, 10.1, 5) mm at 0.706 to 0.734 MPa against a 150 MPa machine.",
+   "failed_checks": [],
+   "warned": [
+    "time step"
+   ],
+   "size_kb": 836,
+   "seconds": 700.7
+  },
+  {
+   "id": "shelf-bracket-print",
+   "part": "shelf-bracket",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 0.696 mm off flat, over the 0.4 mm tolerance, with a corner lifting 0.696 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1364,
+   "seconds": 259.2
+  },
+  {
+   "id": "shelf-bracket-casting",
+   "part": "shelf-bracket",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": true,
+   "verdict": "marginal",
+   "confidence": "medium",
+   "headline": "Freezes sound in 0.795 min, fed throughout by the risers, which freeze at 0.886 min, with at most 0.134% Niyama porosity.",
+   "failed_checks": [],
+   "warned": [
+    "mesh convergence"
+   ],
+   "size_kb": 1322,
+   "seconds": 881.6
+  },
+  {
+   "id": "shelf-bracket-molding",
+   "part": "shelf-bracket",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": false,
+   "verdict": "ok",
+   "confidence": "low",
+   "headline": "Fills in 0.852 s from the gate at (18.5, 8.1, 6) mm at 0.692 to 0.715 MPa against a 150 MPa machine.",
+   "failed_checks": [
+    "time step: filling twice as much per step moves the switch pressure from 0.692 to 0.631 MPa (8.8%)"
+   ],
+   "warned": [],
+   "size_kb": 668,
+   "seconds": 488.7
+  },
+  {
+   "id": "bracket-crack-print",
+   "part": "bracket-crack",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 0.96 mm off flat, over the 0.8 mm tolerance, with a corner lifting 0.939 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1343,
+   "seconds": 99.5
+  },
+  {
+   "id": "bracket-crack-casting",
+   "part": "bracket-crack",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": true,
+   "verdict": "marginal",
+   "confidence": "medium",
+   "headline": "Freezes sound in 0.584 min, fed throughout by the risers, which freeze at 0.647 min, with at most 0.306% Niyama porosity.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1602,
+   "seconds": 842.1
+  },
+  {
+   "id": "bracket-crack-molding",
+   "part": "bracket-crack",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Fills in 0.566 s from the gate at (52, 4.27, 5) mm at 0.503 to 0.524 MPa against a 150 MPa machine.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 638,
+   "seconds": 186.2
+  },
+  {
+   "id": "steel-hook-print",
+   "part": "steel-hook",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": false,
+   "verdict": "ok",
+   "confidence": "low",
+   "headline": "Comes off the bed 0.0711 mm out of flat against a 0.4 mm tolerance.",
+   "failed_checks": [
+    "mesh convergence: flatness after release not converged: 0.0613 -> 0.0711 mm, last change 13.8%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 733,
+   "seconds": 69.4
+  },
+  {
+   "id": "steel-hook-casting",
+   "part": "steel-hook",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": false,
+   "verdict": "marginal",
+   "confidence": "low",
+   "headline": "Freezes sound in 0.849 min, fed throughout by the risers, which freeze at 0.926 min, with at most 0.72% Niyama porosity.",
+   "failed_checks": [
+    "mesh convergence: time for 99% of the casting to freeze not converged: 43 -> 50.1 s, last change 14.2%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 812,
+   "seconds": 238.9
+  },
+  {
+   "id": "steel-hook-molding",
+   "part": "steel-hook",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Fills in 0.929 s from the gate at (6, 5, 42.4) mm at 0.37 to 0.379 MPa against a 150 MPa machine.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 390,
+   "seconds": 76.2
+  },
+  {
+   "id": "strut-print",
+   "part": "strut",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Comes off the bed 0.0165 mm out of flat against a 1.2 mm tolerance.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1107,
+   "seconds": 274.2
+  },
+  {
+   "id": "strut-casting",
+   "part": "strut",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": false,
+   "verdict": "fails",
+   "confidence": "low",
+   "headline": "Shrinkage pocket of about 4.61 cm3 near (-6.14, 3.36, 443) mm, which freezes last at 0.144 min cut off from the risers.",
+   "failed_checks": [
+    "mesh convergence: time for 99% of the casting to freeze not converged: 5.29 -> 9.31 s, last change 43.2%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 1315,
+   "seconds": 503.0
+  },
+  {
+   "id": "strut-molding",
+   "part": "strut",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Fills in 3.34 s from the gate at (-5.55, -4.26, 300) mm at 6.16 to 7.4 MPa against a 150 MPa machine, with 69 weld lines.",
+   "failed_checks": [],
+   "warned": [
+    "volume balance"
+   ],
+   "size_kb": 916,
+   "seconds": 1370.1
+  },
+  {
+   "id": "battery-pack-print",
+   "part": "battery-pack",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Comes off the bed 0.111 mm out of flat against a 0.4 mm tolerance.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1040,
+   "seconds": 122.0
+  },
+  {
+   "id": "battery-pack-casting",
+   "part": "battery-pack",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": true,
+   "verdict": "marginal",
+   "confidence": "medium",
+   "headline": "Freezes sound in 7.07 min, fed throughout by the risers, which freeze at 7.28 min, with at most 0.0282% Niyama porosity.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1202,
+   "seconds": 646.9
+  },
+  {
+   "id": "battery-pack-molding",
+   "part": "battery-pack",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": false,
+   "verdict": "ok",
+   "confidence": "low",
+   "headline": "Fills in 0.161 s from the gate at (0, 18.5, 18.6) mm at 0.0383 to 0.0385 MPa against a 150 MPa machine.",
+   "failed_checks": [
+    "mesh convergence: pressure at the switch to packing not converged: 0.0281 -> 0.0383 MPa, last change 26.7%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 397,
+   "seconds": 45.2
+  },
+  {
+   "id": "printed-lid-print",
+   "part": "printed-lid",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 3.79 mm off flat, over the 0.8 mm tolerance, with a corner lifting 3.79 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1511,
+   "seconds": 102.7
+  },
+  {
+   "id": "printed-lid-casting",
+   "part": "printed-lid",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": false,
+   "verdict": "marginal",
+   "confidence": "low",
+   "headline": "Freezes sound in 0.218 min, fed throughout by the risers, which freeze at 0.241 min, with at most 0.102% Niyama porosity.",
+   "failed_checks": [
+    "mesh convergence: time for 99% of the casting to freeze not converged: 9.37 -> 12.2 s, last change 22.9%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 1781,
+   "seconds": 539.9
+  },
+  {
+   "id": "printed-lid-molding",
+   "part": "printed-lid",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Fills in 1.4 s from the gate at (110, 48.6, 0) mm at 3.07 to 3.51 MPa against a 150 MPa machine, with 5 weld lines.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 993,
+   "seconds": 700.9
+  },
+  {
+   "id": "cast-pulley-print",
+   "part": "cast-pulley",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Comes off the bed 0.0613 mm out of flat against a 0.8 mm tolerance.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1769,
+   "seconds": 120.5
+  },
+  {
+   "id": "cast-pulley-casting",
+   "part": "cast-pulley",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": true,
+   "verdict": "marginal",
+   "confidence": "medium",
+   "headline": "Freezes sound in 2.14 min, fed throughout by the risers, which freeze at 2.18 min, with at most 0.382% Niyama porosity.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 2111,
+   "seconds": 1050.9
+  },
+  {
+   "id": "cast-pulley-molding",
+   "part": "cast-pulley",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Fills in 0.707 s from the gate at (-6.94, 0.94, -2.39) mm at 0.463 to 0.479 MPa against a 150 MPa machine.",
+   "failed_checks": [],
+   "warned": [
+    "mesh convergence"
+   ],
+   "size_kb": 756,
+   "seconds": 177.5
+  },
+  {
+   "id": "cold-plate-print",
+   "part": "cold-plate",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 1.22 mm off flat, over the 0.8 mm tolerance, with a corner lifting 1.22 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1804,
+   "seconds": 216.0
+  },
+  {
+   "id": "cold-plate-casting",
+   "part": "cold-plate",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": false,
+   "verdict": "marginal",
+   "confidence": "low",
+   "headline": "Freezes sound in 2.75 min, fed throughout by the risers, which freeze at 2.81 min, with at most 0.0985% Niyama porosity.",
+   "failed_checks": [
+    "mesh convergence: time for 99% of the casting to freeze not converged: 146 -> 164 s, last change 11.0%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 1210,
+   "seconds": 610.6
+  },
+  {
+   "id": "cold-plate-molding",
+   "part": "cold-plate",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": false,
+   "verdict": "ok",
+   "confidence": "low",
+   "headline": "Fills in 0.598 s from the gate at (60, 23.6, 0) mm at 0.386 to 0.399 MPa against a 150 MPa machine, with 3 weld lines.",
+   "failed_checks": [
+    "mesh convergence: pressure at the switch to packing not converged: 0.286 -> 0.386 MPa, last change 26.0%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 787,
+   "seconds": 693.8
+  },
+  {
+   "id": "fan-heat-sink-print",
+   "part": "fan-heat-sink",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 0.44 mm off flat, over the 0.4 mm tolerance, with a corner lifting 0.44 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1840,
+   "seconds": 379.9
+  },
+  {
+   "id": "fan-heat-sink-casting",
+   "part": "fan-heat-sink",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Shrinkage pocket of about 2.45 cm3 near (30, 30, 1.57) mm, which freezes last at 0.31 min cut off from the risers.",
+   "failed_checks": [],
+   "warned": [
+    "mesh convergence"
+   ],
+   "size_kb": 1948,
+   "seconds": 1263.7
+  },
+  {
+   "id": "fan-heat-sink-molding",
+   "part": "fan-heat-sink",
+   "source": "example",
+   "process": "molding",
+   "ran": false,
+   "ok": false,
+   "timed_out": true,
+   "seconds": 1500.1,
+   "error": "timed out after 1500 s and was stopped"
+  },
+  {
+   "id": "bolted-flange-print",
+   "part": "bolted-flange",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Comes off the bed 0.348 mm out of flat against a 0.8 mm tolerance.",
+   "failed_checks": [],
+   "warned": [
+    "hand calculation"
+   ],
+   "size_kb": 2336,
+   "seconds": 124.8
+  },
+  {
+   "id": "bolted-flange-casting",
+   "part": "bolted-flange",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Freezes sound in 4.57 min, fed throughout by the risers, which freeze at 4.45 min, with at most 1.79% Niyama porosity.",
+   "failed_checks": [],
+   "warned": [
+    "mesh convergence"
+   ],
+   "size_kb": 1085,
+   "seconds": 385.9
+  },
+  {
+   "id": "bolted-flange-molding",
+   "part": "bolted-flange",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Fills in 0.806 s from the gate at (23.1, -9.57, 14) mm at 0.114 to 0.116 MPa against a 150 MPa machine.",
+   "failed_checks": [],
+   "warned": [
+    "volume balance"
+   ],
+   "size_kb": 826,
+   "seconds": 137.1
+  },
+  {
+   "id": "handheld-print",
+   "part": "handheld",
+   "source": "example",
+   "process": "print",
+   "ran": true,
+   "ok": true,
+   "verdict": "fails",
+   "confidence": "medium",
+   "headline": "Warps 0.579 mm off flat, over the 0.4 mm tolerance, with a corner lifting 0.575 mm when it comes off the bed.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1853,
+   "seconds": 226.9
+  },
+  {
+   "id": "handheld-casting",
+   "part": "handheld",
+   "source": "example",
+   "process": "casting",
+   "ran": true,
+   "ok": false,
+   "verdict": "marginal",
+   "confidence": "low",
+   "headline": "Freezes sound in 0.245 min, fed throughout by the risers, which freeze at 0.255 min, with at most 0.0989% Niyama porosity.",
+   "failed_checks": [
+    "mesh convergence: time for 99% of the casting to freeze not converged: 10.8 -> 14.2 s, last change 24.0%. The number is not reliable yet; run with --quality fine or a longer --budget"
+   ],
+   "warned": [],
+   "size_kb": 2031,
+   "seconds": 352.5
+  },
+  {
+   "id": "handheld-molding",
+   "part": "handheld",
+   "source": "example",
+   "process": "molding",
+   "ran": true,
+   "ok": true,
+   "verdict": "ok",
+   "confidence": "medium",
+   "headline": "Fills in 0.811 s from the gate at (0.401, -8.9, 0) mm at 1.93 to 2.15 MPa against a 150 MPa machine, with 4 weld lines.",
+   "failed_checks": [],
+   "warned": [],
+   "size_kb": 1132,
+   "seconds": 824.0
+  }
+ ]
+}
