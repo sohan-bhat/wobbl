@@ -220,6 +220,7 @@ ASSEMBLIES = [
 ]
 
 
+@pytest.mark.solver
 @pytest.mark.slow
 @pytest.mark.parametrize("case", ASSEMBLIES, ids=[c["id"] for c in ASSEMBLIES])
 def test_unfamiliar_assemblies_are_found_solved_and_checked(case, tmp_path):
