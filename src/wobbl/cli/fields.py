@@ -86,7 +86,7 @@ def board(template, sets, out, question, keep, as_json):
 
 
 @click.command()
-@click.argument("template", type=click.Choice(["dipole", "monopole", "patch", "link"]))
+@click.argument("template", type=click.Choice(["dipole", "monopole", "patch", "loop", "invf", "link"]))
 @_common
 def antenna(template, sets, out, question, keep, as_json):
     """Antenna resonance, impedance, S11 and gain, and wireless range.
@@ -95,6 +95,9 @@ def antenna(template, sets, out, question, keep, as_json):
     wobbl antenna dipole --set frequency=2.4GHz --set length=58mm --set diameter=1mm
     wobbl antenna monopole --set frequency=915MHz --set tx_power=14dBm --set sensitivity=-120dBm --set environment=suburban
     wobbl antenna patch --set frequency=2.4GHz --set height=1.6mm --set dielectric=fr4
+    wobbl antenna patch --set frequency=2.4GHz --set length=29mm --set width=38mm --question "what is its S11?"
+    wobbl antenna loop --set frequency=868MHz --set circumference=345mm
+    wobbl antenna invf --set frequency=2.4GHz --set dielectric=fr4 --set height=1.6mm
     wobbl antenna link --set frequency=2.4GHz --set tx_power=10dBm --set sensitivity=-90dBm --set distance=30m
     """
     _run("antenna", template, sets, out, question, keep, as_json)

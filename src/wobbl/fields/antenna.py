@@ -39,11 +39,12 @@ ETA0 = MU0 * C0
 SIGMA_CU = 5.8e7
 EULER = 0.5772156649015329
 WIRE_KEYS = {"frequency", "length", "diameter", "gap", "impedance", "span", "points", "tolerance", "tx_power",
-             "sensitivity", "rx_gain", "losses", "environment", "distance", "reliability", "heights", "floors"}
+             "sensitivity", "rx_gain", "losses", "environment", "distance", "reliability", "heights", "floors",
+             "budget", "quality"}
 LINK_KEYS = {"frequency", "tx_power", "sensitivity", "tx_gain", "rx_gain", "losses", "environment", "distance",
              "reliability", "heights", "floors", "sigma", "exponent"}
 PATCH_KEYS = {"frequency", "width", "length", "height", "dielectric", "er", "impedance", "tx_power", "sensitivity",
-              "rx_gain", "losses", "environment", "distance", "reliability", "heights", "floors"}
+              "rx_gain", "losses", "environment", "distance", "reliability", "heights", "floors", "budget", "quality"}
 
 
 @dataclass
@@ -163,10 +164,15 @@ def run_antenna(template: str, params: dict, out_dir: str | Path, question: str 
                 log=lambda stage, detail="": None) -> GenericOutcome:
     if template == "link":
         return run_link(params, out_dir, question)
+    if template not in ("dipole", "monopole", "patch", "loop", "invf"):
+        raise ParamError(f"unknown antenna template '{template}' (use dipole, monopole, patch, loop, invf or link)")
+    from .radiate import route, run_radiate
+
+    way = route(template, params, question)
+    if way.full_wave:
+        return run_radiate(template, params, out_dir, question, keep, log, why=way.reasons)
     if template == "patch":
-        return run_patch(params, out_dir, question, keep, log)
-    if template not in ("dipole", "monopole"):
-        raise ParamError(f"unknown antenna template '{template}' (use dipole, monopole, patch or link)")
+        return run_patch(params, out_dir, question, keep, log, way.reasons)
     t_start = time.time()
     s = wire_spec(template, dict(params))
     dip = template == "dipole"
@@ -282,7 +288,10 @@ def run_antenna(template: str, params: dict, out_dir: str | Path, question: str 
               "induced_emf_ohm": [zt.real, zt.imag], "nodes": [msh.n_nodes, fine_m.n_nodes]}
     metrics = [("resonance", f"{fmt(cross[0] / 1e6)} MHz" if cross else "none in sweep"), ("S11", f"{s11_0:.1f} dB"),
                ("impedance", _zs(z_fine)), ("gain", f"{gdb:.2f} dBi")]
-    assumptions = [f"{'Center fed dipole' if dip else 'Monopole on an infinite, perfect ground plane'} in free space, "
+    assumptions = [f"Solved with the axisymmetric model, no 3D solve was needed. {way.reasons[0][:1].upper()}"
+                   f"{way.reasons[0][1:]}. Give a finite ground plate or put the antenna near something and it is "
+                   "solved in 3D.",
+                   f"{'Center fed dipole' if dip else 'Monopole on an infinite, perfect ground plane'} in free space, "
                    f"wire diameter {fmt(2 * s.a * 1e3)} mm, fed across a {fmt(s.g * mult * 1e3)} mm gap (delta gap).",
                    "Axisymmetric full wave solve, and the outer boundary absorbs outgoing waves to first order.",
                    f"Copper conductor loss from the skin effect, {100 * (1 - eff):.2g}% of the power. No feed line, "
@@ -529,7 +538,7 @@ def run_link(params: dict, out_dir: str | Path, question: str = "") -> GenericOu
 
 # --- patch ------------------------------------------------------------------------------------------
 def run_patch(params: dict, out_dir: str | Path, question: str = "", keep: bool = False,
-              log=lambda stage, detail="": None) -> GenericOutcome:
+              log=lambda stage, detail="": None, why: list | None = None) -> GenericOutcome:
     from .board import hammerstad_jensen, run_board
 
     t0 = time.time()
@@ -597,6 +606,8 @@ def run_patch(params: dict, out_dir: str | Path, question: str = "", keep: bool 
                    "Transmission line model (Balanis, Antenna Theory, chapter 14): two radiating slots joined by a "
                    "line, fringing length from Hammerstad's formula, edge conductance with mutual coupling.",
                    "Dielectric and conductor loss, surface waves and the feed's own reactance are not modeled."]
+    assumptions += [f"No 3D solve was made. {r[:1].upper() + r[1:]}. Give the patch's length, width or feed, or ask "
+                    "for its S11, gain or pattern, and it is solved in 3D." for r in (why or [])]
     metrics = [("resonance", f"{fmt(fr / 1e6)} MHz"), ("edge resistance", f"{fmt(rin)} ohm"),
                ("inset for match", f"{fmt(y0 * 1e3)} mm"), ("directivity", f"{10 * math.log10(D):.1f} dBi")]
     vals = {"width_m": W, "length_m": L, "resonance_Hz": fr, "eps_eff": ee, "fringe_m": dl, "edge_resistance_ohm": rin,

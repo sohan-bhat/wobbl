@@ -8,7 +8,7 @@ TEMPLATES = {
     "magnetic": ("solenoid", "electromagnet", "magnet"),
     "electric": ("plates", "coax", "sphere"),
     "board": ("microstrip", "stripline", "coplanar", "coupled", "coax"),
-    "antenna": ("dipole", "monopole", "patch", "link"),
+    "antenna": ("dipole", "monopole", "patch", "loop", "invf", "link"),
     "sound": ("room", "enclosure", "muffler", "panel"),
 }
 
@@ -32,13 +32,19 @@ def check_params(domain: str, template: str, params: dict) -> None:
     elif domain == "board":
         mod.spec(template, p)
     elif domain == "antenna":
-        if template in ("dipole", "monopole"):
-            mod.wire_spec(template, p)
+        if template in ("dipole", "monopole", "loop", "invf"):
+            from .radiate import route
+            if route(template, p).full_wave:
+                from .antenna3d import KEYS
+                mod.check_known(p, KEYS[template], template)
+            else:
+                mod.wire_spec(template, p)
         elif template == "link":
             mod.check_known(p, mod.LINK_KEYS, "link")
             mod.link_budget(p)
         else:
-            mod.check_known(p, mod.PATCH_KEYS, "patch")
+            from .antenna3d import KEYS
+            mod.check_known(p, mod.PATCH_KEYS | KEYS["patch"], "patch")
     else:
         keys = {"room": mod.ROOM_KEYS, "enclosure": mod.ROOM_KEYS, "muffler": mod.MUFFLER_KEYS,
                 "panel": mod.PANEL_KEYS}[template]

@@ -294,6 +294,10 @@ READ = {
              ("fmax", r"(?:below|under|up to)\s*" + NUM + r"\s*hz", "Hz")],
 }
 READ["monopole"] = READ["patch"] = READ["dipole"]
+READ["loop"] = [("frequency", NUM + r"\s*([gm]hz)\b", ""), ("circumference", NUM + r"\s*mm\s*circumference", "mm"),
+                ("radius", NUM + r"\s*mm\s*radius", "mm"), ("diameter", NUM + r"\s*mm\s*(?:wire|diameter)", "mm")]
+READ["invf"] = [("frequency", NUM + r"\s*([gm]hz)\b", ""),
+                ("dielectric", r"\b(fr4|ro4350b|rogers|ptfe|polyimide|alumina)\b", "")]
 READ["stripline"] = READ["coplanar"] = READ["coupled"] = READ["microstrip"]
 READ["link"] = [("frequency", NUM + r"\s*([gm]hz)\b", ""), ("tx_power", r"(-?\d+(?:\.\d+)?)\s*dbm\b", "dBm"),
                 ("distance", NUM + r"\s*m\b", "m")]
@@ -323,7 +327,7 @@ def read_words(kind: str, question: str, thing: str = "") -> dict:
 
 TEMPLATE_OF = {"magnetic": ("solenoid", "electromagnet", "magnet"), "electric": ("plates", "coax", "sphere"),
                "board": ("microstrip", "stripline", "coplanar", "coupled", "coax"),
-               "antenna": ("dipole", "monopole", "patch", "link"), "sound": ("room", "enclosure", "muffler", "panel")}
+               "antenna": ("dipole", "monopole", "patch", "loop", "invf", "link"), "sound": ("room", "enclosure", "muffler", "panel")}
 
 
 def _template_entry(physics: str):
@@ -362,10 +366,11 @@ register(Analysis("field", "trace", "Impedance and crosstalk of a microstrip, st
                   _template_entry("board"), kinds=TEMPLATE_OF["board"], options=WORD_OPTS, legacy="wobbl board",
                   aliases=("impedance", "board"), default=True,
                   keywords=(r"impedance", r"crosstalk", r"microstrip", r"stripline", r"coplanar")))
-register(Analysis("field", "antenna", "Resonance, S11, gain and range of a dipole, monopole or patch, or a link budget",
+register(Analysis("field", "antenna", "Resonance, S11, gain and range of a dipole, monopole, patch, loop or trace antenna, or a link budget",
                   _template_entry("antenna"), kinds=TEMPLATE_OF["antenna"], options=WORD_OPTS, legacy="wobbl antenna",
                   aliases=("radio", "range"), default=True,
-                  keywords=(r"\bantennas?\b", r"\bdipole\b", r"\bmonopole\b", r"\bpatch\b", r"\brange\b", r"s11")))
+                  keywords=(r"\bantennas?\b", r"\bdipole\b", r"\bmonopole\b", r"\bpatch\b", r"\bloop\b", r"inverted[- ]?f",
+                            r"\bmeander", r"\brange\b", r"s11")))
 register(Analysis("field", "acoustic", "Room and enclosure modes, muffler loss and panel noise described by size",
                   _template_entry("sound"), kinds=TEMPLATE_OF["sound"], options=WORD_OPTS, legacy="wobbl sound",
                   aliases=("sound",), default=True,

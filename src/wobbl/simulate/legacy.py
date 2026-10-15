@@ -214,7 +214,7 @@ BRIDGES = {
                               ("trace", "Trace impedance and crosstalk",
                                ("microstrip", "stripline", "coplanar", "coupled", "coax")),
                               ("electric", "Capacitance, peak field and breakdown", ("plates", "coax", "sphere")),
-                              ("antenna", "Antenna resonance, gain and range", ("dipole", "monopole", "patch", "link")),
+                              ("antenna", "Antenna resonance, gain and range", ("dipole", "monopole", "patch", "loop", "invf", "link")),
                               ("sound", "Room modes, mufflers and panel noise",
                                ("room", "enclosure", "muffler", "panel")))],
     "chemistry": [
