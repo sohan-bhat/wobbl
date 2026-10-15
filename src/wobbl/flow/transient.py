@@ -38,9 +38,17 @@ def run_transient(case: foam.Case, s, grid, tag: str, fields: bool) -> dict:
     fo = _functions(s, grid) + foam.fo_average(settle, nut=True) + foam.fo_cell_volumes()
     foam.write_transient(case, s.turb, end, dt0, fo, window / FRAMES, max_co=1.0, keep=FRAMES)
     _non_orthogonal(case, grid)
+    from .external import cost
+    pred = cost(grid.cells, end, 4 * dt0)         # the Courant limit lets the step grow to about 0.8 cell crossings
+    if s.budget_s and pred["seconds"] > s.budget_s:
+        raise RuntimeError(f"a scale resolving run on {grid.cells:,} cells would take about "
+                           f"{pred['seconds'] / 60:.0f} minutes and {pred['memory_MB'] / 1000:.1f} GB, over the "
+                           f"{s.budget_s / 60:.0f} minute budget. --turbulence rans gives the steady answer in a "
+                           "fraction of that, or raise the budget with --budget-minutes")
     t0 = time.time()
     log = case.run("pimpleFoam", timeout=6 * 3600)
-    out = {"tag": tag, "log": log, "t_solve": time.time() - t0, "settle": settle, "end": end}
+    out = {"tag": tag, "log": log, "t_solve": time.time() - t0, "settle": settle, "end": end,
+           "predicted_s": pred["seconds"]}
     out.update(statistics(case, s, grid, settle))
     co = [float(x) for x in re.findall(r"Courant Number mean: [\d.eE+-]+ max: ([\d.eE+-]+)", log)]
     out["courant"] = max(co[len(co) // 2:]) if co else float("nan")

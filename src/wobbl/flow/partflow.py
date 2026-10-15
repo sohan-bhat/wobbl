@@ -54,6 +54,7 @@ class PartFlowStudy:
     outlet: str = ""                     # face selector for a fluid volume's outlets
     params: dict = field(default_factory=dict)
     quality: str = "normal"
+    budget_minutes: float = 60.0         # longest predicted time a des or les run may take, 0 for no limit
     turbulence: str = "auto"             # auto, laminar, rans, or des and les for a time accurate run
     max_dp: float = 0.0                  # Pa
     max_force: float = 0.0               # N
@@ -180,6 +181,7 @@ class Setup:
     temp: float = 20.0           # C, the fluid's
     pr: float = 0.71             # the fluid's Prandtl number
     unsteady: str = ""           # des or les for a time accurate run, else steady
+    budget_s: float = 3600.0              # a scale resolving run predicted to take longer is refused, 0 for no limit
     unsteady_spans: tuple = (6.0, 20.0)   # flow through times to build the wake, then to average over
 
 
@@ -191,6 +193,7 @@ def build_setup(st: PartFlowStudy, g: PartGeometry, p: Plan, q: dict, flow: floa
     if model in ("des", "les"):
         s.unsteady = model
         s.turb = foam.Turbulence.free_stream(model, s.speed, s.nu, s.ref_length, intensity=0.01, scale=0.1)
+        s.budget_s = 60.0 * float(getattr(st, "budget_minutes", 60.0))
         s.unsteady_spans = {"fast": (4.0, 10.0), "normal": (6.0, 20.0), "fine": (8.0, 40.0)}[st.quality]
     elif model == "laminar":
         s.turb = foam.Turbulence()
