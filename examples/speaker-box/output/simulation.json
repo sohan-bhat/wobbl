@@ -1,0 +1,61 @@
+{
+ "thing": "box.step",
+ "question": "where do standing waves form in the air inside the box below 1 kHz?",
+ "plan": {
+  "thing": "box.step",
+  "question": "where do standing waves form in the air inside the box below 1 kHz?",
+  "domain": "part",
+  "kind": "step",
+  "analyses": [
+   "acoustic"
+  ],
+  "reasons": [
+   {
+    "decided": "box.step is a .step file, read as a part (step)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics acoustic from \"standing waves\"",
+    "override": "--physics acoustic"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "objects": [
+   "air",
+   "box",
+   {
+    "name": "box",
+    "role": "wall",
+    "box_mm": [
+     0.0,
+     0.0,
+     0.0,
+     240.0,
+     200.0,
+     360.0
+    ]
+   }
+  ]
+ },
+ "steps": [
+  {
+   "analysis": "acoustic",
+   "domain": "part",
+   "verdict": "ok",
+   "headline": "The air has 4 standing wave modes below 1000 Hz, the lowest at 331 Hz and the next at 847 Hz.",
+   "confidence": "low",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/speaker-box/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/speaker-box/output/report.html",
+   "assumptions": []
+  }
+ ]
+}

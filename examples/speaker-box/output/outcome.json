@@ -1,0 +1,85 @@
+{
+ "domain": "sound",
+ "part": "box.step",
+ "question": "where do standing waves form in the air inside the box below 1 kHz?",
+ "verdict": "ok",
+ "headline": "The air has 4 standing wave modes below 1000 Hz, the lowest at 331 Hz and the next at 847 Hz.",
+ "metrics": [
+  [
+   "lowest mode",
+   "331 Hz"
+  ],
+  [
+   "modes",
+   "4 below 1000 Hz"
+  ],
+  [
+   "air volume",
+   "10.4 L"
+  ],
+  [
+   "close pairs",
+   "0"
+  ]
+ ],
+ "confidence": "low",
+ "confidence_reasons": [
+  "mesh convergence failed: the first 4 modes moved at most 2.9% on the finer mesh"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "fail",
+   "summary": "the first 4 modes moved at most 2.9% on the finer mesh",
+   "detail": {}
+  },
+  {
+   "name": "mode count",
+   "status": "pass",
+   "summary": "4 modes below 1000 Hz, where Weyl's formula for this volume and surface expects about 4",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Sound hard walls with no absorption, air at 20 C (343 m/s). Real walls damp the modes, and the frequencies hold to about a percent.",
+  "The air is the cavity inside 'box', taken from the CAD."
+ ],
+ "values": {
+  "modes_Hz": [
+   331.125793,
+   846.636555,
+   864.041253,
+   941.306863
+  ],
+  "exact_Hz": [],
+  "weyl_count": 4.424612,
+  "volume_m3": 0.010353,
+  "close_pairs": [],
+  "rigid_body_modes": 1,
+  "nodes": [
+   150,
+   249
+  ],
+  "_figures": [
+   [
+    "modes",
+    "The first mode shapes on a slice"
+   ],
+   [
+    "spectrum",
+    "Mode frequencies"
+   ]
+  ]
+ },
+ "images": {
+  "modes": "images/modes.png",
+  "spectrum": "images/spectrum.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 27.874661,
+ "solver": "GetDP 3.5.0 with SLEPc and gmsh",
+ "criteria": []
+}

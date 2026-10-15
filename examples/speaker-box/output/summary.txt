@@ -1,0 +1,18 @@
+OK. The air has 4 standing wave modes below 1000 Hz, the lowest at 331 Hz and the next at 847 Hz.
+
+Confidence: low. mesh convergence failed: the first 4 modes moved at most 2.9% on the finer mesh
+lowest mode: 331 Hz
+modes: 4 below 1000 Hz
+air volume: 10.4 L
+close pairs: 0
+
+Checks:
+  [fail] mesh convergence: the first 4 modes moved at most 2.9% on the finer mesh
+  [pass] mode count: 4 modes below 1000 Hz, where Weyl's formula for this volume and surface expects about 4
+
+Assumptions:
+  - Sound hard walls with no absorption, air at 20 C (343 m/s). Real walls damp the modes, and the frequencies hold to about a percent.
+  - The air is the cavity inside 'box', taken from the CAD.
+
+Images: modes: images/modes.png, spectrum: images/spectrum.png
+Report: report.html

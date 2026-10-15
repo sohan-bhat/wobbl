@@ -1,0 +1,23 @@
+{
+ "domain": "part",
+ "analysis": "magnetic",
+ "spec": {
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/solenoid-actuator/actuator.step",
+  "kind": "step",
+  "question": "does the plunger pull 5 N at 0.8 A?",
+  "options": {
+   "assign": [
+    "body 1: steel 1010",
+    "body 2: coil 1100 turns 0.8 A",
+    "body 3: steel 1010"
+   ],
+   "force-on": [
+    "body 3"
+   ],
+   "need": [
+    "5 N"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}
