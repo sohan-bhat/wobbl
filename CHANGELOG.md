@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+**Bluff body drag**
+- External flow drag is judged against published references. A sphere meets Clift,
+  Grace and Weber's curve, a cylinder across the stream meets Sucker and Brauer's
+  fit with White's end correction, and any other body meets a Hoerner band for its
+  shape class, in place of the old check that passed anything from 0.02 to 2.5.
+  A result outside the band lowers confidence and says why.
+- Steady runs on a smooth sphere or cylinder read the drag far too low, because a
+  grid that cannot resolve the boundary layer keeps the flow attached (separation
+  near 150 degrees against 82 measured, and the drag falls as the grid refines).
+  When that happens the study reports the curve's drag and keeps the CFD value as
+  `cd_cfd`.
+
 **Any circuit**
 - `wobbl circuit` and `wobbl simulate` take any circuit: a SPICE netlist, a KiCad
   schematic or netlist export, or a description in words, with the LED, RC, buck
