@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from ..scene import Scene
-from .common import read, verdict
+from .common import lathe, read, verdict
 
 LEVELS = 250
 
@@ -220,4 +220,64 @@ def build_flow(out: Path, pb: dict) -> Path | None:
     if not pl:
         s.camera(target=[(x0 + x1) / 2, (y0 + y1) / 2, 0], direction=(0.1, -0.9, 1.1),
                  distance=max(x1 - x0, y1 - y0) * 1.1)
+    return s.save(out)
+
+
+def build_wave(out: Path, pb: dict, frames: int = 24) -> Path | None:
+    """A field phasor solved on an axisymmetric slice (an antenna's), as the wave it is: the slice stood upright
+    through the axis, mirrored to both sides (and about z = 0 when the model is), playing Re(H e^(j w t)) over one
+    cycle so the field leaves the antenna. The wire stands on the axis and the gain pattern wraps around it."""
+    g = pb.get("grid")
+    if not g or "h_re" not in pb or "h_im" not in pb:
+        return None
+    o = read(out, "outcome.json") or {}
+    re_, im_ = unpack(pb["h_re"]), unpack(pb["h_im"])
+    wire = pb.get("wire") or {}
+    mz = bool(wire.get("mirror_z"))
+    if g.get("mirror"):                          # the other side of the axis: r runs out the other way
+        re_, im_ = (np.concatenate([a[:, :0:-1], a], axis=1) for a in (re_, im_))
+        xa, xb = -g["x1"], g["x1"]
+    else:
+        xa, xb = g["x0"], g["x1"]
+    if mz:
+        re_, im_ = (np.concatenate([a[:0:-1], a], axis=0) for a in (re_, im_))
+        za, zb = -g["y1"], g["y1"]
+    else:
+        za, zb = g["y0"], g["y1"]
+    ph = np.linspace(0, 2 * np.pi, frames, endpoint=False)
+    H = np.stack([re_ * np.cos(w) - im_ * np.sin(w) for w in ph])
+    lim = float(np.nanpercentile(np.abs(H), 90)) or 1.0     # the far field shows, the wire saturates
+    f_hz = float(pb.get("frequency_Hz") or 0)
+    s = Scene(f"The {str(pb.get('antenna') or 'antenna')} radiating", domain="fields", question=o.get("question", ""),
+              length="mm", source="The field is the run's own phasor on the slice through the antenna, played over "
+                                  "one cycle. The slice is mirrored about the axis, since the model is axisymmetric.")
+    s.timeline(ph / (2 * np.pi) * (1e9 / f_hz if f_hz else 1.0), unit="ns" if f_hz else "cycle", label="time",
+               seconds=3, between="interpolated")
+    m = plane(s, xa, xb, za, zb, H, "magnetic field", "A/m", "coolwarm", frames=True)
+    if m is not None:
+        m.X = m.X[:, [0, 2, 1]]                  # stand the slice up in the x z plane
+        s.fields[m.fld[0]]["range"] = [-lim, lim]
+    if wire.get("height_mm"):
+        r, h, gap = float(wire.get("radius_mm", 0.5)), float(wire["height_mm"]), float(wire.get("gap_mm", 0))
+        arm = (h - gap / 2) / 2
+        for sgn in ((1, -1) if mz else (1,)):
+            s.body("cylinder", [max(r, 0.4), arm], pos=[0, 0, sgn * (gap / 2 + arm)], color="#d9b45a", name="wire")
+        if mz:
+            s.body("sphere", [max(r, 0.4) * 1.6], pos=[0, 0, 0], color="#2c2f34", name="feed")
+    pat = pb.get("pattern") or {}
+    if pat.get("theta_deg") and pat.get("gain_dBi"):
+        th = np.radians(np.asarray(pat["theta_deg"], float))
+        lin = 10 ** (np.maximum(np.asarray(pat["gain_dBi"], float), -30) / 10)
+        rad = lin / lin.max() * min(xb, zb) * 0.55
+        X, T = lathe(np.c_[rad * np.sin(th), rad * np.cos(th)], seg=36)
+        s.mesh(X, T, name="gain pattern", color="#ffd400", opacity=0.22)
+        s.readout("peak gain", np.full(frames, float(np.max(pat["gain_dBi"]))), unit="dBi", digits=3)
+    sw = pb.get("sweep") or {}
+    if sw.get("x") and sw.get("s11_dB") and f_hz:
+        s11 = float(np.interp(f_hz / 1e6, sw["x"], sw["s11_dB"]))
+        s.readout("S11", np.full(frames, s11), unit="dB", digits=3, limit=-10)
+        s.readout("frequency", np.full(frames, f_hz / 1e6), unit="MHz", digits=4)
+    verdict(s, o)
+    span = max(xb - xa, zb - za)
+    s.camera(target=[0, 0, 0], direction=(0.3, -1.0, 0.6), distance=span * 1.45)
     return s.save(out)

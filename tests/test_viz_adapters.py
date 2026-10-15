@@ -161,3 +161,20 @@ def test_thrown_ball_is_drawn_at_its_size(tmp_path):
     ball = next(o for o in h["objects"] if o.get("name") == "ball")
     X = array(h, blob, ball["pos"])
     assert 0.15 < np.ptp(X[:, 0]) < 0.3
+
+def test_antenna_wave_plays_one_cycle(tmp_path):
+    from wobbl.fields import playback as fp
+    r, z = np.meshgrid(np.linspace(0, 1, 18), np.linspace(0, 1, 14))
+    for mirror_z, gain in ((True, [-30.0, 0.0, 2.1, 0.0]), (False, [-5.0, 1.0, 3.0, 1.0])):
+        fp.write(tmp_path, "antenna-wire", {"h_re, h_im": "phasor, A/m"},
+                 {"grid": {"x0": 0, "x1": 60, "y0": 0, "y1": 60, "nx": 18, "ny": 14, "mirror": True},
+                  "h_re": fp.pack(np.cos(6 * np.hypot(r, z))), "h_im": fp.pack(np.sin(6 * np.hypot(r, z))),
+                  "wire": {"radius_mm": 0.5, "height_mm": 29.0, "gap_mm": 0.5, "mirror_z": mirror_z},
+                  "pattern": {"theta_deg": [0, 45, 90, 135], "gain_dBi": gain}, "frequency_Hz": 2.44e9,
+                  "sweep": {"x": [2300, 2500], "s11_dB": [-12, -8]}})
+        outcome(tmp_path, "antenna")
+        assert build_scene(tmp_path)
+        ks, h = kinds(tmp_path)
+        assert {"mesh", "body"} <= ks and h["timeline"]["frames"] == 24
+        assert any(o.get("name") == "wire" for o in h["objects"])
+        assert {r_["name"] for r_ in h["readouts"]} >= {"S11", "peak gain"}

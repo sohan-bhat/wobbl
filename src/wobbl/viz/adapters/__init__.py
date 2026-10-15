@@ -29,6 +29,9 @@ def build_scene(out_dir: str | Path):
     if domain == "thermal" and (out / "fields.npz").exists():
         from . import thermal
         return thermal.build(out)
+    if kind == "channel" and (out / "fields.npz").exists():
+        from . import thermal
+        return thermal.fan_sink(out)
     if (out / "board.json").exists():
         from . import circuits
         return circuits.build(out)
@@ -44,6 +47,9 @@ def build_scene(out_dir: str | Path):
     if kind in ("molding", "casting", "printing", "print"):
         from . import process
         return process.build(out, pb)
+    if "grid" in pb and "h_re" in pb:
+        from . import grids
+        return grids.build_wave(out, pb)
     if "grid" in pb:
         from . import grids
         return grids.build_fields(out, pb)
