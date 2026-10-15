@@ -6,7 +6,7 @@ const CSS = `
 :host{display:block}
 .wv{--bg:#0e0f11;--panel:#16181b;--line:#2a2d32;--fg:#f2f2ee;--mut:#a3a7ad;--y:#ffd400;--pass:#3ccf7a;--warn:#ffb020;--fail:#ff4d4f;
 position:relative;background:var(--bg);color:var(--fg);border:1px solid var(--line);font:13px/1.4 "IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;container-type:inline-size;-webkit-user-select:none;user-select:none}
-.st{position:relative;aspect-ratio:16/10;min-height:260px;max-height:78vh;overflow:hidden;outline:none}
+.st{position:relative;width:100%;aspect-ratio:16/10;min-height:260px;max-height:78vh;overflow:hidden;outline:none}
 .st:focus-visible{box-shadow:inset 0 0 0 2px var(--y)}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
 .ttl{position:absolute;left:12px;right:12px;top:10px;font:600 14px/1.25 Archivo,"Helvetica Neue",Arial,sans-serif;letter-spacing:.01em;pointer-events:none;text-shadow:0 1px 2px #000;max-width:60%}
