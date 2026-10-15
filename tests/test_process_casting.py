@@ -110,7 +110,10 @@ def test_a_small_casting_end_to_end(tmp_path):
     assert o.values["t_riser_s"] > o.values["t_casting_s"]
     names = {c.name: c.status for c in o.checks}
     assert names["energy balance"] == "pass" and names["feeding"] == "pass"
-    assert names["mesh convergence"] == "fail"            # fast quality solves one mesh and says so
+    # fast quality still solves two meshes, so the convergence check has something to compare
+    assert len(o.values["levels"]) >= 2 and names["mesh convergence"] in ("pass", "warn")
+    conv = next(c for c in o.checks if c.name == "mesh convergence")
+    assert "only one mesh" not in conv.summary
     from wobbl.viz import load
     head, _ = load(tmp_path / "out" / "scene.wobbl")
     assert head["domain"] == "casting" and head["timeline"]["frames"] > 10
