@@ -47,6 +47,7 @@ CASES = [
     Case(str(EX / "motor-mount" / "mount.py"), "will it last a million cycles at 150 N?", "part", "parametric",
          ("stress", "fatigue")),
     Case(str(EX / "shelf-bracket" / "bracket.py"), "will 3 kN bend it for good?", "part", "parametric", ("plastic",)),
+    Case(str(EX / "drone-arm" / "arm.py"), "will 200 N bend the arm for good?", "part", "parametric", ("plastic",)),
     Case(str(EX / "shelf-bracket" / "bracket.py"), "does it yield and spring back after 400 N?", "part", "parametric",
          ("plastic",)),
     Case(str(EX / "bolted-flange" / "flange.py"), "do four M8 bolts at 20 N m keep it closed under a 30 kN pull?",

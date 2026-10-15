@@ -24,7 +24,7 @@ register(Analysis(
     "part", "plastic", "Past first yield: permanent set after unloading and the load that collapses the part",
     plastic, dry=True, kinds=PART_KINDS, covers=("stress",), legacy="wobbl plastic",
     keywords=(r"\bplastic(?:ity|ally)?\b(?! part)", r"permanent(?:ly)?\s+(?:bend|set|deform)",
-              r"bend\w*(?:\s+\w+)?\s+for good",
+              r"bend\w*(?:\s+\w+){0,3}\s+for good",
               r"past yield", r"\bcollapse", r"limit load",
               r"spr(?:ing|ung)\s*-?back"),
     aliases=("plasticity", "collapse", "yield"),
