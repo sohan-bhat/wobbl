@@ -146,14 +146,14 @@ def analyze_shell(study: StructuralStudy, out_dir: str | Path, progress=None, re
         gi = int(np.argmin(np.linalg.norm(shell.X - gxyz, axis=1)))
         tone = {"holds": "pass", "marginal": "warn", "fails": "fail"}[verdict]
         ramp_scene(out, title=f"{Path(study.part).stem.replace('_', ' ').capitalize()} as shells", domain="strength",
-                   question=study.question, model=model, values=measure, field=mname, unit="MPa", U=res.U, end=1.0,
+                   question=study.question, model=model, values=measure, field=mname, unit="MPa", U=res.U, reserve=sf,
                    limit=allow, limit_label="yield" if material.ductile else "strength", keep=gi,
                    peak_label="peak {peak stress}", readouts=[("peak stress", gov, "MPa", allow),
                                                               ("deflection", L["max_disp"], "mm", None)],
-                   events=[(sf, "first yield", where, "fail")] if sf < 1 else [],
+                   events=[(sf, "first yield" if material.ductile else "crack starts", where, "fail")],
                    verdict=(verdict.upper(), head.split(". ")[0] + ".", tone),
-                   source="The walls as shells on their midsurface; frames scale the solved stress and deflection by "
-                          "the load, exact for this linear model.")
+                   source="The walls as shells on their midsurface. The stress and deflection at any load are the "
+                          "solved ones scaled by it, exact for this linear model.")
     except Exception:  # noqa: BLE001  the 3D view is a bonus, never a reason to fail
         import os
         if os.environ.get("WOBBL_DEBUG"):

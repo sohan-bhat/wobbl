@@ -660,3 +660,62 @@ def test_crystal_strains_by_hand(tmp_path):
     assert h["readouts"][0]["name"] == "bulk modulus" and h["readouts"][0]["values"][5] == 133
     f = next(f for f in h["fields"] if f["name"] == "strain energy")
     assert f["limit"] == 0.136 and {"copper", "unit cell"} <= _names(h)
+
+
+
+def _strength_run(sf):
+    from types import SimpleNamespace as NS
+    V, F = grid_mesh()
+    U = np.c_[np.zeros(len(V)), np.zeros(len(V)), 0.01 * V[:, 0]]
+    vm = 2.0 * V[:, 0] + 1.0
+    run = NS(mesh=NS(X=V, tris=F), measure=vm, result=NS(U=U), selections={},
+             study=NS(loads=[NS(kind="force", magnitude=40.0, direction=None, point=None)], fixtures=[]))
+    o = NS(question="will it hold 40 N?", governing_MPa=float(vm.max()), allowable_MPa=sf * float(vm.max()),
+           governing_xyz=V[np.argmax(vm)].tolist(), measure="von Mises (MPa)", safety_factor=sf, part="arm.step",
+           max_disp_mm=0.1, hotspots=[], verdict="holds" if sf >= 2 else "fails", target_sf=2.0,
+           governing_where="at the tip")
+    return run, o
+
+
+@pytest.mark.parametrize("sf", [0.6, 2.5, 40.0])
+def test_strength_scene_is_a_load_sweep_past_failure(tmp_path, sf):
+    """The viewer sets the load: the frames sweep it from none to past where the part yields, open at the asked
+    load, and every colored field carries its limit so the viewer can call the verdict."""
+    from wobbl.viz.adapters.strength import write_scene
+    run, o = _strength_run(sf)
+    h, _ = load(write_scene(run, o, tmp_path))
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["unit"] == "N" and tl["design"] == 40.0 and tl["between"] == "exact"
+    assert tl["t"][0] == 0 and 40.0 in tl["t"] and tl["t"][-1] >= 80.0
+    if sf < 10:
+        assert tl["t"][-1] > sf * 40.0           # the sweep reaches the load that yields it
+        assert [e["name"] for e in h["events"]] == ["first yield"]
+    assert all("limit" in f and f.get("limit_label") for f in h["fields"])
+    first = h["readouts"][0]
+    assert first["name"] == "peak stress" and first["limit"] == pytest.approx(sf * o.governing_MPa)
+    i = tl["t"].index(40.0)
+    assert first["values"][i] == pytest.approx(o.governing_MPa, rel=1e-3)
+
+
+def test_shell_scene_sweeps_the_load_in_newtons(tmp_path):
+    from types import SimpleNamespace as NS
+
+    from wobbl.shells.scene import ramp_scene
+    V, F = grid_mesh()
+    forces = np.zeros((len(V), 3))
+    forces[-1] = [0, 0, -120.0]
+    model = NS(mesh=NS(X=V, tris=F, n_nodes=len(V)), forces=forces, rigid=[], constraints=[])
+    vals = V[:, 0] + 1.0
+    ramp_scene(tmp_path, title="Lid", domain="laminate", question="120 N?", model=model, values=vals / 11,
+               field="failure index", unit="", U=np.c_[0 * V[:, :2], -0.01 * V[:, 0]], reserve=5.0, limit=1.0,
+               limit_label="first ply failure", keep=len(V) - 1, peak_label="ply 1",
+               readouts=[("worst ply index", 0.2, "", 1.0), ("deflection", 0.1, "mm", None)],
+               events=[(5.0, "first ply failure", "ply 1", "fail")], verdict=("HOLDS", "It holds.", "pass"),
+               source="linear")
+    h, _ = load(tmp_path / "scene.wobbl")
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["design"] == 120.0 and tl["t"][-1] >= 600.0
+    assert h["events"][0]["t"] == pytest.approx(600.0)
+    assert h["fields"][0]["limit"] == 1.0 and h["readouts"][0]["name"] == "worst ply index"
+    assert h["readouts"][-1]["name"] == "load"
+

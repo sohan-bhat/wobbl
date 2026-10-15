@@ -1,7 +1,8 @@
-"""A strength run as a scene: the part in its setting, the load coming on, the stress rising and the part bending.
+"""A strength run as a scene: the part in its setting under a load the viewer sets, its stress and bend at that load.
 
-The model is linear elastic, so stress and displacement at a fraction of the load are exactly that fraction of the
-solved ones, and every frame of the ramp is exact. Supports become the wall, the bolts or the plate they stand
+The frames are a sweep over the applied load from none to past where the part gives way, opening at the load the
+question asked about. The model is linear elastic, so stress and displacement at any load are exactly the solved
+ones scaled by it, and every point of the sweep is exact. Supports become the wall, the bolts or the plate they stand
 for, and loads become arrows at their real faces, with a shelf, a weight or a motor where the question names one.
 Where the stress passes the material's limit the part turns white, at the place the solver found.
 """
@@ -16,6 +17,24 @@ from .. import props as P
 from ..scene import Scene
 
 FRAMES = 60
+STEPS = (1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
+
+
+def sweep(reserve: float, frames: int = FRAMES, most: float = 10.0) -> np.ndarray:
+    """Load factors for a linear model's input sweep: from none to a round multiple of the asked load that passes
+    where the part gives way (reserve times the load) when that is within most times it, and at least twice it.
+    The asked load itself, factor 1, is always one of them."""
+    want = min(max(2.0, 1.15 * reserve if np.isfinite(reserve) else 2.0), most)
+    top = next((k * 10.0 ** e for e in range(0, 3) for k in STEPS if k * 10.0 ** e >= want - 1e-9), most)
+    return np.unique(np.r_[np.linspace(0.0, top, frames), 1.0])
+
+
+def exaggeration(span: float, umax: float, top: float) -> float:
+    """How much larger to draw the deflection: enough that the bend shows at the asked load, held back so the top
+    of the sweep (top times the load) does not fold the part over. Never smaller than true size."""
+    if umax <= 0:
+        return 1.0
+    return float(f"{max(min(0.08 * span / umax, 0.25 * span / (umax * max(top, 1.0))), 1.0):.2g}")
 
 
 def _tris(mesh, mask):
@@ -80,7 +99,6 @@ def write_scene(run, o, out_dir) -> Path | None:
     size = float(np.ptp(X, 0).max())
     centre = (lo + hi) / 2
     words = set(re.findall(r"[a-z]+", (o.question or "").lower()))
-    ramp = np.linspace(0.0, 1.0, FRAMES)
     measure = np.asarray(run.measure, float)
     U = np.asarray(run.result.U, float)
     gov, allow = float(o.governing_MPa), float(o.allowable_MPa or 0) or float(measure.max())
@@ -88,6 +106,9 @@ def write_scene(run, o, out_dir) -> Path | None:
     node = int(np.argmin(np.linalg.norm(X - g, axis=1)))
     brittle = "principal" in (o.measure or "")
     limit_word = "strength" if brittle else "yield"
+    sf = float(o.safety_factor)
+    ramp = sweep(sf)                        # load factors, 1 at the asked load
+    reach = ramp / ramp.max()               # props grow to their full size at the top of the sweep
 
     loads = [ld for ld in run.study.loads]
     first = next((ld for ld in loads if ld.kind in ("force", "remote", "bolt")), None)
@@ -96,35 +117,33 @@ def write_scene(run, o, out_dir) -> Path | None:
     name = (Path(o.part).stem or "part").replace("_", " ").replace("-", " ")
     s = Scene(f"{name.capitalize()} under {total:g} N" if total > 0 else f"{name.capitalize()} under its load",
               domain="strength", question=o.question,
-              source="Frames scale the solved stress and displacement by the load, which is exact for this linear "
-                     "elastic model.")
+              source="The stress and displacement at any load are the solved ones scaled by it, which is exact for "
+                     "this linear elastic model.")
     if total > 0:
-        s.timeline(total * ramp, unit="N", label="load", seconds=6, between="exact")
+        s.timeline(total * ramp, unit="N", label="load", between="exact", kind="input", design=total)
     else:
-        s.timeline(100 * ramp, unit="%", label="load", seconds=6, between="exact")
+        s.timeline(100 * ramp, unit="%", label="load", between="exact", kind="input", design=100)
     part = s.mesh(X, mesh.tris, name="part", keep=[node], max_vertices=14000)
     part.color_by(o.measure.split(" (")[0] if o.measure else "stress", measure, unit="MPa", scale=ramp,
                   range=(0.0, allow), limit=allow, limit_label=limit_word)
     umax = float(np.linalg.norm(U, axis=1).max())
-    ex = 0.08 * span / umax if umax > 0 else 1.0
-    ex = float(f"{max(ex, 1.0):.2g}")
+    ex = exaggeration(span, umax, float(ramp.max()))
     part.deform(U, scale=ramp, exaggerate=ex)
 
     supports(s, run, X, size, words)
-    load_props(s, run, X, size, ramp, words)
+    load_props(s, run, X, size, reach, words)
 
-    if total > 0:
-        s.readout("load", total * ramp, unit="N", digits=3)
     s.readout("peak stress", gov * ramp, unit="MPa", limit=allow)
     s.readout("safety factor", np.minimum(np.where(ramp > 0, allow / np.maximum(gov * ramp, 1e-30), 99), 99), digits=3)
     s.readout("deflection", float(o.max_disp_mm) * ramp, unit="mm")
+    if total > 0:
+        s.readout("load", total * ramp, unit="N", digits=3)
     for h in o.hotspots or []:
         if h.get("excluded") and h.get("values") and h["values"][-1] > gov:
             s.label("excluded corner, a mesh artifact", h["xyz"], kind="note")
             break
-    sf = float(o.safety_factor)
-    if sf < 1 and gov > 0:
-        at = sf * (total if total > 0 else 100)
+    at = sf * (total if total > 0 else 100)
+    if gov > 0 and sf <= ramp.max():
         s.event(at, "first yield" if not brittle else "crack starts", f"{o.governing_where or 'at the peak'}",
                 kind="fail")
         s.label(f"{'yields' if not brittle else 'breaks'} here, {{peak stress}}", g, kind="fail", t0=at)
