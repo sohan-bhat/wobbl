@@ -176,3 +176,16 @@ def test_the_estimate_prices_a_3d_antenna_without_meshing_it(tmp_path):
     plan = route("a half wave dipole for 2.4 GHz", "what is its length?", [], None, None)
     c = W.plan_cost(plan, {}, False)
     assert c.known and c.core_seconds < 200 and "axisymmetric" in " ".join(c.basis)
+
+
+def test_a_study_far_over_its_budget_is_refused_before_it_meshes(tmp_path):
+    import time
+
+    from wobbl.fields.wavecost import CostRefusal
+
+    t = time.time()
+    with pytest.raises(CostRefusal) as e:
+        radiate.run_radiate("loop", {"frequency": "2.4GHz", "budget": "5 s"}, tmp_path / "out", quality="fine")
+    assert time.time() - t < 90                      # building the loop took seconds, no mesh or solve was started
+    assert "budget of 5 s" in str(e.value) and "lower frequency" in e.value.hint
+    assert not list((tmp_path / "out").glob("work/*/m.msh"))
