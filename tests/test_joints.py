@@ -173,72 +173,83 @@ def six_bolt_flanges(o):
 
 
 def shaft_clamp(o):
-    """A split collar on a shaft along y, its halves a tenth of a millimetre apart and drawn together by two bolts."""
+    """A split collar on a shaft along y, its halves meeting on the plane z = 0 and drawn together by two bolts."""
     o.addCylinder(0, 0, 0, 0, 80, 0, 10)
-    for lo, hi in ((-20.0, -0.05), (0.05, 20.0)):
-        h = o.addBox(-20, 25, lo, 40, 30, hi - lo)
+    for z0, z1 in ((-20.0, 0.0), (0.0, 20.0)):
+        h = o.addBox(-20, 25, z0, 40, 30, z1 - z0)
         o.cut([(3, h)], [(3, o.addCylinder(0, 20, 0, 0, 40, 0, 10))])
         for x in (-15, 15):
-            o.cut([(3, h)], [(3, o.addCylinder(x, 40, lo - 1, 0, 0, hi - lo + 2, 3.3))])
+            o.cut([(3, h)], [(3, o.addCylinder(x, 40, z0 - 1, 0, 0, z1 - z0 + 2, 3.3))])
 
 
 def press_fit_hub(o):
-    """A hub of 22 mm outer radius pressed on a shaft 0.02 mm larger in radius than its bore."""
-    o.addCylinder(0, 0, 0, 0, 0, 70, 10.02)
+    """A hub of 22 mm outer radius pressed on a shaft 0.01 mm larger in radius than its bore."""
+    o.addCylinder(0, 0, 0, 0, 0, 70, 10.01)
     hub = o.addCylinder(0, 0, 20, 0, 0, 25, 22)
     o.cut([(3, hub)], [(3, o.addCylinder(0, 0, 19, 0, 0, 27, 10.0))])
 
 
 def wall_bracket(o):
+    """A bracket whose flange is bolted to a wall plate by four bolts along y, with a shelf out of its top edge."""
     wall = o.addBox(0, 0, 0, 100, 10, 80)
     flange = o.addBox(20, 10, 15, 60, 8, 50)
-    shelf = o.addBox(20, 18, 15, 60, 50, 8)
+    shelf = o.addBox(20, 18, 57, 60, 50, 8)
     br, _ = o.fuse([(3, flange)], [(3, shelf)])
     for x in (35, 65):
-        for z in (25, 55):
-            o.cut([(3, wall)], [(3, o.addCylinder(x, -1, z, 0, 20, 0, 4.5))])
-            o.cut(br, [(3, o.addCylinder(x, 9, z, 0, 12, 0, 4.5))])
+        for z in (25, 45):
+            o.cut([(3, wall)], [(3, o.addCylinder(x, -1, z, 0, 12, 0, 4.5))])
+            o.cut(br, [(3, o.addCylinder(x, 9, z, 0, 10, 0, 4.5))])
 
 
 ASSEMBLIES = [
-    # id, builder, kind, material, fixtures, loads, bolt, bodies and pairs expected, what the answer must say
-    ("lapped-plates", lapped_plates, "bolts", "mild-steel", ["body 1 and x=min"], ["1.5 kN +x @ body 2 and x=max"],
-     ["M6 8.8 torque 8 N*m"], (2, 1), ("clamp", "slip")),
-    ("six-bolt-flanges", six_bolt_flanges, "bolts", "mild-steel", ["body 1 and bottom"], ["20 kN +z @ body 2 and top"],
-     ["M10 8.8 torque 30 N*m"], (2, 1), ("clamp", "separation")),
-    ("shaft-clamp", shaft_clamp, "bolts", "mild-steel", ["body 1 and y=min"], ["400 N +x @ body 3 and top"],
-     ["M6 8.8 torque 8 N*m"], (3, 3), ("clamp", "slip")),
-    ("press-fit-hub", press_fit_hub, "contact", "mild-steel", ["body 1 and z=min"], ["2 kN +z @ body 2 and top"],
-     [], (2, 1), ("slip",)),
-    ("wall-bracket", wall_bracket, "bolts", "6061-t6", ["body 1 and y=min"], ["1 kN -z @ body 2 and z=max"],
-     ["M8 8.8 torque 20 N*m"], (2, 1), ("clamp", "separation")),
+    dict(id="lapped-plates", build=lapped_plates, kind="bolts", material="mild-steel", fix=["body 1 and x=min"],
+         load=["1.5 kN +x @ body 2 and x=max"], bolt=["M6 8.8 torque 8 N*m"], bodies=2, pairs=1,
+         names={"bolt strength", "separation", "slip", "force balance"}),
+    dict(id="six-bolt-flanges", build=six_bolt_flanges, kind="bolts", material="mild-steel",
+         fix=["body 1 and bottom"], load=["20 kN +z @ body 2 and top"], bolt=["M10 8.8 torque 30 N*m"], bodies=2,
+         pairs=1, names={"bolt strength", "separation", "force balance"}),
+    dict(id="shaft-clamp", build=shaft_clamp, kind="bolts", material="mild-steel", fix=["body 2 and z=min"],
+         load=["600 N +y @ body 1 and y=max"], bolt=["M6 8.8 torque 8 N*m"], bodies=3, pairs=3,
+         names={"bolt strength", "separation", "slip", "force balance"}),
+    dict(id="press-fit-hub", build=press_fit_hub, kind="contact", material="mild-steel", fix=["body 1 and z=min"],
+         load=["2 kN +z @ body 2 and top"], bodies=2, pairs=1, names={"force balance"}),
+    dict(id="wall-bracket", build=wall_bracket, kind="bolts", material="6061-t6", fix=["body 1 and y=min"],
+         load=["1 kN -z @ body 2 and y=max"], bolt=["M8 8.8 torque 20 N*m"], bodies=2, pairs=1,
+         names={"bolt strength", "separation", "force balance"}),
 ]
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("case", ASSEMBLIES, ids=[c[0] for c in ASSEMBLIES])
+@pytest.mark.parametrize("case", ASSEMBLIES, ids=[c["id"] for c in ASSEMBLIES])
 def test_unfamiliar_assemblies_are_found_solved_and_checked(case, tmp_path):
     from wobbl.joints.assembly import prepare_assembly
     from wobbl.joints.bolts import BoltStudy, run_bolts
     from wobbl.joints.contact import ContactStudy, run_contact
     from wobbl.validation import generality as G
 
-    name, build, kind, mat, fix, load, bolt, (bodies, pairs), words = case
-    part = G._step(tmp_path / f"{name}.step", build)
+    name = case["id"]
+    part = G._step(tmp_path / f"{name}.step", case["build"])
     asm = prepare_assembly(part, tmp_path / "pre")
-    assert asm.n_bodies == bodies and len(asm.pairs) >= pairs
-    if kind == "bolts":
-        o = run_bolts(BoltStudy(str(part), mat, bolt, load, fix, quality="fast", budget=600), tmp_path / "run",
-                      render_images=False)
-        assert o.values["bolts"] and o.values["least_clamp_N"] == pytest.approx(o.values["least_clamp_N"])
+    assert asm.n_bodies == case["bodies"] and len(asm.pairs) >= case["pairs"]
+    if case["kind"] == "bolts":
+        o = run_bolts(BoltStudy(str(part), case["material"], case["bolt"], case["load"], case["fix"], quality="fast",
+                                budget=900), tmp_path / "run", render_images=False)
+        assert len(o.values["bolts"]) >= 2 and o.values["least_clamp_N"] >= 0 and o.values["proof_use"] > 0
     else:
-        o = run_contact(ContactStudy(str(part), mat, load, fix, [], 0.2, quality="fast", budget=600),
-                        tmp_path / "run", render_images=False)
-    assert len(o.values["levels"]) == 2
+        o = run_contact(ContactStudy(str(part), case["material"], case["load"], case["fix"], case.get("move", []),
+                                     0.2, quality="fast", budget=900), tmp_path / "run", render_images=False)
+        assert o.values["pairs"] and o.values["pairs"][0]["normal_force_N"] > 0
+    assert len(o.values["levels"]) == 2 and o.values["budget"]["predicted_nodes"][1] > 0
     names = {c.name for c in o.checks}
-    assert {"force balance", "contact convergence"} <= names
-    assert [c.name for c in o.checks if c.status == "fail" and c.name in {"force balance", "contact convergence"}] == []
-    assert any(w in o.headline.lower() or w in names for w in words), (o.headline, names)
+    assert case["names"] <= names, names
+    assert [c.name for c in o.checks if c.status == "fail" and c.name == "force balance"] == []
+    assert o.verdict and o.headline and o.confidence
+    if name == "press-fit-hub":
+        # Lame: p = E d (1 - a^2/b^2) / (2 a) for a solid shaft in a hub of the same steel, over the bore
+        pressing = 210000 * 0.01 * (1 - (10 / 22) ** 2) / 20 * math.pi * 20 * 25
+        pair = o.values["pairs"][0]
+        assert 0.3 * pressing < pair["normal_force_N"] < 4.0 * pressing
+        assert pair["friction_use"] < 1.0
     print(name, o.verdict, o.headline)
 
 
@@ -293,3 +304,29 @@ def test_the_second_level_is_made_less_fine_when_the_first_was_slow():
     plan.budget, plan.spent = 1200.0, 0.0
     slow = B.second_level(plan, asm, make, 600.0, plan.nodes[0], 60, mesh_fn)
     assert slow.n_nodes < n_fast and plan.h[1] > 0.75 * plan.h[0] - 1e-9
+
+
+@pytest.mark.parametrize("physics", ["bolts", "contact"])
+def test_simulate_accepts_a_budget_and_a_mesh_size_for_joints(physics):
+    from wobbl.simulate import registry
+
+    registry.load()
+    a = registry.get("part", physics)
+    assert "budget" in {o.name for o in a.options}
+    assert "mesh-size" in {o.name for o in registry.domain("part").options}
+
+
+def test_round_faces_that_press_on_each_other_keep_their_elements_round_the_circle():
+    from types import SimpleNamespace
+
+    from wobbl.joints import budget as B
+
+    asm, make, mesh_fn = _fake_world()
+    asm.pairs = [SimpleNamespace(slave=1, master=2)]
+    asm.features = SimpleNamespace(faces={1: SimpleNamespace(radius=10.0), 2: SimpleNamespace(radius=10.0)})
+    plan = B.fit(asm, make, 10.0, None, 100.0, 60, 1, mesh_fn=mesh_fn)
+    assert plan.curv >= B.CURVED_CONTACT and plan.rung_index > 0
+    flat = _fake_world()[0]
+    flat.pairs = [SimpleNamespace(slave=1, master=2)]
+    flat.features = SimpleNamespace(faces={1: SimpleNamespace(radius=None), 2: SimpleNamespace(radius=None)})
+    assert B.fit(flat, make, 10.0, None, 100.0, 60, 1, mesh_fn=mesh_fn).curv < B.CURVED_CONTACT

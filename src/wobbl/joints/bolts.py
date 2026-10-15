@@ -589,6 +589,8 @@ def _interface(mesh, pairs, asm, ln: BoltLine, fr, lines: list[BoltLine],
             continue
         w, _ = tri_area_weights(mesh, cp.slave)
         near = (w > 0) & nearest
+        if not near.any():            # a strip of the interface that belongs to another bolt
+            continue
         p, tau, ww = pres_all[near], shear_all[near], w[near]
         touching = p > 1e-6 * max(float(p.max()) if len(p) else 0.0, 1e-30)
         area = float(ww[touching].sum())

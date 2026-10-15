@@ -27,6 +27,7 @@ CONTACT_ITERS = 40           # iterations of a pressed assembly loaded in one st
 # What can be given up, finest first: (factor on the element size, elements per circle round curves). Round holes
 # and bores hold the node count up whatever size is asked for, so the curvature setting is the lever that matters.
 RUNGS = ((1.0, 16), (1.0, 12), (1.25, 9), (1.6, 7), (2.0, 6), (2.5, 5), (3.2, 5))
+CURVED_CONTACT = 12          # round faces that press on each other need at least this many elements round the circle
 FINEST = 0.87                # the second level is at least this fraction of the first element size
 SLACK = 0.85                 # the second level may use this share of what the budget has left
 
@@ -76,6 +77,12 @@ def _predict(plan: Plan, sizings, est, ratio: float) -> tuple[list, list]:
     return nodes, sec
 
 
+def round_contact(asm) -> bool:
+    """Whether any pair of faces that press on each other is round, like a shaft in a bore."""
+    faces = getattr(getattr(asm, "features", None), "faces", {}) or {}
+    return any(getattr(faces.get(i), "radius", None) for p in getattr(asm, "pairs", []) for i in (p.slave, p.master))
+
+
 def fit(asm, make, h_auto: float, h_user: float | None, budget: float, iterations: float, pairs: int, say=None,
         mesh_fn=None, iter_s: float = ITER_S) -> Plan:
     """Choose the element size. ``make(h)`` gives the two sizings for a first level of size h. The first level is
@@ -89,6 +96,12 @@ def fit(asm, make, h_auto: float, h_user: float | None, budget: float, iteration
     plan = Plan([], [], user_size=bool(h_user), iterations=iterations, pairs=pairs, budget=budget, iter_s=iter_s)
     base = float(h_user or h_auto)
     rungs = RUNGS[:1] if h_user else RUNGS
+    if round_contact(asm):
+        # facets of two round faces that press on each other overlap by their sag, which grows into a wedge when the
+        # circle has few elements, so these assemblies are coarsened by element size only
+        rungs = tuple((f, max(c, CURVED_CONTACT)) for f, c in rungs)
+        rungs = tuple(dict.fromkeys(rungs + ((rungs[-1][0] * 1.25, CURVED_CONTACT), (rungs[-1][0] * 1.6,
+                                                                                    CURVED_CONTACT))))
     k = 0
     while True:
         f, curv = rungs[k]
