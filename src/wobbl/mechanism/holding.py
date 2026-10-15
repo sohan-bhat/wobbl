@@ -176,7 +176,7 @@ def holding(su: Setup) -> Finding:
                    "a joint at a time, with contacts and joint stops left out."]
     if dyn:
         assumptions.append(f"Fast moves are {MOVES} point to point moves between random poses, each timed so the "
-                           "fastest joint just reaches its speed limit" +
+                           "fastest joint just reaches half its motor's no load speed, where the motor gives the most power" +
                            (", taken as 1 rad/s or 0.5 m/s since no drive states one." if su.cache.get("plain_speed")
                             else "."))
     if sp.dep:
@@ -222,7 +222,8 @@ def _moves(su: Setup, sp, model, names: list[str]) -> dict:
     its speed limit, from MuJoCo's inverse dynamics. Skipped when no drive states a speed limit."""
     mujoco = _mj()
 
-    vmax = np.array([su.motors[n].no_load_speed if n in su.motors else math.inf for n in names])
+    # a motor at its no load speed has no torque left, so the moves peak at half of it, where its power peaks
+    vmax = np.array([0.5 * su.motors[n].no_load_speed if n in su.motors else math.inf for n in names])
     if not np.isfinite(vmax).any():     # no drive states a speed, so a brisk 1 rad/s or 0.5 m/s
         vmax = np.array([1.0 if j["kind"] == "hinge" else 0.5 for j in sp.free])
         su.cache["plain_speed"] = True
