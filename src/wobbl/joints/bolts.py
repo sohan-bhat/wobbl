@@ -530,13 +530,16 @@ def results(asm, lines, mesh, built, pairs, bolts, springs, floating, mat_of, re
                 ground_f += f
                 ground_m += np.cross(np.asarray(at, float), f) + fin["RF_extra"][ids[rot] - mesh.n_nodes]
     # a bolt's rings are tied to its head and nut, and the bolt carries bending and shear between them. The ring nodes
-    # show what the bolt hands to the clamped parts as forces whose moment the supports must balance as well
+    # show what the bolt hands to the clamped parts, which with the loads and the supports is all that acts on them,
+    # so the supports must balance the loads and these forces together. A bolt end on a held face has no ring
     ring_f, ring_m = np.zeros(3), np.zeros(3)
     for b in bolts:
         nodes = np.concatenate([np.asarray(b.head, np.int64), np.asarray(b.nut, np.int64)])
         if len(nodes):
-            ring_f += fin["RF"][nodes].sum(0)
-            ring_m += np.cross(mesh.X[nodes], fin["RF"][nodes]).sum(0)
+            # a ring node under an applied load reads that load as well, which the balance counts once already
+            hand = fin["RF"][nodes] - built.model.nodal_forces()[nodes]
+            ring_f += hand.sum(0)
+            ring_m += np.cross(mesh.X[nodes], hand).sum(0)
     # gross slip of each interface: CalculiX's shear total against friction on its normal total
     slip = {}
     for cp in pairs:
@@ -618,7 +621,7 @@ def evaluate(study: BoltStudy, asm: Assembly, lines: list[BoltLine], r: dict, le
                             {"clamp": clamps}))
     F, M = sm.applied_total()
     R, RM = support_reactions(built, SimpleNamespace(RF=fin["RF"]), mesh)
-    R, RM = R + r["ground_force"] + r["ring_force"], RM + r["ground_moment"] + r["ring_moment"]
+    R, RM = R + r["ring_force"], RM + r["ring_moment"]
     if np.linalg.norm(F) > 0:
         c = balance_check(F + r["spring_force"], R, M, RM, asm.prep.diag)
         checks.append(c)

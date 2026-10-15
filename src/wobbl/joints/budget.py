@@ -26,7 +26,7 @@ POWER = 1.3
 CONTACT_ITERS = 40           # iterations of a pressed assembly loaded in one step
 # What can be given up, finest first: (factor on the element size, elements per circle round curves). Round holes
 # and bores hold the node count up whatever size is asked for, so the curvature setting is the lever that matters.
-RUNGS = ((1.0, 16), (1.0, 12), (1.25, 9), (1.6, 7), (2.0, 6), (2.5, 5), (3.2, 4))
+RUNGS = ((1.0, 16), (1.0, 12), (1.25, 9), (1.6, 7), (2.0, 6), (2.5, 5), (3.2, 5))
 FINEST = 0.87                # the second level is at least this fraction of the first element size
 SLACK = 0.85                 # the second level may use this share of what the budget has left
 
@@ -109,14 +109,17 @@ def fit(asm, make, h_auto: float, h_user: float | None, budget: float, iteration
         say("budget", f"predicted {sum(sec):.0f} s for two levels of {nodes[0]:,.0f} and {nodes[1]:,.0f} nodes "
                       f"against a budget of {budget:.0f} s, coarsening")
         k = min(k + (2 if sum(sec) > 4 * budget else 1), len(rungs) - 1)
-    if h_user and plan.predicted > budget:
+    if not h_user and plan.predicted > budget:
+        plan.notes.append(f"Even the coarsest mesh is predicted to take {plan.predicted:.0f} s for its two levels, "
+                          f"over the {budget:.0f} s budget, so it runs anyway. A larger --budget silences this.")
+    elif h_user and plan.predicted > budget:
         plan.notes.append(f"The mesh size you set is predicted to take {plan.predicted:.0f} s over its two meshes, "
                           f"more than the {budget:.0f} s budget, so it was kept. Pass a larger --budget to silence "
                           "this or a larger --mesh-size to run faster.")
     elif plan.rung_index > 0:
         plan.notes.append(f"To fit the {budget:.0f} s budget the mesh was coarsened (element size {plan.h[0]:.3g} mm "
-                          f"and {plan.curv} elements round each circle), with about {plan.nodes[0]:,.0f} nodes on the first mesh and "
-                          f"{plan.nodes[1]:,.0f} on the second. A larger --budget keeps a finer mesh.")
+                          f"and {plan.curv} elements round each circle), with about {plan.nodes[0]:,.0f} nodes on the first "
+                          f"mesh and {plan.nodes[1]:,.0f} on the second. A larger --budget keeps a finer mesh.")
     return plan
 
 
