@@ -533,6 +533,15 @@ def mesh_shift(freqs, Z, f0: float, z_coarse: complex, z_fine: complex) -> float
     return float(-delta / f0)
 
 
+def _peak_memory() -> float:
+    """The largest resident size of a solver this process has run, in bytes."""
+    import resource
+    import sys
+
+    m = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    return float(m if sys.platform == "darwin" else m * 1024)
+
+
 def _cpu() -> float:
     """CPU seconds this process and its children have used, which does not grow when the machine is busy."""
     import resource
@@ -956,6 +965,7 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
               "dielectric_loss_W_per_A2": base["p_diel"], "unknowns": dofs, "nodes": nodes,
               "air_radius_m": R, "sampling_radius_m": rs, "port_width_m": fd["width"], "port_gap_m": fd["gap"],
               "plan": plan.to_dict(), "mesh_seconds": t_mesh, "mesh_resonance_shift": mesh_shift_value,
+              "peak_memory_bytes": _peak_memory(),
               "solve_cpu_s": [rows[f]["cpu"] for f in fs], "solve_wall_s": [rows[f]["wall"] for f in fs],
               "_figures": [["s11", "S11 over the sweep"], ["impedance", "Input impedance"],
                            ["pattern", "Radiation pattern cuts"], ["field", "Field strength near the antenna"],

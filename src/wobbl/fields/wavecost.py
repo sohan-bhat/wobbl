@@ -25,7 +25,7 @@ CPU_AT_100K = 175.0               # cpu seconds for one frequency (solve and fie
 EXPONENT = 1.4
 MESH_CPU_PER_NODE = 4.0e-3        # cpu seconds a node costs to mesh
 SPEEDUP = 2.0                     # wall time shrinks by this much on the threads a solve gets
-BYTES_PER_UNKNOWN = 28_000        # peak memory of a direct solve, per unknown at 100 thousand
+BYTES_PER_UNKNOWN = 18_000        # peak memory of a direct solve, per unknown at 100 thousand (about 0.8 GB at 49 thousand)
 FINE_FACTOR = (1 / 0.75) ** 3     # unknowns of the verification mesh against the base mesh
 FAR_FACTOR = 1.4 ** 3
 # element size factors of the qualities, the coarsest first (wave3d.QUALITY)
