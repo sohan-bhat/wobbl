@@ -132,7 +132,7 @@ async function mount(host, opt = {}) {
     u.scrub = el('input', '', trk);
     Object.assign(u.scrub, { type: 'range', min: '0', max: String(Math.max(F - 1, 0)), step: tl.between === 'exact' ? 'any' : '1' });
     u.scrub.setAttribute('aria-label', 'Playback position');
-    u.scrub.oninput = () => { pause(); seek(+u.scrub.value); };
+    u.scrub.oninput = () => { const v = +u.scrub.value; pause(); seek(v); };
     const tPos = (t) => { for (let i = 0; i < F - 1; i++) if (t <= T[i + 1]) return i + (t - T[i]) / ((T[i + 1] - T[i]) || 1); return F - 1; };
     for (const e of S.events || []) {
       const m = el('button', `ev ${e.kind === 'fail' ? 'fail' : ''}`, trk), p = clamp(tPos(e.t), 0, F - 1), x = p / Math.max(F - 1, 1);
