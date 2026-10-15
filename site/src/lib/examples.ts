@@ -2,14 +2,18 @@
 // Nothing here is written by hand. The question and command come from run.sh, the
 // verdict, numbers and checks from outcome.json, the plain text from summary.txt,
 // and the notes from the example's README.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { ROOT } from './site';
 
 // The newer kinds of study come first, since the landing page's hero already shows a stress result:
-// motion, then circuits, then chemistry and the rest as they land, with strength and heat after them.
-export const ORDER = ['rocket-launch', 'falling-rock', 'circuits', 'propane-flame', 'knsb-motor',
+// fields, sound and boards, then molecules and reactions, cooling, drops, yield and cracks, bolts, layups,
+// castings and prints, then motion, circuits, chemistry and the rest, with strength and heat after them.
+export const ORDER = ['antenna-2g4', 'antenna-pcb', 'speaker-box', 'solenoid-actuator', 'pcb-buck-ringing',
+  'caffeine', 'thermite', 'baking-soda-vinegar', 'copper-crystal', 'cold-plate', 'fan-heat-sink',
+  'handheld-drop', 'steel-hook', 'bracket-crack', 'bolted-flange', 'carbon-arm', 'cast-pulley', 'printed-lid',
+  'rocket-launch', 'falling-rock', 'circuits', 'propane-flame', 'knsb-motor',
   'wiper-linkage', 'desktop-arm', 'cell-runaway', 'drone-arm-resonance', 'strut-buckling', 'motor-mount-fatigue',
   'cast-mount-credibility',
   'cast-motor-mount', 'shelf-bracket', 'motor-mount', 'enclosure', 'drone-arm', 'heat-sink', 'battery-pack'];
@@ -49,6 +53,9 @@ export const RUN_IMAGES: Record<string, Record<string, string>> = {
 const DOMAIN: Record<string, string> = {
   strength: 'Strength', thermal: 'Heat', circuit: 'Circuits', motion: 'Motion', combustion: 'Chemistry', motor: 'Motors',
   mechanism: 'Mechanisms', battery: 'Batteries', vibration: 'Vibration', buckling: 'Buckling', fatigue: 'Fatigue',
+  antenna: 'Antennas', sound: 'Sound', magnetic: 'Magnetics', board: 'Boards', chemistry: 'Chemistry', flow: 'Cooling',
+  drop: 'Drops', plastic: 'Yield', fracture: 'Cracks', bolt: 'Bolts', laminate: 'Composites', casting: 'Casting',
+  warp: 'Printing',
 };
 export const COLOR: Record<string, string> = { holds: 'holds', ok: 'holds', marginal: 'marginal', fails: 'fails', hot: 'fails' };
 
@@ -132,9 +139,29 @@ const opt = (a: string[], ...names: string[]) => {
   return i >= 0 ? a[i + 1] : undefined;
 };
 
+/** A title from the folder name, for an example without a README yet: antenna-2g4 is Antenna 2.4 GHz. */
+const WORDS: Record<string, string> = { pcb: 'PCB', '2g4': '2.4 GHz' };
+const named = (name: string) => {
+  const t = name.split('-').map((w) => WORDS[w] ?? w).join(' ');
+  return t[0].toUpperCase() + t.slice(1);
+};
+
+/** The run folders under a command's output: the folder itself, or the studies inside it (caffeine/output/structure). */
+function runFolders(rel: string): string[] {
+  if (existsSync(resolve(EX, rel, 'outcome.json'))) return [rel];
+  const dir = resolve(EX, rel);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).sort().map((d) => `${rel}/${d}`).filter((r) => existsSync(resolve(EX, r, 'outcome.json')));
+}
+
+/** outcome.json as Python writes it, where a bare Infinity or NaN is read as null. */
+const json = (p: string) => JSON.parse(readFileSync(p, 'utf-8').replace(/(:\s*|\[\s*|,\s*)-?(?:Infinity|NaN)\b/g, '$1null'));
+
+const read = (p: string) => (existsSync(p) ? readFileSync(p, 'utf-8') : '');
+
 function load(name: string): Example {
   const folder = resolve(EX, name);
-  const readme = readFileSync(resolve(folder, 'README.md'), 'utf-8');
+  const readme = read(resolve(folder, 'README.md')) || `# ${named(name)}\n`;
   // The title is the H1. A question after it, in the H1 or as the first short line, is the subtitle.
   const h1 = readme.split('\n')[0].replace(/^#\s*/, '').trim();
   const cut = h1.search(/[:.?]\s/);
@@ -163,13 +190,23 @@ function load(name: string): Example {
     // a later command that works on a run's own folder, such as wobbl uncertainty output, belongs to that run
     const on = runs.find((r) => r.rel === `${name}/${a[2]}` || r.rel === rel);
     if (on) { on.command += `\n${shown}`; continue; }
-    const outcome = JSON.parse(readFileSync(resolve(EX, rel, 'outcome.json'), 'utf-8')) as Outcome;
-    const reportRel = `examples/${rel}/report.html`;
-    const has = existsSync(resolve(EX, rel, 'report.html')) && (tracked === null || tracked.has(reportRel));
-    runs.push({
-      rel, question: opt(a, '--question') ?? outcome.question ?? '', command: shown, outcome,
-      summary: readFileSync(resolve(EX, rel, 'summary.txt'), 'utf-8'), report: has ? reportRel : null, fixes: [],
-    });
+    const folders = runFolders(rel);
+    // a run that has not been published yet is listed with its question, and picks up its outputs on a later build
+    if (!folders.length) {
+      const q = a[3] && !a[3].startsWith('-') ? a[3] : '';
+      const outcome: Outcome = { domain: opt(a, '--physics') ?? '', verdict: 'pending', headline: 'The run is on its way', confidence: 'pending', question: q };
+      runs.push({ rel, question: q, command: shown, outcome, summary: '', report: null, fixes: [] });
+      continue;
+    }
+    for (const r of folders) {
+      const outcome = json(resolve(EX, r, 'outcome.json')) as Outcome;
+      const reportRel = `examples/${r}/report.html`;
+      const has = existsSync(resolve(EX, r, 'report.html')) && (tracked === null || tracked.has(reportRel));
+      runs.push({
+        rel: r, question: opt(a, '--question') ?? outcome.question ?? '', command: shown, outcome,
+        summary: read(resolve(EX, r, 'summary.txt')), report: has ? reportRel : null, fixes: [],
+      });
+    }
   }
   return {
     name, title, subtitle: sub ? sub[0].toUpperCase() + sub.slice(1) : '', subtitleFromBody, readme, runs,
