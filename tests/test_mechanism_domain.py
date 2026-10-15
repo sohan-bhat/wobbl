@@ -15,7 +15,8 @@ needs_mujoco = pytest.mark.skipif(not install.available(), reason="MuJoCo is not
 
 def test_the_physics_are_registered_by_name():
     names = {a.name for a in registry.analyses("mechanism")}
-    assert names == {"torque", "kinematics", "collision", "stability", "contact", "dynamics", "overview"}
+    assert names == {"torque", "kinematics", "collision", "stability", "contact", "dynamics", "overview",
+                     "drive"}
     assert all(a.dry for a in registry.analyses("mechanism"))
     assert [a.name for a in registry.analyses("mechanism") if a.default] == ["overview"]
     assert not registry.errors

@@ -41,12 +41,19 @@ KEYWORDS = {
                   r"\bbalance", r"\bstand(?:s|ing)? up\b"),
     "contact": (r"\bfeet\b", r"\bfoot\b", r"\bwheels?\b", r"\bcontact force", r"\breaction", r"\bground force",
                 r"\bstands?\b", r"\bstanding\b", r"what (?:does|do) (?:each|the) .* carry", r"\bweight on\b"),
+    "drive": (r"\bcurrents?\b", r"\bamps?\b", r"\bamperes?\b", r"\bwatts?\b", r"\bpower (?:draw|use|consumption)",
+              r"\bover.?heat", r"\bburn(?:s|ed)? out\b", r"\bquick.?return", r"\bduty cycle\b",
+              r"can (?:a |an |the |this |that |my )?(?:\d[\w. ]* )?(?:\w+ ){0,3}(?:motor|servo|actuator)s? "
+              r"(?:drive|turn|spin|run|swing)", r"\bmotor (?:drives?|driving|can drive|stalls?)\b"),
     "dynamics": (r"\bswing", r"\bsimulate\b", r"what happens", r"\bhow fast\b", r"\bperiod\b",
                  r"\bfall(?:s)?\b(?! over)", r"\bmotion\b"),
 }
+# what a question says about a linkage or slider crank that a motor drives, where nothing else answers it
+DRIVE_WORDS = (r"\bstall", r"\brpm\b", r"\bmotors?\b", r"\bservos?\b", r"\bdrives?\b", r"\bdriving\b",
+               r"\btorques?\b", r"\bpower\b", r"\bspeed\b", r"\bdraws?\b", r"\bhow hard\b", r"\bstrong enough\b")
 PASSIVE = r"nothing (?:holds|drives|powers|supports)|unpowered|\bpassive\b|\blimp\b|\bno motors?\b|motors? off|" \
           r"switched off"
-ORDER = ("torque", "contact", "stability", "kinematics", "collision", "dynamics")
+ORDER = ("drive", "torque", "contact", "stability", "kinematics", "collision", "dynamics")
 
 
 def asked(question: str) -> list[str]:
@@ -158,6 +165,10 @@ def finding(su: Setup, name: str) -> Finding:
         return stance.contact(su)
     if name == "dynamics":
         return dynamics(su)
+    if name == "drive":
+        from . import drive
+
+        return drive.finding(su)
     raise SpecError(f"no mechanism analysis called '{name}' (use {', '.join(ORDER)})")
 
 

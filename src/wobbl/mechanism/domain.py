@@ -7,10 +7,11 @@ the template that fits it, whose own analysis covers that physics in depth.
 from __future__ import annotations
 
 import dataclasses
+import re
 
 from ..simulate import Analysis, Option, register
 from ..simulate.registry import domain
-from .general import KEYWORDS
+from .general import DRIVE_WORDS, KEYWORDS
 
 FILES = ("urdf", "mjcf", "spec")
 GENERAL = (Option("payload", "A load it carries, e.g. '500 g', held at its end effector"),
@@ -21,7 +22,7 @@ GENERAL = (Option("payload", "A load it carries, e.g. '500 g', held at its end e
            Option("duration", "How long a run lasts, e.g. '2 s'"),
            Option("timestep", "Time step, e.g. '1 ms' (default the model's own, at most 2 ms)"),
            Option("set", "A value of a ready made mechanism, e.g. 'payload=500g' or 'crank=30'", multiple=True))
-OBJECTS = {"arm": ["table", "payload"], "tip": ["floor", "payload"], "impact": ["floor"], "fourbar": [],
+OBJECTS = {"arm": ["table", "payload"], "tip": ["floor", "payload"], "impact": ["floor"], "fourbar": [], "slider": [],
            "gears": [], "pendulum": []}
 
 
@@ -73,7 +74,7 @@ def _params(job, path) -> dict:
     return p
 
 
-def _template(job):
+def _template(job, drive: bool = False):
     """A ready made mechanism from words: the kind the router recognized, its values read from the description
     and this analysis's part of the question, each guess recorded with its override, and --set values on top."""
     from .study import run_mechanism
@@ -81,17 +82,22 @@ def _template(job):
 
     text = " ".join(x for x in (job.thing if job.path is None and job.thing != "-" else "", job.focus) if x)
     params, guesses = read_for(job.kind, text)
-    for g in guesses:
-        what, _, override = g.partition(" (override with ")
-        job.assume(what, override.rstrip(")") if override else "")
+    given = {}
     for s in job.values("set"):
         if "=" in s:
             k, v = s.split("=", 1)
-            params[k.strip()] = v.strip()
+            given[k.strip()] = v.strip()
+    for g in guesses:
+        what, _, override = g.partition(" (override with ")
+        keys = re.findall(r"(\w+)=", override)
+        if keys and all(k in given for k in keys):     # the user already gave every value this guess fills in
+            continue
+        job.assume(what, override.rstrip(")") if override else "")
+    params.update(given)
     job.use("set", [f"{k}={v}" for k, v in params.items()])
     job.situate(objects=OBJECTS.get(job.kind, []))
     job.ready()
-    return run_mechanism(job.kind, params, job.out, job.focus, job.log)
+    return run_mechanism(job.kind, params, job.out, job.focus, job.log, drive=drive)
 
 
 def _general(name: str | None):
@@ -101,7 +107,7 @@ def _general(name: str | None):
         from .study import run_mechanism
 
         if job.kind not in FILES:
-            return _template(job)
+            return _template(job, drive=name == "drive")
         if job.path is None:
             raise ValueError(f"file not found: {job.thing}")
         params = _params(job, job.path)
@@ -147,6 +153,15 @@ _add("dynamics", "The mechanism run as written or along its move: what each driv
                  "balance holds", ("pendulum",),
      (r"\bperiod\b", r"\bin time\b", r"\bclose\b", r"spin.?up"), ("motion", "run"),
      'wobbl simulate pendulum.xml "does it fall over if nothing holds it?"')
+register(Analysis("mechanism", "drive", "Whether a motor can drive it: the torque, speed, current and power it takes "
+                                        "through the motion, whether it stalls or runs hot, and the time ratio of "
+                                        "a quick return", _general("drive"), keywords=KEYWORDS["drive"],
+                  options=GENERAL, aliases=("motor", "current", "power", "stall", "speed"),
+                  kinds=FILES + ("fourbar", "slider"),
+                  kind_keywords={"fourbar": DRIVE_WORDS, "slider": DRIVE_WORDS}, covers=("torque",),
+                  covers_question=("kinematics",), covers_kinds=("fourbar", "slider"), dry=True,
+                  example='wobbl simulate fourbar "can a 45 rpm wiper motor drive this linkage, and what current?" '
+                          '--set crank=80 --set coupler=300 --set rocker=110 --set ground=300'))
 register(Analysis("mechanism", "overview", "The usual analyses for the model: torque, reach and collisions for a "
                                            "fixed base, or contact, stability and stance torque for a robot that "
                                            "stands", _general(None), options=GENERAL, kinds=FILES, default=True,

@@ -64,7 +64,7 @@ def mechanism(job):
         job.assume(g.split(" (override")[0], (re.findall(r"override with (--set [^)]*)", g) or [""])[0]
                    .replace("--set ", "--"))
     _record(job, params)
-    return run_mechanism(job.kind if job.kind in ("arm", "fourbar", "gears", "impact", "tip", "pendulum") else tpl,
+    return run_mechanism(job.kind if job.kind in ("arm", "fourbar", "slider", "gears", "impact", "tip", "pendulum") else tpl,
                          params, job.out, job.question, job.log)
 
 

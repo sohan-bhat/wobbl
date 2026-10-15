@@ -58,6 +58,9 @@ class Analysis:
     covers_all: bool = False   # its covers hold for the whole question, as a layup says what the whole part is
     covers_scope: str = "clause"   # or "sentence": a sentence it speaks in is one scenario, as a coolant with
     #                                its heat load, while a drop and a shelf load in one sentence stay two cases
+    kind_keywords: dict[str, tuple[str, ...]] = field(default_factory=dict)   # more regexes, for one kind only
+    covers_question: tuple[str, ...] = ()  # analyses it makes unnecessary wherever they are asked, for covers_kinds
+    covers_kinds: tuple[str, ...] = ()  # the kinds covers_question holds for, all of them when empty
     legacy: str = ""           # the old command that ran the same study, kept as a hidden alias
     dry: bool = False          # the entry calls job.ready() just before it solves, so --plan can show its guesses
     example: str = ""

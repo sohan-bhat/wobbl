@@ -193,7 +193,8 @@ def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None
         hits: dict[str, dict[int, str]] = {}
         for a in pool:
             for i, part in enumerate(parts):
-                m = next((m for rx in a.keywords if (m := _search(rx, part))), None)
+                m = next((m for rx in (*a.keywords, *a.kind_keywords.get(kind, ())) if (m := _search(rx, part))),
+                         None)
                 if m:
                     hits.setdefault(a.key, {})[i] = m.group(0).strip()
         chosen = [a for a in pool if a.key in hits]
@@ -207,15 +208,21 @@ def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None
                 return {i for i, (n, _) in enumerate(where) if n in said}
             return set(hits[a.key])
 
+        def speaks(a: Analysis, name: str, i: int) -> bool:
+            """Whether ``a`` answers what clause ``i`` asks of the analysis called ``name``."""
+            if name in a.covers_question and (not a.covers_kinds or kind in a.covers_kinds):
+                return True
+            return name in a.covers and i in reach(a)
+
         def covered(b: Analysis) -> bool:
-            return any(b.name in a.covers and set(hits[b.key]) <= reach(a) for a in chosen if a is not b)
+            return any(all(speaks(a, b.name, i) for i in hits[b.key]) for a in chosen if a is not b)
 
         chosen = [b for b in chosen if not covered(b)]
         claimed = {i for a in chosen for i in hits[a.key]}
         shared = [i for i in range(len(parts)) if i not in claimed]
         word = {}
         for b in chosen:
-            mine = {i for i in hits[b.key] if not any(b.name in a.covers and i in reach(a) for a in chosen)}
+            mine = {i for i in hits[b.key] if not any(speaks(a, b.name, i) for a in chosen)}
             word[b.key] = hits[b.key][min(mine)] if mine else next(iter(hits[b.key].values()))
             if len(chosen) > 1 and mine:
                 focus[b.name] = " ".join(parts[i] for i in sorted(mine | set(shared)))
