@@ -39,7 +39,8 @@ async function mount(host, opt = {}) {
   const eyeOf = () => { const c = Math.cos(view.el); return [view.t[0] + view.dist * c * Math.cos(view.az), view.t[1] + view.dist * c * Math.sin(view.az), view.t[2] + view.dist * Math.sin(view.el)]; };
 
   // ---------- playback
-  let pos = reduce ? F - 1 : 0, playing = false, speed = 1, last = 0, holdUntil = 0;
+  // opt.end opens on the last frame, where a field run shows its full result rather than an unloaded part
+  let pos = reduce || opt.end ? F - 1 : 0, playing = false, speed = 1, last = 0, holdUntil = 0;
   const ui = buildUI();
   function update(p) {
     const a = Math.floor(clamp(p, 0, F - 1)), b = Math.min(a + 1, F - 1), k = tl.between === 'step' ? 0 : p - a, t = k ? lerp(T[a], T[b], k) : T[a];
