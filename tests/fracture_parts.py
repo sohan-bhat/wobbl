@@ -59,6 +59,6 @@ PARTS = {
     "L bracket fillet": (l_bracket, "800 N 1,0,0 @ z=max", "z=min", ((-1, 20), (-1, 41), (-1, 20))),
     "shaft shoulder": (shaft_shoulder, "1.2 kN 0,1,0 @ x=max", "x=min", ((30, 50), (-17, 17), (-17, 17))),
     "lug": (lug, "4 kN 1,0,0 bearing @ hole d=14", "x=min", ((40, 86), (-16, 16), (0, 6))),
-    "I beam flange": (i_beam, "1.5 kN 0,0,-1 @ x=max", "x=min", ((-1, 60), (-21, 21), (-1, 51))),
+    "I beam flange": (i_beam, "1.5 kN 0,0,-1 @ x=max", "x=min", ((-1, 161), (-21, 21), (-1, 51))),   # a fillet at either end: the root or where the load lands
     "tube": (tube, "1.2 kN 0,1,0 @ x=max", "x=min", ((-1, 40), (-15, 15), (-15, 15))),
 }
