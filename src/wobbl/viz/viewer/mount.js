@@ -47,6 +47,8 @@ async function mount(host, opt = {}) {
       ob.vis = shown(ob.o.when, t) && !(ob.prop && !ui.props);
       if (ob.vis) frame(G, ob, a, b, k, t);
     }
+    // a label can name the timeline itself, as "{load}" on a strength load arrow, and a readout of that name wins
+    if (tl.label) ui.vals[tl.label] = `${fmt(t, 4)}${tl.unit ? ' ' + tl.unit : ''}`;
     for (const [i, r] of S.readouts.entries()) {
       const v = series(r.values, a, b, k), e = ui.ro[i];
       e.v.textContent = fmt(v, r.digits);
