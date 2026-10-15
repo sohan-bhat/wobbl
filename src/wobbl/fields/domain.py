@@ -267,9 +267,8 @@ register(Analysis(
 
 # --- antennas in files ----------------------------------------------------------------------------
 FREQUENCY = re.compile(r"(\d+(?:\.\d+)?)\s*([gmk]?hz)\b", re.I)
-ANTENNA_WORDS = (r"\bantennas?\b", r"\bs11\b", r"return loss", r"\bvswr\b", r"\bradiat", r"\bgain\b",
-                 r"\bdipole\b", r"\bmonopole\b", r"\bpatch\b", r"\bloop\b", r"inverted[- ]?f", r"\bmeander",
-                 r"radiation pattern", r"\bresonat\w*", r"\b\d+(?:\.\d+)?\s*[gm]hz\b")
+ANTENNA_WORDS = (r"\bantennas?\b", r"\bs11\b", r"return loss", r"\bvswr\b", r"\bradiat", r"\bgain\b", r"\bdipole\b",
+                 r"\bmonopole\b", r"inverted[- ]?f", r"\bmeander", r"radiation pattern", r"\b\d+(?:\.\d+)?\s*[gm]hz\b")
 ANTENNA_OPTS = (Option("frequency", "Working frequency, e.g. 2.4GHz (read from the question when it names one)"),
                 Option("port", "The feed gap as two points in mm, x,y,z:x,y,z, when it is not the narrowest gap "
                                "between two conductors"),
