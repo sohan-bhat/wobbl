@@ -2,6 +2,7 @@
 every validation part and a set of parts built here, none of which the studies were tuned on.
 
     python -m wobbl.validation.process_generality OUT [--only id,id] [--process print,casting,molding] [--workers 2]
+                                                      [--limit 1800]
 
 writes OUT/process_generality.json and prints one line per case. A case succeeds when the study runs to an answer
 and none of its own checks (mesh convergence, energy or volume balance, time step, hand calculation, units) fails.
@@ -12,8 +13,12 @@ the part and the process.
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import signal
+import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -21,7 +26,7 @@ from .generality import EX, PARTS, _step
 
 # checks that judge the part rather than the solve: failing one is the answer, not a failure of the study
 DESIGN = {"flatness", "bed peel", "feeding", "porosity", "riser", "fill", "pressure", "thin walls"}
-LIMIT = 1800.0
+LIMIT = 1800.0     # s a case may run before it is killed and recorded as timed out
 PROCESSES = ("print", "casting", "molding")
 
 
@@ -151,47 +156,111 @@ def run_case(case: dict, out: Path, keep: bool = False) -> dict:
     return row
 
 
-def _worker(args):
-    case, out = args
-    return run_case(case, out)
+def run_limited(case: dict, out: Path, limit: float = LIMIT, keep: bool = False) -> dict:
+    """Run one case in a child process of its own with a hard wall clock limit. The child leads a process group, so
+    on timeout the study and the solvers and meshers it started are all stopped together."""
+    out.mkdir(parents=True, exist_ok=True)
+    row_file = out / "row.json"
+    row_file.unlink(missing_ok=True)
+    cmd = [sys.executable, "-m", "wobbl.validation.process_generality", "--one", case["id"], str(out)]
+    if keep:
+        cmd.append("--keep")
+    t0 = time.time()
+    log = open(out / "case.log", "wb")
+    posix = os.name == "posix"
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                            start_new_session=posix)
+    timed_out = False
+    try:
+        proc.wait(timeout=limit)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        _stop_group(proc)
+    finally:
+        log.close()
+    if timed_out:
+        row = {"id": case["id"], "part": case["part_id"], "source": case["source"], "process": case["process"],
+               "ran": False, "ok": False, "timed_out": True, "seconds": round(time.time() - t0, 1),
+               "error": f"timed out after {limit:.0f} s and was stopped"}
+    elif row_file.exists():
+        row = json.loads(row_file.read_text())
+    else:
+        tail = (out / "case.log").read_text(errors="replace").strip().splitlines()[-3:]
+        row = {"id": case["id"], "part": case["part_id"], "source": case["source"], "process": case["process"],
+               "ran": False, "ok": False, "seconds": round(time.time() - t0, 1),
+               "error": f"the case process ended with exit code {proc.returncode} and no answer: " + " ".join(tail)}
+    if not keep:
+        shutil.rmtree(out, ignore_errors=True)
+    return row
+
+
+def _stop_group(proc: subprocess.Popen) -> None:
+    """Stop the child this harness started and everything in its process group, the group id being the child's own
+    pid, never a process matched by name."""
+    try:
+        if os.name == "posix":
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+    except (ProcessLookupError, PermissionError):
+        pass
+    proc.kill() if proc.poll() is None else None
+    proc.wait()
+
+
+def _one(case_id: str, out: Path, keep: bool) -> int:
+    case = next(c for c in CASES if c["id"] == case_id)
+    row = run_case(case, out / "work", keep=True)
+    (out / "row.json").write_text(json.dumps(row, default=str))
+    if not keep:
+        shutil.rmtree(out / "work", ignore_errors=True)
+    return 0
 
 
 def main(argv=None) -> int:
     import argparse
-    import multiprocessing as mp
+    from concurrent.futures import ThreadPoolExecutor
 
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
     ap.add_argument("--only", default="")
     ap.add_argument("--process", default="")
     ap.add_argument("--workers", type=int, default=2)
+    ap.add_argument("--limit", type=float, default=LIMIT, help="seconds a case may run before it is killed")
+    ap.add_argument("--one", default="", help="run one case id in this process and write row.json (used internally)")
+    ap.add_argument("--keep", action="store_true")
     a = ap.parse_args(argv)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
+    if a.one:
+        return _one(a.one, out, a.keep)
     ids = [x for x in a.only.split(",") if x]
     procs = [x for x in a.process.split(",") if x]
     cases = [c for c in CASES if (not ids or c["id"] in ids or c["part_id"] in ids)
              and (not procs or c["process"] in procs)]
-    rows = []
-    ctx = mp.get_context("spawn")
-    with ctx.Pool(a.workers, maxtasksperchild=1) as pool:
-        jobs = {c["id"]: pool.apply_async(_worker, ((c, out / c["id"]),)) for c in cases}
-        for c in cases:
-            try:
-                row = jobs[c["id"]].get(timeout=LIMIT * (1 + len(cases) / max(a.workers, 1)))
-            except Exception as e:  # noqa: BLE001
-                row = {"id": c["id"], "process": c["process"], "ran": False, "ok": False, "error": f"no answer: {e}"}
-            rows.append(row)
-            mark = "ok  " if row["ok"] else ("ran " if row.get("ran") else "FAIL")
+    rows: dict[str, dict] = {}
+    lock = threading.Lock()
+
+    def work(c):
+        row = run_limited(c, out / c["id"], a.limit, a.keep)
+        with lock:
+            rows[c["id"]] = row
+            done = [rows[x["id"]] for x in cases if x["id"] in rows]
+            (out / "process_generality.json").write_text(json.dumps(done, indent=1, default=str))
+            mark = "ok  " if row["ok"] else ("TIME" if row.get("timed_out") else ("ran " if row.get("ran") else "FAIL"))
             print(f"{mark} {row['id']:<26} {row.get('verdict', ''):<10} {row.get('confidence', ''):<7} "
                   f"{row.get('seconds', '')}s  {row.get('error') or '; '.join(row.get('failed_checks', []))}",
                   flush=True)
-            (out / "process_generality.json").write_text(json.dumps(rows, indent=1, default=str))
+
+    with ThreadPoolExecutor(max(a.workers, 1)) as pool:
+        list(pool.map(work, cases))
+    allrows = [rows[c["id"]] for c in cases]
     for proc in PROCESSES:
-        mine = [r for r in rows if r.get("process") == proc]
+        mine = [r for r in allrows if r.get("process") == proc]
         if mine:
             print(f"{proc}: {sum(r['ok'] for r in mine)} of {len(mine)} passed their own checks, "
-                  f"{sum(r.get('ran', False) for r in mine)} ran to an answer")
+                  f"{sum(r.get('ran', False) for r in mine)} ran to an answer, "
+                  f"{sum(r.get('timed_out', False) for r in mine)} timed out")
     return 0
 
 
