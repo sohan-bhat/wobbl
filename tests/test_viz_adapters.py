@@ -228,21 +228,85 @@ def test_antenna_wave_plays_one_cycle(tmp_path):
         assert {r_["name"] for r_ in h["readouts"]} >= {"S11", "peak gain"}
 
 
-def test_heat_pack_draws_its_cells(tmp_path):
+def _pack_mesh():
     from wobbl.viz.adapters.common import box_mesh
     Xb, Tb = box_mesh([18.5, 18.5, 32.5], [18.5, 18.5, 32.5])
     g = np.stack(np.meshgrid(np.linspace(0, 37, 8), np.linspace(0, 37, 8), np.linspace(0, 65, 8)), -1).reshape(-1, 3)
-    X = np.vstack([Xb, g])
+    return np.vstack([Xb, g]), Tb
+
+
+def _pack(tmp_path, study, **extra):
+    X, Tb = _pack_mesh()
     hist = np.array([35 + k * (1 + X[:, 0] / 37) for k in range(1, 6)], float)
     np.savez(tmp_path / "fields.npz", X=X, T=hist[-1], tris=Tb, tets=np.zeros((0, 4), int),
-             hist_t=np.arange(1, 6) * 60.0, hist_T=hist)
-    (tmp_path / "study.json").write_text(json.dumps({"material": "li-ion-cell", "ambient": 35}))
-    outcome(tmp_path, "thermal")
+             hist_t=np.arange(1, 6) * 60.0, hist_T=hist, **extra)
+    (tmp_path / "study.json").write_text(json.dumps({"material": "li-ion-cell", "ambient": 35, "power": 6000,
+                                                     "duration": 300, **study}))
+    (tmp_path / "outcome.json").write_text(json.dumps({"domain": "thermal", "verdict": "hot", "headline": "Hot.",
+                                                       "question": "too hot?", "values": {"limit_C": 42}}))
     assert build_scene(tmp_path)
-    _, h = kinds(tmp_path)
+    return X, hist, kinds(tmp_path)[1]
+
+
+def test_heat_pack_draws_its_cells_at_any_heat_load(tmp_path):
+    X, hist, h = _pack(tmp_path, {})
     cells = [o for o in h["objects"] if o.get("name", "").startswith("cell ")]
     assert len(cells) == 4 and all("field" in c for c in cells)
-    assert h["title"] == "The 4 cell pack heating up"
+    assert h["title"] == "The 4 cell pack after 5 min at each heat load"
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["label"] == "heat load" and tl["unit"] == "W" and tl["design"] == 6.0
+    assert tl["between"] == "exact" and tl["t"][0] == 0 and tl["t"][-1] >= 12
+    hot = h["readouts"][0]
+    assert hot["name"].startswith("hottest") and hot["limit"] == 42
+    at = tl["t"].index(6.0)
+    assert hot["values"][at] == pytest.approx(hist[-1].max(), abs=0.01)    # the asked power is the solved field
+    assert hot["values"][0] == pytest.approx(35)                           # no heat, the air's temperature
+    f = h["fields"][0]
+    assert f["limit"] == 42 and f["limit_label"] == "limit"
+    assert {"time over 42 C"} <= {r["name"] for r in h["readouts"]}
+    assert any(e["kind"] == "fail" and 0 < e["t"] < 6 for e in h["events"])
+
+
+def test_heat_sweep_with_radiation_blends_the_solved_powers(tmp_path):
+    X, _ = _pack_mesh()
+    T = 35 + 5 * (1 + X[:, 0] / 37)
+    W = np.array([0.0, 3.0, 6.0, 12.0])
+    F = np.array([35 + (w / 6) ** 0.8 * (T - 35) for w in W])
+    _, _, h = _pack(tmp_path, {"emissivity": 0.9}, sweep_W=W, sweep_T=F.astype(np.float32),
+                    sweep_hot=np.outer(W / 6, np.arange(1, 6)) + 35)
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["between"] == "interpolated" and tl["t"] == [0, 3, 6, 12]
+    assert h["readouts"][0]["values"][2] == pytest.approx(F[2].max(), abs=0.01)
+
+
+def test_heat_powers_reach_past_the_limit():
+    from wobbl.viz.adapters.thermal import crossing, linear, powers
+    k = powers(15, 70, 40, 85)
+    assert k[0] == 0 and 1.0 in k and k[-1] == 2.0
+    assert powers(150, 34, 25, 60)[-1] == pytest.approx(5.0)          # a cool part runs on to where it passes
+    assert crossing(np.array([0, 10, 20]), np.array([40, 60, 80]), 70) == pytest.approx(15)
+    assert linear({"ambient": 40, "films": [{"h": 0.006, "t_inf": 40}]})
+    assert not linear({"ambient": 40, "emissivity": 0.85})
+    assert not linear({"ambient": 40, "films": "[{'h': 0.03, 't_inf': 43.4}]"})
+
+
+def test_cell_runaway_drags_the_oven(tmp_path):
+    ovens = [60.0, 100.0, 150.0, 154.7, 154.9, 170.0]
+    pb = {"manifest": {"kind": "cell-runaway"}, "frames": [],
+          "cell": {"label": "18650", "diameter_mm": 18, "length_mm": 65, "critical_C": 154.9, "surroundings_C": 74.5},
+          "sweep": {"oven_C": ovens, "peak_C": [60, 101, 160, 203, 205, 260], "peak_min": [150, 60, 120, 72, 70, 30],
+                    "self_heating_C_min": [0, 0.3, 0.9, 9.9, 11.4, 30], "sei_left": [1, 0.5, 0, 0, 0, 0],
+                    "electrolyte_left": [1, 1, 0.9, 0.5, 0.5, 0.2], "runaway": [False] * 4 + [True] * 2}}
+    (tmp_path / "playback.json").write_text(json.dumps(pb))
+    outcome(tmp_path, "battery")
+    assert build_scene(tmp_path)
+    _, h = kinds(tmp_path)
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["unit"] == "C" and tl["design"] == 74.5 and tl["t"] == ovens
+    assert h["readouts"][0]["name"] == "peak self heating" and h["readouts"][0]["limit"] == 10
+    f = h["fields"][0]
+    assert f["name"] == "self heating" and f["limit"] == 10 and f["limit_label"] == "runaway"
+    assert any(e["name"] == "runaway starts" and e["t"] == 154.9 for e in h["events"])
 
 
 MOTOR = """

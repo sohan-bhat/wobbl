@@ -340,7 +340,8 @@ def run_runaway(cell: Cell, ambient: float, out_dir, question: str = "", source:
             burst = transient(cell, ta_cr + 5.0, hours=end, stop=False)
             imgs["onset"] = _chart(out, calm, burst, over, ta_cr, end)
             from . import playback
-            values["files"] = {"playback": playback.runaway(out, cell, calm, burst, over.t_runaway, ta_cr, ambient)}
+            values["files"] = {"playback": playback.runaway(out, cell, calm, burst, over.t_runaway, ta_cr, ambient,
+                                                            sweep=oven_sweep(cell, ta_cr, stay.Ta, ambient))}
         except Exception as e:  # noqa: BLE001
             imgs["error"] = str(e)
     values["_figures"] = [["onset", "Cell temperature in an oven just below and just above the onset"]]
@@ -363,6 +364,42 @@ def run_runaway(cell: Cell, ambient: float, out_dir, question: str = "", source:
                        t_total=time.time() - t0)
     o.criteria = [{"name": "runaway margin", "value": "margin_K", "limit": 0.0, "sense": "min"}]
     return o.write(out)
+
+
+SWEEP_OVENS = 22         # evenly spaced ovens, with the surroundings, the onset bracket and a few just under it
+
+
+def self_heating(cell: Cell, tr: Transient) -> np.ndarray:
+    """How fast the cell heats itself (K/s) at each saved point of a transient, zero while the surroundings are
+    still warming it."""
+    k = cell.kin
+    C = k.rho * k.cp * cell.volume
+    r = np.array([(float(np.sum(_rates(k, T, *y)[1])) * cell.volume - loss(cell, T, tr.Ta)) / C
+                  for T, y in zip(tr.T, tr.y.T)])
+    return np.where(tr.T > tr.Ta, r, 0.0)
+
+
+def oven_sweep(cell: Cell, ta_cr: float, below: float, ambient: float, hours: float = 24.0) -> dict:
+    """The cell put in each of a range of ovens, from well under its onset to past it, and followed until it
+    peaks. For each oven (C): the peak temperature, when it comes, how fast the cell heated itself at most (C/min,
+    the runaway trigger is 10), how much of its SEI and electrolyte are left at the peak, and whether it ran away.
+    Ovens sit just under the onset as well, where the self heating climbs steeply."""
+    lo, hi = min(ambient, ta_cr) - 30.0, ta_cr + 20.0
+    ovens = np.unique(np.round(np.r_[np.linspace(lo, hi, SWEEP_OVENS), ambient, below, ta_cr,
+                                     ta_cr - np.array([1.0, 2.5, 5.0])], 3))
+    rows = {"oven_C": [], "peak_C": [], "peak_min": [], "self_heating_C_min": [], "sei_left": [],
+            "electrolyte_left": [], "runaway": []}
+    for Ta in ovens:
+        tr = transient(cell, float(Ta), hours=hours, stop=False)
+        i = int(np.argmax(tr.T))
+        rows["oven_C"].append(float(Ta) - 273.15)
+        rows["peak_C"].append(float(tr.T[i]) - 273.15)
+        rows["peak_min"].append(float(tr.t[i]) / 60)
+        rows["self_heating_C_min"].append(float(self_heating(cell, tr).max()) * 60)
+        rows["sei_left"].append(float(max(tr.y[0, i] / tr.y[0, 0], 0.0)))
+        rows["electrolyte_left"].append(float(max(tr.y[4, i] / tr.y[4, 0], 0.0)))
+        rows["runaway"].append(bool(Ta >= ta_cr))
+    return rows
 
 
 def _onset(cell: Cell, Ta: float) -> float | None:

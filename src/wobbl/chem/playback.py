@@ -134,8 +134,10 @@ def flame(out: Path, phis, temps, species: list[dict], phi: float, info: dict) -
     return _write(out, data)
 
 
-def runaway(out: Path, cell, calm, burst, t_trigger, ta_cr: float, ambient: float, frames: int = 150) -> str:
-    """Frames in time of a cell in two ovens either side of the onset, with how much of each reactant is left."""
+def runaway(out: Path, cell, calm, burst, t_trigger, ta_cr: float, ambient: float, frames: int = 150,
+            sweep: dict | None = None) -> str:
+    """Frames in time of a cell in two ovens either side of the onset, with how much of each reactant is left, and
+    with sweep, the cell's peak state in each of a range of ovens (see runaway.oven_sweep)."""
     end = min(calm.t[-1], burst.t[-1])
     times = np.linspace(0.0, end, frames)
 
@@ -161,6 +163,9 @@ def runaway(out: Path, cell, calm, burst, t_trigger, ta_cr: float, ambient: floa
                      "trigger_min": _r(t_trigger / 60) if t_trigger else None,
                      "trigger": "the cell heats itself faster than 10 C/min"},
             "frames": rows}
+    if sweep:
+        data["sweep"] = {k: ([_r(x) for x in v] if isinstance(v, list) and v and not isinstance(v[0], bool) else v)
+                         for k, v in sweep.items()}
     return _write(out, data)
 
 

@@ -44,6 +44,9 @@ def build_scene(out_dir: str | Path):
     if kind == "solid-motor":
         from . import motor
         return motor.build(out, pb, o)
+    if kind == "cell-runaway":
+        from . import battery
+        return battery.build(out, pb)
     if kind in CHEM:
         from . import chem
         return chem.build(out, pb)
