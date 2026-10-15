@@ -922,6 +922,9 @@ CASES += [
          "Hu et al. 2020 and Hatchard's oven tests, 155 C", "critical oven temperature", "C", 0.03, False,
          cell_runaway),
 ]
+from .chem_cases import chem_cases  # noqa: E402
+
+CASES += chem_cases()
 
 
 # --- past yield, contact and bolted joints (the case functions are in nonlinear.py) -------------------------------
