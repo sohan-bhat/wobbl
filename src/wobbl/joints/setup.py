@@ -19,6 +19,7 @@ PENALTY = 20.0       # penalty slope K = PENALTY x E / (element size at the cont
 STICK = 0.01         # stick slope as a fraction of K: shear builds over a hundredth of the overlap scale
 SPRING = 1e-6        # stabilizing springs, together, as a fraction of E x body size in each direction
 TOUCH = 1e-3         # gaps and overlaps under this fraction of the assembly are CAD tolerance
+TOUCH_MM = 0.004     # and never more than this, so a press fit of a hundredth of a millimetre is still an interference
 
 _BODY = re.compile(r"^\s*(?:body|part)\s+(\d+)\b\s*(?:and\b|:)?\s*(.*)$", re.I)
 
@@ -140,7 +141,7 @@ def contact_pairs(asm: Assembly, mesh, pairs: list[FacePair], mat_of: dict[int, 
     """Penalty contact for each pair of faces. The penalty slope is twenty times the softer modulus over the element
     size at the contact, stiff enough that faces overlap by a small fraction of an element and soft enough to
     converge. Gaps and overlaps within CAD tolerance are closed to exact contact."""
-    tol = TOUCH * asm.prep.diag
+    tol = min(TOUCH * asm.prep.diag, TOUCH_MM)
     out = []
     for k, p in enumerate(pairs):
         slave, master = mesh.surface_mask([p.slave]), mesh.surface_mask([p.master])
