@@ -105,7 +105,7 @@ def test_a_kicad_trace_antenna_becomes_sheets_a_board_and_a_port(tmp_path):
     ex = Path(__file__).resolve().parents[1] / "examples" / "antenna-pcb"
     sys.path.insert(0, str(ex))
     try:
-        from make_board import build
+        from make_board import board_text as build
     finally:
         sys.path.remove(str(ex))
     pcb = tmp_path / "ifa.kicad_pcb"
@@ -149,7 +149,7 @@ def test_simulate_sends_antenna_files_and_words_to_the_antenna_studies(tmp_path)
     import sys
     sys.path.insert(0, str(ex))
     try:
-        from make_board import build
+        from make_board import board_text as build
     finally:
         sys.path.remove(str(ex))
     pcb = tmp_path / "ifa.kicad_pcb"

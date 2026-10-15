@@ -28,7 +28,7 @@ def zone(layer):
             f'    (polygon (pts {pts}))\n    (filled_polygon (layer "{layer}") (pts {pts}))\n  )\n')
 
 
-def build() -> str:
+def board_text() -> str:
     head = ['(kicad_pcb (version 20240108) (generator "wobbl example")\n', '  (general (thickness 1.6))\n',
             '  (layers (0 "F.Cu" signal) (31 "B.Cu" signal) (44 "Edge.Cuts" user))\n',
             '  (setup (stackup\n'
@@ -50,5 +50,5 @@ def build() -> str:
 
 
 if __name__ == "__main__":
-    (HERE / "ifa.kicad_pcb").write_text(build())
+    (HERE / "ifa.kicad_pcb").write_text(board_text())
     print("wrote", HERE / "ifa.kicad_pcb")
