@@ -2,7 +2,7 @@
  "domain": "part",
  "analysis": "bolts",
  "spec": {
-  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/joints2/examples/bolted-flange/flange.py",
+  "thing": "flange.py",
   "kind": "parametric",
   "question": "Do four M8 bolts at 20 N m keep this flange closed under a 30 kN pull?",
   "options": {

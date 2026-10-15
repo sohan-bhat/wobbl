@@ -44,8 +44,8 @@
    "verdict": "holds",
    "headline": "4 M8 8.8 bolts tightened to 12.5 kN (20 N m of torque with a nut factor of 0.2 (T = K F d)). Under the load the worst bolt carries 12.6 kN, 59% of its proof load, and 4.41 kN of clamp is left at the interface. It holds without opening or slipping. Confidence is medium.",
    "confidence": "medium",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/joints2/examples/bolted-flange/output",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/joints2/examples/bolted-flange/output/report.html",
+   "result_dir": "output",
+   "report": "output/report.html",
    "assumptions": [
     {
      "assumed": "friction coefficient between the clamped parts not given, so Wobbl assumed 0.15",
