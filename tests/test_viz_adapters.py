@@ -222,22 +222,44 @@ target_sf = 2
 
 @pytest.mark.parametrize("shape,extra", [("star", 'points = 5\npoint_length = "6 mm"\npoint_width = "3 mm"'),
                                          ("tube", 'core = "12 mm"')])
-def test_motor_grains_regress_in_a_cutaway(tmp_path, shape, extra):
+def test_motor_cutaway_is_swept_over_its_throat(tmp_path, shape, extra):
     from wobbl.chem.motor import run_motor
     from wobbl.chem.spec import read_spec
     from wobbl.viz.scene import array
-    run_motor(read_spec(MOTOR.format(shape=shape, extra=extra)), tmp_path, render=False)
+    run_motor(read_spec(MOTOR.format(shape=shape, extra=extra), "will the casing hold?"), tmp_path, render=False)
     assert build_scene(tmp_path)
     h, blob = load(tmp_path / "scene.wobbl")
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["label"] == "nozzle throat" and tl["design"] == pytest.approx(8.0)
+    assert 10 <= tl["frames"] <= 25 and min(tl["t"]) < 8.0 < max(tl["t"])
     names = _names(h)
     assert {"casing", "grain", "grain 2", "burning port", "nozzle", "exhaust"} <= names
-    port = next(o for o in h["objects"] if o.get("name") == "burning port")
-    d = array(h, blob, port["deform"]["frames"])
-    r = np.hypot(*(array(h, blob, port["pos"])[None, :, :2] + d[:, :, :2]).transpose(2, 0, 1))
-    assert r[-1].mean() > r[0].mean() + 3                 # the port has grown
+    hoop = next(f for f in h["fields"] if f["name"] == "hoop stress")
+    assert hoop["limit"] > 0 and hoop["limit_label"]
+    ro = {r["name"]: r["values"] for r in h["readouts"]}
+    assert h["readouts"][0]["name"] == "peak pressure" and h["readouts"][0]["limit"] > 0
+    assert ro["peak pressure"][0] > 1.5 * ro["peak pressure"][-1]     # a narrower throat raises the pressure
+    assert {"casing safety factor", "hoop stress", "total impulse"} <= set(ro)
+    assert "follow" not in h["camera"] and h["camera"]["presets"]
+    nozzle = next(o for o in h["objects"] if o.get("name") == "nozzle")
+    d = array(h, blob, nozzle["deform"]["frames"])
+    r = np.hypot(*(array(h, blob, nozzle["pos"])[None, :, :2] + d[:, :, :2]).transpose(2, 0, 1))
+    assert r[-1].min() > r[0].min() + 1                   # the throat opens along the slider
     if shape == "star":
-        assert np.ptp(r[0]) > 2                           # and its outline is not a circle
-    assert {r["name"] for r in h["readouts"]} >= {"thrust", "chamber pressure", "hoop stress"}
+        port = next(o for o in h["objects"] if o.get("name") == "burning port")
+        pr = np.hypot(*array(h, blob, port["pos"])[:, :2].T)
+        assert np.ptp(pr) > 2                             # its outline is not a circle
+
+
+def test_motor_sweeps_what_the_question_turns_on():
+    from wobbl.chem.motor_sweep import apply, choose
+    from wobbl.chem.spec import read_spec
+    sp = read_spec(MOTOR.format(shape="bates", extra='core = "12 mm"'))
+    assert choose(sp, "will the casing hold?").key == "throat"
+    core = choose(sp, "is the core too narrow for erosive burning?")
+    assert core.key == "core" and core.design == pytest.approx(12.0) and 12.0 in core.values
+    wall = choose(sp, "how thick a wall does it need?")
+    assert wall.key == "wall" and apply(sp, "wall", 3.0).casing.wall == pytest.approx(0.003)
 
 
 def test_flame_on_a_burner_for_any_fuel(tmp_path):
