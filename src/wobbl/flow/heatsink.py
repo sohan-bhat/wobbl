@@ -278,6 +278,8 @@ def run_fansink(st: FanSinkStudy, out_dir: str | Path, progress=None):
                    scalars={"airflow": (q * 60000, "L/min"), "gap_velocity": (v, "m/s"), "h": (h, "W/m2K"),
                             "inlet_air": (st.ambient, "C"), "air_rise": (rise, "C"),
                             "hottest": (to.values["t_max_C"], "C"), "power": (st.power, "W")})
+    if (out / "thermal" / "fields.npz").exists():      # the sink's temperatures, for the 3D view
+        shutil.copy(out / "thermal" / "fields.npz", out / "fields.npz")
     if not st.keep:      # the heat study's numbers and picture are in this result, so its own folder goes
         shutil.rmtree(work, ignore_errors=True)
         shutil.rmtree(out / "thermal", ignore_errors=True)
@@ -300,13 +302,20 @@ def run_fansink(st: FanSinkStudy, out_dir: str | Path, progress=None):
               "dp_Pa": dp, "air_rise_C": rise, "nusselt": fine["nu"], "levels": [{k: L[k] for k in
                                                                                   ("grid", "nu", "dp", "seconds")}
                                                                                  for L in levels],
+              "sink_mm": {k: (g[k] * 1e3 if k not in ("fins", "channels") else g[k]) for k in g},
               "_figures": [["temperature", "Heat sink temperature with the hottest point marked"],
                            ["air", "Air between two fins, warming from the inlet on the left"],
                            ["fan", "Where the fan curve meets the heat sink"]]}
     o = GenericOutcome("flow", str(Path(st.part).resolve()), st.question, verdict, head, metrics, level, reasons,
                        checks, assumptions, values, imgs, fixes,
                        solver=f"OpenFOAM {get('openfoam').version()} and {to.solver}", t_total=time.time() - t0)
-    return o.write(out)
+    written = o.write(out)
+    from ..viz.adapters.thermal import fan_sink
+    try:
+        fan_sink(out)
+    except Exception:  # noqa: BLE001  a view that fails must not lose the result
+        pass
+    return written
 
 
 def _conductivity(material: str) -> float:

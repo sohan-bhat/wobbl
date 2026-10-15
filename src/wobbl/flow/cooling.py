@@ -193,3 +193,8 @@ def _playback(flow_out: Path, out: Path, tmax: float, watts: float, h_mean: floa
     (out / "playback.json").write_text(json.dumps(doc, separators=(",", ":")))
     from .scene import write as write_scene
     write_scene(out)
+    from ..viz.adapters.thermal import cooled
+    try:                 # the part colored by its temperature with the fluid through it, over the flow alone
+        cooled(out)
+    except Exception:  # noqa: BLE001  a view that fails must not lose the result
+        pass
