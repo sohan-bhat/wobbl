@@ -200,6 +200,9 @@ def test_board_parasitics_on_varied_boards(monkeypatch, tmp_path, src, spec):
         assert all(p.below or p.above for p in ex.pieces if p.layer == "F.Cu")
 
 
+# the buck example (buck.cir and its two boards) is in commit 7ecce4f, which is not on main yet
+@pytest.mark.skipif(not (ROOT / "examples" / "pcb-buck-ringing" / "buck.cir").exists(),
+                    reason="examples/pcb-buck-ringing is not committed on main")
 def test_the_example_buck_layouts_join_the_netlist(monkeypatch, tmp_path):
     from wobbl.circuits.netlist import join_parasitics, parse_spice
     from wobbl.fields import pcbfield
