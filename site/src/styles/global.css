@@ -650,6 +650,7 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .ex-grid li { display: flex; }
 .ex-card { display: flex; flex-direction: column; width: 100%; min-width: 0; border: 1px solid var(--line); background: var(--bg-2); color: var(--fg-2); }
 .ex-link { display: flex; flex-direction: column; flex: 1; padding-bottom: 18px; color: inherit; text-decoration: none; }
+a.ex-card { padding-bottom: 18px; text-decoration: none; }
 .ex-card:hover { border-color: var(--line-2); }
 .ex-card:hover .ex-title { text-decoration: underline; text-decoration-color: var(--yellow); text-underline-offset: 4px; }
 .ex-card .run-img { border: 0; border-bottom: 1px solid var(--line); aspect-ratio: 4 / 3; object-fit: contain; }

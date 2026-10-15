@@ -2,7 +2,6 @@
 // The landing page's short form of a run: the question, one answer line and the result image.
 // The answer is written by hand, so the build checks that each of its numbers is in the run's outputs.
 import RunImage from './RunImage.astro';
-import { sceneFor } from '../lib/scenes';
 import { COLOR, assertNumbers, findRun } from '../lib/examples';
 import { url } from '../lib/site';
 interface Props { rel: string; answer: string }
@@ -19,13 +18,8 @@ const tally = `${passed} checks passed${warned ? `, ${warned} with a warning` : 
     <p class="answer-ask">“{run.question}”</p>
     <p class="answer-line" data-verdict={COLOR[run.outcome.verdict] ?? 'marginal'}>{answer}</p>
     <p class="answer-checks"><a href={url('guides/results/checks/')}>{tally}</a></p>
-    {sceneFor(rel) && <p class="answer-checks"><a href={url(`examples/${ex.name}/`)}>The {ex.title.toLowerCase()} example</a></p>}
   </div>
-  {sceneFor(rel) ? (
-    <div class="answer-img"><RunImage run={run} sizes="(min-width: 1000px) 56vw, 100vw" /></div>
-  ) : (
-    <a class="answer-img" href={url(`examples/${ex.name}/`)} aria-label={`${ex.title} example`}>
-      <RunImage run={run} sizes="(min-width: 1000px) 56vw, 100vw" />
-    </a>
-  )}
+  <a class="answer-img" href={url(`examples/${ex.name}/`)} aria-label={`${ex.title} example`}>
+    <RunImage run={run} sizes="(min-width: 1000px) 56vw, 100vw" />
+  </a>
 </div>

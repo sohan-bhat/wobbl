@@ -7,7 +7,7 @@ import { COLOR, metrics, type Run } from '../lib/examples';
 import { meters, mps, secs } from '../scripts/flight-format';
 import { url } from '../lib/site';
 import { hasSim } from '../lib/sim';
-import { sceneFor } from '../lib/scenes';
+import { viewerScene } from '../lib/scenes';
 import SceneView from './SceneView.astro';
 interface Props { run: Run }
 const { run } = Astro.props;
@@ -20,7 +20,7 @@ const flightEvents = events.every((e) => e.alt_m !== undefined);
 const held = model?.effects ?? (model?.bodies ? [`${model.bodies} bodies`, `${model.joints} joints`,
   `${model.degrees_of_freedom} degrees of freedom`] : []);
 // a run with a 3D scene shows it across the whole width, above the question and the result
-const scene = sceneFor(run.rel);
+const scene = viewerScene(run);
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 ---
 <div class:list={['run', { 'run-live': hasSim(run) && !scene, 'run-3d': scene }]}>
