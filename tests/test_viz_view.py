@@ -27,7 +27,7 @@ def test_simulation_page_holds_each_step(tmp_path):
     page = simulation_view(tmp_path / "simulation.json")
     text = page.read_text()
     assert page.name == "simulation.html"
-    assert text.count("data-wobbl-scene=") == 2 and "Held by wall x=min." in text and "will it hold?" in text
+    assert text.count("data-wobbl-scene=") == 2 and "Fixed at the wall." in text and "will it hold?" in text
 
 
 def test_nothing_to_play(tmp_path):
@@ -44,3 +44,11 @@ def test_view_command(tmp_path):
     assert json.loads(r.output)["view"].endswith("view.html")
     r = CliRunner().invoke(cli, ["view", str(tmp_path), "--json"])
     assert r.exit_code == 2 and "no 3D view" in r.output
+
+
+def test_titles_and_setting_read_as_plain_words():
+    from wobbl.viz.simulation import _setting, title_of
+    assert title_of("shelf-bracket/bracket.py") == "Shelf bracket"
+    assert title_of("a 9 cm rock of density 2700 kg/m3 dropped from a height of 300 m") == "A rock dropped from 300 m"
+    s = _setting({"supports": ["bolt holes d=4.5"], "loads": ["40 N down @ top and within 12 of 65,12.5,6"]})
+    assert "d=4.5" not in s and "(about 4.1 kg) pressing down on the top face" in s
