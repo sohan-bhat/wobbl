@@ -14,6 +14,29 @@
 - Playback shows the linkage moving with live torque against the motor's limit, speed,
   current and electrical power.
 
+**Antennas in 3D**
+- `wobbl antenna` and `wobbl simulate` send an antenna question to the cheapest solver that is valid for it. A straight
+  wire dipole or a monopole on an infinite plane stays on the axisymmetric solve, which is exact for a body of
+  revolution. A patch sized only for a frequency stays on the transmission line model. Everything else is a 3D full
+  wave solve: a loop, an inverted F trace, a patch whose size or feed was given or whose S11, gain or pattern was
+  asked for, a dipole over a plate of finite size, and any antenna that arrives as a STEP file or a KiCad board.
+  The decision comes from the antenna's dimensions and the question, never from a scenario's name, and the report
+  says why.
+- `wobbl antenna loop` and `wobbl antenna invf` are new, and `wobbl simulate` takes an antenna as a STEP file
+  (`part.antenna`, the feed is the narrowest gap between two conductors or `--port x,y,z:x,y,z`) or as a KiCad or
+  Gerber board (`board.antenna`, the antenna is the net called ANT, RF or FEED, or `--feed NET`). The new
+  `examples/antenna-pcb` is a 2.4 GHz inverted F trace on FR4.
+- A 3D antenna study predicts its run time from the geometry before it meshes, from the air sphere's volume and the
+  surfaces' element sizes (within 10% of the mesh it then builds), and from the mesh before it solves. Over the
+  budget (`--set budget=20min`, 15 minutes by default) it gives up frequencies, then mesh fineness, then its
+  verification solves, and far over it refuses and says what a cheaper question is. `wobbl estimate` prices the same
+  way, and the report puts the prediction beside the time it took.
+- The sweep adds frequencies where the return loss changes fast or the resonance sits between samples, so a narrow
+  resonance is not missed. The mesh check says how far the finer mesh moves a resonance.
+- Every 3D antenna run writes `scene.wobbl` for `wobbl view`: the conductors the solver meshed, the feed, the
+  electric field on a slice through the feed played over one radio frequency cycle, and the radiation pattern as a
+  translucent balloon colored by gain.
+
 **Budgets, flow scenes and crack views**
 - Drops predict their own run time from the mesh they would march before they solve. The
   mesh is coarsened rung by rung to fit a 600 s budget, with what was given up stated in
