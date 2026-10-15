@@ -123,9 +123,9 @@ def write(out: Path, *, title: str, question: str, scene, setup, feed: dict, msh
     if d is not None:
         pts = np.array([a, b_, *(X * mm if len(X) else [])])
         center = 0.5 * (pts.min(0) + pts.max(0))
-        rad = 0.55 * float(np.linalg.norm(pts.max(0) - pts.min(0))) + 0.15 * C0 / f0 * mm
+        rad = 0.5 * float(np.linalg.norm(pts.max(0) - pts.min(0))) + 0.1 * C0 / f0 * mm
         Xb, Tb, gdb = balloon(d, base["sphere_theta"], base["sphere_phi"], eff, rad, center)
-        m = s.mesh(Xb, Tb, name="radiation pattern", opacity=0.5, max_vertices=len(Xb) + 1, smooth=True)
+        m = s.mesh(Xb, Tb, name="radiation pattern", opacity=0.28, max_vertices=len(Xb) + 1, smooth=True)
         m.color_by("gain", np.tile(gdb, (FRAMES, 1)), unit="dBi", colormap="turbo",
                    range=[max(gdb.max() - 30, -20), gdb.max()], digits=3)
         s.label(f"peak gain {gain_db:.1f} dBi", Xb[int(np.argmax(gdb))].tolist(), kind="note")
