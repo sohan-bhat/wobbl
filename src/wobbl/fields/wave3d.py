@@ -211,7 +211,7 @@ def feed(scene: Scene, s: WaveSetup) -> dict:
             notes.append(f"The port end {label} moved {fmt(d * 1e3)} mm onto '{name}'.")
             p = np.asarray(q, float)
         ends.append(p)
-    if near[0][3] == near[1][3]:
+    if near[0][3] == near[1][3] and (near[0][3][1] >= 0 or near[2][0] < 0.3 * gap):
         raise ValueError(f"both ends of the port touch '{near[0][3][0]}'. The port must bridge the gap between two "
                          "separate conductors")
     a, b = ends
@@ -645,10 +645,29 @@ def _validate(scene: Scene, s: WaveSetup, quality: str) -> None:
         raise ValueError("the sweep span is a fraction of f0 between 0 and 0.9, for example 0.25")
 
 
+def _sweep(s: WaveSetup, points: int) -> list[float]:
+    """The first frequencies: evenly spaced over the span, the working frequency and the hints."""
+    freqs = [float(f) for f in np.linspace(s.f0 * (1 - s.span), s.f0 * (1 + s.span), max(int(points), 3))]
+    freqs = [float(s.f0) if abs(f - s.f0) < 1e-6 * s.f0 else f for f in freqs]
+    if s.f0 not in freqs:
+        freqs = sorted(freqs + [float(s.f0)])
+    return sorted(set(freqs) | {float(h) for h in s.hints if 0.5 * s.f0 <= h <= 1.5 * s.f0})
+
+
 def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: str = "normal",
-        log=lambda stage, detail="": None, title: str = "", keep: bool = False):
-    """Sweep the antenna's impedance, find its resonance and pattern, check the answer and write the report."""
+        log=lambda stage, detail="": None, title: str = "", keep: bool = False, budget: float = 0.0,
+        compare=None, notes=()):
+    """Sweep the antenna's impedance, find its resonance and pattern, check the answer and write the report.
+
+    budget is the wall time in seconds the study may be predicted to take (0 for no limit). The prediction comes from
+    the base mesh before any frequency is solved. A study over its budget gives up frequencies, then mesh fineness,
+    then its verification solves, and one far over refuses with a CostRefusal. compare(found) may return more checks
+    against a reference the caller knows (found holds the resonance, the sweep and the working frequency's solve),
+    and notes are added to the report's assumptions."""
+    from dataclasses import replace
+
     from ..outcome_generic import GenericOutcome
+    from . import wavecost
 
     t0 = time.time()
     s = setup
@@ -659,11 +678,7 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir(parents=True)
     k = QUALITY[quality]
-    freqs = [float(f) for f in np.linspace(s.f0 * (1 - s.span), s.f0 * (1 + s.span), max(int(s.points), 3))]
-    freqs = [float(s.f0) if abs(f - s.f0) < 1e-6 * s.f0 else f for f in freqs]
-    if s.f0 not in freqs:
-        freqs = sorted(freqs + [float(s.f0)])
-    freqs = sorted(set(freqs) | {float(h) for h in s.hints if 0.5 * s.f0 <= h <= 1.5 * s.f0})
+    freqs = _sweep(s, s.points)
     lam_min, lam_max = C0 / max(freqs), C0 / min(freqs)
     log("mesh", "placing the port")
     fd = feed(scene, s)
@@ -672,11 +687,6 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
     R = r_ext + lam_max / 2
     rs = r_ext + 0.5 * (R - r_ext)
     sizes = element_sizes(scene, s, lam_min, sheets, fd["gap"])
-    # about three samples per element across the sampling sphere, so the element scale ripple of the field
-    # averages out of the radiation integrals instead of aliasing into the pattern
-    n_th = int(np.clip(math.ceil(3 * math.pi * rs / (0.1 * lam_min * k)), 24, 64))
-    sph = {**sphere_grid(n_th), "center": center, "radius": rs}
-
     def make(tag: str, kk: float, radius: float):
         log("mesh", f"{tag} mesh, air sphere {fmt(radius * 1e3)} mm")
         sz = dict(sizes)
@@ -693,7 +703,23 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
                 log("mesh", "gmsh could not mesh a curved surface, trying finer elements on the conductors")
                 sz = {n: 0.7 * h for n, h in sz.items()}
 
+    t_mesh = time.time()
     msh = make("base", k, R)
+    plan = wavecost.assess(msh.n_nodes, quality, len(freqs), s.refine, budget)
+    log("plan", f"{msh.n_nodes:,} nodes, about {plan.solves:.0f} frequency solves, predicted {wavecost._t(plan.seconds)}"
+                + (f" (gave up {'; '.join(plan.gave_up)})" if plan.gave_up else ""))
+    if plan.quality != quality or plan.points < len(freqs):
+        s = replace(s, points=plan.points, refine=plan.refine)
+        freqs = _sweep(s, plan.points)
+        if plan.quality != quality:
+            quality, k = plan.quality, QUALITY[plan.quality]
+            msh = make("base", k, R)
+    t_mesh = time.time() - t_mesh
+    # about three samples per element across the sampling sphere, so the element scale ripple of the field
+    # averages out of the radiation integrals instead of aliasing into the pattern
+    n_th = int(np.clip(math.ceil(3 * math.pi * rs / (0.1 * lam_min * k)), 24, 64))
+    sph = {**sphere_grid(n_th), "center": center, "radius": rs}
+
     bbox = np.array([b.bbox for b in scene.bodies if b.name in s.metals or b.name in s.dielectrics] or
                     [scene.bbox])
     pts = np.concatenate([np.asarray(p) for ps in sheets.values() for p in ps])
@@ -739,7 +765,7 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
     extra = []
     nodes = [msh.n_nodes]
     dofs = [base["dofs"]]
-    if quality != "fast":
+    if plan.verify:
         log("verify", "the working frequency on a finer mesh")
         m2 = make("fine", 0.75 * k, R)
         r2 = _solve(m2, s, s.f0, fd, sph, work / "fine")
@@ -784,6 +810,15 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
         if not dip:
             text += f", on a plate {wire['plate_wavelengths']:.2g} wavelengths across"
         checks.append(Check("closed form", st, text, {"induced_emf_ohm": [zt.real, zt.imag]}))
+    if compare is not None:
+        checks += compare({"resonance": res, "freqs": fs, "z": Z, "base": base, "rows": rows, "setup": s,
+                           "gain_dBi": 10 * math.log10(max(_gain(base), 1e-12))})
+    took = time.time() - t0
+    checks.append(Check("run time", "info",
+                        f"predicted {wavecost._t(plan.seconds)} from the {msh.n_nodes:,} node mesh before any solve, "
+                        f"took {wavecost._t(took)} for {len(fs)} frequencies" +
+                        (f". It gave up {'; '.join(plan.gave_up)} to fit the {wavecost._t(budget)} budget"
+                         if plan.gave_up else ""), {"predicted_s": plan.seconds, "took_s": took}))
     lvl, reasons = confidence(checks, extra)
     s11 = s11_db(Z, s.port.z0)
     s11_0 = float(s11_db([base["Z"]], s.port.z0)[0])
@@ -854,6 +889,8 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
               "radiated_power_W_per_A2": base["p_rad"], "input_power_W_per_A2": base["p_in"],
               "dielectric_loss_W_per_A2": base["p_diel"], "unknowns": dofs, "nodes": nodes,
               "air_radius_m": R, "sampling_radius_m": rs, "port_width_m": fd["width"], "port_gap_m": fd["gap"],
+              "plan": plan.to_dict(), "mesh_seconds": t_mesh,
+              "solve_cpu_s": [rows[f]["cpu"] for f in fs], "solve_wall_s": [rows[f]["wall"] for f in fs],
               "_figures": [["s11", "S11 over the sweep"], ["impedance", "Input impedance"],
                            ["pattern", "Radiation pattern cuts"], ["field", "Field strength near the antenna"],
                            ["range", "Received power over distance"]]}
@@ -874,7 +911,7 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
                    f"the whole sweep with {fmt(base['dofs'])} unknowns."]
     assumptions += [f"'{n}' is {v[2] if len(v) > 2 else 'a dielectric'}, relative permittivity {v[0]:g}, loss tangent "
                     f"{v[1]:g}." for n, v in s.dielectrics.items()]
-    assumptions += fd["notes"] + list(scene.notes)
+    assumptions += fd["notes"] + list(scene.notes) + list(notes)
     lk = None
     if s.link.get("tx_power") or s.link.get("distance"):
         from .antenna import link_budget
@@ -898,6 +935,14 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
                        assumptions, values, images, fixes, solver=f"GetDP {solve.getdp().version()} with gmsh",
                        t_total=time.time() - t0)
     _playback(out, s, fd, pl, base, fs, Z, s11, g_el, g_az, lk)
+    try:
+        from . import antscene
+        antscene.write(out, title=f"The {title or name} at {fmt(s.f0 / 1e6)} MHz", question=question, scene=scene, setup=s,
+                       feed=fd, msh=msh, plane=pl, base=base, gain_db=gdb, eff=eff, f0=s.f0,
+                       verdict=({"ok": "WORKS", "marginal": "MARGINAL", "fails": "FAILS"}[verdict], head,
+                                {"ok": "pass", "marginal": "warn", "fails": "fail"}[verdict]))
+    except Exception as e:  # noqa: BLE001  a picture must not lose a solved study
+        o.checks.append(Check("3D scene", "info", f"the 3D scene could not be written ({type(e).__name__}: {e})"))
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
