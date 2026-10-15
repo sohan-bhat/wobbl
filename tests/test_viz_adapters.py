@@ -140,13 +140,38 @@ def test_rocket_flies_its_own_airframe(tmp_path):
                       "thrust": [[0, 0], [0.05, 120], [1.0, 90], [1.3, 0]]},
             "launch": {"rail_length": "1 m", "rail_angle": "3 deg", "wind": "3 m/s"},
             "drogue": {"diameter": "45 cm", "cd": 1.5}}
-    run_motion(read_spec(spec, "how high does it go?"), tmp_path)
+    st = read_spec(spec, "how high does it go in a 3 m/s wind?")
+    run_motion(st, tmp_path)
     h, _ = load(tmp_path / "scene.wobbl")
     names = _names(h)
-    assert {"rocket", "nose", "fins", "exhaust", "drogue parachute", "launch rail", "wind"} <= names
+    assert {"rocket", "nose", "fins", "climb", "drogue descent", "landing spot", "launch rail", "wind"} <= names
+    assert "exhaust" not in names and "follow" not in h["camera"]
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["label"] == "wind" and tl["unit"] == "m/s" and tl["design"] == 3.0
+    assert 3.0 in tl["t"] and tl["t"][0] == 0 and 10 <= tl["frames"] <= 25
     rocket = next(o for o in h["objects"] if o.get("name") == "rocket")
-    assert rocket["pose"]["pos"]["shape"][0] == h["timeline"]["frames"]
-    assert {r["name"] for r in h["readouts"]} >= {"altitude", "speed", "Mach", "thrust"}
+    assert rocket["pose"]["pos"]["shape"][0] == tl["frames"]
+    assert h["readouts"][0]["name"] == "apogee"
+    land = next(f for f in h["fields"] if f["name"] == "landing speed")
+    assert land["limit"] == pytest.approx(st.landing_limit) and land["limit_label"]
+    # the asked wind gives exactly the run's own apogee
+    o = json.loads((tmp_path / "outcome.json").read_text())
+    i = tl["t"].index(3.0)
+    assert h["readouts"][0]["values"][i] == pytest.approx(o["values"]["apogee_m"], rel=1e-4)
+
+
+def test_sweep_inputs_follow_the_question():
+    from wobbl.motion.spec import MotionStudy
+    from wobbl.motion.sweep import choose
+    drop = choose(MotionStudy(name="rock", mass=1, diameter=0.09, height=300, question="how fast from 300 m?"))
+    assert drop.label == "drop height" and drop.design == 300 and 300 in drop.values
+    assert drop.values[0] < 30 and drop.values[-1] >= 600
+    feet = choose(MotionStudy(name="rock", mass=1, diameter=0.09, height=30.48, question="dropped from 100 ft"))
+    assert feet.unit == "ft" and feet.design == pytest.approx(100)
+    angle = choose(MotionStudy(name="ball", mass=0.4, diameter=0.2, speed=20, angle=35, question="how far?"))
+    assert angle.key == "angle" and 35 in angle.values
+    speed = choose(MotionStudy(name="ball", mass=0.4, diameter=0.2, speed=20, angle=35, question="how high?"))
+    assert speed.key == "speed" and 20 in speed.values
 
 
 def test_thrown_ball_is_drawn_at_its_size(tmp_path):
@@ -158,10 +183,31 @@ def test_thrown_ball_is_drawn_at_its_size(tmp_path):
     h, blob = load(tmp_path / "scene.wobbl")
     names = _names(h)
     assert {"ball", "weight", "drag", "path"} <= names and "cliff" not in names
+    assert h["timeline"]["kind"] == "input" and h["timeline"]["label"] == "launch angle"
+    speed = next(f for f in h["fields"] if f["name"] == "speed")
+    assert speed["limit"] > 0 and speed["limit_label"] == "terminal speed"
     from wobbl.viz.scene import array
     ball = next(o for o in h["objects"] if o.get("name") == "ball")
     X = array(h, blob, ball["pos"])
     assert 0.15 < np.ptp(X[:, 0]) < 0.3
+
+
+def test_dropped_rock_rises_its_cliff_with_the_slider(tmp_path):
+    from wobbl.motion.spec import MotionStudy
+    from wobbl.motion.study import run_motion
+    st = MotionStudy(name="rock", mass=1.03, diameter=0.09, cd=0.6, height=300,
+                     question="How fast does a rock hit the ground after falling off a 300 m cliff?")
+    run_motion(st, tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["design"] == 300 and tl["unit"] == "m"
+    cliff = next(o for o in h["objects"] if o.get("name") == "cliff")
+    assert cliff["deform"]["frames"]["shape"][0] == tl["frames"]
+    assert h["readouts"][0]["name"] == "impact speed"
+    v = h["readouts"][0]["values"]
+    assert all(b >= a for a, b in zip(v, v[1:]))        # a longer fall never lands slower
+    o = json.loads((tmp_path / "outcome.json").read_text())
+    assert v[tl["t"].index(300)] == pytest.approx(o["values"]["impact_speed_mps"], rel=1e-4)
 
 
 def test_antenna_wave_plays_one_cycle(tmp_path):
