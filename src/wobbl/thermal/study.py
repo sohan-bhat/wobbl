@@ -184,7 +184,10 @@ def early_times(ramp: float, first: float) -> list[float]:
     return [x for x in out if x < first]
 
 
-def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=None):
+def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=None, sweep: bool = False):
+    """Solve the study, refining the mesh until the hottest point settles. With sweep, a model that is not linear
+    in its power (radiation, held temperatures, air at other temperatures) is also solved at a few other powers, so
+    its view can show the result at any power the designer drags to."""
     from ..outcome_generic import GenericOutcome
     from ..report.render import line_plot, render_scalar
     from ..structural.run import describe_part
@@ -205,7 +208,7 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
     s0 = auto_sizing(prep, thickness=feats.thickness_typical, fineness=0.8,
                      max_nodes=8000 if transient else 25000)
     factors = [1.0, 0.7] if (study.quality == "fast" or transient) else [1.0, 0.7, 0.5]
-    levels, last = [], None
+    levels, last, first = [], None, None
     for k, f in enumerate(factors):
         sz = Sizing(h=s0.h * f)
         say("mesh", f"level {k}: element size {sz.h:.3g} mm")
@@ -218,12 +221,17 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
         levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sz.h, "t_max": float(T[i]),
                        "t_min": float(T.min()), "xyz": mesh.X[i].tolist(), "t_solve": res.t_solve})
         last = (mesh, model, info, res)
+        first = first or last
         if k >= 2 and _spread_change(levels, study.ambient) <= 0.02:
             break
     mesh, model, info, res = last
     T = res.T
+    extra = {}
+    if sweep and study.power and not linear_in_power(study):
+        say("solve", "the same model at other powers")
+        extra = power_sweep(study, first, last, feats, mat, adapter, out / "work")
     np.savez_compressed(out / "fields.npz", X=mesh.X, T=T, tets=mesh.tets, tris=mesh.tris,
-                        hist_t=res.history_t, hist_T=res.history_T)
+                        hist_t=res.history_t, hist_T=res.history_T, **extra)
     _save_study(study, out)
     tmax = float(T.max())
     hot = mesh.X[int(np.argmax(T))]
@@ -393,6 +401,68 @@ def run_thermal(study: ThermalStudy, out_dir: str | Path, progress=None, pre=Non
                                      ["history", "Temperature over time"]]},
                        img, fixes, prep.notes, solver=res.solver, t_total=time.time() - t0)
     return o.write(out)
+
+
+SWEEP_POINTS = 7          # powers from none to the top of the sweep, the asked one added
+
+
+def linear_in_power(study: ThermalStudy) -> bool:
+    """Whether the rise above the air is exactly proportional to the power: no radiation, no held temperatures,
+    every film's air at the ambient, and a transient that starts at the ambient."""
+    films = study.films or [Film(0.0, study.ambient)]
+    return (not study.emissivity and not study.fixed and all(abs(f.t_inf - study.ambient) < 1e-9 for f in films)
+            and (study.duration <= 0 or study.initial is None or abs(study.initial - study.ambient) < 1e-9))
+
+
+def sweep_top(study: ThermalStudy, t_max: float) -> float:
+    """How far past the asked power a sweep runs, as a multiple of it: twice the power, or on to where the hottest
+    point clearly passes the limit, by the linear estimate, at most five times."""
+    rise = t_max - study.ambient
+    if study.limit is None or rise <= 0:
+        return 2.0
+    return float(max(2.0, min(1.3 * (study.limit - study.ambient) / rise, 5.0)))
+
+
+def power_sweep(study: ThermalStudy, coarse, fine, feats, mat, adapter, work: Path) -> dict:
+    """The model solved at other powers on the coarsest mesh, carried to the finest by the difference each makes
+    there, so the asked power keeps the converged field. Returns the arrays fields.npz keeps: sweep_W (the powers),
+    sweep_T (the field at each, at the end of a transient) and, for a transient, sweep_hot (the hottest point over
+    the run's saved times at each power)."""
+    from dataclasses import replace
+
+    from scipy.spatial import cKDTree
+
+    mesh0, _, _, res0 = coarse
+    mesh, _, _, res = fine
+    k = np.unique(np.round(np.r_[np.linspace(0.0, sweep_top(study, float(res.T.max())), SWEEP_POINTS), 1.0], 6))
+    near = cKDTree(mesh0.X).query(mesh.X)[1]
+    t_f = np.asarray(res.history_t, float)
+    hot_f = np.asarray(res.history_T, float).max(1) if len(t_f) else None
+
+    def hot(r):
+        return np.interp(t_f, np.asarray(r.history_t, float), np.asarray(r.history_T, float).max(1))
+
+    still = (not study.fixed and all(abs(f.t_inf - study.ambient) < 1e-9 for f in study.films)
+             and (study.initial is None or abs(study.initial - study.ambient) < 1e-9))
+    fields, hots = [], []
+    for i, f in enumerate(k):
+        if f == 1.0:
+            fields.append(res.T)
+            hots.append(hot_f)
+            continue
+        if f == 0.0 and still:                     # nothing heats it, so it stays at the air's temperature
+            Tc, hc = np.full(len(mesh0.X), study.ambient), np.full(len(t_f), study.ambient)
+        else:
+            model, _ = build_heat(mesh0, replace(study, power=study.power * f), feats.faces, feats.bbox, mat)
+            r = adapter.solve_heat(model, work / f"sweep{i}")
+            Tc, hc = r.T, (hot(r) if len(t_f) else None)
+        fields.append(res.T + (Tc - res0.T)[near])
+        if len(t_f):
+            hots.append(hot_f + hc - hot(res0))
+    d = {"sweep_W": k * study.power / 1000, "sweep_T": np.asarray(fields, np.float32)}
+    if len(t_f):
+        d["sweep_hot"] = np.asarray(hots, np.float32)
+    return d
 
 
 def _save_study(study: ThermalStudy, out: Path):

@@ -36,7 +36,7 @@ def heat(job):
                     job.value("quality") or "normal")
     job.situate(environment={"ambient": ambient, "cooling": films}, loads=[f"{power} of heat"])
     job.ready()
-    o = run_thermal(st, job.out, job.log)
+    o = run_thermal(st, job.out, job.log, sweep=True)
     if o.values.get("limit_C") is not None:
         job.criterion("temperature", "t_max_C", o.values["limit_C"], "max")
     return o
