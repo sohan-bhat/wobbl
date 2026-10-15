@@ -189,3 +189,15 @@ def test_a_study_far_over_its_budget_is_refused_before_it_meshes(tmp_path):
     assert time.time() - t < 90                      # building the loop took seconds, no mesh or solve was started
     assert "budget of 5 s" in str(e.value) and "lower frequency" in e.value.hint
     assert not list((tmp_path / "out").glob("work/*/m.msh"))
+
+
+def test_the_recorded_generality_runs_balance_their_power():
+    import json
+    from pathlib import Path
+
+    d = json.loads((Path(__file__).resolve().parents[1] / "docs" / "antenna-generality.json").read_text())
+    names = {r["antenna"] for r in d["rows"]}
+    assert {"dipole", "monopole", "patch", "loop", "invf", "ifa-kicad"} <= names
+    for r in d["rows"]:
+        assert r["checks"]["power balance"] == "pass", r["antenna"]
+        assert r["gain_dBi"] <= r["directivity_dBi"] + 1e-6 and r["peak_theta_deg"] >= 0
