@@ -103,6 +103,9 @@ def vacuum_check(st: MotionStudy, fl: Flight) -> tuple[Check, dict]:
     vs, vh = st.speed * math.sin(a), st.speed * math.cos(a)
     g = gravity(st.site_altitude)
     t_c = (vs + math.sqrt(vs * vs + 2 * g * st.height)) / g
+    if t_c <= 0:
+        raise ValueError("the body starts on the ground at rest, so the run has no fall to check. Give the height "
+                         "it falls from or a launch speed.")
     v_c = math.hypot(vh, vs - g * t_c)
     err = max(abs(end.t - t_c) / t_c, abs(_speed(end.y) - v_c) / v_c)
     drop = st.speed == 0

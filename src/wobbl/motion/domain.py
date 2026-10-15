@@ -31,7 +31,7 @@ def read_flight(text: str) -> dict:
     m = re.search(rf"{_N}\s*(kg|g|grams?|lbs?|oz)\b", low)
     if m:
         out["mass"] = f"{m.group(1)} {m.group(2).rstrip('s') if m.group(2) != 'lbs' else 'lb'}"
-    m = re.search(rf"(?:from|off|height of|above the ground|up)\s+(?:a height of\s+)?{_N}\s*(km|m|ft|feet|meters?)\b",
+    m = re.search(rf"(?:from|off|height of|above the ground|up|falls?|falling|fell|drops?|dropped|dropping)\s+(?:a height of\s+)?{_N}\s*(km|m|ft|feet|meters?)\b",
                   low)
     if m:
         unit = {"feet": "ft"}.get(m.group(2), "m" if m.group(2).startswith("meter") else m.group(2))

@@ -198,6 +198,9 @@ class MotionStudy:
             raise SpecError("a rocket needs a launch rail", "Set rail_length under [launch], for example "
                                                             "'2.44 m', so the rocket points straight until its "
                                                             "fins can steer it.")
+        if not self.rocket and self.height <= 0 and self.speed == 0:
+            raise SpecError("the body starts on the ground at rest, so there is nothing to fly",
+                            "Give the height it falls from, for example '300 m', or a launch speed.")
         if self.height < 0 or not 0 <= self.angle <= 90:
             raise SpecError("the start height cannot be negative and the angle runs from 0 (level) to 90 deg "
                             "(straight up)")
