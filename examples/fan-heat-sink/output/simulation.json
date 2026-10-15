@@ -1,0 +1,66 @@
+{
+ "thing": "heatsink.py",
+ "question": "Does a 30 W chip stay under 85 C with a 10 CFM, 20 Pa fan blowing along the fins in a 40 C cabinet?",
+ "plan": {
+  "thing": "heatsink.py",
+  "question": "Does a 30 W chip stay under 85 C with a 10 CFM, 20 Pa fan blowing along the fins in a 40 C cabinet?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "cooling"
+  ],
+  "reasons": [
+   {
+    "decided": "heatsink.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics cooling from \"fan\"",
+    "override": "--physics cooling"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "environment": {
+   "fluid": "air",
+   "temperature": "40 C",
+   "speed": null,
+   "flow": "10 cfm",
+   "fan": "10 cfm, 20 pa",
+   "direction": "+y",
+   "inlet": "the largest opening"
+  },
+  "objects": [
+   "heatsink.py"
+  ]
+ },
+ "steps": [
+  {
+   "analysis": "cooling",
+   "domain": "part",
+   "verdict": "ok",
+   "headline": "With 232 L/min of air through its duct, the faces shed heat at 29.8 W/(m2 K) on average, and 30 W brings the hottest point to 77 C against a limit of 85 C.",
+   "confidence": "low",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": [
+    {
+     "assumed": "The stream runs along (+0.00, +1.00, +0.00) in the part's coordinates",
+     "override": "--direction +x"
+    },
+    {
+     "assumed": "The part has no passage of its own, so it sits in a duct of its own cross section, the way a shroud carries a fan's air through a heat sink",
+     "override": "--mode external"
+    }
+   ]
+  }
+ ]
+}

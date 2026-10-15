@@ -1,0 +1,42 @@
+{
+ "domain": "part",
+ "analysis": "cooling",
+ "spec": {
+  "thing": "heatsink.py",
+  "kind": "parametric",
+  "question": "Does a 30 W chip stay under 85 C with a 10 CFM, 20 Pa fan blowing along the fins in a 40 C cabinet?",
+  "options": {
+   "heat-faces": [
+    "bottom and box 17.5,17.5,-1,42.5,42.5,0.5"
+   ],
+   "direction": [
+    "+y"
+   ],
+   "mode": [
+    "ducted"
+   ],
+   "temperature": [
+    "40 C"
+   ],
+   "material": [
+    "6063-t5"
+   ],
+   "fluid": [
+    "air"
+   ],
+   "flow": [
+    "10 cfm"
+   ],
+   "quality": [
+    "normal"
+   ],
+   "power": [
+    "30 w"
+   ],
+   "limit": [
+    "85 C"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

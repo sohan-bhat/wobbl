@@ -1,0 +1,153 @@
+{
+ "domain": "thermal",
+ "part": "../../heatsink.py",
+ "question": "Does a 30 W chip stay under 85 C with a 10 CFM, 20 Pa fan blowing along the fins in a 40 C cabinet?",
+ "verdict": "ok",
+ "headline": "Hottest point reaches 77 C (limit 85 C) at (30, 29.9, 0) mm at steady state.",
+ "metrics": [
+  [
+   "max temperature",
+   "77 C"
+  ],
+  [
+   "limit",
+   "85 C"
+  ],
+  [
+   "power",
+   "30 W"
+  ],
+  [
+   "mesh nodes",
+   "137,258"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "hand calculation: heat balance on a uniform skin gives 69.2 C; the FEA skin averages 72.6 C (12% of the rise). Biot 0.00013: the part is nearly isothermal"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "temperature rise at the hottest point settled: 37.1 -> 36.9 -> 37 C over 3 meshes, last change 0.4%",
+   "detail": {
+    "values": [
+     37.0688,
+     36.9199,
+     37.05
+    ],
+    "last_change": 0.003511,
+    "tolerance": 0.02,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "heat in 30 W, heat out through the surfaces 30 W (3.9e-07% apart)",
+   "detail": {
+    "in_W": 30.0,
+    "out_W": 30.0
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "warn",
+   "summary": "heat balance on a uniform skin gives 69.2 C; the FEA skin averages 72.6 C (12% of the rise). Biot 0.00013: the part is nearly isothermal",
+   "detail": {
+    "lumped_surface_C": 69.15298,
+    "fea_surface_C": 72.630734,
+    "biot": 0.000129
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "temperatures between 70.7 and 77 C; radiation is off, it could shed up to about 11.6 W at this temperature (pass --radiation 0.9 for painted or plastic surfaces)",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Aluminum 6063-T5: conductivity 209 W/(m K), specific heat 900 J/(kg K), density 2700 kg/m3.",
+  "Heat enters through bottom and box 17.5,17.5,-1,42.5,42.5,0.5.",
+  "Convection uses a fixed film coefficient; real coefficients vary with temperature and airflow.",
+  "Surrounding air or coolant at 40 C does not heat up.",
+  "Radiation is ignored (conservative).",
+  "Contact resistance between parts and internal airflow are not modeled."
+ ],
+ "values": {
+  "t_max_C": 77.05,
+  "hot_xyz": [
+   30.0,
+   29.917012,
+   0.0
+  ],
+  "limit_C": 85.0,
+  "levels": [
+   {
+    "level": 0,
+    "n_nodes": 34756,
+    "h": 3.233166,
+    "t_max": 77.0688,
+    "t_min": 70.7002,
+    "xyz": [
+     30.082988,
+     30.0,
+     0.0
+    ],
+    "t_solve": 4.816117
+   },
+   {
+    "level": 1,
+    "n_nodes": 69076,
+    "h": 2.263216,
+    "t_max": 76.9199,
+    "t_min": 70.6844,
+    "xyz": [
+     29.829764,
+     30.555556,
+     0.0
+    ],
+    "t_solve": 10.47518
+   },
+   {
+    "level": 2,
+    "n_nodes": 137258,
+    "h": 1.616583,
+    "t_max": 77.05,
+    "t_min": 70.7075,
+    "xyz": [
+     30.0,
+     29.917012,
+     0.0
+    ],
+    "t_solve": 34.028747
+   }
+  ],
+  "lumped_C": 69.15298,
+  "time_over_limit_s": null,
+  "_figures": [
+   [
+    "temperature",
+    "Temperature with the hottest point marked"
+   ],
+   [
+    "history",
+    "Temperature over time"
+   ]
+  ]
+ },
+ "images": {
+  "temperature": "images/temperature.png"
+ },
+ "fixes": [],
+ "notes": [
+  "Built from heatsink.py with base=6, size=60, fins=9, fin=1.5, fin_height=30."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 78.112576,
+ "solver": "CalculiX 2.23",
+ "criteria": []
+}

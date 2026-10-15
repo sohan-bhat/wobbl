@@ -1,37 +1,45 @@
-OK. 227 L/min through the fins gives 35.1 W/(m2 K), and the hottest point reaches 70.5 C against a limit of 85 C.
+OK. With 232 L/min of air through its duct, the faces shed heat at 29.8 W/(m2 K) on average, and 30 W brings the hottest point to 77 C against a limit of 85 C.
 
-Confidence: medium. grid convergence: Nusselt number 15.29 -> 15.13 -> 14.98 over 3 grids, grid convergence index 2.3% (observed order 2, extrapolated 14.87), so expect about that much discretization error; Nusselt correlation: Stephan's correlation for developing flow between plates gives 13.7, the simulation 15 (9.7% apart); the air is ducted through the fins with none going around them, so a sink without a shroud gets less
-max temperature: 70.5 C
+Confidence: low. grid convergence failed: pressure drop 3.539 -> 3.868 -> 4.045 Pa over 3 grids, grid convergence index 32% (observed order 2, extrapolated 4.473 Pa), so the grid is too coarse for this answer; residuals: largest final residual 0.0032 (k), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly; wall resolution: y+ on the walls averages 6.53, at most 11.3, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent; operating point: the curve gives 3.58 Pa at 232 L/min, and the fine grid needs 4.05 Pa there (13% apart), so the coarse grid's fit set the flow a little off
+max temperature: 77 C
 limit: 85 C
-airflow: 227 L/min
-h on the fins: 35.1 W/m2K
+mean h: 29.8 W/m2K
+pressure drop: 4.05 Pa
+flow: 232 L/min
 
 Checks:
-  [warn] grid convergence: Nusselt number 15.29 -> 15.13 -> 14.98 over 3 grids, grid convergence index 2.3% (observed order 2, extrapolated 14.87), so expect about that much discretization error
-  [pass] mass conservation: in 0.00926 m3/s per unit depth, out 0.00926 m3/s per unit depth (0% apart)
-  [pass] residuals: largest final residual 0.0001 (T), every field fell at least 4.0 orders, and the solver met its convergence target
-  [warn] Nusselt correlation: Stephan's correlation for developing flow between plates gives 13.7, the simulation 15 (9.7% apart)
-  [pass] heat sink model: Teertstra's plate fin model gives 13.2, the simulation 15 (14% apart)
-  [pass] pressure drop: Shah and London's apparent friction gives 0.385, the simulation 0.385 (0.092% apart)
-  [pass] mesh convergence: temperature rise at the hottest point settled: 27 -> 26.9 -> 27 C over 3 meshes, last change 0.5%
-  [pass] energy balance: heat in 30 W, heat out through the surfaces 30 W (5.4e-07% apart)
-  [pass] hand calculation: heat balance on a uniform skin gives 65.9 C; the FEA skin averages 66.1 C (0.5% of the rise). Biot 0.00017: the part is nearly isothermal
-  [pass] units and sanity: temperatures between 64.2 and 70.5 C; radiation is off, it could shed up to about 8.31 W at this temperature (pass --radiation 0.9 for painted or plastic surfaces)
-  [info] sink effectiveness: fins of efficiency 0.94 shedding 30 W into 227 L/min of air put a sink at one temperature at 69.4 C, and the FEA spans 64.2 to 70.5 C
-  [pass] operating point: the fan curve meets the sink at 227 L/min and 4.09 Pa, 80% of the fan's free flow
+  [pass] mesh quality: 102,204 cells, worst non orthogonality 37 degrees and skewness 0.39
+  [fail] grid convergence: pressure drop 3.539 -> 3.868 -> 4.045 Pa over 3 grids, grid convergence index 32% (observed order 2, extrapolated 4.473 Pa), so the grid is too coarse for this answer
+  [pass] iterative convergence: pressure drop swings 0.0063% over the last fifth of 153 iterations
+  [pass] mass conservation: in 0.00387 m3/s, out 0.00387 m3/s (9.5e-06% apart)
+  [warn] residuals: largest final residual 0.0032 (k), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly
+  [warn] wall resolution: y+ on the walls averages 6.53, at most 11.3, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent
+  [pass] flow regime: Re 6361 on the inlet's hydraulic diameter, turbulent
+  [info] hand calculation: a straight smooth duct of the same 60 mm hydraulic diameter and 60 mm length loses 0.0634 Pa by Colebrook, and the part loses 4.05 Pa, 63.86 times that, the rest from turns, junctions and changes of section
+  [warn] operating point: the curve gives 3.58 Pa at 232 L/min, and the fine grid needs 4.05 Pa there (13% apart), so the coarse grid's fit set the flow a little off
+  [pass] mesh convergence: temperature rise at the hottest point settled: 37.1 -> 36.9 -> 37 C over 3 meshes, last change 0.4%
+  [pass] energy balance: heat in 30 W, heat out through the surfaces 30 W (3.9e-07% apart)
+  [warn] hand calculation: heat balance on a uniform skin gives 69.2 C; the FEA skin averages 72.6 C (12% of the rise). Biot 0.00013: the part is nearly isothermal
+  [pass] units and sanity: temperatures between 70.7 and 77 C; radiation is off, it could shed up to about 11.6 W at this temperature (pass --radiation 0.9 for painted or plastic surfaces)
+  [info] lumped estimate: the wetted area of 331 cm2 at the mean 29.8 W/(m2 K) puts a part at one temperature at 73.9 C, and the FEA's hottest point is 77 C
+  [info] heat transfer correlation: Gnielinski's correlation for a straight tube gives 9.35 W/(m2 K) at Re 6361 on the 60 mm hydraulic diameter, and the CFD averages 29.8 W/(m2 K) over the wetted faces, which include entrance regions and turns that raise it
 
 Assumptions:
-  - 9 fins 1.5 mm thick and 30 mm tall, gaps of 5.81 mm, 60 mm along the flow.
-  - The fan's air is ducted through the fins with none going around them, as with a shroud or a fan mounted on the end of the sink.
-  - The fan curve is a straight line from its free flow to its shut off pressure.
-  - Air at 40 C warms by 7 C through the sink, so the fins see air at 43.5 C on average.
-  - One heat transfer coefficient from the gap's mean covers every fin and the base between them, the fin tips under the shroud and the outside of the base get 5 W/(m2 K).
-  - Entry and exit losses at the fins come from Kays and London's contraction and expansion coefficients.
+  - Wobbl guessed: The stream runs along (+0.00, +1.00, +0.00) in the part's coordinates.
+  - Wobbl guessed: The part has no passage of its own, so it sits in a duct of its own cross section, the way a shroud carries a fan's air through a heat sink.
+  - Air at 40 C, density 1.127 kg/m3, viscosity 1.907e-05 Pa s, conductivity 0.0272 W/(m K), Prandtl 0.704.
+  - The stream runs along (+0.00, +1.00, +0.00) in the part's coordinates.
+  - The part has no passage of its own, so it sits in a duct of its own cross section, the way a shroud carries a fan's air through a heat sink.
+  - Steady, incompressible flow with the k omega SST turbulence model and blended wall functions.
+  - Meshed by snappyHexMesh with 102,204 cells on the finest of 3 grids, without boundary layer cells.
+  - The fluid enters at 40 C and warms by 6.83 C, so the films use 43.4 C.
+  - Each face's heat transfer coefficient comes from the CFD with the walls at one uniform temperature, and faces the flow does not reach get still air at 5 W/(m2 K).
+  - One way coupling, so the fluid's properties do not change with the part's temperature.
   - Aluminum 6063-T5: conductivity 209 W/(m K), specific heat 900 J/(kg K), density 2700 kg/m3.
   - Heat enters through bottom and box 17.5,17.5,-1,42.5,42.5,0.5.
-  - Surrounding air or coolant at 43.5 C does not heat up.
+  - Surrounding air or coolant at 40 C does not heat up.
   - Radiation is ignored (conservative).
   - Contact resistance between parts and internal airflow are not modeled.
 
-Images: temperature: images/temperature.png, air: images/air.png, fan: images/fan.png
+Images: temperature: heat/images/temperature.png, pressure: flow/images/pressure.png
 Report: report.html

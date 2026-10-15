@@ -1,0 +1,244 @@
+{
+ "part": "../../heatsink.py",
+ "material": "6063-t5",
+ "power": 30000.0,
+ "heat_faces": "bottom and box 17.5,17.5,-1,42.5,42.5,0.5",
+ "films": [
+  {
+   "h": 0.03438488144995591,
+   "t_inf": 43.41367309410407,
+   "faces": "face 2",
+   "text": "34.4 W/m2K from CFD"
+  },
+  {
+   "h": 0.009710950330194248,
+   "t_inf": 43.41367309410407,
+   "faces": "face 3",
+   "text": "9.71 W/m2K from CFD"
+  },
+  {
+   "h": 0.011698581529679637,
+   "t_inf": 43.41367309410407,
+   "faces": "face 6",
+   "text": "11.7 W/m2K from CFD"
+  },
+  {
+   "h": 0.011945687194613419,
+   "t_inf": 43.41367309410407,
+   "faces": "face 7",
+   "text": "11.9 W/m2K from CFD"
+  },
+  {
+   "h": 0.011831122193290996,
+   "t_inf": 43.41367309410407,
+   "faces": "face 8",
+   "text": "11.8 W/m2K from CFD"
+  },
+  {
+   "h": 0.011996347853304218,
+   "t_inf": 43.41367309410407,
+   "faces": "face 9",
+   "text": "12 W/m2K from CFD"
+  },
+  {
+   "h": 0.012013096710928286,
+   "t_inf": 43.41367309410407,
+   "faces": "face 10",
+   "text": "12 W/m2K from CFD"
+  },
+  {
+   "h": 0.011790718508821626,
+   "t_inf": 43.41367309410407,
+   "faces": "face 11",
+   "text": "11.8 W/m2K from CFD"
+  },
+  {
+   "h": 0.011937165437872906,
+   "t_inf": 43.41367309410407,
+   "faces": "face 12",
+   "text": "11.9 W/m2K from CFD"
+  },
+  {
+   "h": 0.011679814021814021,
+   "t_inf": 43.41367309410407,
+   "faces": "face 13",
+   "text": "11.7 W/m2K from CFD"
+  },
+  {
+   "h": 0.027041388422369358,
+   "t_inf": 43.41367309410407,
+   "faces": "face 15",
+   "text": "27 W/m2K from CFD"
+  },
+  {
+   "h": 0.032228651958229396,
+   "t_inf": 43.41367309410407,
+   "faces": "face 16",
+   "text": "32.2 W/m2K from CFD"
+  },
+  {
+   "h": 0.03249403248754185,
+   "t_inf": 43.41367309410407,
+   "faces": "face 17",
+   "text": "32.5 W/m2K from CFD"
+  },
+  {
+   "h": 0.03305302669673518,
+   "t_inf": 43.41367309410407,
+   "faces": "face 19",
+   "text": "33.1 W/m2K from CFD"
+  },
+  {
+   "h": 0.03246494217204358,
+   "t_inf": 43.41367309410407,
+   "faces": "face 20",
+   "text": "32.5 W/m2K from CFD"
+  },
+  {
+   "h": 0.03262964805732057,
+   "t_inf": 43.41367309410407,
+   "faces": "face 22",
+   "text": "32.6 W/m2K from CFD"
+  },
+  {
+   "h": 0.03255165116621914,
+   "t_inf": 43.41367309410407,
+   "faces": "face 23",
+   "text": "32.6 W/m2K from CFD"
+  },
+  {
+   "h": 0.03268712763710885,
+   "t_inf": 43.41367309410407,
+   "faces": "face 25",
+   "text": "32.7 W/m2K from CFD"
+  },
+  {
+   "h": 0.032685070009775455,
+   "t_inf": 43.41367309410407,
+   "faces": "face 26",
+   "text": "32.7 W/m2K from CFD"
+  },
+  {
+   "h": 0.03255537623543769,
+   "t_inf": 43.41367309410407,
+   "faces": "face 28",
+   "text": "32.6 W/m2K from CFD"
+  },
+  {
+   "h": 0.032624923680184575,
+   "t_inf": 43.41367309410407,
+   "faces": "face 29",
+   "text": "32.6 W/m2K from CFD"
+  },
+  {
+   "h": 0.032463601972012965,
+   "t_inf": 43.41367309410407,
+   "faces": "face 31",
+   "text": "32.5 W/m2K from CFD"
+  },
+  {
+   "h": 0.033049765669583495,
+   "t_inf": 43.41367309410407,
+   "faces": "face 32",
+   "text": "33 W/m2K from CFD"
+  },
+  {
+   "h": 0.03251586248964848,
+   "t_inf": 43.41367309410407,
+   "faces": "face 34",
+   "text": "32.5 W/m2K from CFD"
+  },
+  {
+   "h": 0.03223275843877684,
+   "t_inf": 43.41367309410407,
+   "faces": "face 35",
+   "text": "32.2 W/m2K from CFD"
+  },
+  {
+   "h": 0.027042865053989708,
+   "t_inf": 43.41367309410407,
+   "faces": "face 37",
+   "text": "27 W/m2K from CFD"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 1",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 4",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 5",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 14",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 18",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 21",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 24",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 27",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 30",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 33",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 36",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 40.0,
+   "faces": "face 38",
+   "text": "still air"
+  }
+ ],
+ "fixed": [],
+ "ambient": 40.0,
+ "initial": null,
+ "duration": 0.0,
+ "limit": 85.0,
+ "emissivity": 0.0,
+ "question": "Does a 30 W chip stay under 85 C with a 10 CFM, 20 Pa fan blowing along the fins in a 40 C cabinet?",
+ "quality": "normal"
+}

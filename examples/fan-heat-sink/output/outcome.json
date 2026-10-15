@@ -1,136 +1,202 @@
 {
- "domain": "flow",
+ "domain": "thermal",
  "part": "../heatsink.py",
- "question": "Does a 30 W chip stay under 85 C on this heat sink with a small fan in a 40 C cabinet?",
+ "question": "Does a 30 W chip stay under 85 C with a 10 CFM, 20 Pa fan blowing along the fins in a 40 C cabinet?",
  "verdict": "ok",
- "headline": "227 L/min through the fins gives 35.1 W/(m2 K), and the hottest point reaches 70.5 C against a limit of 85 C.",
+ "headline": "With 232 L/min of air through its duct, the faces shed heat at 29.8 W/(m2 K) on average, and 30 W brings the hottest point to 77 C against a limit of 85 C.",
  "metrics": [
   [
    "max temperature",
-   "70.5 C"
+   "77 C"
   ],
   [
    "limit",
    "85 C"
   ],
   [
-   "airflow",
-   "227 L/min"
+   "mean h",
+   "29.8 W/m2K"
   ],
   [
-   "h on the fins",
-   "35.1 W/m2K"
+   "pressure drop",
+   "4.05 Pa"
+  ],
+  [
+   "flow",
+   "232 L/min"
   ]
  ],
- "confidence": "medium",
+ "confidence": "low",
  "confidence_reasons": [
-  "grid convergence: Nusselt number 15.29 -> 15.13 -> 14.98 over 3 grids, grid convergence index 2.3% (observed order 2, extrapolated 14.87), so expect about that much discretization error",
-  "Nusselt correlation: Stephan's correlation for developing flow between plates gives 13.7, the simulation 15 (9.7% apart)",
-  "the air is ducted through the fins with none going around them, so a sink without a shroud gets less"
+  "grid convergence failed: pressure drop 3.539 -> 3.868 -> 4.045 Pa over 3 grids, grid convergence index 32% (observed order 2, extrapolated 4.473 Pa), so the grid is too coarse for this answer",
+  "residuals: largest final residual 0.0032 (k), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly",
+  "wall resolution: y+ on the walls averages 6.53, at most 11.3, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent",
+  "operating point: the curve gives 3.58 Pa at 232 L/min, and the fine grid needs 4.05 Pa there (13% apart), so the coarse grid's fit set the flow a little off",
+  "hand calculation: heat balance on a uniform skin gives 69.2 C; the FEA skin averages 72.6 C (12% of the rise). Biot 0.00013: the part is nearly isothermal",
+  "convective heat transfer from RANS is commonly within 10 to 25% of measurements"
  ],
  "checks": [
   {
+   "name": "mesh quality",
+   "status": "pass",
+   "summary": "102,204 cells, worst non orthogonality 37 degrees and skewness 0.39",
+   "detail": {
+    "cells": 102204,
+    "non_ortho": 36.725712,
+    "skewness": 0.393454
+   }
+  },
+  {
    "name": "grid convergence",
-   "status": "warn",
-   "summary": "Nusselt number 15.29 -> 15.13 -> 14.98 over 3 grids, grid convergence index 2.3% (observed order 2, extrapolated 14.87), so expect about that much discretization error",
+   "status": "fail",
+   "summary": "pressure drop 3.539 -> 3.868 -> 4.045 Pa over 3 grids, grid convergence index 32% (observed order 2, extrapolated 4.473 Pa), so the grid is too coarse for this answer",
    "detail": {
     "values_fine_to_coarse": [
-     14.98304,
-     15.126093,
-     15.28762
+     4.045375,
+     3.867987,
+     3.539099
     ],
     "sizes": [
-     0.011111,
-     0.016667,
-     0.025
+     0.021388,
+     0.025441,
+     0.040218
     ],
     "order": 2.0,
-    "extrapolated": 14.868597,
-    "gci_fine": 0.022914,
+    "extrapolated": 4.47291,
+    "gci_fine": 0.317055,
     "kind": "monotone"
    }
   },
   {
+   "name": "iterative convergence",
+   "status": "pass",
+   "summary": "pressure drop swings 0.0063% over the last fifth of 153 iterations",
+   "detail": {}
+  },
+  {
    "name": "mass conservation",
    "status": "pass",
-   "summary": "in 0.00926 m3/s per unit depth, out 0.00926 m3/s per unit depth (0% apart)",
+   "summary": "in 0.00387 m3/s, out 0.00387 m3/s (9.5e-06% apart)",
    "detail": {
-    "in": 0.009259,
-    "out": 0.009259,
+    "in": 0.003875,
+    "out": 0.003875,
     "error": 0.0
    }
   },
   {
    "name": "residuals",
-   "status": "pass",
-   "summary": "largest final residual 0.0001 (T), every field fell at least 4.0 orders, and the solver met its convergence target",
+   "status": "warn",
+   "summary": "largest final residual 0.0032 (k), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly",
    "detail": {
     "fields": {
      "Ux": {
       "first": 1.0,
-      "last": 0.0
+      "last": 0.000108
      },
      "Uy": {
-      "first": 0.372876,
-      "last": 0.0
+      "first": 0.995743,
+      "last": 0.000705
+     },
+     "Uz": {
+      "first": 0.994426,
+      "last": 0.000318
      },
      "p": {
       "first": 1.0,
-      "last": 0.0
+      "last": 7e-06
+     },
+     "omega": {
+      "first": 0.018321,
+      "last": 0.000689
+     },
+     "k": {
+      "first": 1.0,
+      "last": 0.003211
      },
      "T": {
       "first": 1.0,
-      "last": 0.000103
+      "last": 0.002921
      }
     },
-    "tolerance": 1e-05,
-    "converged_flag": true
+    "tolerance": 0.001,
+    "converged_flag": false
    }
   },
   {
-   "name": "Nusselt correlation",
+   "name": "wall resolution",
    "status": "warn",
-   "summary": "Stephan's correlation for developing flow between plates gives 13.7, the simulation 15 (9.7% apart)",
+   "summary": "y+ on the walls averages 6.53, at most 11.3, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent",
    "detail": {
-    "expected": 13.652965,
-    "got": 14.98304,
-    "error": 0.09742,
-    "tolerance": 0.05
+    "patches": {
+     "walls": {
+      "min": 0.227393,
+      "max": 11.273805,
+      "mean": 6.533767
+     }
+    },
+    "treatment": "wall functions"
    }
   },
   {
-   "name": "heat sink model",
+   "name": "flow regime",
    "status": "pass",
-   "summary": "Teertstra's plate fin model gives 13.2, the simulation 15 (14% apart)",
+   "summary": "Re 6361 on the inlet's hydraulic diameter, turbulent",
    "detail": {
-    "expected": 13.156149,
-    "got": 14.98304,
-    "error": 0.138862,
-    "tolerance": 0.15
+    "re": 6360.737119
    }
   },
   {
-   "name": "pressure drop",
-   "status": "pass",
-   "summary": "Shah and London's apparent friction gives 0.385, the simulation 0.385 (0.092% apart)",
+   "name": "hand calculation",
+   "status": "info",
+   "summary": "a straight smooth duct of the same 60 mm hydraulic diameter and 60 mm length loses 0.0634 Pa by Colebrook, and the part loses 4.05 Pa, 63.86 times that, the rest from turns, junctions and changes of section",
    "detail": {
-    "expected": 0.385037,
-    "got": 0.385393,
-    "error": 0.000924,
-    "tolerance": 0.15
+    "straight_Pa": 0.063352,
+    "length_m": 0.06,
+    "ratio": 63.856025
+   }
+  },
+  {
+   "name": "operating point",
+   "status": "warn",
+   "summary": "the curve gives 3.58 Pa at 232 L/min, and the fine grid needs 4.05 Pa there (13% apart), so the coarse grid's fit set the flow a little off",
+   "detail": {
+    "flow": 0.003875,
+    "dp": 3.578945,
+    "a": 193.402771,
+    "b": 188444.52748,
+    "trial": [
+     [
+      0.001652,
+      0.833636
+     ],
+     [
+      0.00354,
+      3.045555
+     ]
+    ],
+    "curve": [
+     [
+      0.0,
+      20.0
+     ],
+     [
+      0.004719,
+      0.0
+     ]
+    ]
    }
   },
   {
    "name": "mesh convergence",
    "status": "pass",
-   "summary": "temperature rise at the hottest point settled: 27 -> 26.9 -> 27 C over 3 meshes, last change 0.5%",
+   "summary": "temperature rise at the hottest point settled: 37.1 -> 36.9 -> 37 C over 3 meshes, last change 0.4%",
    "detail": {
     "values": [
-     27.017532,
-     26.866532,
-     26.997432
+     37.0688,
+     36.9199,
+     37.05
     ],
-    "last_change": 0.004849,
+    "last_change": 0.003511,
     "tolerance": 0.02,
     "stopped_by": ""
    }
@@ -138,7 +204,7 @@
   {
    "name": "energy balance",
    "status": "pass",
-   "summary": "heat in 30 W, heat out through the surfaces 30 W (5.4e-07% apart)",
+   "summary": "heat in 30 W, heat out through the surfaces 30 W (3.9e-07% apart)",
    "detail": {
     "in_W": 30.0,
     "out_W": 30.0
@@ -146,112 +212,243 @@
   },
   {
    "name": "hand calculation",
-   "status": "pass",
-   "summary": "heat balance on a uniform skin gives 65.9 C; the FEA skin averages 66.1 C (0.5% of the rise). Biot 0.00017: the part is nearly isothermal",
+   "status": "warn",
+   "summary": "heat balance on a uniform skin gives 69.2 C; the FEA skin averages 72.6 C (12% of the rise). Biot 0.00013: the part is nearly isothermal",
    "detail": {
-    "lumped_surface_C": 65.940697,
-    "fea_surface_C": 66.052956,
-    "biot": 0.000168
+    "lumped_surface_C": 69.15298,
+    "fea_surface_C": 72.630734,
+    "biot": 0.000129
    }
   },
   {
    "name": "units and sanity",
    "status": "pass",
-   "summary": "temperatures between 64.2 and 70.5 C; radiation is off, it could shed up to about 8.31 W at this temperature (pass --radiation 0.9 for painted or plastic surfaces)",
+   "summary": "temperatures between 70.7 and 77 C; radiation is off, it could shed up to about 11.6 W at this temperature (pass --radiation 0.9 for painted or plastic surfaces)",
    "detail": {}
   },
   {
-   "name": "sink effectiveness",
+   "name": "lumped estimate",
    "status": "info",
-   "summary": "fins of efficiency 0.94 shedding 30 W into 227 L/min of air put a sink at one temperature at 69.4 C, and the FEA spans 64.2 to 70.5 C",
+   "summary": "the wetted area of 331 cm2 at the mean 29.8 W/(m2 K) puts a part at one temperature at 73.9 C, and the FEA's hottest point is 77 C",
    "detail": {
-    "fin_efficiency": 0.937795,
-    "uniform_sink_C": 69.408977
+    "uniform_C": 73.851166
    }
   },
   {
-   "name": "operating point",
-   "status": "pass",
-   "summary": "the fan curve meets the sink at 227 L/min and 4.09 Pa, 80% of the fan's free flow",
-   "detail": {}
+   "name": "heat transfer correlation",
+   "status": "info",
+   "summary": "Gnielinski's correlation for a straight tube gives 9.35 W/(m2 K) at Re 6361 on the 60 mm hydraulic diameter, and the CFD averages 29.8 W/(m2 K) over the wetted faces, which include entrance regions and turns that raise it",
+   "detail": {
+    "correlation_W_m2K": 9.348827,
+    "cfd_W_m2K": 29.752513
+   }
   }
  ],
  "assumptions": [
-  "9 fins 1.5 mm thick and 30 mm tall, gaps of 5.81 mm, 60 mm along the flow.",
-  "The fan's air is ducted through the fins with none going around them, as with a shroud or a fan mounted on the end of the sink.",
-  "The fan curve is a straight line from its free flow to its shut off pressure.",
-  "Air at 40 C warms by 7 C through the sink, so the fins see air at 43.5 C on average.",
-  "One heat transfer coefficient from the gap's mean covers every fin and the base between them, the fin tips under the shroud and the outside of the base get 5 W/(m2 K).",
-  "Entry and exit losses at the fins come from Kays and London's contraction and expansion coefficients.",
+  "Wobbl guessed: The stream runs along (+0.00, +1.00, +0.00) in the part's coordinates.",
+  "Wobbl guessed: The part has no passage of its own, so it sits in a duct of its own cross section, the way a shroud carries a fan's air through a heat sink.",
+  "Air at 40 C, density 1.127 kg/m3, viscosity 1.907e-05 Pa s, conductivity 0.0272 W/(m K), Prandtl 0.704.",
+  "The stream runs along (+0.00, +1.00, +0.00) in the part's coordinates.",
+  "The part has no passage of its own, so it sits in a duct of its own cross section, the way a shroud carries a fan's air through a heat sink.",
+  "Steady, incompressible flow with the k omega SST turbulence model and blended wall functions.",
+  "Meshed by snappyHexMesh with 102,204 cells on the finest of 3 grids, without boundary layer cells.",
+  "The fluid enters at 40 C and warms by 6.83 C, so the films use 43.4 C.",
+  "Each face's heat transfer coefficient comes from the CFD with the walls at one uniform temperature, and faces the flow does not reach get still air at 5 W/(m2 K).",
+  "One way coupling, so the fluid's properties do not change with the part's temperature.",
   "Aluminum 6063-T5: conductivity 209 W/(m K), specific heat 900 J/(kg K), density 2700 kg/m3.",
   "Heat enters through bottom and box 17.5,17.5,-1,42.5,42.5,0.5.",
-  "Surrounding air or coolant at 43.5 C does not heat up.",
+  "Surrounding air or coolant at 40 C does not heat up.",
   "Radiation is ignored (conservative).",
   "Contact resistance between parts and internal airflow are not modeled."
  ],
  "values": {
-  "t_max_C": 70.4997,
-  "limit_C": 85.0,
-  "h_W_m2K": 35.121314,
-  "flow_m3_s": 0.003777,
-  "velocity_m_s": 2.707466,
-  "re": 1859.949691,
-  "dp_Pa": 4.086618,
-  "air_rise_C": 7.004537,
-  "nusselt": 14.98304,
+  "mode": "ducted",
+  "re": 6360.737119,
+  "model": "rans",
+  "cells": 102204,
+  "fluid": "air",
   "levels": [
    {
-    "grid": [
-     90,
-     27
-    ],
-    "nu": 14.98304,
-    "dp": 0.385393,
-    "seconds": 17.978493
+    "cells": 102204,
+    "value": 4.045375,
+    "iterations": 153,
+    "t_mesh": 172.271724,
+    "t_solve": 353.938924
    },
    {
-    "grid": [
-     60,
-     18
-    ],
-    "nu": 15.126093,
-    "dp": 0.378419,
-    "seconds": 12.23404
+    "cells": 60726,
+    "value": 3.867987,
+    "iterations": 153,
+    "t_mesh": 131.540215,
+    "t_solve": 234.30411
    },
    {
-    "grid": [
-     40,
-     12
-    ],
-    "nu": 15.28762,
-    "dp": 0.367454,
-    "seconds": 11.054234
+    "cells": 15372,
+    "value": 3.539099,
+    "iterations": 156,
+    "t_mesh": 25.266609,
+    "t_solve": 74.621905
    }
   ],
+  "dp_Pa": 4.045375,
+  "dp_static_Pa": 4.123972,
+  "flow_m3_s": 0.003875,
+  "velocity_m_s": 1.793953,
+  "split": {
+   "xmax": 1.0
+  },
+  "pump_power_W": 0.015676,
+  "hydraulic_diameter_m": 0.06,
+  "operating_point": {
+   "flow_m3_s": 0.003875,
+   "dp_Pa": 3.578945
+  },
+  "t_max_C": 77.05,
+  "limit_C": 85.0,
+  "h_mean_W_m2K": 29.752513,
+  "fluid_rise_C": 6.827346,
+  "film_C": 43.413673,
+  "power_W": 30.0,
+  "faces": {
+   "2": {
+    "h_W_m2K": 34.384881,
+    "wetted_mm2": 765.873193
+   },
+   "3": {
+    "h_W_m2K": 9.71095,
+    "wetted_mm2": 765.873193
+   },
+   "6": {
+    "h_W_m2K": 11.698582,
+    "wetted_mm2": 348.749988
+   },
+   "7": {
+    "h_W_m2K": 11.945687,
+    "wetted_mm2": 348.749928
+   },
+   "8": {
+    "h_W_m2K": 11.831122,
+    "wetted_mm2": 348.750012
+   },
+   "9": {
+    "h_W_m2K": 11.996348,
+    "wetted_mm2": 348.749976
+   },
+   "10": {
+    "h_W_m2K": 12.013097,
+    "wetted_mm2": 348.749976
+   },
+   "11": {
+    "h_W_m2K": 11.790719,
+    "wetted_mm2": 348.750012
+   },
+   "12": {
+    "h_W_m2K": 11.937165,
+    "wetted_mm2": 348.749928
+   },
+   "13": {
+    "h_W_m2K": 11.679814,
+    "wetted_mm2": 348.749988
+   },
+   "15": {
+    "h_W_m2K": 27.041388,
+    "wetted_mm2": 1800.35994
+   },
+   "16": {
+    "h_W_m2K": 32.228652,
+    "wetted_mm2": 1800.35994
+   },
+   "17": {
+    "h_W_m2K": 32.494032,
+    "wetted_mm2": 1800.35994
+   },
+   "19": {
+    "h_W_m2K": 33.053027,
+    "wetted_mm2": 1800.35994
+   },
+   "20": {
+    "h_W_m2K": 32.464942,
+    "wetted_mm2": 1800.35994
+   },
+   "22": {
+    "h_W_m2K": 32.629648,
+    "wetted_mm2": 1800.35994
+   },
+   "23": {
+    "h_W_m2K": 32.551651,
+    "wetted_mm2": 1800.35994
+   },
+   "25": {
+    "h_W_m2K": 32.687128,
+    "wetted_mm2": 1800.35994
+   },
+   "26": {
+    "h_W_m2K": 32.68507,
+    "wetted_mm2": 1800.35994
+   },
+   "28": {
+    "h_W_m2K": 32.555376,
+    "wetted_mm2": 1800.35994
+   },
+   "29": {
+    "h_W_m2K": 32.624924,
+    "wetted_mm2": 1800.35994
+   },
+   "31": {
+    "h_W_m2K": 32.463602,
+    "wetted_mm2": 1800.35994
+   },
+   "32": {
+    "h_W_m2K": 33.049766,
+    "wetted_mm2": 1800.35994
+   },
+   "34": {
+    "h_W_m2K": 32.515862,
+    "wetted_mm2": 1800.35994
+   },
+   "35": {
+    "h_W_m2K": 32.232758,
+    "wetted_mm2": 1800.35994
+   },
+   "37": {
+    "h_W_m2K": 27.042865,
+    "wetted_mm2": 1800.35994
+   }
+  },
   "_figures": [
    [
     "temperature",
-    "Heat sink temperature with the hottest point marked"
+    "The part's temperature with the hottest point marked"
    ],
    [
-    "air",
-    "Air between two fins, warming from the inlet on the left"
+    "pressure",
+    "Pressure on the part's walls"
    ],
    [
-    "fan",
-    "Where the fan curve meets the heat sink"
+    "velocity",
+    "Speed through the flow"
    ]
   ]
  },
  "images": {
-  "temperature": "images/temperature.png",
-  "air": "images/air.png",
-  "fan": "images/fan.png"
+  "temperature": "heat/images/temperature.png",
+  "pressure": "flow/images/pressure.png"
  },
  "fixes": [],
- "notes": [],
+ "notes": [
+  "Built from heatsink.py with base=6, size=60, fins=9, fin=1.5, fin_height=30.",
+  "Built from heatsink.py with base=6, size=60, fins=9, fin=1.5, fin_height=30."
+ ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 325.562211,
- "solver": "OpenFOAM v2412 and CalculiX 2.23"
+ "t_total": 750.098372,
+ "solver": "OpenFOAM v2412, snappyHexMesh and simpleFoam and CalculiX 2.23",
+ "criteria": [
+  {
+   "name": "temperature",
+   "value": "t_max_C",
+   "limit": 85.0,
+   "sense": "max"
+  }
+ ]
 }

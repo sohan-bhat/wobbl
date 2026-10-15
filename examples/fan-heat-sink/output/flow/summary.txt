@@ -1,0 +1,29 @@
+OK. The fan curve meets the part at 232 L/min and 3.58 Pa. 232 L/min of air loses 4.05 Pa past the part in its duct (turbulent, Re 6361).
+
+Confidence: low. grid convergence failed: pressure drop 3.539 -> 3.868 -> 4.045 Pa over 3 grids, grid convergence index 32% (observed order 2, extrapolated 4.473 Pa), so the grid is too coarse for this answer; residuals: largest final residual 0.0032 (k), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly; wall resolution: y+ on the walls averages 6.53, at most 11.3, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent; operating point: the curve gives 3.58 Pa at 232 L/min, and the fine grid needs 4.05 Pa there (13% apart), so the coarse grid's fit set the flow a little off
+pressure drop: 4.05 Pa
+flow: 232 L/min
+inlet velocity: 1.79 m/s
+Reynolds number: 6361
+pumping power: 0.0157 W
+
+Checks:
+  [pass] mesh quality: 102,204 cells, worst non orthogonality 37 degrees and skewness 0.39
+  [fail] grid convergence: pressure drop 3.539 -> 3.868 -> 4.045 Pa over 3 grids, grid convergence index 32% (observed order 2, extrapolated 4.473 Pa), so the grid is too coarse for this answer
+  [pass] iterative convergence: pressure drop swings 0.0063% over the last fifth of 153 iterations
+  [pass] mass conservation: in 0.00387 m3/s, out 0.00387 m3/s (9.5e-06% apart)
+  [warn] residuals: largest final residual 0.0032 (k), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly
+  [warn] wall resolution: y+ on the walls averages 6.53, at most 11.3, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent
+  [pass] flow regime: Re 6361 on the inlet's hydraulic diameter, turbulent
+  [info] hand calculation: a straight smooth duct of the same 60 mm hydraulic diameter and 60 mm length loses 0.0634 Pa by Colebrook, and the part loses 4.05 Pa, 63.86 times that, the rest from turns, junctions and changes of section
+  [warn] operating point: the curve gives 3.58 Pa at 232 L/min, and the fine grid needs 4.05 Pa there (13% apart), so the coarse grid's fit set the flow a little off
+
+Assumptions:
+  - Air at 40 C, density 1.127 kg/m3, viscosity 1.907e-05 Pa s, conductivity 0.0272 W/(m K), Prandtl 0.704.
+  - The stream runs along (+0.00, +1.00, +0.00) in the part's coordinates.
+  - The part has no passage of its own, so it sits in a duct of its own cross section, the way a shroud carries a fan's air through a heat sink.
+  - Steady, incompressible flow with the k omega SST turbulence model and blended wall functions.
+  - Meshed by snappyHexMesh with 102,204 cells on the finest of 3 grids, without boundary layer cells.
+
+Images: pressure: images/pressure.png, error: z array must not contain non-finite values within the triangulation
+Report: report.html
