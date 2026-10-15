@@ -20,8 +20,9 @@ const all = examples();
         // the first number among the headline figures, so a card never shows a bare word
         const [, v] = metrics(r).find(([, x]) => /\d/.test(x)) ?? metrics(r)[0];
         return (
-          <li><a class="ex-card" href={url(`examples/${ex.name}/`)}>
+          <li class="ex-card">
             <RunImage run={r} sizes="(min-width: 1100px) 300px, (min-width: 720px) 45vw, 100vw" compact />
+            <a class="ex-link" href={url(`examples/${ex.name}/`)}>
             <span class="ex-cat">{ex.domain}</span>
             <span class="ex-title">{ex.title}</span>
             <span class="ex-sub">{ex.subtitle || r.question}</span>

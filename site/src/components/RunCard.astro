@@ -7,6 +7,8 @@ import { COLOR, metrics, type Run } from '../lib/examples';
 import { meters, mps, secs } from '../scripts/flight-format';
 import { url } from '../lib/site';
 import { hasSim } from '../lib/sim';
+import { sceneFor } from '../lib/scenes';
+import SceneView from './SceneView.astro';
 interface Props { run: Run }
 const { run } = Astro.props;
 const checks = (run.outcome.checks ?? []).filter((c) => c.status !== 'skip');
@@ -17,9 +19,12 @@ const flightEvents = events.every((e) => e.alt_m !== undefined);
 // what the model holds: a motion run's effects, or a mechanism's bodies, joints and freedoms
 const held = model?.effects ?? (model?.bodies ? [`${model.bodies} bodies`, `${model.joints} joints`,
   `${model.degrees_of_freedom} degrees of freedom`] : []);
+// a run with a 3D scene shows it across the whole width, above the question and the result
+const scene = sceneFor(run.rel);
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 ---
-<div class:list={['run', { 'run-live': hasSim(run) }]}>
+<div class:list={['run', { 'run-live': hasSim(run) && !scene, 'run-3d': scene }]}>
+  {scene && <div class="run-scene"><SceneView rel={run.rel} /></div>}
   <div class="run-steps">
     <div class="run-step"><p class="run-label">You ask</p><p class="run-ask">{run.question}</p></div>
     <div class="run-step"><p class="run-label">Wobbl runs</p><Term code={run.command} /></div>
@@ -63,7 +68,7 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
     )}
   </div>
   <div class="run-result">
-    <RunImage run={run} sizes="(min-width: 1000px) 46vw, 100vw" controls />
+    {!scene && <RunImage run={run} sizes="(min-width: 1000px) 46vw, 100vw" controls />}
     <p class="run-verdict"><span class="vword" data-verdict={COLOR[run.outcome.verdict] ?? 'marginal'}>{run.outcome.verdict.toUpperCase()}</span><samp class="run-said" translate="no">{run.outcome.headline}</samp></p>
     <dl class="readout">{metrics(run).map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
     {sugg.length > 0 && (

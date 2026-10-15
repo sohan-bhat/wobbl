@@ -1,0 +1,15 @@
+---
+// A run's scene.wobbl, played live in Wobbl's viewer once it is near the screen (see scripts/scenes.ts).
+// card: a quiet view for the example cards, with only the moving scene and no controls.
+import { sceneFor, viewerSrc } from '../lib/scenes';
+interface Props { rel: string; card?: boolean; label?: string }
+const { rel, card = false, label } = Astro.props;
+const s = sceneFor(rel)!;
+---
+<div class:list={['scene', { 'scene-card': card }]} data-scene={s.src} data-viewer={viewerSrc()} data-mode={card ? 'card' : 'full'}
+     role={card ? 'img' : undefined} aria-label={card ? `${label ?? s.title}, a live 3D scene of the run` : undefined}>
+  <div class="scene-wait" aria-hidden="true"><span>{s.title}</span><span>Live 3D scene of the run</span></div>
+</div>
+<script>
+  import '../scripts/scenes';
+</script>

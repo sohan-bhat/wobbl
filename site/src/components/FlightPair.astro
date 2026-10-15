@@ -3,6 +3,8 @@
 // ran it over its playback, read from the example's own outputs and linked to its page.
 import Term from './Term.astro';
 import FlightSim from './FlightSim.astro';
+import SceneView from './SceneView.astro';
+import { sceneFor } from '../lib/scenes';
 import { findRun } from '../lib/examples';
 import { url } from '../lib/site';
 interface Props { rels: string[] }
@@ -30,7 +32,12 @@ function narrow(cmd: string): string {
   {sides.map(({ ex, run }) => (
     <div class="flight">
       <Term code={narrow(run.command)} />
-      <FlightSim run={run} name={{ label: ex.title, href: url(`examples/${ex.name}/`) }} />
+      {sceneFor(run.rel) ? (
+        <div class="flight-scene">
+          <SceneView rel={run.rel} />
+          <p class="flight-link"><a href={url(`examples/${ex.name}/`)}>{ex.title}</a></p>
+        </div>
+      ) : <FlightSim run={run} name={{ label: ex.title, href: url(`examples/${ex.name}/`) }} />}
     </div>
   ))}
 </div>
