@@ -20,7 +20,8 @@ from dataclasses import dataclass, field
 from ..structural.budget import BACKSTOP, mesh_cost
 
 DEFAULT_BUDGET = 1500.0      # s, the time the two levels together may be predicted to take
-ITER_S = 1.0e-4              # s per Newton iteration per node^1.3
+ITER_S = 1.0e-4              # s per Newton iteration per node^1.3, bolted joints (a flange: 8e-5 to 9e-5)
+CONTACT_ITER_S = 2.0e-4      # the same for pressed faces without bolts, which iterate on a heavier contact (1e-4 to 2.5e-4)
 POWER = 1.3
 CONTACT_ITERS = 40           # iterations of a pressed assembly loaded in one step
 # What can be given up, finest first: (factor on the element size, elements per circle round curves). Round holes
@@ -30,9 +31,9 @@ FINEST = 0.87                # the second level is at least this fraction of the
 SLACK = 0.85                 # the second level may use this share of what the budget has left
 
 
-def solve_seconds(nodes: float, iterations: float, pairs: int = 1) -> float:
+def solve_seconds(nodes: float, iterations: float, pairs: int = 1, iter_s: float = ITER_S) -> float:
     """Modeled seconds of one nonlinear solve with its result reading."""
-    return 2.0 + ITER_S * iterations * nodes ** POWER * (1.0 + 0.04 * max(0, pairs - 1))
+    return 2.0 + iter_s * iterations * nodes ** POWER * (1.0 + 0.04 * max(0, pairs - 1))
 
 
 @dataclass
@@ -50,6 +51,7 @@ class Plan:
     user_size: bool = False
     iterations: float = CONTACT_ITERS
     pairs: int = 1
+    iter_s: float = ITER_S
     spent: float = 0.0
     budget: float = DEFAULT_BUDGET
     notes: list = field(default_factory=list)
@@ -70,12 +72,12 @@ class Plan:
 
 def _predict(plan: Plan, sizings, est, ratio: float) -> tuple[list, list]:
     nodes = [e * ratio for e in est]
-    sec = [mesh_cost(n) + solve_seconds(n, plan.iterations, plan.pairs) for n in nodes]
+    sec = [mesh_cost(n) + solve_seconds(n, plan.iterations, plan.pairs, plan.iter_s) for n in nodes]
     return nodes, sec
 
 
 def fit(asm, make, h_auto: float, h_user: float | None, budget: float, iterations: float, pairs: int, say=None,
-        mesh_fn=None) -> Plan:
+        mesh_fn=None, iter_s: float = ITER_S) -> Plan:
     """Choose the element size. ``make(h)`` gives the two sizings for a first level of size h. The first level is
     meshed for real, the second is estimated from it, and the size is coarsened until both levels are predicted to
     fit the budget."""
@@ -84,7 +86,7 @@ def fit(asm, make, h_auto: float, h_user: float | None, budget: float, iteration
 
     say = say or (lambda a, b: None)
     mesh_fn = mesh_fn or build_assembly_mesh
-    plan = Plan([], [], user_size=bool(h_user), iterations=iterations, pairs=pairs, budget=budget)
+    plan = Plan([], [], user_size=bool(h_user), iterations=iterations, pairs=pairs, budget=budget, iter_s=iter_s)
     base = float(h_user or h_auto)
     rungs = RUNGS[:1] if h_user else RUNGS
     k = 0
@@ -97,7 +99,7 @@ def fit(asm, make, h_auto: float, h_user: float | None, budget: float, iteration
         est = [estimate_nodes(asm.prep, s) for s in sizings]
         nodes, sec = _predict(plan, sizings, est, ratio)
         nodes[0] = mesh0.n_nodes
-        sec[0] = mesh_cost(nodes[0]) + solve_seconds(nodes[0], iterations, pairs)
+        sec[0] = mesh_cost(nodes[0]) + solve_seconds(nodes[0], iterations, pairs, iter_s)
         plan.sizings, plan.h, plan.nodes, plan.seconds, plan.ratio, plan.rung = sizings, [s.h for s in sizings], \
             nodes, sec, ratio, f
         plan.curv, plan.rung_index = curv, k
@@ -126,14 +128,15 @@ def second_level(plan: Plan, asm, make, t_first: float, n_first: int, iters_firs
 
     mesh_fn = mesh_fn or build_assembly_mesh
     plan.spent += t_first + mesh_cost(n_first)
-    modeled = solve_seconds(n_first, max(iters_first, 1), plan.pairs)
+    modeled = solve_seconds(n_first, max(iters_first, 1), plan.pairs, plan.iter_s)
     scale = min(max(t_first / max(modeled, 1e-9), 0.3), 6.0) if t_first > 0 else 1.0
     left = SLACK * (plan.budget - plan.spent)
     h0 = plan.h[0]
     for q in (0.75, 0.82, FINEST):          # the ladder from the usual refinement to the least refinement
         sizing = make(h0, q, plan.curv)[1]
         mesh = mesh_fn(asm, sizing)
-        cost = mesh_cost(mesh.n_nodes) + scale * solve_seconds(mesh.n_nodes, max(iters_first, 1), plan.pairs)
+        cost = mesh_cost(mesh.n_nodes) + scale * solve_seconds(mesh.n_nodes, max(iters_first, 1), plan.pairs,
+                                                               plan.iter_s)
         if cost <= left:
             break
     plan.sizings[1], plan.h[1], plan.nodes[1], plan.seconds[1] = sizing, sizing.h, mesh.n_nodes, cost

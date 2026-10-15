@@ -89,7 +89,7 @@ def run_contact(study: ContactStudy, out_dir: str | Path, progress=None, asm: As
         return level_sizes(asm, study, h, refine, curv)
 
     plan = BUD.fit(asm, make, s0.h, study.mesh_size, study.budget, CONTACT_ITERS * (1 + bool(moves)),
-                   len(asm.pairs), say)
+                   len(asm.pairs), say, iter_s=BUD.CONTACT_ITER_S)
     for k in range(2):
         if k == 1:
             mesh1 = BUD.second_level(plan, asm, make, levels[0]["t_solve"], levels[0]["n_nodes"],
