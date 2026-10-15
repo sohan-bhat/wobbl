@@ -1,0 +1,242 @@
+{
+ "domain": "antenna",
+ "part": "dipole",
+ "question": "dipole. Is this 58 mm dipole tuned for 2.4 GHz, and does the link reach across a 25 m office?",
+ "verdict": "ok",
+ "headline": "The 58 mm dipole resonates at 2395 MHz (-1.8% from 2440 MHz), with 77.5 + j11.5 ohm and S11 of -12.6 dB against 50 ohm at 2440 MHz. Peak gain 2.14 dBi. At 25 m the median received power is -67.4 dBm, 24.6 dB above the -92 dBm sensitivity, and the link holds out to 61.8 m in 90% of spots and 165 m in half of them (office).",
+ "metrics": [
+  [
+   "resonance",
+   "2395 MHz"
+  ],
+  [
+   "S11",
+   "-12.6 dB"
+  ],
+  [
+   "impedance",
+   "77.5 + j11.5 ohm"
+  ],
+  [
+   "gain",
+   "2.14 dBi"
+  ],
+  [
+   "range, 90%",
+   "61.8 m"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "the range comes from an empirical path loss model with 10 dB of shadowing"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "input impedance magnitude settled: 78.3 -> 78.4 ohm over 2 meshes, last change 0.1%",
+   "detail": {
+    "values": [
+     78.333353,
+     78.395491
+    ],
+    "last_change": 0.000793,
+    "tolerance": 0.01,
+    "stopped_by": "two meshes"
+   }
+  },
+  {
+   "name": "boundary distance",
+   "status": "pass",
+   "summary": "moving the absorbing boundary half again as far out changes the impedance from 77.5 + j11.4 ohm to 77.4 + j11.6 ohm (0.31%)",
+   "detail": {}
+  },
+  {
+   "name": "power balance",
+   "status": "pass",
+   "summary": "power fed in at the gap 12.6 mW, power leaving through the outer boundary 12.6 mW (5.4e-08% apart)",
+   "detail": {}
+  },
+  {
+   "name": "pattern power",
+   "status": "pass",
+   "summary": "the radiation integral of the current along the wire gives 24.6 mW against 25.3 mW fed to the full dipole (2.7% apart)",
+   "detail": {}
+  },
+  {
+   "name": "closed form",
+   "status": "pass",
+   "summary": "resonance at 2395 MHz with 72.8 ohm, against 73.1 ohm for a thin half wave dipole (0.35% apart). Induced EMF theory puts this length at 61.9 + j4.68 ohm at 2440 MHz, the field solve 77.5 + j11.4 ohm",
+   "detail": {
+    "induced_emf_ohm": [
+     61.948082,
+     4.679008
+    ]
+   }
+  },
+  {
+   "name": "free space bound",
+   "status": "pass",
+   "summary": "the office model's median range 165 m is within the free space limit 2016 m",
+   "detail": {}
+  },
+  {
+   "name": "link uncertainty",
+   "status": "info",
+   "summary": "shadow fading of 10 dB moves the range from 165 m (half the spots) to 61.8 m (90% of spots), and a power loss coefficient 3 lower or higher gives 104 to 291 m",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Solved with the axisymmetric model, no 3D solve was needed. A straight wire is a body of revolution, so the axisymmetric full wave solve is exact for it. Give a finite ground plate or put the antenna near something and it is solved in 3D.",
+  "Center fed dipole in free space, wire diameter 1 mm, fed across a 1 mm gap (delta gap).",
+  "Axisymmetric full wave solve, and the outer boundary absorbs outgoing waves to first order.",
+  "Copper conductor loss from the skin effect, 0.15% of the power. No feed line, balun or nearby objects.",
+  "Path loss from the ITU-R P.1238 site general indoor model (power loss coefficient 30, 10 dB shadow fading, for a typical office) at 2440 MHz.",
+  "Link budget 10.0 dBm out, 2.14 dBi and 2.14 dBi antennas, 0.0 dB of other losses, -92.0 dBm sensitivity, and a fading margin of 12.8 dB for 90% of spots."
+ ],
+ "values": {
+  "freqs_Hz": [
+   1830000000.0,
+   1952000000.0,
+   2074000000.0,
+   2196000000.0,
+   2318000000.0,
+   2440000000.0,
+   2562000000.0,
+   2684000000.0,
+   2806000000.0,
+   2928000000.0,
+   3050000000.0
+  ],
+  "z_ohm": [
+   [
+    31.154087,
+    -152.066904
+   ],
+   [
+    37.729463,
+    -117.099808
+   ],
+   [
+    45.209981,
+    -83.962011
+   ],
+   [
+    53.930923,
+    -51.438189
+   ],
+   [
+    64.833726,
+    -19.643165
+   ],
+   [
+    77.496975,
+    11.416348
+   ],
+   [
+    92.595884,
+    42.884943
+   ],
+   [
+    111.511588,
+    74.176472
+   ],
+   [
+    133.943193,
+    104.979881
+   ],
+   [
+    161.290613,
+    136.244485
+   ],
+   [
+    195.642755,
+    166.276959
+   ]
+  ],
+  "s11_dB": [
+   -1.022184,
+   -1.887377,
+   -3.576416,
+   -7.035421,
+   -13.502681,
+   -12.668301,
+   -7.831063,
+   -5.317036,
+   -3.949276,
+   -3.101254,
+   -2.554733
+  ],
+  "resonance_Hz": 2395157234.266838,
+  "z_resonance_ohm": [
+   72.842425,
+   0.0
+  ],
+  "z_at_f0_ohm": [
+   77.54474,
+   11.518087
+  ],
+  "s11_at_f0_dB": -12.647901,
+  "bandwidth_Hz": 122000000.0,
+  "directivity_dBi": 2.150193,
+  "gain_dBi": 2.143531,
+  "efficiency": 0.998467,
+  "induced_emf_ohm": [
+   61.948082,
+   4.679008
+  ],
+  "nodes": [
+   2313,
+   4219
+  ],
+  "range_median_m": 165.186873,
+  "range_reliable_m": 61.769706,
+  "range_free_space_m": 2016.388158,
+  "link_budget_dB": 106.287063,
+  "sigma_dB": 10.0,
+  "reliability": 0.9,
+  "environment": "office",
+  "params": {
+   "frequency": "2.44GHz",
+   "length": "58mm",
+   "diameter": "1mm",
+   "points": "11",
+   "tx_power": "10dBm",
+   "sensitivity": "-92dBm",
+   "environment": "office",
+   "distance": "25m"
+  },
+  "_figures": [
+   [
+    "s11",
+    "S11 over the sweep"
+   ],
+   [
+    "impedance",
+    "Input impedance"
+   ],
+   [
+    "pattern",
+    "Elevation pattern"
+   ],
+   [
+    "range",
+    "Received power over distance"
+   ]
+  ]
+ },
+ "images": {
+  "s11": "images/s11.png",
+  "impedance": "images/impedance.png",
+  "pattern": "images/pattern.png",
+  "range": "images/range.png"
+ },
+ "fixes": [],
+ "notes": [],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 32.105684,
+ "solver": "GetDP 3.5.0 with gmsh",
+ "criteria": []
+}

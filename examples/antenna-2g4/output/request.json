@@ -1,0 +1,28 @@
+{
+ "domain": "field",
+ "analysis": "antenna",
+ "spec": {
+  "thing": "dipole",
+  "kind": "dipole",
+  "question": "Is this 58 mm dipole tuned for 2.4 GHz, and does the link reach across a 25 m office?",
+  "options": {
+   "set": [
+    "frequency=2.44GHz",
+    "length=58mm",
+    "diameter=1mm",
+    "points=11",
+    "tx_power=10dBm",
+    "sensitivity=-92dBm",
+    "environment=office",
+    "distance=25m"
+   ],
+   "frequency": [
+    "2.4 GHz"
+   ],
+   "template": [
+    "dipole"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

@@ -1,0 +1,44 @@
+{
+ "thing": "dipole",
+ "question": "Is this 58 mm dipole tuned for 2.4 GHz, and does the link reach across a 25 m office?",
+ "plan": {
+  "thing": "dipole",
+  "question": "Is this 58 mm dipole tuned for 2.4 GHz, and does the link reach across a 25 m office?",
+  "domain": "field",
+  "kind": "dipole",
+  "analyses": [
+   "antenna"
+  ],
+  "reasons": [
+   {
+    "decided": "the words \"dipole\", \"2.4 GHz\" point to field (dipole)",
+    "override": "--domain field"
+   },
+   {
+    "decided": "physics antenna, as asked",
+    "override": "--physics antenna"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "field",
+    "score": 4
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {},
+ "steps": [
+  {
+   "analysis": "antenna",
+   "domain": "field",
+   "verdict": "ok",
+   "headline": "The 58 mm dipole resonates at 2395 MHz (-1.8% from 2440 MHz), with 77.5 + j11.5 ohm and S11 of -12.6 dB against 50 ohm at 2440 MHz. Peak gain 2.14 dBi. At 25 m the median received power is -67.4 dBm, 24.6 dB above the -92 dBm sensitivity, and the link holds out to 61.8 m in 90% of spots and 165 m in half of them (office).",
+   "confidence": "medium",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": []
+  }
+ ]
+}
