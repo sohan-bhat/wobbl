@@ -24,6 +24,7 @@ EDGE_CELLS = 12.4                 # nodes per element length of a copper sheet's
 WIRE_CELLS = 24.4                 # nodes per element length of a thin wire, for the fine skirt that grows around it
 CPU_AT_100K = 175.0               # cpu seconds for one frequency (solve and field sampling) at 100 thousand unknowns
 EXPONENT = 1.4
+FREQUENCY_CPU = 40.0              # cpu seconds a frequency costs besides the solve: reading and integrating the fields
 MESH_CPU_PER_NODE = 4.0e-3        # cpu seconds a node costs to mesh
 SPEEDUP = 2.0                     # wall time shrinks by this much on the threads a solve gets
 BYTES_PER_UNKNOWN = 18_000        # peak memory of a direct solve, per unknown at 100 thousand (about 0.8 GB at 49 thousand)
@@ -78,7 +79,7 @@ def nodes_from(inp: dict) -> float:
 
 
 def solve_cpu(unknowns: float) -> float:
-    return CPU_AT_100K * (unknowns / 1e5) ** EXPONENT
+    return CPU_AT_100K * (unknowns / 1e5) ** EXPONENT + FREQUENCY_CPU
 
 
 def mesh_cpu(nodes: float) -> float:
