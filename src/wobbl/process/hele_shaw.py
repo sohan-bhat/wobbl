@@ -375,4 +375,21 @@ def weld_lines(mesh: Mesh, t_fill: np.ndarray, angle: float = 135.0) -> np.ndarr
         d = u[els] @ u[els].T
         if d.min() < cos_a:
             weld.append(i)
-    return np.array(weld, dtype=int)
+    return _connected(mesh, np.array(weld, dtype=int))
+
+
+def _connected(mesh: Mesh, weld: np.ndarray, reach: float = 2.5) -> np.ndarray:
+    """Keep the weld nodes that have another within a couple of mesh edges. Two fronts meeting leave a line of
+    nodes, while one node alone is the noise of a poor element where the fill time is nearly flat, which differs
+    from one mesher to the next."""
+    if len(weld) < 2:
+        return weld
+    from scipy.spatial import cKDTree
+
+    t = mesh.tets
+    edge = np.median(np.linalg.norm(mesh.X[t[:, 0]] - mesh.X[t[:, 1]], axis=1))
+    near = cKDTree(mesh.X[weld]).query_ball_point(mesh.X[weld], reach * edge)
+    # a copy of the node on the other face of the plate is not a neighbor along the line
+    have = np.array([any(np.linalg.norm(mesh.X[weld[j]][:2] - mesh.X[w][:2]) > 1e-9 for j in nb)
+                     for w, nb in zip(weld, near)])
+    return weld[have]
