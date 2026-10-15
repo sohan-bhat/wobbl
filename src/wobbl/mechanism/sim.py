@@ -410,7 +410,8 @@ def simulate(m: Mechanism, timestep: float | None = None, end: float | None = No
                 "mass_kg": total_mass, "late_samples": nlate, "final_qpos": d.qpos.copy(),
                 "final_contacts": last_contacts,
                 "com": d.subtree_com[0].copy(), "gravity": model.opt.gravity.copy(),
-                "geoms": _geom_table(model, gname)}, _quats(mujoco, pose_t, pose_x, pose_m))
+                "geoms": _geom_table(model, gname),
+                "drives": {dr.joint: mot for dr, _, mot, _ in drives if mot is not None}}, _quats(mujoco, pose_t, pose_x, pose_m))
 
 
 def _assemble(model, d, held: list[int], tol: float = 1e-9, max_steps: int = 20000):

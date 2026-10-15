@@ -72,9 +72,10 @@ def with_(m: Mechanism, **changes) -> Mechanism:
 
 
 def _registry():
-    from . import arm, gears, impacts, linkage
+    from . import arm, drive, gears, impacts, linkage
 
-    return {"pendulum": pendulum, "arm": arm.answer, "fourbar": linkage.answer, "gears": gears.answer,
+    return {"pendulum": pendulum, "arm": arm.answer, "fourbar": linkage.answer, "slider": drive.slider_answer,
+            "gears": gears.answer,
             "impact": impacts.impact, "tip": impacts.tip}
 
 

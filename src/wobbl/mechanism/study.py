@@ -60,6 +60,7 @@ class Answer:
     run: Run | None = None                 # the run the trajectory table comes from
     extra: list[tuple[str, str]] = field(default_factory=list)      # (level, reason) for the confidence
     model: dict = field(default_factory=dict)
+    kin: tuple | None = None               # (mechanism, run) of a slow ideal drive, where the drive checks reuse it
 
 
 def event(name: str, t: float, detail: str = "") -> dict:
@@ -216,7 +217,7 @@ def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome")
     t = P["t"]
     keep = np.arange(len(t))
     geoms = run.model_info["geoms"]
-    drives = {d.joint: d.at_joint for d in mech.drives if d.motor is not None}
+    drives = run.model_info.get("drives") or {d.joint: d.at_joint for d in mech.drives if d.motor is not None}
 
     def at(series):
         return np.interp(t[keep], run.t, series)
@@ -253,6 +254,17 @@ def write_playback(path: Path, run: Run, mech: Mechanism, o: "MechanismOutcome")
         extra = {}
         if any(not c["support"] for c in run.contacts.values()):
             extra["contact force"] = {"unit": "N", "values": r(at(run.peak_force), 3)}
+        for j, mot in drives.items():
+            c = run.joints.index(j)
+            w_j = at(run.v[:, c])
+            slide = j in {x.name for x in mech.joints if x.kind == "slide"}
+            extra[f"{j} speed"] = {"unit": "mm/s" if slide else "rpm",
+                                   "values": r(w_j * (1000 if slide else 60 / (2 * math.pi)), 3)}
+            amps = mot.current(at(run.tau[:, c]))
+            if amps is not None:
+                extra[f"{j} current"] = {"unit": "A", "values": r(amps, 4)}
+                if mot.voltage > 0:
+                    extra[f"{j} electrical power"] = {"unit": "W", "values": r(mot.voltage * amps, 3)}
         for f in run.free.values():
             extra[f"{f['body']} tilt"] = {"unit": "deg", "values": r(at(f["tilt"]), 3)}
         dur = float(t[-1] - t[0]) if len(t) > 1 else 0.0
@@ -326,7 +338,7 @@ def load_target(target: str, params: dict) -> Mechanism:
 
 
 def run_mechanism(target: str, params: dict | None, out_dir: str | Path, question: str = "",
-                  progress=None) -> MechanismOutcome:
+                  progress=None, drive: bool = False) -> MechanismOutcome:
     """Build, run, check and write a mechanism study: outcome.json, summary.txt, report.html, trajectory.csv,
     model.xml and the pictures."""
     from . import general
@@ -345,7 +357,7 @@ def run_mechanism(target: str, params: dict | None, out_dir: str | Path, questio
         b = template(target, params)
         mech, part = b.mech, b.kind
         say("solve", f"MuJoCo {mj.__version__}, {b.kind}")
-        a = ANALYSES[b.kind](b, out / "images", say)
+        a = ANALYSES[b.kind](b, out / "images", say, **({"drive": True} if drive else {}))
     else:
         mech = load_target(target, params)
         part = str(Path(target).resolve())

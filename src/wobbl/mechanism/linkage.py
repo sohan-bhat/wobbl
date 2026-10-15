@@ -31,7 +31,7 @@ def _wrap(x):
     return np.mod(np.asarray(x) + math.pi, 2 * math.pi) - math.pi
 
 
-def answer(b, img: Path, say) -> Answer:
+def answer(b, img: Path, say, drive: bool = False) -> Answer:
     info, m = b.info, b.mech
     d, a, bl, c = info["lengths"]
     t2s, t3s, t4s = info["start"]
@@ -196,8 +196,13 @@ def answer(b, img: Path, say) -> Answer:
               "grashof": info["grashof"], "full_turn": full, "freudenstein_error_deg": perr,
               "peak_torque_Nm": peak, "rms_torque_Nm": rms,
               "mean_crank_rpm": w_mean * 60 / (2 * math.pi) if w_mean is not None else None, "stalled": stalled}
-    return Answer(verdict, head, metrics, checks, assumptions, values, fixes, events, figs, images, run,
-                  model=model_info(m, run))
+    a = Answer(verdict, head, metrics, checks, assumptions, values, fixes, events, figs, images, run,
+               model=model_info(m, run), kin=(kin, kr))
+    if drive:
+        from . import drive as D
+
+        D.extend(a, b, "crank", "rocker")
+    return a
 
 
 def _reach(d, a, b, c, t2s) -> tuple[float, float]:

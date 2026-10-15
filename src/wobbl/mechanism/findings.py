@@ -59,6 +59,7 @@ class Finding:
     assumptions: list[str] = field(default_factory=list)
     extra: list[tuple[str, str]] = field(default_factory=list)
     run: object = None
+    kin: object = None                    # the slow ideal run and the mechanism it ran, for checks that reuse it
 
 
 def motor_from_limits(joint: str, effort: float, speed: float, source: str) -> Motor:
