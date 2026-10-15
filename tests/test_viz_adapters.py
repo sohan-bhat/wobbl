@@ -87,6 +87,32 @@ def test_crack_fronts(tmp_path):
     assert h["verdict"]["tone"] == "fail" and any(o.get("name") == "crack face" for o in h["objects"])
 
 
+def test_crack_load_label_and_view(tmp_path):
+    from types import SimpleNamespace
+    from wobbl.structural.spec import Load
+    from wobbl.viz.adapters import fracture
+    V, F = grid_mesh()
+    steps = [{"step": i, "size_mm": 1 + i, "cycles": 1000.0 * i, "k_lead": 5 + i,
+              "fronts": [{"xyz": np.c_[np.linspace(0, 1 + i, 5), np.zeros(5), np.full(5, 1.0)].tolist(),
+                          "k": np.full((5, 3), 5.0 + i).tolist()}]} for i in range(4)]
+    from wobbl.fracture.playback import write
+    write(tmp_path / "playback.json", part={"vertices": V.tolist(), "triangles": F.tolist(), "edge_vertices": [],
+                                            "edges": []},
+          origin=[5, 5, 1], normal=[0, 1, 0], steps=steps, starts=[[[0, 0, 1], [0.5, 0, 1]]],
+          growth=([1, 2], [0, 1000]), lives=np.array([1e4, 2e4]), percentiles={"B10": 1e4}, target=None, pof=None,
+          inspection={}, verdict="fails", headline="It cracks through.", material="6061", spectrum="", end="edge")
+    outcome(tmp_path, "crack", "fails")
+    run = SimpleNamespace(mesh=SimpleNamespace(X=V), study=SimpleNamespace(loads=[Load("force", magnitude=250.0)], fixtures=[]),
+                          selections={})
+    pb = json.loads((tmp_path / "playback.json").read_text())
+    fracture.build(tmp_path, pb, run=run, outcome={"question": ""})
+    h, _ = load(tmp_path / "scene.wobbl")
+    names = {r["name"]: r for r in h["readouts"]}
+    assert names["load"]["unit"] == "N" and names["load"]["values"][0] == 250.0
+    assert "front outline" in {o.get("name") for o in h["objects"]}
+    assert len(h["camera"]["target"]) == 3 and h["camera"]["dist"] > 0
+
+
 def test_examples_with_playback(tmp_path):
     import shutil
     for name in ("wiper-linkage", "propane-flame", "strut-buckling", "cell-runaway"):

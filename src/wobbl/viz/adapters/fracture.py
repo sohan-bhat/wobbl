@@ -14,6 +14,8 @@ from ..scene import Scene
 from .common import read
 
 FORMAT = "wobbl-crack-playback"
+# the start distance, in half diagonals of the part, from the crack region: near enough to see the crack
+CRACK_VIEW = 3.6
 
 
 def _resample(p: np.ndarray, n: int) -> np.ndarray:
@@ -87,6 +89,11 @@ def build(out: Path, pb: dict, run=None, outcome: dict | None = None) -> Path | 
     face.reveal(W, cyc)
     s.lines(rings, values=kvals, field="stress intensity K I", unit="MPa sqrt(m)", width=2.5, at=when, fade=True,
             name="fronts")
+    # the crack is a sliver on a large part, so the outline of each front is drawn bright over the colored one
+    s.lines(rings, color="#ffd400", width=4, at=when, fade=True, name="front outline")
+    # the view starts on the crack and keeps most of the part in frame, rather than the whole part at its far fit
+    r = 0.5 * float(np.linalg.norm(np.ptp(X, axis=0)))
+    s.camera(target=rings[-1].mean(0), distance=CRACK_VIEW * r)
     if run is not None:
         _setting(s, run, X, o, len(cyc))
     g = pb.get("growth", {})
@@ -118,5 +125,10 @@ def _setting(s: Scene, run, X: np.ndarray, o: dict, n: int) -> None:
     total = sum(float(ld.magnitude) for ld in run.study.loads if ld.kind in ("force", "remote", "bolt"))
     supports(s, run, run.mesh.X, size, words)
     load_props(s, run, run.mesh.X, size, np.ones(n), words)
+    # the load arrows read "{load}", so the readout has that name; the peak load is what the study was given
     if total > 0:
-        s.readout("peak load", np.full(n, total), unit="N", digits=4)
+        s.readout("load", np.full(n, total), unit="N", digits=4)
+    else:
+        press = [float(ld.magnitude) for ld in run.study.loads if ld.kind == "pressure"]
+        if press:
+            s.readout("load", np.full(n, max(press)), unit="MPa", digits=4)
