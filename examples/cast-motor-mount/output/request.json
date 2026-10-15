@@ -1,0 +1,27 @@
+{
+ "domain": "part",
+ "analysis": "stress",
+ "spec": {
+  "thing": "src/wobbl/validation/parts/cast_motor_mount.step",
+  "kind": "step",
+  "question": "Does this cast motor mount meet our safety factor 2 rule under a 2 kN emergency stop belt pull?",
+  "options": {
+   "target-sf": [
+    "2"
+   ],
+   "budget": [
+    "600"
+   ],
+   "material": [
+    "custom:E=72400,nu=0.33,yield=165,process=cast"
+   ],
+   "load": [
+    "2000 N -0.8660254,0,-0.5 at 0,-30,66 @ holes d=6.6"
+   ],
+   "fix": [
+    "fixed z=min"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

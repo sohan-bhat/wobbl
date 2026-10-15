@@ -301,8 +301,8 @@
    "n_elems": 48295,
    "h_global": 5.96652,
    "h_min": 1.159223,
-   "t_mesh": 6.863766,
-   "t_solve": 28.375181,
+   "t_mesh": 12.614813,
+   "t_solve": 77.417093,
    "governing": 122.178602,
    "governing_xyz": [
     43.78021,
@@ -349,8 +349,8 @@
    "n_elems": 55613,
    "h_global": 5.071542,
    "h_min": 0.627539,
-   "t_mesh": 8.173015,
-   "t_solve": 42.677945,
+   "t_mesh": 20.645662,
+   "t_solve": 94.254052,
    "governing": 123.57253,
    "governing_xyz": [
     43.857835,
@@ -397,8 +397,8 @@
    "n_elems": 63469,
    "h_global": 4.310811,
    "h_min": 0.302432,
-   "t_mesh": 8.335474,
-   "t_solve": 36.229714,
+   "t_mesh": 16.637088,
+   "t_solve": 144.956397,
    "governing": 123.695449,
    "governing_xyz": [
     43.857835,
@@ -2993,7 +2993,8 @@
  "notes": [
   "Thin walls need a large first mesh (88,155 nodes), so this study takes longer than usual.",
   "3 curved elements folded on thin walls, so this mesh uses straight sided second order elements.",
-  "1 curved elements folded on thin walls, so this mesh uses straight sided second order elements."
+  "1 curved elements folded on thin walls, so this mesh uses straight sided second order elements.",
+  "Wobbl tried a shell model of the thin walls first and solved the solid instead: the shell model could not be built (CalculiX failed (exit 255): g up the structure of the matrix.\n number of equations\n 77786\n number of nonzero lower triangular matrix elements\n 3039499\n\n Using u)."
  ],
  "imperial": false,
  "mass_kg": 0.358956,
@@ -3050,6 +3051,14 @@
  },
  "report": "report.html",
  "workdir": ".",
- "t_total": 296.333545,
- "solver": "CalculiX 2.23"
+ "t_total": 799.228499,
+ "solver": "CalculiX 2.23",
+ "criteria": [
+  {
+   "name": "stress",
+   "value": "governing_MPa",
+   "limit": 165.0,
+   "sense": "max"
+  }
+ ]
 }

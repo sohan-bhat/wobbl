@@ -64,6 +64,7 @@
   }
  ],
  "assumptions": [
+  "Wobbl guessed: required life not given, so Wobbl assumed 1e7.",
   "Stress life method for crack initiation, as Shigley sets it out, with an S-N line from f Sut at 1000 cycles to the corrected endurance strength. It does not cover crack growth after a crack starts, which is a separate damage tolerance question.",
   "S-N data for Custom material (cast) give 42.7 MPa at 500 million cycles, smooth specimens, fully reversed (estimated as 0.26 Sut at 5e8 cycles, the ratio of sand cast A356-T6).",
   "The Marin factors are surface as-cast (1.00), size 1.05, load 1.00, reliability 90% (0.897), with the part at room temperature.",
@@ -218,7 +219,8 @@
     ]
    ]
   ],
-  "playback": "playback.json"
+  "playback": "playback.json",
+  "scene": "scene.wobbl"
  },
  "images": {
   "sn": "images/sn.png",
@@ -244,6 +246,14 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 18.439545,
- "solver": "Wobbl stress life"
+ "t_total": 8.562267,
+ "solver": "Wobbl stress life",
+ "criteria": [
+  {
+   "name": "fatigue",
+   "value": "sf",
+   "limit": 2.0,
+   "sense": "min"
+  }
+ ]
 }

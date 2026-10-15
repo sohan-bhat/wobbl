@@ -1,0 +1,52 @@
+{
+ "thing": "../../src/wobbl/validation/parts/cast_motor_mount.step",
+ "question": "Does this cast motor mount meet our safety factor 2 rule under a 2 kN emergency stop belt pull?",
+ "plan": {
+  "thing": "../../src/wobbl/validation/parts/cast_motor_mount.step",
+  "question": "Does this cast motor mount meet our safety factor 2 rule under a 2 kN emergency stop belt pull?",
+  "domain": "part",
+  "kind": "step",
+  "analyses": [
+   "stress"
+  ],
+  "reasons": [
+   {
+    "decided": "cast_motor_mount.step is a .step file, read as a part (step)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics stress, as asked",
+    "override": "--physics stress"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "marginal",
+ "situation": {
+  "supports": [
+   "fixed z=min"
+  ],
+  "loads": [
+   "2000 N -0.8660254,0,-0.5 at 0,-30,66 @ holes d=6.6"
+  ],
+  "material": "custom:E=72400,nu=0.33,yield=165,process=cast"
+ },
+ "steps": [
+  {
+   "analysis": "stress",
+   "domain": "part",
+   "verdict": "marginal",
+   "headline": "Peak 124 MPa on the 3.99 mm inside fillet (face 65) at (43.9, 8.96, 79.6). It survives the load, but the safety factor 1.33 is below the 2 target. Confidence is medium.",
+   "confidence": "medium",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": []
+  }
+ ]
+}

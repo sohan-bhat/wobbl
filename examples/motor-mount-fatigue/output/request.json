@@ -1,0 +1,22 @@
+{
+ "domain": "part",
+ "analysis": "fatigue",
+ "spec": {
+  "thing": "examples/cast-motor-mount/output",
+  "kind": "result",
+  "question": "Does the cast motor mount last ten years of starts and running without a fatigue crack?",
+  "options": {
+   "block": [
+    "100% x 3650 R=0",
+    "70% x 1e8 R=0.714"
+   ],
+   "repeats": [
+    "10"
+   ],
+   "cycles": [
+    "1e7"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

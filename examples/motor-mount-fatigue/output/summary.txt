@@ -14,6 +14,7 @@ Checks:
   [pass] other peaks: 2 stress peaks were tracked away from supports and sharp corners, and under the same cycling none starts a crack sooner than the one judged
 
 Assumptions:
+  - Wobbl guessed: required life not given, so Wobbl assumed 1e7.
   - Stress life method for crack initiation, as Shigley sets it out, with an S-N line from f Sut at 1000 cycles to the corrected endurance strength. It does not cover crack growth after a crack starts, which is a separate damage tolerance question.
   - S-N data for Custom material (cast) give 42.7 MPa at 500 million cycles, smooth specimens, fully reversed (estimated as 0.26 Sut at 5e8 cycles, the ratio of sand cast A356-T6).
   - The Marin factors are surface as-cast (1.00), size 1.05, load 1.00, reliability 90% (0.897), with the part at room temperature.

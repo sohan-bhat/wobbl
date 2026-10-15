@@ -1,0 +1,49 @@
+{
+ "thing": "../cast-motor-mount/output",
+ "question": "Does the cast motor mount last ten years of starts and running without a fatigue crack?",
+ "plan": {
+  "thing": "../cast-motor-mount/output",
+  "question": "Does the cast motor mount last ten years of starts and running without a fatigue crack?",
+  "domain": "part",
+  "kind": "result",
+  "analyses": [
+   "fatigue"
+  ],
+  "reasons": [
+   {
+    "decided": "output is a finished part result",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics fatigue, as asked",
+    "override": "--physics fatigue"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "marginal",
+ "situation": {},
+ "steps": [
+  {
+   "analysis": "fatigue",
+   "domain": "part",
+   "verdict": "marginal",
+   "headline": "10 runs of the duty cycle use 62.7% of the fatigue life on the 3.99 mm inside fillet (face 65) at (43.9, 8.96, 79.6) (Miner's rule), so it can run about 16 times before cracks start, and the stresses could rise 1.03 times before the required 10 runs would start a crack (target 2). Confidence is medium.",
+   "confidence": "medium",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": [
+    {
+     "assumed": "required life not given, so Wobbl assumed 1e7",
+     "override": "--cycles 1e7"
+    }
+   ]
+  }
+ ]
+}

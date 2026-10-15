@@ -26,7 +26,8 @@
    "kind": "fixed",
    "faces": "z=min",
    "text": "fixed z=min",
-   "dofs": "xyz"
+   "dofs": "xyz",
+   "stiffness": 0.0
   }
  ],
  "target_sf": 2.0,

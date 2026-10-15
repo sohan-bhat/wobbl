@@ -1,5 +1,5 @@
 {
- "source": "../cast-motor-mount/output",
+ "source": "examples/cast-motor-mount/output",
  "material": "",
  "amplitude": "",
  "mean": "",
@@ -19,5 +19,6 @@
  "reliability": 0.9,
  "mean_model": "goodman",
  "target_sf": null,
- "question": "Does the cast motor mount last ten years of starts and running without a fatigue crack?"
+ "question": "Does the cast motor mount last ten years of starts and running without a fatigue crack?",
+ "history": ""
 }
