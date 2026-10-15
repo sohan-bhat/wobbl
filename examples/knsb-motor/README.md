@@ -38,5 +38,5 @@ sweeps out its own volume. The output folder holds `thrust.csv` and a RASP `moto
 pressure, thrust and the casing's safety factor. It also holds the motor burned again at 21 nozzle
 throats from 7.9 to 16 mm, each kept at its peak pressure, which `wobbl view output` shows as a
 cutaway you drive with a throat slider. The casing colors by hoop stress against its allowable, and
-the readouts give the peak pressure, safety factor and impulse at that throat. Below about 10.3 mm
-the casing passes its allowable, and by 16 mm the cores are as narrow as the throat.
+the readouts give the peak pressure, safety factor and impulse at that throat. A throat under about
+10.3 mm drives the hoop stress over the allowable, and at 16 mm the cores are as narrow as the throat.
