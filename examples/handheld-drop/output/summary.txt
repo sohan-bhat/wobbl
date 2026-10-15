@@ -1,0 +1,38 @@
+FAILS. Fails a 1.2 m drop onto concrete slab, worst landing -x-y-z corner down: peak von Mises stress 68.1 MPa at (-41.5, -23.2, 0) mm, safety factor 0.91 against 62 MPa (target 2). An accelerometer there reads 2503 g filtered at 10 kHz; the impact itself peaks at 2499 g over 0.704 ms. Confidence is medium.
+
+Confidence: medium. mesh convergence: peak drop stress agreed on two meshes (72.8 -> 68.1 MPa, 6.9%) but no third mesh was run (stopped by converged); two coarse meshes can agree and still both be off
+peak stress: 68.1 MPa
+safety factor: 0.91
+target: 2
+worst landing: -x-y-z corner down
+peak g: 2503 g
+impact speed: 4.85 m/s
+pulse: 0.704 ms
+
+Checks:
+  [warn] mesh convergence: peak drop stress agreed on two meshes (72.8 -> 68.1 MPa, 6.9%) but no third mesh was run (stopped by converged); two coarse meshes can agree and still both be off
+  [pass] momentum: the floor's impulse, 0.886 N s, against the change of momentum less gravity's impulse, 0.886 N s (4.9e-05% apart); the part leaves at -4.36 m/s, a coefficient of restitution of 0.90
+  [pass] energy: kinetic plus strain energy, less the work of the floor and gravity and the energy damped at the mesh's own frequency, stays within 5.3e-05% of the impact energy
+  [pass] contact: the part sinks at most 0.048 mm into the floor, 2.6% of an element; the floor's stiffness is a penalty that keeps that small
+  [info] contact stress: 515 MPa right where the part meets the floor, within 7.5 mm of it, is left out of the answer: it is the local crush of the contact patch, set by the mesh and the floor's idealized stiffness. Expect a scuff or a dent there
+  [pass] units and sanity: part 116 mm across, 96 g, peak g at the center of mass 2499, pulse 0.704 ms; the run stopped because the part left the floor
+
+Assumptions:
+  - Wobbl guessed: landing not given, so every face and corner is tried (worst).
+  - Dropped from 1.2 m, so it lands at 4.85 m/s (no air drag), without spin, landing -x-y-z corner down.
+  - Floor: Concrete slab, far stiffer than the part (E about 30 GPa, ACI 318-19 19.2.2.1, Ec = 4700 sqrt(f'c) for 40 MPa concrete).
+  - Polycarbonate: E 2350 MPa, Poisson 0.37, density 1200 kg/m3, von Mises vs yield 62 MPa (Covestro Makrolon 2405 datasheet). Strength at impact rates is often higher than the datasheet's static value, so this errs on the safe side.
+  - Linear elastic part, small strains, no friction with the floor. The first impact only: a bounce and a second landing on another corner are not followed.
+  - Stress is averaged over the time a wave takes to cross two elements, and the accelerometer record is low pass filtered at 10 kHz, the bandwidth of a drop test accelerometer.
+  - The contact patch itself, within two elements of the first mesh of where the part meets the floor, is reported apart: its stress is the local crush of an ideally sharp landing.
+  - 2% of the part's mass is added at the nodes of the smallest elements so they do not hold the time step down (selective mass scaling); the momentum and energy checks include it.
+  - Added mass: 45 g spread over 3916 nodes at 0,0,6 r=26.
+  - Mirror symmetry of the part made these landings the same as one already run: -x face down stands for +x face down; -y face down stands for +y face down; -x-y-z corner down stands for -x+y-z corner down, +x-y-z corner down, +x+y-z corner down; -x-y+z corner down stands for -x+y+z corner down, +x-y+z corner down, +x+y+z corner down.
+
+Suggested fixes:
+  - A material good for 136 MPa: The worst landing peaks at 68.1 MPa; reaching the 2 target takes a material whose von Mises vs yield strength is at least 136 MPa at a similar stiffness, or a tougher grade that yields instead of cracking.
+  - Soften the landing: A rubber bumper or corner guard lengthens the impact and lowers both the stress and the g. Check it by running the same drop with --floor 'layer:E=5,t=3', a 3 mm elastomer skin.
+  - Spread the load near the worst spot: A rib or a thicker wall around the peak spreads the impact. The stress has to fall by 54% to reach the target.
+
+Images: stress: images/stress.png, g: images/g.png, screen: images/screen.png
+Report: report.html

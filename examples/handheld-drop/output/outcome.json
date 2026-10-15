@@ -1,0 +1,306 @@
+{
+ "domain": "drop",
+ "part": "../handheld.py",
+ "question": "Will it survive a 1.2 m drop onto concrete with its 45 g battery?",
+ "verdict": "fails",
+ "headline": "Fails a 1.2 m drop onto concrete slab, worst landing -x-y-z corner down: peak von Mises stress 68.1 MPa at (-41.5, -23.2, 0) mm, safety factor 0.91 against 62 MPa (target 2). An accelerometer there reads 2503 g filtered at 10 kHz; the impact itself peaks at 2499 g over 0.704 ms. Confidence is medium.",
+ "metrics": [
+  [
+   "peak stress",
+   "68.1 MPa"
+  ],
+  [
+   "safety factor",
+   "0.91"
+  ],
+  [
+   "target",
+   "2"
+  ],
+  [
+   "worst landing",
+   "-x-y-z corner down"
+  ],
+  [
+   "peak g",
+   "2503 g"
+  ],
+  [
+   "impact speed",
+   "4.85 m/s"
+  ],
+  [
+   "pulse",
+   "0.704 ms"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "mesh convergence: peak drop stress agreed on two meshes (72.8 -> 68.1 MPa, 6.9%) but no third mesh was run (stopped by converged); two coarse meshes can agree and still both be off"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "warn",
+   "summary": "peak drop stress agreed on two meshes (72.8 -> 68.1 MPa, 6.9%) but no third mesh was run (stopped by converged); two coarse meshes can agree and still both be off",
+   "detail": {
+    "values": [
+     72.761026,
+     68.051325
+    ],
+    "last_change": 0.069208,
+    "tolerance": 0.1,
+    "stopped_by": "converged",
+    "max_displacement": [
+     2509.057799,
+     2503.174711
+    ]
+   }
+  },
+  {
+   "name": "momentum",
+   "status": "pass",
+   "summary": "the floor's impulse, 0.886 N s, against the change of momentum less gravity's impulse, 0.886 N s (4.9e-05% apart); the part leaves at -4.36 m/s, a coefficient of restitution of 0.90",
+   "detail": {
+    "error": 0.0
+   }
+  },
+  {
+   "name": "energy",
+   "status": "pass",
+   "summary": "kinetic plus strain energy, less the work of the floor and gravity and the energy damped at the mesh's own frequency, stays within 5.3e-05% of the impact energy",
+   "detail": {
+    "drift": 1e-06
+   }
+  },
+  {
+   "name": "contact",
+   "status": "pass",
+   "summary": "the part sinks at most 0.048 mm into the floor, 2.6% of an element; the floor's stiffness is a penalty that keeps that small",
+   "detail": {
+    "penetration_mm": 0.048047
+   }
+  },
+  {
+   "name": "contact stress",
+   "status": "info",
+   "summary": "515 MPa right where the part meets the floor, within 7.5 mm of it, is left out of the answer: it is the local crush of the contact patch, set by the mesh and the floor's idealized stiffness. Expect a scuff or a dent there",
+   "detail": {
+    "value": 514.801654
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "part 116 mm across, 96 g, peak g at the center of mass 2499, pulse 0.704 ms; the run stopped because the part left the floor",
+   "detail": {
+    "stress_ratio": 1.097602
+   }
+  }
+ ],
+ "assumptions": [
+  "Wobbl guessed: landing not given, so every face and corner is tried (worst).",
+  "Dropped from 1.2 m, so it lands at 4.85 m/s (no air drag), without spin, landing -x-y-z corner down.",
+  "Floor: Concrete slab, far stiffer than the part (E about 30 GPa, ACI 318-19 19.2.2.1, Ec = 4700 sqrt(f'c) for 40 MPa concrete).",
+  "Polycarbonate: E 2350 MPa, Poisson 0.37, density 1200 kg/m3, von Mises vs yield 62 MPa (Covestro Makrolon 2405 datasheet). Strength at impact rates is often higher than the datasheet's static value, so this errs on the safe side.",
+  "Linear elastic part, small strains, no friction with the floor. The first impact only: a bounce and a second landing on another corner are not followed.",
+  "Stress is averaged over the time a wave takes to cross two elements, and the accelerometer record is low pass filtered at 10 kHz, the bandwidth of a drop test accelerometer.",
+  "The contact patch itself, within two elements of the first mesh of where the part meets the floor, is reported apart: its stress is the local crush of an ideally sharp landing.",
+  "2% of the part's mass is added at the nodes of the smallest elements so they do not hold the time step down (selective mass scaling); the momentum and energy checks include it.",
+  "Added mass: 45 g spread over 3916 nodes at 0,0,6 r=26.",
+  "Mirror symmetry of the part made these landings the same as one already run: -x face down stands for +x face down; -y face down stands for +y face down; -x-y-z corner down stands for -x+y-z corner down, +x-y-z corner down, +x+y-z corner down; -x-y+z corner down stands for -x+y+z corner down, +x-y+z corner down, +x+y+z corner down."
+ ],
+ "values": {
+  "height_mm": 1200.0,
+  "impact_speed_mm_s": 4852.215989,
+  "floor": "concrete",
+  "orientation": "-x-y-z corner down",
+  "down": [
+   -0.862871,
+   -0.474506,
+   -0.174062
+  ],
+  "governing_MPa": 68.051325,
+  "governing_xyz": [
+   -41.4525,
+   -23.201575,
+   0.0
+  ],
+  "contact_zone_peak_MPa": 514.801654,
+  "safety_factor": 0.911077,
+  "allowable_MPa": 62,
+  "g_watch": 2503.174711,
+  "g_watch_unfiltered": 2510.160588,
+  "g_center_of_mass": 2498.905917,
+  "peak_force_N": 2353.418922,
+  "pulse_ms": 0.704265,
+  "restitution": 0.899465,
+  "screening": [
+   {
+    "name": "-x face down",
+    "d": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "governing": 22.839136,
+    "g_watch": 6493.171952,
+    "g_rigid": 12845.613711,
+    "pulse_ms": 0.242059
+   },
+   {
+    "name": "-y face down",
+    "d": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "governing": 23.079491,
+    "g_watch": 9948.163274,
+    "g_rigid": 24597.905675,
+    "pulse_ms": 0.150171
+   },
+   {
+    "name": "-z face down",
+    "d": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "governing": 14.746314,
+    "g_watch": 138118.326783,
+    "g_rigid": 113393.044908,
+    "pulse_ms": 0.044106
+   },
+   {
+    "name": "+z face down",
+    "d": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "governing": 24.630051,
+    "g_watch": 89902.707359,
+    "g_rigid": 91866.461546,
+    "pulse_ms": 0.162773
+   },
+   {
+    "name": "-x-y-z corner down",
+    "d": [
+     -0.862871,
+     -0.474506,
+     -0.174062
+    ],
+    "governing": 57.313187,
+    "g_watch": 2381.534375,
+    "g_rigid": 2336.817673,
+    "pulse_ms": 0.730901
+   },
+   {
+    "name": "-x-y+z corner down",
+    "d": [
+     -0.857744,
+     -0.471687,
+     0.20442
+    ],
+    "governing": 55.152332,
+    "g_watch": 2266.444617,
+    "g_rigid": 2168.816254,
+    "pulse_ms": 0.754529
+   }
+  ],
+  "levels": [
+   {
+    "level": 0,
+    "h": 3.75,
+    "n_nodes": 23501,
+    "governing": 72.761026,
+    "g_watch": 2509.057799,
+    "g_rigid": 2497.173838,
+    "pulse_ms": 0.708481,
+    "steps": 5137,
+    "dt": 0.0,
+    "t_run": 372.980334,
+    "xyz": [
+     -42.105902,
+     -21.933343,
+     0.0
+    ]
+   },
+   {
+    "level": 1,
+    "h": 1.875,
+    "n_nodes": 25461,
+    "governing": 68.051325,
+    "g_watch": 2503.174711,
+    "g_rigid": 2498.905917,
+    "pulse_ms": 0.704265,
+    "steps": 5315,
+    "dt": 0.0,
+    "t_run": 491.85039,
+    "xyz": [
+     -41.4525,
+     -23.201575,
+     0.0
+    ]
+   }
+  ],
+  "mass_kg": 0.096002,
+  "accelerometer_cutoff_Hz": 10000.0,
+  "measure": "von Mises",
+  "_figures": [
+   [
+    "stress",
+    "Peak stress over the impact, worst landing"
+   ],
+   [
+    "g",
+    "Acceleration at the accelerometer and the floor force"
+   ],
+   [
+    "screen",
+    "Peak stress of every landing screened"
+   ]
+  ]
+ },
+ "images": {
+  "stress": "images/stress.png",
+  "g": "images/g.png",
+  "screen": "images/screen.png"
+ },
+ "fixes": [
+  {
+   "kind": "material",
+   "auto": false,
+   "title": "A material good for 136 MPa",
+   "summary": "The worst landing peaks at 68.1 MPa; reaching the 2 target takes a material whose von Mises vs yield strength is at least 136 MPa at a similar stiffness, or a tougher grade that yields instead of cracking."
+  },
+  {
+   "kind": "bumper",
+   "auto": false,
+   "title": "Soften the landing",
+   "summary": "A rubber bumper or corner guard lengthens the impact and lowers both the stress and the g. Check it by running the same drop with --floor 'layer:E=5,t=3', a 3 mm elastomer skin."
+  },
+  {
+   "kind": "wall",
+   "auto": false,
+   "title": "Spread the load near the worst spot",
+   "summary": "A rib or a thicker wall around the peak spreads the impact. The stress has to fall by 54% to reach the target."
+  }
+ ],
+ "notes": [
+  "Built from handheld.py with wall=2.5, length=100, width=55, height=22, corner=5, rib=2, rib_height=7, cradle=56."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 1698.132922,
+ "solver": "Wobbl explicit (numpy)",
+ "criteria": [
+  {
+   "name": "stress",
+   "value": "governing_MPa",
+   "limit": 62.0,
+   "sense": "max"
+  }
+ ]
+}

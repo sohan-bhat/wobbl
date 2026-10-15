@@ -1,0 +1,27 @@
+{
+ "domain": "part",
+ "analysis": "drop",
+ "spec": {
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-af831ad401cf865f2/examples/handheld-drop/handheld.py",
+  "kind": "parametric",
+  "question": "Will it survive a 1.2 m drop onto concrete with its 45 g battery?",
+  "options": {
+   "mass": [
+    "45 g @ 0,0,6 r=26"
+   ],
+   "material": [
+    "pc"
+   ],
+   "height": [
+    "1.2 m"
+   ],
+   "floor": [
+    "concrete"
+   ],
+   "orientation": [
+    "worst"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

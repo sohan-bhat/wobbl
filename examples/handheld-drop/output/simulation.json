@@ -1,0 +1,69 @@
+{
+ "thing": "handheld.py",
+ "question": "Will it survive a 1.2 m drop onto concrete with its 45 g battery?",
+ "plan": {
+  "thing": "handheld.py",
+  "question": "Will it survive a 1.2 m drop onto concrete with its 45 g battery?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "drop"
+  ],
+  "reasons": [
+   {
+    "decided": "handheld.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics drop, as asked",
+    "override": "--physics drop"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "fail",
+ "situation": {
+  "objects": [
+   "concrete",
+   "45 g @ 0,0,6 r=26"
+  ],
+  "environment": {
+   "floor": "concrete",
+   "floor_name": "Concrete slab",
+   "height_m": 1.2,
+   "down": [
+    -0.8628708829646448,
+    -0.47450631802586785,
+    -0.17406203918530955
+   ],
+   "landing": "-x-y-z corner down",
+   "impact_speed_m_s": 4.852215988597375
+  },
+  "loads": [
+   "dropped from 1.2 m"
+  ]
+ },
+ "steps": [
+  {
+   "analysis": "drop",
+   "domain": "part",
+   "verdict": "fails",
+   "headline": "Fails a 1.2 m drop onto concrete slab, worst landing -x-y-z corner down: peak von Mises stress 68.1 MPa at (-41.5, -23.2, 0) mm, safety factor 0.91 against 62 MPa (target 2). An accelerometer there reads 2503 g filtered at 10 kHz; the impact itself peaks at 2499 g over 0.704 ms. Confidence is medium.",
+   "confidence": "medium",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-af831ad401cf865f2/examples/handheld-drop/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-af831ad401cf865f2/examples/handheld-drop/output/report.html",
+   "assumptions": [
+    {
+     "assumed": "landing not given, so every face and corner is tried (worst)",
+     "override": "--orientation worst"
+    }
+   ]
+  }
+ ]
+}
