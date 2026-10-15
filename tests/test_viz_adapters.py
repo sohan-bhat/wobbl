@@ -178,3 +178,20 @@ def test_antenna_wave_plays_one_cycle(tmp_path):
         assert {"mesh", "body"} <= ks and h["timeline"]["frames"] == 24
         assert any(o.get("name") == "wire" for o in h["objects"])
         assert {r_["name"] for r_ in h["readouts"]} >= {"S11", "peak gain"}
+
+
+def test_heat_pack_draws_its_cells(tmp_path):
+    from wobbl.viz.adapters.common import box_mesh
+    Xb, Tb = box_mesh([18.5, 18.5, 32.5], [18.5, 18.5, 32.5])
+    g = np.stack(np.meshgrid(np.linspace(0, 37, 8), np.linspace(0, 37, 8), np.linspace(0, 65, 8)), -1).reshape(-1, 3)
+    X = np.vstack([Xb, g])
+    hist = np.array([35 + k * (1 + X[:, 0] / 37) for k in range(1, 6)], float)
+    np.savez(tmp_path / "fields.npz", X=X, T=hist[-1], tris=Tb, tets=np.zeros((0, 4), int),
+             hist_t=np.arange(1, 6) * 60.0, hist_T=hist)
+    (tmp_path / "study.json").write_text(json.dumps({"material": "li-ion-cell", "ambient": 35}))
+    outcome(tmp_path, "thermal")
+    assert build_scene(tmp_path)
+    _, h = kinds(tmp_path)
+    cells = [o for o in h["objects"] if o.get("name", "").startswith("cell ")]
+    assert len(cells) == 4 and all("field" in c for c in cells)
+    assert h["title"] == "The 4 cell pack heating up"

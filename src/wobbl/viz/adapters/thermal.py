@@ -59,9 +59,19 @@ def build(out: Path) -> Path | None:
         start = float(st.get("initial", amb) or amb)
         H = np.vstack([np.full((1, len(X)), start), np.asarray(hT, float)])
         s.timeline(t, unit="min", label="time", seconds=8, between="interpolated")
-        m = s.mesh(X, tris, name="part", keep=[int(np.argmax(T))])
-        m.color_by("temperature", H, unit="C", colormap="inferno", range=(min(H.min(), amb), max(tmax, limit or tmax)),
-                   limit=limit, limit_label="limit")
+        cells = _cells(X, st)
+        if cells:
+            s.head["title"] = f"The {len(cells)} cell pack heating up"
+        m = s.mesh(X, tris, name="part", keep=[int(np.argmax(T))], opacity=0.22 if cells else 1.0)
+        rng = (min(H.min(), amb), max(tmax, limit or tmax))
+        m.color_by("temperature", H, unit="C", colormap="inferno", range=rng, limit=limit, limit_label="limit")
+        for k, (c, ax, r, half, inside) in enumerate(cells):
+            s.body("cylinder", [r, half], pos=c, quat=P.z_to(np.eye(3)[ax]), color="#5b6470",
+                   name=f"cell {k + 1}").color_by("temperature", H[:, inside].mean(1), unit="C", colormap="inferno",
+                                                 range=rng, limit=limit, limit_label="limit")
+        if cells:
+            s.note(f"The block is {len(cells)} cells treated as one solid. Each cell is drawn at its place in the "
+                   "block and colored by the solved temperature averaged over its volume.")
         s.readout("hottest", H.max(1), unit="C", digits=4, limit=limit)
         s.readout("average", H.mean(1), unit="C", digits=4)
         over = (o.get("values") or {}).get("time_over_limit_s")
@@ -216,3 +226,36 @@ def _first(o: dict) -> str:
     """The headline's first sentence as it stands, since its units carry brackets, as W/(m2 K)."""
     import re
     return re.split(r"(?<=[.!?])\s", (o.get("headline") or "").strip())[0]
+
+
+CELL_D = {"18650": (18.4, 65.0), "21700": (21.2, 70.0), "26650": (26.5, 65.0)}
+
+
+def _cells(X, st: dict) -> list:
+    """Cylindrical cells in a block a battery study treats as one solid: the largest standard cells whose length
+    matches the block's longest side, packed side by side across it. Each is (center, axis, radius, half length,
+    the block's nodes inside it)."""
+    if "cell" not in str(st.get("material", "")).lower():
+        return []
+    lo, hi = X.min(0), X.max(0)
+    ext = hi - lo
+    ax = int(np.argmax(ext))
+    others = [i for i in range(3) if i != ax]
+    fits = [(int(ext[others[0]] // d) * int(ext[others[1]] // d) * d * d, d) for d, length in CELL_D.values()
+             if abs(ext[ax] - length) <= 0.15 * length and min(ext[others]) >= d]
+    if not fits:
+        return []
+    d = max(fits)[1]                              # the cell that fills the block's section best
+    n = [int(ext[i] // d) for i in others]
+    out = []
+    for i in range(n[0]):
+        for j in range(n[1]):
+            c = (lo + hi) / 2
+            c[others[0]] = lo[others[0]] + ext[others[0]] * (i + 0.5) / n[0]
+            c[others[1]] = lo[others[1]] + ext[others[1]] * (j + 0.5) / n[1]
+            off = X - c
+            off[:, ax] = 0
+            inside = np.nonzero(np.linalg.norm(off, axis=1) <= d / 2)[0]
+            if len(inside):
+                out.append((c, ax, d / 2 * 0.97, ext[ax] / 2 * 0.97, inside))
+    return out
