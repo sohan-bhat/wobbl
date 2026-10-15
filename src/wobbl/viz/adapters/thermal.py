@@ -1,9 +1,10 @@
-"""A heat run as a scene: the part warming over time, or coming up to its steady temperatures as the power comes on.
+"""A heat run as a scene the designer drives: drag the heat load and the part's temperatures follow.
 
-fields.npz, which every heat run writes, holds the mesh and the temperatures: the history of a transient run, or
-the steady field. Steady conduction with convection to fixed air is linear, so the rise above the air at a share of
-the power is exactly that share of the solved rise, and the view ramps the power with it. With radiation or held
-temperatures that is no longer exact, so the view then shows the steady result alone.
+fields.npz, which every heat run writes, holds the mesh and the temperatures: the steady field, or the history of a
+transient run. Conduction with convection to fixed air is linear, so the rise above the air at any power is exactly
+that share of the solved rise. With radiation or held temperatures it is not, so the heat domain solves the model at
+a few powers as well and keeps them in fields.npz, and the view blends between those. A part cooled by a fluid
+scales exactly about the fluid's inlet temperature, since the fluid's own warming grows with the power too.
 """
 from __future__ import annotations
 
@@ -15,7 +16,6 @@ from .. import props as P
 from ..scene import Scene
 from .common import read, verdict
 
-FRAMES = 40
 
 
 def _faces(X, tris, selector: str):
@@ -40,7 +40,54 @@ def _faces(X, tris, selector: str):
     return (t[m], ax, edge, sel.endswith("min")) if m.any() else None
 
 
+EXACT_POINTS = 9          # frames of an exact power sweep, linear in between, the asked power added
+
+
+def _films(st: dict) -> list[dict]:
+    f = st.get("films") or []
+    if isinstance(f, str):                       # older study files kept the list as its text
+        import ast
+        try:
+            f = ast.literal_eval(f)
+        except (ValueError, SyntaxError):
+            f = []
+    return [x for x in f if isinstance(x, dict)]
+
+
+def linear(st: dict) -> bool:
+    """Whether the study's rise above its air is exactly proportional to its power, as the heat domain decides."""
+    amb = float(st.get("ambient", 25.0) or 25.0)
+    init = st.get("initial")
+    return (not st.get("emissivity") and not st.get("fixed")
+            and all(abs(float(f.get("t_inf", amb)) - amb) < 1e-9 for f in _films(st))
+            and (not st.get("duration") or init is None or abs(float(init) - amb) < 1e-9))
+
+
+def powers(p0: float, t_max: float, ref: float, limit) -> np.ndarray:
+    """Multiples of the asked power for an exact sweep: none to twice the power, or on to where the hottest point
+    clearly passes the limit, at most five times, with the asked power itself among them."""
+    rise = t_max - ref
+    top = 2.0 if limit is None or rise <= 0 else max(2.0, min(1.3 * (float(limit) - ref) / rise, 5.0))
+    return np.unique(np.round(np.r_[np.linspace(0.0, top, EXACT_POINTS), 1.0], 6))
+
+
+def crossing(x: np.ndarray, y: np.ndarray, level) -> float | None:
+    """The first x where y rises through level, by linear interpolation, or None."""
+    if level is None:
+        return None
+    above = np.nonzero(np.asarray(y) > level)[0]
+    if not len(above):
+        return None
+    i = int(above[0])
+    if i == 0:
+        return float(x[0])
+    return float(x[i - 1] + (level - y[i - 1]) / (y[i] - y[i - 1]) * (x[i] - x[i - 1]))
+
+
 def build(out: Path) -> Path | None:
+    """A heat run as a part the designer turns the heat load up and down on. Each power shows its steady field, or
+    for a transient the field at the end of the run: scaled exactly when the model is linear in its power, else
+    the run's own solves at a few powers, blended in between."""
     p = Path(out) / "fields.npz"
     o = read(out, "outcome.json") or {}
     if not p.exists() or o.get("domain") != "thermal":
@@ -51,54 +98,59 @@ def build(out: Path) -> Path | None:
     ht, hT = d["hist_t"], d["hist_T"]
     amb = float(st.get("ambient", 25.0) or 25.0)
     limit = (o.get("values") or {}).get("limit_C")
-    s = Scene("The part heating up", domain="thermal", question=o.get("question", ""), length="mm")
-    tmax = float(T.max())
-    hot = X[int(np.argmax(T))]
-    if len(ht) and len(hT) == len(ht):
-        t = np.concatenate([[0.0], np.asarray(ht, float)]) / 60
-        start = float(st.get("initial", amb) or amb)
-        H = np.vstack([np.full((1, len(X)), start), np.asarray(hT, float)])
-        s.timeline(t, unit="min", label="time", seconds=8, between="interpolated")
-        cells = _cells(X, st)
-        if cells:
-            s.head["title"] = f"The {len(cells)} cell pack heating up"
-        m = s.mesh(X, tris, name="part", keep=[int(np.argmax(T))], opacity=0.22 if cells else 1.0)
-        rng = (min(H.min(), amb), tmax)
-        m.color_by("temperature", H, unit="C", colormap="inferno", range=rng, limit=limit, limit_label="limit")
-        for k, (c, ax, r, half, inside) in enumerate(cells):
-            s.body("cylinder", [r, half], pos=c, quat=P.z_to(np.eye(3)[ax]), color="#5b6470",
-                   name=f"cell {k + 1}").color_by("temperature", H[:, inside].mean(1), unit="C", colormap="inferno",
-                                                 range=rng, limit=limit, limit_label="limit")
-        if cells:
-            s.note(f"The block is {len(cells)} cells treated as one solid. Each cell is drawn at its place in the "
-                   "block and colored by the solved temperature averaged over its volume.")
-        s.readout("hottest", H.max(1), unit="C", digits=4, limit=limit)
-        s.readout("average", H.mean(1), unit="C", digits=4)
-        over = (o.get("values") or {}).get("time_over_limit_s")
-        if over:
-            s.event(over / 60, f"passes {limit:g} C", "", kind="fail")
-            s.label("too hot here", hot, t0=over / 60, kind="fail")
-        else:
-            s.label("hottest {hottest}", hot, kind="peak")
+    p0 = float(st.get("power", 0) or 0) / 1000
+    transient = len(ht) > 0 and len(hT) == len(ht)
+    hot0 = np.asarray(hT, float).max(1) if transient else None
+    cells = _cells(X, st)
+    if "sweep_W" in d.files:
+        W, F = np.asarray(d["sweep_W"], float), np.asarray(d["sweep_T"], float)
+        H = np.asarray(d["sweep_hot"], float) if "sweep_hot" in d.files else None
+        between = "interpolated"
+        how = (f"Radiation or held temperatures make the result depend on the power in a nonlinear way, so the run "
+               f"solved the model at {len(W)} powers and the view blends between them.")
+    elif p0 > 0 and linear(st):
+        k = powers(p0, float(T.max()), amb, limit)
+        W, F = k * p0, amb + np.outer(k, T - amb)
+        H = amb + np.outer(k, hot0 - amb) if transient else None
+        between = "exact"
+        how = "The rise above the air is exactly proportional to the power in this linear model, so every power is exact."
     else:
-        linear = not st.get("emissivity") and not st.get("fixed")
-        m = s.mesh(X, tris, name="part", keep=[int(np.argmax(T))])
-        if linear:
-            ramp = np.linspace(0, 1, FRAMES)
-            power = float(st.get("power", 0) or 0)
-            s.timeline(ramp * (power / 1000 if power else 100), unit="W" if power else "%", label="power", seconds=6,
-                       between="exact", note="The rise above the air is exactly proportional to the power in this "
-                                             "linear model, so every frame of the ramp is a steady result.")
-            m.color_by("temperature", np.outer(ramp, T - amb) + amb, unit="C", colormap="inferno",
-                       range=(amb, tmax), limit=limit, limit_label="limit")
-            s.readout("hottest", amb + ramp * (tmax - amb), unit="C", digits=4, limit=limit)
-        else:
-            s.note("Radiation or held temperatures make the result depend on the power in a nonlinear way, so this "
-                   "is the steady result alone.")
-            m.color_by("temperature", T, unit="C", colormap="inferno", range=(amb, tmax),
-                       limit=limit, limit_label="limit")
-            s.readout("hottest", [tmax], unit="C", digits=4, limit=limit)
-        s.label("hottest {hottest}", hot, kind="fail" if limit and tmax > limit else "peak")
+        W = F = H = None
+    end = f" after {float(ht[-1]) / 60:.3g} min" if transient else ""
+    what = f"The {len(cells)} cell pack" if cells else "The part"
+    s = Scene(f"{what}{end} at each heat load" if W is not None else f"{what}{end}", domain="thermal",
+              question=o.get("question", ""), length="mm")
+    hot = int(np.argmax(T))
+    m = s.mesh(X, tris, name="part", keep=[hot], opacity=0.22 if cells else 1.0)
+    if W is None:
+        s.note("The run has no power to turn up and down, so this is its result alone.")
+        F, W = T[None, :], np.array([p0])
+    else:
+        s.timeline(W, unit="W", label="heat load", kind="input", design=p0, between=between)
+        s.note(how + (f" Each power shows the part at the end of its {float(ht[-1]) / 60:.3g} min run."
+                      if transient else ""))
+    rng = (min(float(F.min()), amb), max(float(F.max()), amb + 1e-6))
+    m.color_by("temperature", F, unit="C", colormap="inferno", range=rng, limit=limit, limit_label="limit")
+    for k_, (c, ax, r, half, inside) in enumerate(cells):
+        s.body("cylinder", [r, half], pos=c, quat=P.z_to(np.eye(3)[ax]), color="#5b6470",
+               name=f"cell {k_ + 1}").color_by("temperature", F[:, inside].mean(1), unit="C", colormap="inferno",
+                                              range=rng, limit=limit, limit_label="limit")
+    if cells:
+        s.note(f"The block is {len(cells)} cells treated as one solid. Each cell is drawn at its place in the "
+               "block and colored by the solved temperature averaged over its volume.")
+    s.readout("hottest" + end, F.max(1), unit="C", digits=4, limit=limit)
+    s.readout("average" + end, F.mean(1), unit="C", digits=4)
+    if transient and H is not None and limit is not None:
+        t_min = np.asarray(ht, float) / 60
+        over = [t_min[-1] - c if (c := crossing(t_min, h, limit)) is not None else 0.0 for h in H]
+        s.readout(f"time over {limit:g} C", over, unit="min", digits=3)
+    cross = crossing(W, F.max(1), limit) if len(W) > 1 else None
+    if cross is not None and cross > 0:
+        s.event(cross, f"passes {limit:g} C", f"at {cross:.3g} W", kind="fail")
+        s.label("too hot here {hottest" + end + "}", X[hot], t0=cross, kind="fail")
+        s.label("hottest {hottest" + end + "}", X[hot], t1=cross, kind="peak")
+    else:
+        s.label("hottest {hottest" + end + "}", X[hot], kind="fail" if limit and F.max() > limit else "peak")
     heat = _faces(X, tris, st.get("heat_faces", ""))
     if heat is not None:
         t_, ax, edge, low = heat
@@ -109,8 +161,7 @@ def build(out: Path) -> Path | None:
         half = np.maximum(np.ptp(pts, 0) / 2, 1.0)
         u = [i for i in range(3) if i != ax]
         P.slab(s, c, n, half[u[0]], half[u[1]], float(np.ptp(X, 0).max()) * 0.04, color="#2c2f34", name="heat source")
-        s.label(f"{float(st.get('power', 0)) / 1000:.3g} W in" if st.get("power") else "heat in",
-                c - n * float(np.ptp(X, 0).max()) * 0.08, kind="note")
+        s.label("heat in", c - n * float(np.ptp(X, 0).max()) * 0.08, kind="note")
     verdict(s, o)
     return s.save(out)
 
@@ -130,24 +181,18 @@ def fan_sink(out: Path) -> Path | None:
     d = np.load(p)
     X, tris, T = d["X"], d["tris"], d["T"]
     sc = pb.get("scalars") or {}
-    air = float((sc.get("inlet_air") or {}).get("value", 25.0)) + float((sc.get("air_rise") or {}).get("value", 0)) / 2
+    inlet = float((sc.get("inlet_air") or {}).get("value", 25.0))
     power = float((sc.get("power") or {}).get("value", 0) or 0)
     limit = (o.get("values") or {}).get("limit_C")
-    tmax = float(T.max())
-    s = Scene("The heat sink in its fan's air", domain="thermal", question=o.get("question", ""), length="mm",
+    s = Scene("The heat sink in its fan's air at each heat load", domain="thermal", question=o.get("question", ""),
+              length="mm",
               source="The sink's temperatures are the CalculiX solution with the films the gap's CFD gave, and the "
                      "streamlines trace the CFD's velocity through one gap, repeated in every gap.")
-    ramp = np.linspace(0, 1, FRAMES)
-    s.timeline(ramp * (power or 100), unit="W" if power else "%", label="power", seconds=6, between="exact",
-               note="The rise above the air is exactly proportional to the power with fixed films, so every frame of "
-                    "the ramp is a steady result.")
     hot = int(np.argmax(T))
     m = s.mesh(X, tris, name="heat sink", keep=[hot])
-    m.color_by("temperature", np.outer(ramp, T - air) + air, unit="C", colormap="inferno",
-               range=(air, tmax), limit=limit, limit_label="limit")
-    s.readout("hottest", air + ramp * (tmax - air), unit="C", digits=4, limit=limit)
-    s.readout("airflow", np.full(FRAMES, float((sc.get("airflow") or {}).get("value", 0))), unit="L/min", digits=4)
-    s.label("hottest {hottest}", X[hot], kind="fail" if limit and tmax > limit else "peak")
+    F = _input_power(s, m, T, inlet, power, limit, "air")
+    s.readout("airflow", np.full(s.n, float((sc.get("airflow") or {}).get("value", 0))), unit="L/min", digits=4)
+    _hot_label(s, X[hot], F, limit)
     pl = Plane(pb["fields"][0], 1000.0 if pb["fields"][0]["grid"].get("unit") == "m" else 1.0)
     half = pl.y1 - pl.y0
     seeds = np.c_[np.full(3, pl.x0 + 0.01 * (pl.x1 - pl.x0)), pl.y0 + half * np.array([0.25, 0.55, 0.9])]
@@ -164,14 +209,12 @@ def fan_sink(out: Path) -> Path | None:
                     speeds.append(sp)
     if paths:
         top = float(max(w.max() for w in speeds))
-        s.lines(paths, values=speeds, field="air speed", unit="m/s", colormap="blues", range=(0.0, top),
-                flow=np.array([float(w.mean()) for w in speeds]) / top * g["length"] / 2.5,
-                spacing=g["length"] / 10, name="air", width=1.2)
+        s.lines(paths, color=AIR, name="air", width=1.2)
+        s.readout("fastest air", np.full(s.n, top), unit="m/s", digits=3)
     r = min(g["width"], height + base) * 0.45
     s.body("cylinder", [r, r * 0.12], pos=[g["width"] / 2, -r * 0.5, base + height / 2], quat=P.z_to([0, 1, 0]),
            color="#2c2f34", name="fan", prop=True)
-    if power:
-        s.label(f"{power:.3g} W in", [g["width"] / 2, g["length"] / 2, -0.15 * g["width"]], kind="note")
+    s.label("heat in", [g["width"] / 2, g["length"] / 2, -0.15 * g["width"]], kind="note")
     verdict(s, o, _first(o))
     size = float(np.ptp(X, 0).max())
     s.camera(target=X.mean(0), direction=(1.0, -0.8, 0.9), distance=size * 2.4)
@@ -192,19 +235,21 @@ def cooled(out: Path) -> Path | None:
     d = np.load(p)
     X, tris, T = d["X"], d["tris"], d["T"]
     limit = (o.get("values") or {}).get("limit_C")
-    tmax = float(T.max())
     hot = int(np.argmax(T))
-    s = Scene("The part and the fluid cooling it", domain="thermal", question=o.get("question", ""), length="mm",
+    st = read(p.parent, "study.json") or {}
+    sc = pb.get("scalars") or {}
+    inlet = float(st.get("ambient", float(T.min())))
+    power = float((sc.get("power") or {}).get("value", 0) or 0) or float(st.get("power", 0) or 0) / 1000
+    s = Scene("The part and the fluid cooling it at each heat load", domain="thermal", question=o.get("question", ""),
+              length="mm",
               source="The part's temperatures are the CalculiX solution with the films the CFD gave, and the "
                      "streamlines trace the CFD's velocity in the plane through the middle of the flow.")
     m = s.mesh(X, tris, name="part", keep=[hot], opacity=0.55)
-    m.color_by("temperature", T, unit="C", colormap="inferno", range=(float(T.min()), tmax), limit=limit,
-               limit_label="limit")
-    s.readout("hottest", [tmax], unit="C", digits=4, limit=limit)
-    for name, sc in list((pb.get("scalars") or {}).items())[:3]:
+    F = _input_power(s, m, T, inlet, power, limit, "fluid")
+    for name, v in list(sc.items())[:3]:
         if name not in ("hottest",):
-            s.readout(name.replace("_", " "), [sc["value"]], unit=sc.get("unit", ""), digits=4)
-    s.label("hottest {hottest}", X[hot], kind="fail" if limit and tmax > limit else "peak")
+            s.readout(name.replace("_", " "), np.full(s.n, v["value"]), unit=v.get("unit", ""), digits=4)
+    _hot_label(s, X[hot], F, limit)
     f = pb["fields"][0]
     pl = Plane(f, 1000.0 if f["grid"].get("unit") == "m" else 1.0)
     fluid = np.argwhere(np.isfinite(pl.u) & (np.hypot(pl.u, pl.v) > 0))
@@ -220,15 +265,44 @@ def cooled(out: Path) -> Path | None:
         m.opacity = 1.0
         s.note("The flow holds too little fluid to trace streamlines, so the part shows alone.")
     if lines:
-        top = float(max(w.max() for _, w in lines))
-        span = pl.x1 - pl.x0
-        s.lines([q for q, _ in lines], values=[w for _, w in lines], field="fluid speed", unit="m/s",
-                colormap="blues", range=(0.0, top), flow=np.array([float(w.mean()) for _, w in lines]) / top * span / 3,
-                spacing=span / 14, name="fluid", width=1.6)
+        s.lines([q for q, _ in lines], color=FLUID, name="fluid", width=1.6)
+        s.readout("fastest fluid", np.full(s.n, float(max(w.max() for _, w in lines))), unit="m/s", digits=3)
     verdict(s, o, _first(o))
     size = float(np.ptp(X, 0).max())
     s.camera(target=X.mean(0), direction=(0.4, -0.8, 1.0), distance=size * 2.6)
     return s.save(out)
+
+
+AIR, FLUID = "#8fb8de", "#5aa0e0"
+
+
+def _input_power(s, m, T, inlet: float, power: float, limit, what: str) -> np.ndarray:
+    """The heat load as the slider of a part cooled by a moving fluid, and the part colored at each power. The
+    films' air or water warms in proportion to the power too, so the rise above the inlet is exactly proportional
+    to the power and every power is exact. Returns the field at each frame."""
+    if power > 0:
+        k = powers(power, float(T.max()), inlet, limit)
+        s.timeline(k * power, unit="W", label="heat load", kind="input", design=power, between="exact")
+        s.note(f"The {what} keeps its speeds at any heat load, and the part's rise above the {what}'s inlet "
+               "temperature is exactly proportional to the power, so every power is exact.")
+        F = inlet + np.outer(k, T - inlet)
+    else:
+        F = T[None, :]
+    m.color_by("temperature", F, unit="C", colormap="inferno", range=(min(inlet, float(F.min())), float(F.max())),
+               limit=limit, limit_label="limit")
+    s.readout("hottest", F.max(1), unit="C", digits=4, limit=limit)
+    return F
+
+
+def _hot_label(s, at, F, limit):
+    W = s.t
+    cross = crossing(W, F.max(1), limit) if len(W) > 1 else None
+    if cross is not None and cross > 0:
+        s.event(cross, f"passes {limit:g} C", f"at {cross:.3g} W", kind="fail")
+        s.label("too hot here {hottest}", at, t0=cross, kind="fail")
+        s.label("hottest {hottest}", at, t1=cross, kind="peak")
+    else:
+        s.label("hottest {hottest}", at, kind="fail" if limit and F.max() > limit else "peak")
 
 
 def _first(o: dict) -> str:
