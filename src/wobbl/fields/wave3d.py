@@ -508,7 +508,7 @@ def mesh_inputs(scene: Scene, s: WaveSetup, quality: str = "normal") -> dict:
             surf.append((b.area, sizes[b.name] * k))
             side = sorted(b.bbox[i + 3] - b.bbox[i] for i in range(3))
             if b.name in s.metals and side[2] > 8 * side[0]:
-                wires.append((side[2], sizes[b.name] * k))
+                wires.append((b.area / (math.pi * max(side[0], 1e-9)), sizes[b.name] * k))   # length of a round wire
     for n, polys in sheets.items():
         surf.append((sum(_polygon_area(p) for p in polys), sizes.get(n, lam_min / 20) * k))
     return {"R": R, "far": min(lam_min / 10, R / 5) * k, "surfaces": surf, "wires": wires}
