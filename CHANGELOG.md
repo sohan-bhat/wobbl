@@ -277,6 +277,37 @@
 - A generality run over 14 real boards and varied CAD scenes, and examples of a
   solenoid actuator, a buck converter's layout on two boards and a speaker box.
 
+**Manufacturing**
+- `wobbl simulate` checks a part against how it will be made. Ask whether it
+  warps when printed, casts without shrinkage porosity or fills when molded,
+  and the process, material and settings come from the question, from options
+  or from a slicer file next to the part.
+- Print warping solves the shrinkage each layer locks in as it cools on the
+  bed, with CalculiX holding the part on the bed and then letting it go, for
+  ABS, ASA, PETG, PLA and PC. The warp ramp is fitted to the 48 plates
+  Armillotta et al. measured. It answers with flatness against ISO 2768-2,
+  corner lift and the bed's pull, and tries an enclosure, another plastic, a
+  brim and other ways down, each solved again. Cura, Orca, Bambu, Creality
+  and PrusaSlicer settings and .3mf projects are read for the temperatures,
+  layers and infill.
+- Sand casting freezes the metal and its mold together with an enthalpy
+  solver, places risers over the hot spots by the modulus rule unless they
+  are given, checks each feeds the region it serves and gives shrinkage
+  porosity from the Niyama criterion fitted to Carlson and Beckermann's A356
+  plates. Chills and steel or copper molds are taken too.
+- Injection molding fills the cavity as a Hele Shaw flow of a Cross WLF melt
+  with its frozen skin, for polystyrene, polycarbonate or a resin given by its
+  constants, places the gate when none is given and reports fill time, the
+  injection pressure against the machine, weld lines, air traps and walls too
+  thin to fill.
+- Every run checks mesh convergence, the time step, the energy or volume
+  balance and a hand calculation (Chvorinov, the radial or strip fill and
+  Timoshenko's plate). Five validation cases cover a freezing front against
+  Neumann, a slab against Chvorinov, a disk fill, a bimetal strip and a
+  measured ABS plate, and a run over every example and validation part and
+  eight new shapes shows each study takes parts it was not tuned on. No
+  solver was added for this.
+
 ## 0.1.1 (2026-10-13)
 
 **Heat**
