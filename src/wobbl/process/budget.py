@@ -150,9 +150,12 @@ def fit(law: CostLaw, found: list[Pilot], h_base: float, scales: list[float], bu
 
 
 def room_for(law: CostLaw, n_last: float, h_last: float, curv: int, h_next: float, spent: float,
-             budget: float, power: float = 1.5) -> bool:
-    """Whether one more level, priced from the mesh just solved, fits in what is left of the budget."""
-    return spent + law.level(grow(n_last, h_last, curv, h_next, curv, power)) <= budget
+             budget: float, power: float = 1.5, last_seconds: float = 0.0) -> bool:
+    """Whether one more level, priced from the mesh just solved, fits in what is left of the budget. When the level
+    just solved took last_seconds, the law is scaled by how far that was from what it predicted, so a part that is
+    slower than the machines the law was fit on is priced at its own pace."""
+    pace = last_seconds / max(law.level(n_last), 1e-9) if last_seconds > 0 else 1.0
+    return spent + pace * law.level(grow(n_last, h_last, curv, h_next, curv, power)) <= budget
 
 
 def note(f: Fit) -> str:

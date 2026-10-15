@@ -341,17 +341,20 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
         margin = float(np.clip(3.0 * math.sqrt(alpha * 1.5 * t_est), 15.0, 80.0))
         duration = max(10.0 * t_est, 60.0)
     runs = []
-    t_levels = time.time()
+    t_levels = t_last = time.time()
+    last_s = 0.0
     for k, sc in enumerate(scales):
         h_k = h_r * sc
         if k >= bud.MIN_LEVELS and not bud.room_for(bud.CASTING, len(runs[-1][0].rm.X), h_r * scales[k - 1], c_r, h_k,
-                                                    time.time() - t_levels, study.budget, bfit.power):
+                                                    time.time() - t_levels, study.budget, bfit.power, last_s):
             break
+        t_last = time.time()
         say("mesh", f"level {k}: metal elements {h_k:.3g} mm, sand up to {h_mold:.3g} mm")
         rm = build(prep, study.risers, study.chills, margin, h_k, h_mold, 0.6 * math.sqrt(alpha * t_est), c_r)
         say("solve", f"level {k}: {len(rm.X):,} nodes, freezing")
         sv = solidify(study, rm, alloy, mold, pour, duration, progress=say, limit=limit)
         runs.append((sv, feeding(sv)))
+        last_s = time.time() - t_last
         if k >= 1 and abs(runs[-1][1]["t99_s"] / runs[-2][1]["t99_s"] - 1) < CONVERGED:
             break
     bfit.measured = {"levels": len(runs), "nodes": [len(r[0].rm.X) for r in runs],

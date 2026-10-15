@@ -156,14 +156,17 @@ def run_print_warp(study: W.WarpStudy, out_dir: str | Path, progress=None, keep:
         build_text = f"layers along {study.build}"
     R = W.to_build_frame(d)
     levels = []
-    t_levels = time.time()
+    t_levels = t_last = time.time()
     for k, sc in enumerate(scales):
         h_k = h0 * sc * f_r
         if k >= bud.MIN_LEVELS and not bud.room_for(bud.PRINT, levels[-1]["nodes"], h0 * scales[k - 1] * f_r, c_r,
-                                                    h_k, time.time() - t_levels, study.budget, bfit.power):
+                                                    h_k, time.time() - t_levels, study.budget, bfit.power,
+                                                    levels[-1]["seconds"]):
             break
         say("mesh", f"level {k}")
+        t_last = time.time()
         levels.append(solve_level(prep, R, fil, study, eps_max, h_k, out / "work" / f"level{k}", say, c_r, limit))
+        levels[-1]["seconds"] = time.time() - t_last
         if k >= 1 and abs(levels[-1]["flatness"] / levels[-2]["flatness"] - 1) < 0.03:
             break
     bfit.measured = {"levels": len(levels), "nodes": [L["nodes"] for L in levels],

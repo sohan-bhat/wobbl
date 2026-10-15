@@ -107,3 +107,11 @@ def test_a_mold_fill_given_an_expired_deadline_stops_at_once(tmp_path):
     late = H.FillSettings([gate], 800.0, deadline=time.time() - 1.0, budget=600.0)
     with pytest.raises(B.OverBudget):
         H.fill(hm, H.Viscosity(m=2e4, n=0.35), late)
+
+
+def test_an_extra_level_is_priced_at_the_pace_the_last_one_ran():
+    n = 5000.0
+    base = B.PRINT.level(n)
+    fits = dict(law=B.PRINT, n_last=n, h_last=4.0, curv=8, h_next=3.0, spent=base, budget=3 * base, power=1.5)
+    assert B.room_for(**fits)
+    assert not B.room_for(**fits, last_seconds=20 * base)        # this part ran twenty times slower than the law

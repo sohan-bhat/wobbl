@@ -170,13 +170,15 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
     say("budget", bud.note(bfit).split(". The budget")[0])
     f_r, c_r = bfit.factor, bfit.curvature
     levels, gates_xyz, flow, t_fill_set, L_flow = [], [], None, None, None
-    t_levels = time.time()
+    t_levels = t_last = time.time()
     for k, sc in enumerate(scales):
         f = sc * f_r
         if k >= bud.MIN_LEVELS and not bud.room_for(bud.MOLDING, levels[-1]["mesh"].n_nodes,
                                                     h0 * scales[k - 1] * f_r, c_r, h0 * f,
-                                                    time.time() - t_levels, study.budget, bfit.power):
+                                                    time.time() - t_levels, study.budget, bfit.power,
+                                                    levels[-1]["seconds"]):
             break
+        t_last = time.time()
         say("mesh", f"level {k}: element size {h0 * f:.3g} mm")
         mesh = build_mesh(prep, Sizing(h=h0 * f, order=1, curvature=c_r))
         th = element_thickness(mesh, feats)
@@ -200,7 +202,8 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
                                   deadline=limit, budget=study.budget)
         say("fill", f"level {k}: {mesh.n_nodes:,} nodes, melt at {fmt(melt)} C")
         iso = H.fill(hm, visc, settings, say)
-        levels.append({"mesh": mesh, "hm": hm, "gsets": gsets, "iso": iso, "p_switch": _share_pressure(iso)})
+        levels.append({"mesh": mesh, "hm": hm, "gsets": gsets, "iso": iso, "p_switch": _share_pressure(iso),
+                       "seconds": time.time() - t_last})
         if k >= 1 and abs(levels[-1]["p_switch"] / max(levels[-2]["p_switch"], 1e-12) - 1) < CONVERGED:
             break
     bfit.measured = {"levels": len(levels), "nodes": [int(L["mesh"].n_nodes) for L in levels],
