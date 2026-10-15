@@ -475,7 +475,8 @@ def last_time(case: Case) -> Path:
 
 
 def read_field(path: Path) -> np.ndarray:
-    """The internal values of a volScalarField or volVectorField written as ASCII."""
+    """The internal values of a vol field written as ASCII: scalars as a vector of n, vectors, symmetric tensors
+    and tensors as n rows of 3, 6 and 9."""
     text = path.read_text()
     m = re.search(r"internalField\s+(uniform|nonuniform)\s+", text)
     if m.group(1) == "uniform":
@@ -486,4 +487,4 @@ def read_field(path: Path) -> np.ndarray:
     end = text.index("\n)", start)
     vals = np.array(text[start:end].replace("(", " ").replace(")", " ").split(), dtype=float)
     n = int(n_m.group(2))
-    return vals.reshape(n, -1) if n_m.group(1) == "vector" else vals
+    return vals if n_m.group(1) == "scalar" else vals.reshape(n, -1)

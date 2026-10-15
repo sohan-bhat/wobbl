@@ -127,3 +127,13 @@ def test_first_cell_height_scales_with_y_plus():
     assert C.first_cell(30.0, 10.0, 1.5e-5, 1.0) == pytest.approx(30 * h1)
     assert 1e-6 < h1 < 1e-4
     assert math.isfinite(C.darcy_dp(0.02, 10, 0.025, 1000, 1.0, 2.0))
+
+
+def test_tensor_fields_read_as_one_row_per_cell(tmp_path):
+    from wobbl.flow import foam
+    f = tmp_path / "UPrime2Mean"
+    f.write_text("internalField   nonuniform List<symmTensor> 2\n(\n(1 2 3 4 5 6)\n(7 8 9 10 11 12)\n)\n;\n")
+    assert foam.read_field(f).shape == (2, 6)
+    g = tmp_path / "p"
+    g.write_text("internalField   nonuniform List<scalar> 3\n(\n1\n2\n3\n)\n;\n")
+    assert foam.read_field(g).shape == (3,)
