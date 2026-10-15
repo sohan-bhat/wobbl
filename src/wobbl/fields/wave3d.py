@@ -556,7 +556,8 @@ def _cpu() -> float:
 def _gain(r: dict) -> float:
     """Peak gain: directivity times the share of the input power that is radiated rather than lost."""
     eff = min(max((r["p_in"] - r["p_diel"]) / r["p_in"], 1e-6), 1.0) if r["p_in"] > 0 else 1e-6
-    return r["d_max"] * eff
+    d = r["d_max"] if math.isfinite(r["d_max"]) else 0.0          # a closed structure has no far field
+    return d * eff
 
 
 # --- closed forms ------------------------------------------------------------------------------------
@@ -943,8 +944,8 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
     images["impedance"] = plots.curve(out / "images" / "impedance.png", fz,
                                       {"resistance, ohm": [z.real for z in Z], "reactance, ohm": [z.imag for z in Z]},
                                       "frequency, MHz", "ohm", hline=0.0)
-    g_el = 10 * np.log10(np.maximum(base["d_el"] * eff, 1e-6))
-    g_az = 10 * np.log10(np.maximum(base["d_az"] * eff, 1e-6))
+    g_el = 10 * np.log10(np.maximum(np.nan_to_num(base["d_el"], nan=0.0) * eff, 1e-6))   # a closed structure radiates nothing
+    g_az = 10 * np.log10(np.maximum(np.nan_to_num(base["d_az"], nan=0.0) * eff, 1e-6))
     images["pattern"] = plots.polar(out / "images" / "pattern.png", base["angles"],
                                     {"elevation": g_el, "azimuth": g_az},
                                     "gain in dBi, elevation cut (0 is along the feed) and azimuth cut")

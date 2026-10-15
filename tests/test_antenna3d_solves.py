@@ -66,7 +66,7 @@ def test_patch_resonance_against_the_transmission_line_model(tmp_path):
     assert fr == pytest.approx(10e9, rel=1e-3)
     b.setup.span, b.setup.points = 0.05, 3
     b.setup.hints = [7.6e9, 8.0e9, 8.4e9, 8.8e9, 9.2e9]
-    o = wave3d.run(b.scene, b.setup, tmp_path / "out", quality="fast", budget=0)
+    o = wave3d.run(b.scene, b.setup, tmp_path / "out", quality="fast", budget=0, compare=radiate.compare_with_models(b))
     res = o.values["resonance_Hz"]
     assert res is not None and 0.80 < res / fr < 0.92
     st = {c.name: c.status for c in o.checks}
