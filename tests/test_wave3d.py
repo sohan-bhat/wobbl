@@ -136,6 +136,19 @@ def test_resonance_from_reactance_or_resistance_peak():
     assert wave3d.resonance(f, [20 + 30j, 30 + 40j, 40 + 50j], 50) is None
 
 
+def test_sweep_adds_the_resonance_then_the_sharpest_bend():
+    s = wave3d.WaveSetup(f0=1e9, port=wave3d.Port((0, 0, 0), (0, 0, 1e-3)))
+    f = [0.8e9, 0.9e9, 1.0e9, 1.1e9]
+    # a smooth reactive antenna with no resonance in the sweep needs nothing more
+    assert wave3d.next_frequency(f, [2 + 20j, 2 + 30j, 2 + 40j, 2 + 50j], s) is None
+    # a resistance peak that no sample sits near is solved for first
+    nxt = wave3d.next_frequency(f, [2 + 20j, 20 + 22j, 18 + 24j, 2 + 26j], s)
+    assert nxt is not None and 0.9e9 < nxt[0] < 1.0e9 and "resonance" in nxt[1]
+    # a jump of the reflection coefficient between two samples is bisected
+    nxt = wave3d.next_frequency(f, [2 + 20j, 2 + 22j, 45 + 5j, 2 + 28j], s)
+    assert nxt is not None and "changes most" in nxt[1] and 0.9e9 < nxt[0] < 1.1e9
+
+
 def test_setup_mistakes_say_what_to_do(tmp_path):
     sc = Scene([_rod("arm 1", 1, -0.071, -0.0005)], "")
     with pytest.raises(ValueError, match="needs a port"):

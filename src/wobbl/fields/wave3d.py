@@ -59,7 +59,8 @@ class WaveSetup:
     link: dict = field(default_factory=dict)            # tx_power, sensitivity, environment, distance and the like
     tolerance: float = 0.02                             # resonance within this fraction of f0 is on target
     sizes: dict = field(default_factory=dict)           # body or sheet name: element size at its surface, m
-    refine: int = 2                                     # extra solves that home in on the resonance
+    refine: int = 4                                     # extra solves that home in on the resonance and any sharp bend
+    hints: list = field(default_factory=list)           # frequencies a simple model expects structure at, sampled too
 
 
 # --- port geometry -------------------------------------------------------------------------------
@@ -439,6 +440,8 @@ def pattern(E: np.ndarray, H: np.ndarray, sph: dict, rs: float, k: float, axis=N
            "theta_deg": float(np.degrees(np.arccos(np.clip(peak[2], -1, 1)))),
            "phi_deg": float(np.degrees(np.arctan2(peak[1], peak[0])) % 360)}
     if cuts:
+        out["d_sphere"] = (4 * math.pi * U / max(p_ff, 1e-300)).reshape(len(th), len(phs))   # theta by phi
+        out["sphere_theta"], out["sphere_phi"] = th, phs
         t = _unit(axis if axis is not None else (0, 0, 1))
         p = peak - np.dot(peak, t) * t
         if np.linalg.norm(p) < 0.1:
@@ -460,6 +463,7 @@ def pattern(E: np.ndarray, H: np.ndarray, sph: dict, rs: float, k: float, axis=N
 def _solve(msh, s: WaveSetup, f: float, fd: dict, sph: dict, d: Path, plane: dict | None = None,
            cuts: bool = False) -> dict:
     d.mkdir(parents=True, exist_ok=True)
+    t_wall, t_cpu = time.time(), _cpu()
     n = LINE_POINTS
     dl = fd["gap"] / n
     line = (fd["a"] + 0.5 * dl * fd["t"], fd["b"] - 0.5 * dl * fd["t"], n)
@@ -480,9 +484,18 @@ def _solve(msh, s: WaveSetup, f: float, fd: dict, sph: dict, d: Path, plane: dic
            "p_in": 0.5 * (V * np.conj(I0)).real, "p_diel": float(solve.read_global(d, "pdiel.txt")[0]),
            "p_rad": sphere_flux(E, H, sph, sph["radius"]), "dofs": int(hits[-1]) if hits else 0,
            "missing": int(np.isnan(E[..., 0].real).sum()), **pat}
+    out["wall"], out["cpu"] = time.time() - t_wall, _cpu() - t_cpu
     if plane:
         out["slice"] = pro3d.read_plane(d / "slice_e.txt", plane, comps=6)
     return out
+
+
+def _cpu() -> float:
+    """CPU seconds this process and its children have used, which does not grow when the machine is busy."""
+    import resource
+
+    a, b = resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN)
+    return a.ru_utime + a.ru_stime + b.ru_utime + b.ru_stime
 
 
 def _gain(r: dict) -> float:
@@ -582,6 +595,27 @@ def resonance(freqs, Z, z0: float) -> tuple[float, complex, str] | None:
     return None
 
 
+BEND = 0.08           # the largest change in the reflection coefficient's magnitude between neighboring samples left alone
+
+
+def next_frequency(freqs, Z, s: WaveSetup) -> tuple[float, str] | None:
+    """The next frequency worth a solve: the resonance when no sample sits near it, else the middle of the
+    interval where the reflection coefficient's magnitude changes most (a resonance sharper than the sweep's
+    spacing shows up as a dip between two samples), until nothing changes by more than BEND or the intervals are narrower than an eighth of the
+    tolerance. None when the sweep has seen enough."""
+    res = resonance(freqs, Z, s.port.z0)
+    if res and min(abs(res[0] - f) for f in freqs) > 0.003 * s.f0:
+        return float(res[0]), "where the resonance is estimated to be"
+    g = (np.asarray(Z) - s.port.z0) / (np.asarray(Z) + s.port.z0)
+    step = np.abs(np.diff(np.abs(g)))
+    width = np.diff(freqs)
+    ok = width > s.tolerance * s.f0 / 8
+    if not ok.any() or float(np.max(np.where(ok, step, 0.0))) < BEND:
+        return None
+    i = int(np.argmax(np.where(ok, step, 0.0)))
+    return float(0.5 * (freqs[i] + freqs[i + 1])), "where the return loss changes most between samples"
+
+
 def _zs(z: complex) -> str:
     return f"{fmt(z.real)} {'+' if z.imag >= 0 else '-'} j{fmt(abs(z.imag))} ohm"
 
@@ -629,6 +663,7 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
     freqs = [float(s.f0) if abs(f - s.f0) < 1e-6 * s.f0 else f for f in freqs]
     if s.f0 not in freqs:
         freqs = sorted(freqs + [float(s.f0)])
+    freqs = sorted(set(freqs) | {float(h) for h in s.hints if 0.5 * s.f0 <= h <= 1.5 * s.f0})
     lam_min, lam_max = C0 / max(freqs), C0 / min(freqs)
     log("mesh", "placing the port")
     fd = feed(scene, s)
@@ -674,18 +709,13 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
 
     for i, f in enumerate(freqs):
         at(f, i + 1, len(freqs))
-    res = None
-    for _ in range(max(int(s.refine), 0) + 1):
+    for _ in range(max(int(s.refine), 0)):
         fs = sorted(rows)
-        res = resonance(fs, [rows[f]["Z"] for f in fs], s.port.z0)
-        if res is None or len(rows) >= len(freqs) + max(int(s.refine), 0):
+        nxt = next_frequency(fs, [rows[f]["Z"] for f in fs], s)
+        if nxt is None:
             break
-        near = min(abs(res[0] - f) for f in fs)
-        step = min((b - a for a, b in itertools.pairwise(fs) if a <= res[0] <= b), default=0.0)
-        if near < 0.002 * s.f0 or step <= s.tolerance * s.f0 / 4:
-            break
-        log("solve", f"homing in on the resonance near {fmt(res[0] / 1e6)} MHz")
-        at(float(res[0]), len(rows) + 1, len(rows) + 1)
+        log("solve", f"adding {fmt(nxt[0] / 1e6)} MHz, {nxt[1]}")
+        at(nxt[0], len(rows) + 1, len(rows) + 1)
     fs = sorted(rows)
     Z = [rows[f]["Z"] for f in fs]
     base = rows[s.f0]
