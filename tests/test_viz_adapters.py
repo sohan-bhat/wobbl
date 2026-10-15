@@ -56,12 +56,13 @@ def test_flow_particles(tmp_path):
 
 
 def test_molding_fill(tmp_path):
-    from wobbl.process import playback as pp
     V, F = grid_mesh()
     tf = V[:, 0] / 10
-    pp.write(tmp_path / "playback.json", "molding", "fill", V, F, {"t_fill": (tf, "s", "fill", 3)},
-             {"gates": [[0, 0, 1]]}, {"time_s": list(np.linspace(0, 1, 10)), "gate_pressure_MPa": list(range(10)),
-                                      "share_full": list(np.linspace(0, 1, 10))})
+    pb = {"manifest": {"kind": "molding", "title": "Fill", "gates": [[0, 0, 1]]},
+          "mesh": {"vertices": V.tolist(), "triangles": F.tolist()}, "fields": {"t_fill": tf.tolist()},
+          "frames": {"time_s": list(np.linspace(0, 1, 10)), "gate_pressure_MPa": list(range(10)),
+                     "share_full": list(np.linspace(0, 1, 10))}}
+    (tmp_path / "playback.json").write_text(json.dumps(pb))
     outcome(tmp_path, "process")
     assert build_scene(tmp_path)
     _, h = kinds(tmp_path)
