@@ -178,6 +178,7 @@
   "apogee_t_s": 23.464145,
   "landing_speed_mps": 5.719701,
   "drift_m": 29.25408,
+  "diameter_m": 0.098,
   "flight_time_s": 202.751133,
   "impact_speed_mps": 7.259439,
   "distance_m": 29.25408,
@@ -203,8 +204,28 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 4.153,
+ "t_total": 11.688,
  "solver": "scipy 1.18.1 solve_ivp (DOP853)",
+ "criteria": [
+  {
+   "name": "stability margin",
+   "value": "margin_cal",
+   "limit": 1.0,
+   "sense": "min"
+  },
+  {
+   "name": "rail exit speed",
+   "value": "rail_exit_speed_mps",
+   "limit": 15.0,
+   "sense": "min"
+  },
+  {
+   "name": "landing speed",
+   "value": "landing_speed_mps",
+   "limit": 6.1,
+   "sense": "max"
+  }
+ ],
  "events": [
   {
    "name": "liftoff",
@@ -256,7 +277,7 @@
    "speed_mps": 7.259
   }
  ],
- "runtime_s": 4.153,
+ "runtime_s": 11.688,
  "model": {
   "states": 6,
   "effects": [

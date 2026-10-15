@@ -1,0 +1,27 @@
+{
+ "domain": "flight",
+ "analysis": "trajectory",
+ "spec": {
+  "thing": "a 9 cm rock dropped from 300 m",
+  "kind": "body",
+  "question": "How fast does a fist sized rock hit the ground after falling off a 300 m cliff?",
+  "options": {
+   "name": [
+    "rock"
+   ],
+   "diameter": [
+    "9 cm"
+   ],
+   "density": [
+    "2700 kg/m3"
+   ],
+   "cd": [
+    "0.6"
+   ],
+   "height": [
+    "300 m"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

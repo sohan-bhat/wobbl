@@ -95,6 +95,7 @@
   "Still air."
  ],
  "values": {
+  "diameter_m": 0.09,
   "flight_time_s": 8.716865,
   "impact_speed_mps": 56.823386,
   "distance_m": 0.0,
@@ -121,8 +122,9 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 3.774,
+ "t_total": 5.27,
  "solver": "scipy 1.18.1 solve_ivp (DOP853)",
+ "criteria": [],
  "events": [
   {
    "name": "release",
@@ -139,7 +141,7 @@
    "speed_mps": 56.823
   }
  ],
- "runtime_s": 3.774,
+ "runtime_s": 5.27,
  "model": {
   "states": 4,
   "effects": [

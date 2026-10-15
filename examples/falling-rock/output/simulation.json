@@ -1,0 +1,52 @@
+{
+ "thing": "a 9 cm rock dropped from 300 m",
+ "question": "How fast does a fist sized rock hit the ground after falling off a 300 m cliff?",
+ "plan": {
+  "thing": "a 9 cm rock dropped from 300 m",
+  "question": "How fast does a fist sized rock hit the ground after falling off a 300 m cliff?",
+  "domain": "flight",
+  "kind": "body",
+  "analyses": [
+   "trajectory"
+  ],
+  "reasons": [
+   {
+    "decided": "the words \"dropped from\" point to flight (body)",
+    "override": "--domain flight"
+   },
+   {
+    "decided": "physics trajectory, as asked",
+    "override": "--physics trajectory"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "flight",
+    "score": 3
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "objects": [
+   "ground"
+  ],
+  "environment": {
+   "gravity": "1 g",
+   "air": "1976 standard atmosphere"
+  }
+ },
+ "steps": [
+  {
+   "analysis": "trajectory",
+   "domain": "flight",
+   "verdict": "ok",
+   "headline": "Hits the ground 8.72 s after release at 56.8 m/s (205 km/h). Without air it would land after 7.82 s at 76.7 m/s, so drag takes 26% off the impact speed.",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a/examples/falling-rock/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a/examples/falling-rock/output/report.html",
+   "assumptions": []
+  }
+ ]
+}

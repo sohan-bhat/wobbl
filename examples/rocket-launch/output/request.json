@@ -1,0 +1,11 @@
+{
+ "domain": "flight",
+ "analysis": "trajectory",
+ "spec": {
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a/examples/rocket-launch/rocket.toml",
+  "kind": "rocket",
+  "question": "Will this L class rocket fly straight, reach 11,000 ft and land softly in a 10 mph wind?",
+  "options": {}
+ },
+ "wobbl": "0.1.1"
+}
