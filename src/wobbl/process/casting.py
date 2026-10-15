@@ -240,10 +240,10 @@ def mesh_sizes(feats, quality: str) -> tuple[float, float]:
 
 
 def riser_for(xyz, t_hot: float, b_eff: float, X: np.ndarray, casting_nodes: np.ndarray) -> Riser:
-    """A blind riser over a hot spot that freezes at t_hot: modulus 1.2x the hot spot's (from Chvorinov's rule with
+    """A blind riser over a hot spot that freezes at t_hot: modulus 1.35x the hot spot's (from Chvorinov's rule with
     the mold constant b_eff), height 1.5x the diameter, its foot on the casting's top surface above the spot."""
     m_hot = math.sqrt(t_hot / b_eff)
-    d = 5.0 * math.ceil(1.2 * m_hot / 0.2143 / 5.0)              # height 1.5 d gives modulus 0.2143 d
+    d = 5.0 * math.ceil(1.35 * m_hot / 0.2143 / 5.0)              # height 1.5 d gives modulus 0.2143 d
     P = X[casting_nodes]
     near = np.linalg.norm(P[:, :2] - np.asarray(xyz[:2]), axis=1) < max(d / 2, 1e-6)
     top = float(P[near][:, 2].max()) if near.any() else float(xyz[2])
