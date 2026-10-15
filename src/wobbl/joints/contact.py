@@ -27,12 +27,14 @@ from ..structural.spec import SpecError, StructuralStudy, parse_fixture, parse_l
 from ..units import fmt
 from ..verify.checks import Check, balance_check, confidence, convergence_check
 from ..plastic.common import NonlinearOutcome, clean_work, light_png, where
+from . import budget as BUD
 from . import setup as S
 from .assembly import Assembly, prepare_assembly
 
 QUALITY = {"fast": 2000, "normal": 5000, "fine": 12000}   # nodes on the first of two meshes, before the contact
 CONTACT_SIZE = 0.6                                        # element size on contact faces against the global size
 REFINE = 0.75
+CONTACT_ITERS = 40                                        # Newton iterations of one loading step, for the cost model
 TOL = 0.05                                                # the two meshes agree within this
 
 
@@ -54,6 +56,8 @@ class ContactStudy:
     params: dict = field(default_factory=dict)
     keep: bool = False
     playback: bool = False               # also write playback.json with every increment, for a player
+    mesh_size: float | None = None       # element size of the first mesh, mm
+    budget: float = BUD.DEFAULT_BUDGET   # seconds the two meshes may be predicted to take together
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -78,26 +82,40 @@ def run_contact(study: ContactStudy, out_dir: str | Path, progress=None, asm: As
     moves = [S.parse_move(m) for m in study.moves]
     move_sel = [S.select(asm, m.faces) for m in moves]
     levels, last = [], None
-    for k, sizing in enumerate(level_sizes(asm, study)):
-        say("mesh", f"level {k}: element size {sizing.h:.3g} mm")
-        from .assembly import build_assembly_mesh
-        mesh = build_assembly_mesh(asm, sizing)
-        r = solve_level(asm, study, mesh, loads, fixtures, moves, move_sel, work / f"level{k}", say, k)
+    s0 = auto_sizing(asm.prep, thickness=asm.features.thickness_typical,
+                     max_nodes=QUALITY.get(study.quality, QUALITY["normal"]))
+
+    def make(h, refine=REFINE, curv=16):
+        return level_sizes(asm, study, h, refine, curv)
+
+    plan = BUD.fit(asm, make, s0.h, study.mesh_size, study.budget, CONTACT_ITERS * (1 + bool(moves)),
+                   len(asm.pairs), say)
+    for k in range(2):
+        if k == 1:
+            mesh1 = BUD.second_level(plan, asm, make, levels[0]["t_solve"], levels[0]["n_nodes"],
+                                     levels[0]["iterations"])
+        sizing = plan.sizings[k]
+        say("mesh", f"level {k}: element size {sizing.h:.3g} mm, about {plan.nodes[k]:,.0f} nodes, predicted "
+                    f"{plan.seconds[k]:.0f} s")
+        mesh = plan.mesh0 if k == 0 else mesh1
+        r = solve_level(asm, study, mesh, loads, fixtures, moves, move_sel, work / f"level{k}", say, k, plan.timeout())
         levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sizing.h, "governing": r["governing"],
                        "contact_force": r["contact_force"], "peak_pressure": r["peak_pressure"],
                        "increments": r["res"].increments, "iterations": r["res"].iterations,
-                       "t_solve": r["res"].t_solve})
+                       "t_solve": r["res"].t_solve, "predicted_s": round(plan.seconds[k], 1)})
         say("check", f"level {k}: peak stress {r['governing']:.4g} MPa, peak contact pressure "
                      f"{r['peak_pressure']:.4g} MPa")
         last = r
     o = evaluate(study, asm, last, levels, moves)
+    plan.spent = time.time() - t0
+    o.values["budget"] = {**plan.to_dict(), "measured_s": round(plan.spent, 1)}
     o.t_total = time.time() - t0
     if render_images:
         say("render", "drawing the stress and the contact pressure")
         o.images = render(out / "images", last)
     if study.playback:
         o.images["playback"] = playback(out / "playback.json", study, last, bool(moves))
-    o.notes = list(asm.prep.notes)
+    o.notes = list(asm.prep.notes) + plan.notes
     try:
         from .scene import write_scene
         write_scene(out, "contact", study, o, last, base, selections)
@@ -108,21 +126,26 @@ def run_contact(study: ContactStudy, out_dir: str | Path, progress=None, asm: As
     return o
 
 
-def level_sizes(asm: Assembly, study: ContactStudy) -> list[Sizing]:
-    """Two meshes, each finer at the contact faces (0.6 of the global size there, or the size asked for)."""
-    s0 = auto_sizing(asm.prep, thickness=asm.features.thickness_typical,
-                     max_nodes=QUALITY.get(study.quality, QUALITY["normal"]))
+def level_sizes(asm: Assembly, study: ContactStudy, h0: float | None = None, refine: float = REFINE,
+                curv: int = 16) -> list[Sizing]:
+    """Two meshes, each finer at the contact faces (0.6 of the global size there, or the size asked for). The first
+    has element size h0, the second refine times that."""
+    if h0 is None:
+        h0 = float(study.mesh_size or auto_sizing(asm.prep, thickness=asm.features.thickness_typical,
+                                                  max_nodes=QUALITY.get(study.quality, QUALITY["normal"])).h)
     faces = sorted({f for p in asm.pairs for f in (p.slave, p.master)})
     out = []
     for k in range(2):
-        h = s0.h * REFINE ** k
-        c = (study.contact_size * REFINE ** k) if study.contact_size else CONTACT_SIZE * h
+        h = h0 * refine ** k
+        c = (study.contact_size * refine ** k) if study.contact_size else CONTACT_SIZE * h
         out.append(Sizing(h=h, refinements=[Refinement(min(c, h), surfaces=faces, grow=3 * h,
-                                                       label="contact faces")]))
+                                                       label="contact faces")],
+                         curvature=curv))
     return out
 
 
-def solve_level(asm, study, mesh, loads, fixtures, moves, move_sel, work: Path, say, k: int) -> dict:
+def solve_level(asm, study, mesh, loads, fixtures, moves, move_sel, work: Path, say, k: int,
+                timeout: float = 3600.0) -> dict:
     notes: list[str] = []
     mats, mat_of = S.materials(mesh, study.material, {int(b): m for b, m in study.body_materials.items()})
     built = build_static(mesh, loads, fixtures, mat_of[1], asm.features.faces)
@@ -152,7 +175,7 @@ def solve_level(asm, study, mesh, loads, fixtures, moves, move_sel, work: Path, 
                  + ("s" if len(pairs) != 1 else "") + (f", {len(floating)} body held only by contact"
                                                          if floating else ""))
     try:
-        res = nl.solve_nonlinear(model, work, "contact")
+        res = nl.solve_nonlinear(model, work, "contact", timeout=timeout)
     except SolverError as e:
         if floating and not moves:
             raise SolverError(f"{e}", f"Body {floating[0]} is held only by contact and friction, so a load "

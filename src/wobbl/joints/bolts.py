@@ -28,6 +28,7 @@ from ..structural.spec import SpecError, StructuralStudy, parse_fixture, parse_l
 from ..units import UnitError, fmt, parse_quantity
 from ..verify.checks import Check, balance_check, confidence, convergence_check
 from ..plastic.common import NonlinearOutcome, clean_work, light_png
+from . import budget as BUD
 from . import setup as S
 from . import vdi2230 as V
 from .assembly import Assembly, build_assembly_mesh, prepare_assembly
@@ -35,6 +36,7 @@ from .assembly import Assembly, build_assembly_mesh, prepare_assembly
 QUALITY = {"fast": 2000, "normal": 5000, "fine": 12000}
 REFINE = 0.75
 TOL = 0.05
+BOLT_ITERS = 60          # Newton iterations the tightening and the load take together, for the cost model
 PRELOAD_SHARE = 0.7      # without a torque or preload, bolts are tightened to 70% of their proof load
 SLIP_TARGET = 1.2        # VDI 2230's usual safety against slip under static shear
 
@@ -360,6 +362,8 @@ class BoltStudy:
     params: dict = field(default_factory=dict)
     keep: bool = False
     playback: bool = False           # also write playback.json, tightening and loading increment by increment
+    mesh_size: float | None = None   # element size of the first mesh, mm
+    budget: float = BUD.DEFAULT_BUDGET   # seconds the two meshes may be predicted to take together
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -383,27 +387,42 @@ def run_bolts(study: BoltStudy, out_dir: str | Path, progress=None, asm: Assembl
                            [parse_fixture(x) for x in study.fixtures])
     loads, fixtures, selections = S.resolve(asm, base.loads, base.fixtures)
     levels, last = [], None
-    for k, sizing in enumerate(level_sizes(asm, lines, study)):
-        say("mesh", f"level {k}: element size {sizing.h:.3g} mm")
-        mesh = build_assembly_mesh(asm, sizing)
+    s0 = auto_sizing(asm.prep, thickness=asm.features.thickness_typical,
+                     max_nodes=QUALITY.get(study.quality, QUALITY["normal"]))
+
+    def make(h, refine=REFINE, curv=16):
+        return level_sizes(asm, lines, study, h, refine, curv)
+
+    plan = BUD.fit(asm, make, s0.h, study.mesh_size, study.budget, BOLT_ITERS, len(asm.pairs), say)
+    for k in range(2):
+        if k == 1:
+            mesh1 = BUD.second_level(plan, asm, make, levels[0]["t_solve"], levels[0]["n_nodes"],
+                                     levels[0]["iterations"])
+        sizing = plan.sizings[k]
+        say("mesh", f"level {k}: element size {sizing.h:.3g} mm, about {plan.nodes[k]:,.0f} nodes, predicted "
+                    f"{plan.seconds[k]:.0f} s")
+        mesh = plan.mesh0 if k == 0 else mesh1
         say("solve", f"level {k}: tightening {len(lines)} bolt{'s' if len(lines) != 1 else ''}, then the load, on "
                      f"{mesh.n_nodes:,} nodes")
-        r = solve_level(asm, study, lines, mesh, loads, fixtures, work / f"level{k}")
+        r = solve_level(asm, study, lines, mesh, loads, fixtures, work / f"level{k}", plan.timeout())
         levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sizing.h,
                        "bolt_force": max(b["force"] for b in r["bolts"]),
                        "clamp_force": min(b["clamp"] for b in r["bolts"]), "increments": r["res"].increments,
-                       "iterations": r["res"].iterations, "t_solve": r["res"].t_solve})
+                       "iterations": r["res"].iterations, "t_solve": r["res"].t_solve,
+                       "predicted_s": round(plan.seconds[k], 1)})
         say("check", f"level {k}: worst bolt {levels[-1]['bolt_force'] / 1000:.4g} kN, least clamp "
                      f"{levels[-1]['clamp_force'] / 1000:.4g} kN")
         last = r
     o = evaluate(study, asm, lines, last, levels)
+    plan.spent = time.time() - t0
+    o.values["budget"] = {**plan.to_dict(), "measured_s": round(plan.spent, 1)}
     o.t_total = time.time() - t0
     if render_images:
         say("render", "drawing the contact pressure between the clamped parts")
         o.images = render(out / "images", last)
     if study.playback:
         o.images["playback"] = playback(out / "playback.json", study, last)
-    o.notes = list(asm.prep.notes)
+    o.notes = list(asm.prep.notes) + plan.notes
     try:
         from .scene import write_scene
         write_scene(out, "bolts", study, o, last, base, selections, lines)
@@ -414,24 +433,28 @@ def run_bolts(study: BoltStudy, out_dir: str | Path, progress=None, asm: Assembl
     return o
 
 
-def level_sizes(asm: Assembly, lines: list[BoltLine], study: BoltStudy) -> list[Sizing]:
-    """Two meshes, finer around each head and nut so the rings and the cone under them are resolved."""
-    s0 = auto_sizing(asm.prep, thickness=asm.features.thickness_typical,
-                     max_nodes=QUALITY.get(study.quality, QUALITY["normal"]))
+def level_sizes(asm: Assembly, lines: list[BoltLine], study: BoltStudy, h0: float | None = None,
+                refine: float = REFINE, curv: int = 16) -> list[Sizing]:
+    """Two meshes, finer around each head and nut so the rings and the cone under them are resolved. The first has
+    element size h0, the second refine times that."""
+    auto = float(auto_sizing(asm.prep, thickness=asm.features.thickness_typical,
+                             max_nodes=QUALITY.get(study.quality, QUALITY["normal"])).h)
+    h0 = float(h0 or study.mesh_size or auto)
+    coarse = max(1.0, h0 / auto)      # a coarser mesh than the automatic one coarsens the rings with it
     out = []
     for k in range(2):
-        h = s0.h * REFINE ** k
+        h = h0 * refine ** k
         refs = []
         for ln in lines:
             # about two elements across the ring under the head: the ring is rigid, so finer only adds nodes
-            size = min(h, max(0.5 * (ln.bolt.dw - ln.hole), 0.2 * ln.bolt.dw)) * REFINE ** k
+            size = min(h, max(0.5 * (ln.bolt.dw - ln.hole), 0.2 * ln.bolt.dw) * coarse * refine ** k)
             refs.append(Refinement(size, points=[tuple(ln.head), tuple(ln.nut)], radius=0.5 * ln.bolt.dw,
                                    grow=0.5 * ln.bolt.dw, label=f"bolt {ln.label}"))
-        out.append(Sizing(h=h, refinements=refs))
+        out.append(Sizing(h=h, refinements=refs, curvature=curv))
     return out
 
 
-def solve_level(asm, study, lines, mesh, loads, fixtures, work: Path) -> dict:
+def solve_level(asm, study, lines, mesh, loads, fixtures, work: Path, timeout: float = 3600.0) -> dict:
     notes: list[str] = []
     mats, mat_of = S.materials(mesh, study.material, {int(b): m for b, m in study.body_materials.items()})
     built = build_static(mesh, loads, fixtures, mat_of[min(mat_of)], asm.features.faces)
@@ -465,7 +488,7 @@ def solve_level(asm, study, lines, mesh, loads, fixtures, work: Path) -> dict:
                              every_increment=every))
     model = nl.NonlinearModel(sm, mats, steps, contact=pairs, springs=springs, bolts=bolts, fields=("U", "RF", "S"))
     try:
-        res = nl.solve_nonlinear(model, work, "joint")
+        res = nl.solve_nonlinear(model, work, "joint", timeout=timeout)
     except SolverError as e:
         raise SolverError(str(e), "If the clamped parts slide under the load, friction cannot hold it: check the "
                           "slip safety with fewer load or more preload") from None

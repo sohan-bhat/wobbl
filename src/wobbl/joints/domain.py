@@ -26,6 +26,11 @@ def _common(job):
     return base, quality
 
 
+def budget(job) -> float:
+    from .budget import DEFAULT_BUDGET
+    return job.number("budget", DEFAULT_BUDGET) or DEFAULT_BUDGET
+
+
 def contact(job):
     from .contact import ContactStudy, run_contact
 
@@ -35,7 +40,7 @@ def contact(job):
     st = ContactStudy(base.part, base.material, [x.text for x in base.loads], [f.text for f in base.fixtures],
                       job.values("move"), friction, _bodies(job, "body-material"), bonded,
                       job.number("contact-size"), job.number("target-sf"), quality, job.question, base.scale,
-                      base.params, job.flag("keep"), job.flag("playback"))
+                      base.params, job.flag("keep"), job.flag("playback"), base.mesh_size, budget(job))
     job.ready()
     o = run_contact(st, job.out, job.log, render_images=not job.quick)
     job.criterion("stress", "governing_MPa", o.values["governing_MPa"] * o.values["safety_factor"], "max")
@@ -58,7 +63,7 @@ def bolts(job):
     nut = float(job.value("nut-factor", "0.2", "nut factor K in T = K F d not given"))
     st = BoltStudy(base.part, base.material, given, [x.text for x in base.loads], [f.text for f in base.fixtures],
                    friction, nut, _bodies(job, "body-material"), [], quality, job.question, base.scale, base.params,
-                   job.flag("keep"), job.flag("playback"))
+                   job.flag("keep"), job.flag("playback"), base.mesh_size, budget(job))
     job.ready()
     o = run_bolts(st, job.out, job.log, render_images=not job.quick)
     job.criterion("bolt proof use", "proof_use", 1.0, "max")
@@ -69,7 +74,9 @@ def bolts(job):
 _SHARED = (Option("friction", "Friction coefficient between touching parts"),
            Option("body-material", "Material of one body of the assembly, as '2=pc'", multiple=True),
            Option("playback", "Also write playback.json with every increment, for a player", flag=True),
-           Option("keep", "Keep the solver's work files", flag=True))
+           Option("keep", "Keep the solver's work files", flag=True),
+           Option("budget", "Seconds the two meshes may be predicted to take together before the mesh is coarsened",
+                  "1500"))
 
 register(Analysis(
     "part", "contact", "Parts of an assembly that press on each other, slide and open, with friction",
