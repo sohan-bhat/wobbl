@@ -109,8 +109,7 @@ function lut(name) {
   for (let i = 0; i < 256; i++) {
     const x = i / 255;
     let c;
-    // turbo without its near black ends, so a part at low or peak stress still reads under the lights
-    if (!s.length) c = turbo(0.06 + 0.79 * x);
+    if (!s.length) c = turbo(x);
     else { const f = x * (s.length - 1), a = Math.min(Math.floor(f), s.length - 2), k = f - a; c = [0, 1, 2].map((j) => lerp(s[a][j], s[a + 1][j], k)); }
     o.set(c.map((v) => Math.round(v * 255)), i * 3);
   }
@@ -227,7 +226,7 @@ precision highp float;in vec3 vn,vw;in vec4 vc;in float vr;
 uniform vec3 eye,gc;uniform float th,prop,glow,alpha;out vec4 o;
 void main(){if(vr>th)discard;vec3 N=normalize(vn),v=normalize(eye-vw);if(dot(N,v)<0.)N=-N;
 vec3 l1=normalize(vec3(.35,.55,.75)),l2=normalize(vec3(-.7,-.1,.45));
-float d=.26+.6*max(dot(N,l1),0.)+.2*max(dot(N,l2),0.)+.3*max(dot(N,v),0.),s=.16*pow(max(dot(N,normalize(l1+v)),0.),28.);
+float d=.34+.6*max(dot(N,l1),0.)+.2*max(dot(N,l2),0.),s=.16*pow(max(dot(N,normalize(l1+v)),0.),28.);
 vec3 col=vc.rgb*d+s;if(prop>.5&&mod(gl_FragCoord.x+gl_FragCoord.y,12.)<6.)col*=.8;
 col=mix(col,gc,glow);o=vec4(col,vc.a*alpha);}`;
 const LVS = `#version 300 es
