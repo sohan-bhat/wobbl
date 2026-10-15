@@ -65,7 +65,8 @@ UNSTEADY_GRID = (24, 60)
 LES_GRID = (16, 36, 8)          # around a quarter, out, along the span
 LES_SPAN = math.pi / 2
 LES_FAR = 20.0
-SECONDS_PER_CELL_STEP = 1.2e-5  # pimpleFoam with two pressure correctors on one core of a 2018 laptop, measured
+SECONDS_PER_CELL_STEP = 4e-5    # pimpleFoam IDDES on 3D cells with two correctors, measured 6e-5 with other runs
+                                # sharing the machine and 1.2e-5 for 2D laminar, so the middle is quoted
 BYTES_PER_CELL = 2500           # OpenFOAM's peak memory per cell for these runs, measured
 
 

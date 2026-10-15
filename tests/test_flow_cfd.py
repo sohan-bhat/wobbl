@@ -64,3 +64,18 @@ def test_time_accurate_runs_reproduce_vortex_shedding_at_re_100(tmp_path):
     assert r["cd"] == pytest.approx(1.33, rel=0.03)
     assert r["cl_amp"] == pytest.approx(0.33, rel=0.12)
     assert abs(r["st_halves"][0] - r["st_halves"][1]) < 0.01 * r["st"]       # the street had settled
+
+
+@pytest.mark.slow
+def test_iddes_sheds_at_the_cylinders_strouhal_number_at_re_3900(tmp_path):
+    """Spalart Allmaras IDDES on a coarse 3D slab of the cylinder (18 thousand cells, 90 degrees of span), against
+    the subcritical Strouhal number of about 0.21 (Williamson 1996 gives 0.215 at Re 3900). Measured here in about
+    50 minutes: St 0.233 over eight cycles, the two halves of the run within 1%, and 99% of the near wake's energy
+    resolved. The mean drag of 1.76 is far above the 0.9 to 1.1 of fine grids, which is why the check is on the
+    frequency only and a coarse grid is reported with low confidence."""
+    from wobbl.flow.external import shedding
+
+    r = shedding(3900.0, tmp_path, "des", periods=8, st_guess=0.2, settle_periods=6)
+    assert 0.18 < r["st"] < 0.25
+    assert abs(r["st_halves"][0] - r["st_halves"][1]) < 0.03 * r["st"]
+    assert r["resolved"]["resolved_fraction"] > 0.8
