@@ -61,6 +61,11 @@ class Plan:
     def predicted(self) -> float:
         return float(sum(self.seconds))
 
+    def coarsened_note(self) -> str:
+        return (f"To fit the {self.budget:.0f} s budget the mesh was coarsened (element size {self.h[0]:.3g} mm and "
+                f"{self.curv} elements round each circle), with about {self.nodes[0]:,.0f} nodes on the first mesh "
+                f"and {self.nodes[1]:,.0f} on the second. A larger --budget keeps a finer mesh.")
+
     def to_dict(self) -> dict:
         return {"budget_s": self.budget, "predicted_s": round(self.predicted, 1),
                 "predicted_nodes": [int(n) for n in self.nodes], "element_mm": [round(float(h), 3) for h in self.h],
@@ -130,9 +135,7 @@ def fit(asm, make, h_auto: float, h_user: float | None, budget: float, iteration
                           f"more than the {budget:.0f} s budget, so it was kept. Pass a larger --budget to silence "
                           "this or a larger --mesh-size to run faster.")
     elif plan.rung_index > 0:
-        plan.notes.append(f"To fit the {budget:.0f} s budget the mesh was coarsened (element size {plan.h[0]:.3g} mm "
-                          f"and {plan.curv} elements round each circle), with about {plan.nodes[0]:,.0f} nodes on the first "
-                          f"mesh and {plan.nodes[1]:,.0f} on the second. A larger --budget keeps a finer mesh.")
+        plan.notes.append(plan.coarsened_note())
     return plan
 
 
@@ -156,6 +159,7 @@ def second_level(plan: Plan, asm, make, t_first: float, n_first: int, iters_firs
         if cost <= left:
             break
     plan.sizings[1], plan.h[1], plan.nodes[1], plan.seconds[1] = sizing, sizing.h, mesh.n_nodes, cost
+    plan.notes = [plan.coarsened_note() if n.startswith("To fit the") else n for n in plan.notes]
     if cost > left and not plan.user_size:
         plan.notes.append(f"The second mesh is predicted to take {cost:.0f} s against {left:.0f} s left in the "
                           f"budget even at its least refinement ({q:g} of the first element size). It runs anyway, "
