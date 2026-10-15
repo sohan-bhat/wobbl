@@ -14,7 +14,6 @@ the induced EMF theory.
 """
 from __future__ import annotations
 
-import itertools
 import math
 import re
 import shutil

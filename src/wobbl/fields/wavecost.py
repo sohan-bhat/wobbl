@@ -96,7 +96,7 @@ def cost(nodes: float, points: int, refine: int, verify: bool, speedup: float = 
 
 def memory(unknowns: float, verify: bool) -> float:
     big = unknowns * (max(FINE_FACTOR, FAR_FACTOR) if verify else 1.0)
-    return BYTES_PER_UNKNOWN * big * (big / 1e5) ** 0.3 / 1.0
+    return BYTES_PER_UNKNOWN * big * (big / 1e5) ** 0.3
 
 
 def assess(nodes: int, quality: str, points: int, refine: int, budget: float, speedup: float = SPEEDUP,
