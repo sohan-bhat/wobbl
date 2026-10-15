@@ -132,3 +132,48 @@ def test_flat_block_drop_study(tmp_path):
     doc = json.loads((tmp_path / "out" / "playback.json").read_text())
     assert doc["kind"] == "drop" and (tmp_path / "out" / "playback.json").stat().st_size < 300_000
     assert len(doc["frames"]["time_s"]) >= 10 and doc["fall"]["down"] == [0.0, 0.0, -1.0]
+
+
+def test_budget_estimate_scales_like_an_explicit_march():
+    """The cost is steps times matrix work: twice the impact time doubles it, and a shorter step lengthens it."""
+    from wobbl.drop import budget as B
+
+    a = B.study_cost(20_000, 4e6, 1e7, 1e-4, 6, 2)
+    b = B.study_cost(20_000, 4e6, 1e7, 2e-4, 6, 2)
+    assert a.steps == pytest.approx(1e-4 / B.stable_dt(1e7), abs=1)
+    assert 1.4 < b.runs["quadratic"] / a.runs["quadratic"] < 2.0      # the stress frames do not grow with time
+    c = B.study_cost(20_000, 4e6, 2e7, 1e-4, 6, 2)          # a mesh twice as stiff steps half as long
+    assert c.steps == pytest.approx(2 * a.steps, abs=2)
+    assert B.study_cost(20_000, 4e6, 1e7, 1e-4, 1, 1, refine=False).seconds < a.seconds
+    assert list(a.runs) == ["setup", "screen", "quadratic", "refined"]
+
+
+def test_budget_coarsens_the_mesh_and_says_so(tmp_path):
+    """A plate with a hole over a tiny budget is meshed with fewer elements round the hole and more mass scaling,
+    and the budget is reported; with a generous budget the first mesh is kept."""
+    from wobbl.drop import budget as B
+    from wobbl.drop.floors import get_floor
+    from wobbl.drop.study import DropStudy, fit_mesh
+    from wobbl.materials import resolve_material
+    from wobbl.structural.run import describe_part
+
+    part = tmp_path / "plate.py"
+    part.write_text('PARAMS = {"a": 60.0, "b": 40.0, "c": 4.0}\n\n\n'
+                    "def build(occ, a, b, c):\n    box = occ.addBox(0, 0, 0, a, b, c)\n"
+                    "    hole = occ.addCylinder(a / 2, b / 2, -1, 0, 0, c + 2, 6)\n    occ.cut([(3, box)], [(3, hole)])\n")
+    mat = resolve_material("pc").internal()
+    prep, feats = describe_part(str(part), tmp_path / "w", 1.0, None, {})
+    h = 3.0
+    floor = get_floor("tile")
+    roomy = DropStudy(str(part), "pc", "0.8 m", "-z", "tile", quality="fast", budget=1e6)
+    q, *_, rung, cost = fit_mesh(roomy, prep, feats, mat, floor, h)
+    assert rung == B.RUNGS[0] and "left as meshed" in cost.fit
+    tight = DropStudy(str(part), "pc", "0.8 m", "-z", "tile", quality="fast", budget=1.0)
+    q2, *_, rung2, cost2 = fit_mesh(tight, prep, feats, mat, floor, h)
+    assert rung2 == B.RUNGS[-1] and len(q2.X) < len(q.X)
+    assert "coarsened" in cost2.fit and "still over the budget" in cost2.fit
+    assert cost2.seconds < cost.seconds
+    held = DropStudy(str(part), "pc", "0.8 m", "-z", "tile", quality="fast", budget=1.0, mesh_size=h)
+    *_, rung3, cost3 = fit_mesh(held, prep, feats, mat, floor, h)
+    assert rung3 == B.RUNGS[0] and "was set" in cost3.fit
+

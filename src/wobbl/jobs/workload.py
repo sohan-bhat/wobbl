@@ -357,6 +357,32 @@ def cost(w: Workload):
 _PART_COSTS: dict = {}
 
 
+def drop_cost(w: Workload):
+    """A drop study priced from the mesh it would march: its node count, stiffness matrix and time step, with the
+    study's own budget deciding how coarse that mesh is."""
+    from .. import estimate as E
+    from ..drop.study import predict
+
+    p = w.params
+    if w.part is None:
+        return E.Cost("wobbl drop", "drop", 0.0, 0.0, 0.0, 0.0, {}, ["No part was given, so the drop is not priced."],
+                      known=False)
+    st = w.part.stat()
+    key = ("drop", str(w.part.resolve()), st.st_size, int(st.st_mtime), p.get("quality"), p.get("mesh_size"),
+           p.get("scale"), p.get("budget"))
+    if key not in _PART_COSTS:
+        _PART_COSTS[key] = predict(str(w.part), quality=str(p.get("quality") or "normal"),
+                                   budget=float(p.get("budget") or 600.0), scale=float(p.get("scale") or 1.0),
+                                   mesh_size=p.get("mesh_size"))
+    cost, mem = _PART_COSTS[key]
+    basis = [f"Explicit drop priced from the part's mesh of {cost.nodes:,} nodes, its time step of "
+             f"{cost.dt * 1e6:.2g} microseconds over up to {cost.t_end * 1e6:.0f} microseconds of impact "
+             f"({cost.steps:,} steps), and the landings it screens. The mesh is coarsened to fit a budget of "
+             f"{float(p.get('budget') or 600.0):.0f} s. {cost.fit}."]
+    return E.Cost("wobbl drop", "drop", cost.seconds, 0.2, 2e8 + mem, 5e6,
+                  {"nodes": cost.nodes, "steps": cost.steps}, basis)
+
+
 def part_cost(w: Workload, h: Hooks):
     """A command that meshes a CAD part, priced from the part's first mesh and its procedure's solves."""
     import tempfile
@@ -486,6 +512,7 @@ def _builtin():
     register("buckling", domain="buckling", solves=2.5)
     register("vibration", domain="vibration", solves=2.0)
     register("plastic", domain="plastic", solves=25.0)
+    register("drop", domain="drop", cost=drop_cost)
     register("jobs run-plan", domain="simulate", cost=_run_plan_cost)
 
 

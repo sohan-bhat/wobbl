@@ -22,13 +22,14 @@ import numpy as np
 
 from ..units import fmt, to_internal
 from ..verify.checks import Check, confidence, convergence_check
-from . import tet10
+from . import budget as bud, tet10
 from .explicit import Contact, History, integrate, omega_max
 from .floors import FloorMaterial, get_floor
 
 G = 9810.0                   # mm/s2
 TOP = {"fast": 1, "normal": 2, "fine": 3}          # screened landings run again on quadratic tets
 MAX_NODES = 80_000           # the largest solid mesh, estimated, a drop marches
+FRAME_BYTES = 150 * 3 * 4    # the kept frames of displacement, per node
 TOL = 0.10                   # drop peaks settle to about 10% between meshes
 RIGID_FLOOR = 10.0           # a hard floor is ten times stiffer than a layer of the part one element deep
 
@@ -48,6 +49,7 @@ class DropStudy:
     scale: float = 1.0
     params: dict = field(default_factory=dict)
     mesh_size: float | None = None
+    budget: float = bud.DEFAULT_BUDGET     # s, the run time the study may be predicted to take
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -80,10 +82,10 @@ def parse_height(text: str) -> float:
     return to_internal(str(text), "length", "m")
 
 
-def make_model(prep, h: float, mat: dict, order: int, base=None) -> Model:
+def make_model(prep, h: float, mat: dict, order: int, base=None, curvature: int = 12) -> Model:
     from ..mesh.mesher import Sizing, build_mesh
 
-    mesh = base.mesh if base is not None else build_mesh(prep, Sizing(h=h, order=2, curvature=12))
+    mesh = base.mesh if base is not None else build_mesh(prep, Sizing(h=h, order=2, curvature=curvature))
     tets, tris = (mesh.tets, mesh.tris) if order == 2 else _linear(mesh)
     X = mesh.X
     if order == 1:
@@ -251,16 +253,19 @@ def contact_for(model: Model, d: np.ndarray, floor: FloorMaterial, E: float, ban
                    k_rigid)
 
 
+def march_limit(model: Model, c: Contact, mat: dict) -> float:
+    """The longest a landing is marched, s: long enough for a soft floor (a spring and mass pulse on the softest
+    floor patch, three times over) and for a wave to cross the part twenty times, never above 50 ms."""
+    pulse = np.pi * np.sqrt(model.mass.sum() / max(float(c.k.sum()) * 0.05, 1e-30))
+    cw = np.sqrt(mat["E"] / mat["density"])
+    return min(max(3 * pulse, 20 * float(np.ptp(model.X, axis=0).max()) / cw), 0.05)
+
+
 def simulate(model: Model, d: np.ndarray, v0: float, floor: FloorMaterial, mat: dict, watch: np.ndarray,
              frames: int = 100, ring: float = 0.3, progress=None) -> tuple[History, Contact]:
     band = 0.15 * float(np.ptp(model.X @ d)) + 2 * model.h
     c = contact_for(model, d, floor, mat["E"], band)
-    # long enough for a soft floor: a spring and mass pulse on the softest floor patch, plus ringing
-    m = model.mass.sum()
-    k_all = float(c.k.sum())
-    pulse = np.pi * np.sqrt(m / max(k_all * 0.05, 1e-30))
-    cw = np.sqrt(mat["E"] / mat["density"])
-    t_max = min(max(3 * pulse, 20 * float(np.ptp(model.X, axis=0).max()) / cw), 0.05)
+    t_max = march_limit(model, c, mat)
     hist = integrate(model.K, model.mass, model.X, c, v0 * d, G * d, watch, t_max, frames, model.wmax,
                      ring=ring, progress=progress)
     return hist, c
@@ -361,7 +366,7 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
         pre = describe_part(study.part, out / "work", study.scale, None, study.params)
     prep, feats = pre
     t_wall = feats.thickness_typical or prep.diag / 10
-    h0 = study.mesh_size or min(prep.diag / 14.0, 1.5 * t_wall)
+    h0 = h_user = study.mesh_size or min(prep.diag / 14.0, 1.5 * t_wall)
     # a ten node tet mesh has about 9.4 V / h^3 nodes, and no element can be larger than the wall it sits in
     estimate = 9.4 * max(prep.volume, 1e-9) / min(h0, t_wall) ** 3
     if estimate > MAX_NODES and not study.mesh_size:
@@ -372,12 +377,9 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
     ductile = material.ductile
     say("mesh", f"meshing with {h0:.3g} mm tets")
     lin = None
-    quad0 = make_model(prep, h0, mat, 2)
-    extra, watch, mass_notes = added_masses(study, quad0, feats)
-    finish(quad0, extra)
-    cands = candidates(study.orientation, quad0.X, quad0.mass, study.quality)
-    axes = mirror_axes(quad0.X, extra, h0)
-    cands, same = unique_landings(cands, axes)
+    (quad0, extra, watch, mass_notes, cands, axes, same, h0, rung, cost) = fit_mesh(
+        study, prep, feats, mat, floor, h0, say)
+    _, curv, cap = rung
     g_cut = 10_000.0
     zone = 2.0 * h0
     screen = []
@@ -410,13 +412,13 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
 
         g0 = quad0.X[runs[worst][2]["node"]]
         say("mesh", f"level 1: {0.5 * h0:.3g} mm tets around the peak for {name}")
-        mesh = build_mesh(prep, Sizing(h=h0, order=2, curvature=12,
+        mesh = build_mesh(prep, Sizing(h=h0, order=2, curvature=curv,
                                        refinements=[Refinement(0.5 * h0, points=[tuple(g0)], radius=3 * h0,
                                                                label="drop peak")]))
         mk = make_model(prep, h0, mat, 2, base=_Base(mesh))
         mk.h = 0.5 * h0
         ex, wk, _ = added_masses(study, mk, feats)
-        finish(mk, ex)
+        finish(mk, ex, scale=cap)
         say("solve", f"level 1: {len(mk.X):,} nodes")
         hist, c = simulate(mk, d, v0, floor, mat, wk)
         ev = evaluate(mk, hist, c, mat, ductile, v0, wk, g_cut, zone)
@@ -445,6 +447,7 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
                ("impact speed", f"{fmt(v0 / 1000)} m/s"), ("pulse", f"{fmt(ev['pulse_ms'])} ms")]
     fixes = _fixes(material, gov, target, sf, floor, H) if verdict != "holds" else []
     assumptions = _assumptions(material, floor, H, v0, name, same, mass_notes, model, g_cut, axes)
+    assumptions.append(cost.fit + '. The whole study took ' + bud.hhmm(time.time() - t_start))
     img = {}
     if render:
         say("render", "drawing the stress and the g record")
@@ -518,6 +521,114 @@ def _screen_one(job) -> dict:
     ev = evaluate(model, hist, c, mat, ductile, v0, watch, None)     # ranked by stress; the g is read later
     return {"name": name, "d": [float(x) for x in d], "governing": ev["governing"], "g_watch": ev["g_watch"],
             "g_rigid": ev["g_rigid"], "pulse_ms": ev["pulse_ms"]}
+
+
+def fit_mesh(study: DropStudy, prep, feats, mat: dict, floor: FloorMaterial, h_user: float, say=None):
+    """Mesh the part and predict the study's run time on that mesh, giving up fineness rung by rung (fewer
+    elements round curves, larger elements, more mass scaling) until the prediction fits the study's budget.
+    A mesh size the user set is kept, and the prediction is only reported."""
+    say = say or (lambda a, b: None)
+    rungs = bud.RUNGS[:1] if study.mesh_size else bud.RUNGS
+    k = 0
+    while True:
+        hf, curv, cap = rungs[k]
+        h0 = h_user * hf
+        quad0 = make_model(prep, h0, mat, 2, curvature=curv)
+        extra, watch, mass_notes = added_masses(study, quad0, feats)
+        finish(quad0, extra, scale=cap)
+        cands = candidates(study.orientation, quad0.X, quad0.mass, study.quality)
+        axes = mirror_axes(quad0.X, extra, h0)
+        cands, same = unique_landings(cands, axes)
+        cost = _predict(quad0, cands[0][1], floor, mat, len(cands), study)
+        if cost.seconds <= study.budget or k == len(rungs) - 1:
+            break
+        say("budget", f"predicted {bud.hhmm(cost.seconds)} against a budget of {bud.hhmm(study.budget)} with "
+                      f"{len(quad0.X):,} nodes, coarsening")
+        k = min(k + (2 if cost.seconds > 4 * study.budget else 1), len(rungs) - 1)    # far over: skip a rung
+    rung = (hf, curv, cap)
+    cost.fit = _fit_note(cost, study, rung)
+    return quad0, extra, watch, mass_notes, cands, axes, same, h0, rung, cost
+
+
+def predict(part: str, material: str = "abs", floor: str = "concrete", orientation: str = "worst",
+            quality: str = "normal", budget: float = bud.DEFAULT_BUDGET, scale: float = 1.0,
+            mesh_size: float | None = None) -> tuple[bud.DropCost, int]:
+    """The predicted run time of a drop study of a part, and the bytes its matrices and frames take, before any
+    of it is solved: the part is meshed, as the study would, and the mesh is fitted to the budget."""
+    import tempfile
+
+    from ..materials import resolve_material
+    from ..structural.run import describe_part
+
+    st = DropStudy(part, material, "1 m", orientation, floor, quality=quality, scale=scale, mesh_size=mesh_size,
+                   budget=budget)
+    mat = resolve_material(material if material != "auto" else "abs").internal()
+    with tempfile.TemporaryDirectory() as tmp:
+        prep, feats = describe_part(part, tmp, scale, None, {})
+        t_wall = feats.thickness_typical or prep.diag / 10
+        h0 = mesh_size or min(prep.diag / 14.0, 1.5 * t_wall)
+        quad0, *_, cost = fit_mesh(st, prep, feats, mat, get_floor(floor), h0)
+    return cost, int(24 * quad0.K.nnz + FRAME_BYTES * len(quad0.X))
+
+
+def _predict(model: Model, d: np.ndarray, floor: FloorMaterial, mat: dict, landings: int,
+             study: DropStudy) -> bud.DropCost:
+    """What the study is predicted to cost on this mesh, from its node count, its stiffness matrix and its time
+    step, and the longest a landing is marched."""
+    band = 0.15 * float(np.ptp(model.X @ d)) + 2 * model.h
+    c = contact_for(model, d, floor, mat["E"], band)
+    top = min(landings, TOP.get(study.quality, 2))
+    return bud.study_cost(len(model.X), model.K.nnz, model.wmax, march_limit(model, c, mat), landings, top,
+                          study.quality != "fast")
+
+
+def _fit_note(cost: bud.DropCost, study: DropStudy, rung: tuple, h_user: float) -> str:
+    """The sentence for the assumptions: what was predicted and what was given up to fit the budget."""
+    hf, curv, cap = rung
+    base = f"predicted run time {bud.hhmm(cost.seconds)} against a budget of {bud.hhmm(study.budget)}"
+    if rung == bud.RUNGS[0]:
+        return base + (", so the mesh was left as it was" if cost.seconds <= study.budget else
+                       " (a mesh size was set, so it was not coarsened, pass a larger budget to silence this)")
+    gave = []
+    if curv != bud.RUNGS[0][1]:
+        gave.append(f"{curv} elements round each curve instead of {bud.RUNGS[0][1]}")
+    if hf != 1.0:
+        gave.append(f"elements {hf:g} times larger")
+    if cap != bud.RUNGS[0][2]:
+        gave.append(f"mass scaling up to {100 * cap:.0f}% of the part's mass instead of "
+                    f"{100 * bud.RUNGS[0][2]:.0f}%")
+    tail = "" if cost.seconds <= study.budget else ", still over the budget at the coarsest allowed mesh"
+    return f"{base}, so the mesh was coarsened to {'; '.join(gave)}{tail} (--budget raises it)"
+
+
+def _predict(model: Model, d: np.ndarray, floor: FloorMaterial, mat: dict, landings: int,
+             study: DropStudy) -> bud.DropCost:
+    """What the study is predicted to cost on this mesh, from its node count, its stiffness matrix and its time
+    step, and the longest a landing is marched."""
+    band = 0.15 * float(np.ptp(model.X @ d)) + 2 * model.h
+    c = contact_for(model, d, floor, mat["E"], band)
+    top = min(landings, TOP.get(study.quality, 2))
+    return bud.study_cost(len(model.X), model.K.nnz, model.wmax, march_limit(model, c, mat), landings, top,
+                          study.quality != "fast")
+
+
+def _fit_note(cost: bud.DropCost, study: DropStudy, rung: tuple) -> str:
+    """The sentence for the assumptions: what was predicted and what was given up to fit the budget."""
+    hf, curv, cap = rung
+    first = bud.RUNGS[0]
+    base = f"Predicted run time {bud.hhmm(cost.seconds)} against a budget of {bud.hhmm(study.budget)}"
+    if rung == first:
+        return base + (", so the mesh was left as meshed" if cost.seconds <= study.budget else
+                       ", over the budget, but a mesh size was set so it was not coarsened")
+    gave = []
+    if curv != first[1]:
+        gave.append(f"{curv} elements round each curve instead of {first[1]}")
+    if hf != 1.0:
+        gave.append(f"elements {hf:g} times larger")
+    if cap != first[2]:
+        gave.append(f"mass scaling up to {100 * cap:.0f}% of the part's mass instead of {100 * first[2]:.0f}%")
+    tail = "" if cost.seconds <= study.budget else ", and it is still over the budget at the coarsest mesh allowed"
+    return f"{base}, so the mesh was coarsened to {' and '.join(gave)}{tail}. The budget can be raised with --budget"
 
 
 def _level(k: int, model: Model, ev: dict) -> dict:

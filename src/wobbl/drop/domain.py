@@ -66,7 +66,7 @@ def drop(job):
     st = DropStudy(str(job.path), mat, height, land, fl, job.values("mass"), job.value("watch") or "",
                    num("target-sf"), "fast" if job.quick else (job.value("quality") or "normal"), q,
                    num("scale", 1.0) or 1.0, dict(p.split("=", 1) for p in job.values("param") if "=" in p),
-                   num("mesh-size"))
+                   num("mesh-size"), job.number("budget", 600.0) or 600.0)
     floor = get_floor(fl)
     job.situate(environment={"floor": floor.key, "floor_name": floor.name, "height_m": parse_height(height) / 1000},
                 loads=[f"dropped from {height}"], objects=job.values("mass"))
