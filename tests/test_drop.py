@@ -177,3 +177,16 @@ def test_budget_coarsens_the_mesh_and_says_so(tmp_path):
     *_, rung3, cost3 = fit_mesh(held, prep, feats, mat, floor, h)
     assert rung3 == B.RUNGS[0] and "was set" in cost3.fit
 
+
+def test_estimate_prices_a_drop_from_its_mesh(tmp_path):
+    """wobbl estimate prices a drop from the mesh it would march."""
+    from wobbl.jobs import workload as W
+
+    part = tmp_path / "block.py"
+    part.write_text('PARAMS = {"a": 60.0, "b": 40.0, "c": 10.0}\n\n\n'
+                    "def build(occ, a, b, c):\n    occ.addBox(0, 0, 0, a, b, c)\n")
+    w = W.Workload([], "drop", {"part": str(part), "quality": "fast", "budget": 1e6}, [part], None, [str(part)])
+    c = W.drop_cost(w)
+    assert c.solver == "wobbl drop" and c.core_seconds > 0 and c.size["nodes"] > 100
+    assert "time step" in c.basis[0] and "budget" in c.basis[0]
+    assert W.REGISTRY["drop"].cost is W.drop_cost
