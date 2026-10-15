@@ -137,3 +137,42 @@ def test_pattern_balloon_grows_with_the_field_not_the_power():
     assert T.max() < len(X) and T.shape[1] == 3
     ring = np.isclose(X[:, 2], 3.0, atol=1e-6)
     assert np.allclose(r[ring], 10.0, rtol=1e-6)                         # the equator is the full radius
+
+
+# --- the simulate registry ----------------------------------------------------------------------
+def test_simulate_sends_antenna_files_and_words_to_the_antenna_studies(tmp_path):
+    from pathlib import Path
+
+    from wobbl.simulate import route
+
+    ex = Path(__file__).resolve().parents[1] / "examples" / "antenna-pcb"
+    import sys
+    sys.path.insert(0, str(ex))
+    try:
+        from make_board import build
+    finally:
+        sys.path.remove(str(ex))
+    pcb = tmp_path / "ifa.kicad_pcb"
+    pcb.write_text(build())
+    p = route(str(pcb), "does the trace antenna resonate at 2.4 GHz and what is its S11?", [], None, None)
+    assert [a.key for a in p.analyses] == ["board.antenna"]            # the word trace does not ask for parasitics too
+    antenna3d._scene([("cyl", "arm one", (0, 0, -30), (0, 0, -0.5), 0.5), ("cyl", "arm two", (0, 0, 0.5), (0, 0, 30), 0.5)],
+                     tmp_path / "geo", "dipole")
+    p = route(str(tmp_path / "geo" / "dipole.step"), "what is the S11 and gain of this antenna at 2.4 GHz?", [], None, None)
+    assert "part.antenna" in [a.key for a in p.analyses]
+    p = route("a loop antenna 100 mm across at 868 MHz, what is its gain?", "", [], None, None)
+    assert [a.key for a in p.analyses] == ["field.antenna"] and p.kind == "loop"
+    p = route("an inverted F antenna on FR4 for 2.4 GHz", "what is the S11?", [], None, None)
+    assert p.kind == "invf"
+
+
+def test_the_estimate_prices_a_3d_antenna_without_meshing_it(tmp_path):
+    from wobbl.jobs import workload as W
+    from wobbl.simulate import route
+
+    plan = route("a patch antenna for 2.4 GHz with a 29 mm long patch", "does it match, what is its S11?", [], None, None)
+    c = W.plan_cost(plan, {}, False)
+    assert c.known and c.core_seconds > 10 and "3D full wave" in " ".join(c.basis)
+    plan = route("a half wave dipole for 2.4 GHz", "what is its length?", [], None, None)
+    c = W.plan_cost(plan, {}, False)
+    assert c.known and c.core_seconds < 200 and "axisymmetric" in " ".join(c.basis)

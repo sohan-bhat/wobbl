@@ -196,6 +196,11 @@ def estimate(w):
             sets.setdefault(k, str(p[k]))
     question = str(p.get("question") or "")
     kind = p.get("template") or _kind_from_words(str(p.get("thing") or ""), question)
+    if kind in ("dipole", "monopole", "patch", "loop", "invf"):
+        from .domain import read_words
+
+        for k, v in read_words(kind, question, str(p.get("thing") or "")).items():
+            sets.setdefault(k, v)
     path = next((x for x in w.inputs if x.exists()), None)
     if kind in (None, "link") and path is None:
         return E.Cost(solver, "antenna", 1.0, 0.0, 5e7, 1e6, {}, ["A link budget is a closed form."])
