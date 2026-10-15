@@ -18,9 +18,10 @@ from dataclasses import dataclass, field
 DEFAULT_BUDGET = 900.0            # s of wall time a study may be predicted to take before it gives something up
 REFUSE_OVER = 2.5                 # a study predicted this many times over budget at its coarsest is refused
 UNKNOWNS_PER_NODE = 7.1           # edge elements on tetrahedra, plus the absorbing sphere's surface unknowns
-AIR_CELLS = 0.84                  # nodes per far sized cell of air
-SKIN_CELLS = 1.57                 # nodes per cell of surface, with the graded mesh around it
-WIRE_CELLS = 21.0                 # nodes per element length of a thin wire, for the fine skirt that grows around it
+AIR_CELLS = 0.72                  # nodes per far sized cell of air
+SKIN_CELLS = 1.09                 # nodes per cell of surface, with the graded mesh around it
+EDGE_CELLS = 12.4                 # nodes per element length of a copper sheet's edge, which the mesh refines around
+WIRE_CELLS = 24.4                 # nodes per element length of a thin wire, for the fine skirt that grows around it
 CPU_AT_100K = 175.0               # cpu seconds for one frequency (solve and field sampling) at 100 thousand unknowns
 EXPONENT = 1.4
 MESH_CPU_PER_NODE = 4.0e-3        # cpu seconds a node costs to mesh
@@ -64,14 +65,16 @@ class Plan:
 def nodes_from(inp: dict) -> float:
     """The base mesh's node count from what sets its element sizes (wave3d.mesh_inputs): the air sphere's volume in
     cells of the far size, and each surface's area in cells of its own size, with the refinement that grows around
-    it, and a thin wire's fine skirt by its length in cells. Fit to the node counts of six patch meshes and three
-    dipole meshes, to 10% or better on all of them."""
+    it, a thin wire's fine skirt by its length in cells and a copper sheet's edge by its perimeter in cells. Fit to the
+    node counts of eleven meshes (six patches, two dipoles, two loops and a trace antenna on a board), to 12% or
+    better on all of them."""
     import math
 
     air = 4 / 3 * math.pi * inp["R"] ** 3 / inp["far"] ** 3
     skin = sum(a / (h * h) for a, h in inp["surfaces"])
     wires = sum(length / h for length, h in inp.get("wires", ()))
-    return AIR_CELLS * air + SKIN_CELLS * skin + WIRE_CELLS * wires
+    edges = sum(length / h for length, h in inp.get("edges", ()))
+    return AIR_CELLS * air + SKIN_CELLS * skin + WIRE_CELLS * wires + EDGE_CELLS * edges
 
 
 def solve_cpu(unknowns: float) -> float:

@@ -509,9 +509,12 @@ def mesh_inputs(scene: Scene, s: WaveSetup, quality: str = "normal") -> dict:
             side = sorted(b.bbox[i + 3] - b.bbox[i] for i in range(3))
             if b.name in s.metals and side[2] > 8 * side[0]:
                 wires.append((b.area / (math.pi * max(side[0], 1e-9)), sizes[b.name] * k))   # length of a round wire
+    edges = []
     for n, polys in sheets.items():
-        surf.append((sum(_polygon_area(p) for p in polys), sizes.get(n, lam_min / 20) * k))
-    return {"R": R, "far": min(lam_min / 10, R / 5) * k, "surfaces": surf, "wires": wires}
+        h = sizes.get(n, lam_min / 20) * k
+        surf.append((sum(_polygon_area(p) for p in polys), h))
+        edges.append((sum(float(np.sum(np.linalg.norm(np.asarray(p) - np.roll(p, -1, axis=0), axis=1))) for p in polys), h))
+    return {"R": R, "far": min(lam_min / 10, R / 5) * k, "surfaces": surf, "wires": wires, "edges": edges}
 
 
 FINE_STEP = 1 / (1 - 0.75 ** 2)       # coarse error over the change to a mesh 0.75 as large, for an error of h squared
