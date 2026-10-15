@@ -1,0 +1,226 @@
+{
+ "domain": "flow",
+ "part": "../../plate.py",
+ "question": "Does it stay under 60 C with 150 W on the bottom and 2 L/min of water at 25 C flowing through it?",
+ "verdict": "ok",
+ "headline": "2 L/min of water loses 838 Pa through the part (turbulent, Re 5979).",
+ "metrics": [
+  [
+   "pressure drop",
+   "838 Pa"
+  ],
+  [
+   "flow",
+   "2 L/min"
+  ],
+  [
+   "inlet velocity",
+   "0.681 m/s"
+  ],
+  [
+   "Reynolds number",
+   "5979"
+  ],
+  [
+   "pumping power",
+   "0.0279 W"
+  ]
+ ],
+ "confidence": "low",
+ "confidence_reasons": [
+  "grid convergence failed: pressure drop 344.2 -> 839.9 -> 838.5 Pa over 3 grids, grid convergence index 37% (observed order 2, extrapolated 836.1 Pa), so the grid is too coarse for this answer",
+  "residuals: largest final residual 0.0011 (T), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly",
+  "wall resolution: y+ on the walls averages 15.4, at most 42.9, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent",
+  "the RANS turbulence model is an estimate for internal flow with junctions and turns, where loss coefficients from RANS scatter about 10%, so expect about 10% either way"
+ ],
+ "checks": [
+  {
+   "name": "mesh quality",
+   "status": "pass",
+   "summary": "24,383 cells, worst non orthogonality 45 degrees and skewness 2",
+   "detail": {
+    "cells": 24383,
+    "non_ortho": 45.138533,
+    "skewness": 2.028375
+   }
+  },
+  {
+   "name": "grid convergence",
+   "status": "fail",
+   "summary": "pressure drop 344.2 -> 839.9 -> 838.5 Pa over 3 grids, grid convergence index 37% (observed order 2, extrapolated 836.1 Pa), so the grid is too coarse for this answer",
+   "detail": {
+    "values_fine_to_coarse": [
+     838.461142,
+     839.947717,
+     344.174188
+    ],
+    "sizes": [
+     0.034486,
+     0.043992,
+     0.047173
+    ],
+    "order": 2.0,
+    "extrapolated": 836.091302,
+    "gci_fine": 0.369556,
+    "kind": "oscillatory"
+   }
+  },
+  {
+   "name": "iterative convergence",
+   "status": "pass",
+   "summary": "pressure drop swings 0.046% over the last fifth of 194 iterations",
+   "detail": {}
+  },
+  {
+   "name": "mass conservation",
+   "status": "pass",
+   "summary": "in 3.33e-05 m3/s, out 3.33e-05 m3/s (0.00013% apart)",
+   "detail": {
+    "in": 3.3e-05,
+    "out": 3.3e-05,
+    "error": 1e-06
+   }
+  },
+  {
+   "name": "residuals",
+   "status": "warn",
+   "summary": "largest final residual 0.0011 (T), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly",
+   "detail": {
+    "fields": {
+     "Ux": {
+      "first": 1.0,
+      "last": 8e-05
+     },
+     "Uy": {
+      "first": 1.0,
+      "last": 0.000159
+     },
+     "Uz": {
+      "first": 1.0,
+      "last": 0.000611
+     },
+     "p": {
+      "first": 1.0,
+      "last": 2.5e-05
+     },
+     "omega": {
+      "first": 0.020541,
+      "last": 0.000881
+     },
+     "k": {
+      "first": 1.0,
+      "last": 0.000563
+     },
+     "T": {
+      "first": 1.0,
+      "last": 0.001054
+     }
+    },
+    "tolerance": 0.001,
+    "converged_flag": false
+   }
+  },
+  {
+   "name": "wall resolution",
+   "status": "warn",
+   "summary": "y+ on the walls averages 15.4, at most 42.9, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent",
+   "detail": {
+    "patches": {
+     "walls": {
+      "min": 1.055693,
+      "max": 42.860961,
+      "mean": 15.392866
+     }
+    },
+    "treatment": "wall functions"
+   }
+  },
+  {
+   "name": "flow regime",
+   "status": "pass",
+   "summary": "Re 5979 on the inlet's hydraulic diameter, turbulent",
+   "detail": {
+    "re": 5978.656355
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "info",
+   "summary": "a straight smooth duct of the same 7.85 mm hydraulic diameter and 185 mm length loses 193 Pa by Colebrook, and the part loses 838 Pa, 4.34 times that, the rest from turns, junctions and changes of section",
+   "detail": {
+    "straight_Pa": 193.260267,
+    "length_m": 0.184826,
+    "ratio": 4.338508
+   }
+  }
+ ],
+ "assumptions": [
+  "Water at 25 C, density 997 kg/m3, viscosity 0.0008904 Pa s, conductivity 0.606 W/(m K), Prandtl 6.14.",
+  "The inlet is opening 0, the largest of passage 0's openings (49 mm2).",
+  "The fluid leaves through opening 1, open to the surroundings.",
+  "Steady, incompressible flow with the k omega SST turbulence model and blended wall functions.",
+  "Meshed by snappyHexMesh with 24,383 cells on the finest of 3 grids, without boundary layer cells."
+ ],
+ "values": {
+  "mode": "internal",
+  "re": 5978.656355,
+  "model": "rans",
+  "cells": 24383,
+  "fluid": "water",
+  "levels": [
+   {
+    "cells": 24383,
+    "value": 838.461142,
+    "iterations": 194,
+    "t_mesh": 133.583976,
+    "t_solve": 140.042186
+   },
+   {
+    "cells": 11746,
+    "value": 839.947717,
+    "iterations": 169,
+    "t_mesh": 51.032476,
+    "t_solve": 45.961098
+   },
+   {
+    "cells": 9526,
+    "value": 344.174188,
+    "iterations": 154,
+    "t_mesh": 26.215935,
+    "t_solve": 74.610318
+   }
+  ],
+  "dp_Pa": 838.461142,
+  "dp_static_Pa": 858.572376,
+  "flow_m3_s": 3.3e-05,
+  "velocity_m_s": 0.680502,
+  "split": {
+   "opening 1": 1.0
+  },
+  "pump_power_W": 0.027949,
+  "hydraulic_diameter_m": 0.007846,
+  "_figures": [
+   [
+    "pressure",
+    "Pressure on the part's walls"
+   ],
+   [
+    "velocity",
+    "Speed through the middle of the flow"
+   ]
+  ]
+ },
+ "images": {
+  "pressure": "images/pressure.png",
+  "velocity": "images/velocity.png"
+ },
+ "fixes": [],
+ "notes": [
+  "Built from plate.py with length=120, width=70, thickness=16, bore=8, pitch=40."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 279.032103,
+ "solver": "OpenFOAM v2412, snappyHexMesh and simpleFoam",
+ "criteria": []
+}

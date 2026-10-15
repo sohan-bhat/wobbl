@@ -1,0 +1,39 @@
+{
+ "domain": "part",
+ "analysis": "cooling",
+ "spec": {
+  "thing": "plate.py",
+  "kind": "parametric",
+  "question": "Does it stay under 60 C with 150 W on the bottom and 2 L/min of water at 25 C flowing through it?",
+  "options": {
+   "heat-faces": [
+    "bottom"
+   ],
+   "material": [
+    "6061-t6"
+   ],
+   "fluid": [
+    "water"
+   ],
+   "temperature": [
+    "25 C"
+   ],
+   "flow": [
+    "2 l/min"
+   ],
+   "quality": [
+    "normal"
+   ],
+   "power": [
+    "150 w"
+   ],
+   "limit": [
+    "60 C"
+   ],
+   "mode": [
+    "internal"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

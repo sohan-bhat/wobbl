@@ -1,0 +1,153 @@
+{
+ "domain": "thermal",
+ "part": "../../plate.py",
+ "question": "Does it stay under 60 C with 150 W on the bottom and 2 L/min of water at 25 C flowing through it?",
+ "verdict": "ok",
+ "headline": "Hottest point reaches 34.2 C (limit 60 C) at (3.27, 35, 0) mm at steady state.",
+ "metrics": [
+  [
+   "max temperature",
+   "34.2 C"
+  ],
+  [
+   "limit",
+   "60 C"
+  ],
+  [
+   "power",
+   "150 W"
+  ],
+  [
+   "mesh nodes",
+   "46,007"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "hand calculation: heat balance on a uniform skin gives 31.6 C; the FEA skin averages 32.8 C (18% of the rise). Biot 0.02: the part is nearly isothermal"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "temperature rise at the hottest point settled: 9.22 -> 9.23 -> 9.23 C over 3 meshes, last change 0.0%",
+   "detail": {
+    "values": [
+     9.2245,
+     9.2254,
+     9.2264
+    ],
+    "last_change": 0.000108,
+    "tolerance": 0.02,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "heat in 150 W, heat out through the surfaces 149 W (0.43% apart)",
+   "detail": {
+    "in_W": 150.0,
+    "out_W": 149.356667
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "warn",
+   "summary": "heat balance on a uniform skin gives 31.6 C; the FEA skin averages 32.8 C (18% of the rise). Biot 0.02: the part is nearly isothermal",
+   "detail": {
+    "lumped_surface_C": 31.643699,
+    "fea_surface_C": 32.817561,
+    "biot": 0.019921
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "temperatures between 31 and 34.2 C",
+   "detail": {}
+  }
+ ],
+ "assumptions": [
+  "Aluminum 6061-T6: conductivity 167 W/(m K), specific heat 896 J/(kg K), density 2700 kg/m3.",
+  "Heat enters through bottom.",
+  "Convection uses a fixed film coefficient; real coefficients vary with temperature and airflow.",
+  "Surrounding air or coolant at 25 C does not heat up.",
+  "Radiation is ignored (conservative).",
+  "Contact resistance between parts and internal airflow are not modeled."
+ ],
+ "values": {
+  "t_max_C": 34.2264,
+  "hot_xyz": [
+   3.274572,
+   34.991151,
+   0.0
+  ],
+  "limit_C": 60.0,
+  "levels": [
+   {
+    "level": 0,
+    "n_nodes": 24297,
+    "h": 7.945612,
+    "t_max": 34.2245,
+    "t_min": 30.9812,
+    "xyz": [
+     0.0,
+     35.0,
+     0.0
+    ],
+    "t_solve": 6.938614
+   },
+   {
+    "level": 1,
+    "n_nodes": 31547,
+    "h": 5.561928,
+    "t_max": 34.2254,
+    "t_min": 30.9828,
+    "xyz": [
+     0.0,
+     35.0,
+     0.0
+    ],
+    "t_solve": 14.526488
+   },
+   {
+    "level": 2,
+    "n_nodes": 46007,
+    "h": 3.972806,
+    "t_max": 34.2264,
+    "t_min": 30.9823,
+    "xyz": [
+     3.274572,
+     34.991151,
+     0.0
+    ],
+    "t_solve": 35.949058
+   }
+  ],
+  "lumped_C": 31.643699,
+  "time_over_limit_s": null,
+  "_figures": [
+   [
+    "temperature",
+    "Temperature with the hottest point marked"
+   ],
+   [
+    "history",
+    "Temperature over time"
+   ]
+  ]
+ },
+ "images": {
+  "temperature": "images/temperature.png"
+ },
+ "fixes": [],
+ "notes": [
+  "Built from plate.py with length=120, width=70, thickness=16, bore=8, pitch=40."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 114.59974,
+ "solver": "CalculiX 2.23",
+ "criteria": []
+}

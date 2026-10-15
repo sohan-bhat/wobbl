@@ -1,0 +1,28 @@
+OK. 2 L/min of water loses 838 Pa through the part (turbulent, Re 5979).
+
+Confidence: low. grid convergence failed: pressure drop 344.2 -> 839.9 -> 838.5 Pa over 3 grids, grid convergence index 37% (observed order 2, extrapolated 836.1 Pa), so the grid is too coarse for this answer; residuals: largest final residual 0.0011 (T), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly; wall resolution: y+ on the walls averages 15.4, at most 42.9, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent; the RANS turbulence model is an estimate for internal flow with junctions and turns, where loss coefficients from RANS scatter about 10%, so expect about 10% either way
+pressure drop: 838 Pa
+flow: 2 L/min
+inlet velocity: 0.681 m/s
+Reynolds number: 5979
+pumping power: 0.0279 W
+
+Checks:
+  [pass] mesh quality: 24,383 cells, worst non orthogonality 45 degrees and skewness 2
+  [fail] grid convergence: pressure drop 344.2 -> 839.9 -> 838.5 Pa over 3 grids, grid convergence index 37% (observed order 2, extrapolated 836.1 Pa), so the grid is too coarse for this answer
+  [pass] iterative convergence: pressure drop swings 0.046% over the last fifth of 194 iterations
+  [pass] mass conservation: in 3.33e-05 m3/s, out 3.33e-05 m3/s (0.00013% apart)
+  [warn] residuals: largest final residual 0.0011 (T), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly
+  [warn] wall resolution: y+ on the walls averages 15.4, at most 42.9, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent
+  [pass] flow regime: Re 5979 on the inlet's hydraulic diameter, turbulent
+  [info] hand calculation: a straight smooth duct of the same 7.85 mm hydraulic diameter and 185 mm length loses 193 Pa by Colebrook, and the part loses 838 Pa, 4.34 times that, the rest from turns, junctions and changes of section
+
+Assumptions:
+  - Water at 25 C, density 997 kg/m3, viscosity 0.0008904 Pa s, conductivity 0.606 W/(m K), Prandtl 6.14.
+  - The inlet is opening 0, the largest of passage 0's openings (49 mm2).
+  - The fluid leaves through opening 1, open to the surroundings.
+  - Steady, incompressible flow with the k omega SST turbulence model and blended wall functions.
+  - Meshed by snappyHexMesh with 24,383 cells on the finest of 3 grids, without boundary layer cells.
+
+Images: pressure: images/pressure.png, velocity: images/velocity.png
+Report: report.html

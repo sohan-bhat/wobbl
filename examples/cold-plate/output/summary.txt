@@ -1,0 +1,44 @@
+OK. With 2 L/min of water through it, the faces shed heat at 3712 W/(m2 K) on average, and 150 W brings the hottest point to 34.2 C against a limit of 60 C.
+
+Confidence: low. grid convergence failed: pressure drop 344.2 -> 839.9 -> 838.5 Pa over 3 grids, grid convergence index 37% (observed order 2, extrapolated 836.1 Pa), so the grid is too coarse for this answer; residuals: largest final residual 0.0011 (T), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly; wall resolution: y+ on the walls averages 15.4, at most 42.9, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent; hand calculation: heat balance on a uniform skin gives 31.6 C; the FEA skin averages 32.8 C (18% of the rise). Biot 0.02: the part is nearly isothermal
+max temperature: 34.2 C
+limit: 60 C
+mean h: 3712 W/m2K
+pressure drop: 838 Pa
+flow: 2 L/min
+
+Checks:
+  [pass] mesh quality: 24,383 cells, worst non orthogonality 45 degrees and skewness 2
+  [fail] grid convergence: pressure drop 344.2 -> 839.9 -> 838.5 Pa over 3 grids, grid convergence index 37% (observed order 2, extrapolated 836.1 Pa), so the grid is too coarse for this answer
+  [pass] iterative convergence: pressure drop swings 0.046% over the last fifth of 194 iterations
+  [pass] mass conservation: in 3.33e-05 m3/s, out 3.33e-05 m3/s (0.00013% apart)
+  [warn] residuals: largest final residual 0.0011 (T), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly
+  [warn] wall resolution: y+ on the walls averages 15.4, at most 42.9, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent
+  [pass] flow regime: Re 5979 on the inlet's hydraulic diameter, turbulent
+  [info] hand calculation: a straight smooth duct of the same 7.85 mm hydraulic diameter and 185 mm length loses 193 Pa by Colebrook, and the part loses 838 Pa, 4.34 times that, the rest from turns, junctions and changes of section
+  [pass] mesh convergence: temperature rise at the hottest point settled: 9.22 -> 9.23 -> 9.23 C over 3 meshes, last change 0.0%
+  [pass] energy balance: heat in 150 W, heat out through the surfaces 149 W (0.43% apart)
+  [warn] hand calculation: heat balance on a uniform skin gives 31.6 C; the FEA skin averages 32.8 C (18% of the rise). Biot 0.02: the part is nearly isothermal
+  [pass] units and sanity: temperatures between 31 and 34.2 C
+  [info] lumped estimate: the wetted area of 60 cm2 at the mean 3712 W/(m2 K) puts a part at one temperature at 32.3 C, and the FEA's hottest point is 34.2 C
+  [info] heat transfer correlation: Gnielinski's correlation for a straight tube gives 3575 W/(m2 K) at Re 5979 on the 7.85 mm hydraulic diameter, and the CFD averages 3712 W/(m2 K) over the wetted faces, which include entrance regions and turns that raise it
+
+Assumptions:
+  - Wobbl guessed: The inlet is opening 0, the largest of passage 0's openings (49 mm2).
+  - Wobbl guessed: The fluid leaves through opening 1, open to the surroundings.
+  - Water at 25 C, density 997 kg/m3, viscosity 0.0008904 Pa s, conductivity 0.606 W/(m K), Prandtl 6.14.
+  - The inlet is opening 0, the largest of passage 0's openings (49 mm2).
+  - The fluid leaves through opening 1, open to the surroundings.
+  - Steady, incompressible flow with the k omega SST turbulence model and blended wall functions.
+  - Meshed by snappyHexMesh with 24,383 cells on the finest of 3 grids, without boundary layer cells.
+  - The fluid enters at 25 C and warms by 1.08 C, so the films use 25.5 C.
+  - Each face's heat transfer coefficient comes from the CFD with the walls at one uniform temperature, and faces the flow does not reach get still air at 5 W/(m2 K).
+  - One way coupling, so the fluid's properties do not change with the part's temperature.
+  - Aluminum 6061-T6: conductivity 167 W/(m K), specific heat 896 J/(kg K), density 2700 kg/m3.
+  - Heat enters through bottom.
+  - Surrounding air or coolant at 25 C does not heat up.
+  - Radiation is ignored (conservative).
+  - Contact resistance between parts and internal airflow are not modeled.
+
+Images: temperature: heat/images/temperature.png, pressure: flow/images/pressure.png, velocity: flow/images/velocity.png
+Report: report.html

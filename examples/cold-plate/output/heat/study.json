@@ -1,0 +1,94 @@
+{
+ "part": "../../plate.py",
+ "material": "6061-t6",
+ "power": 150000.0,
+ "heat_faces": "bottom",
+ "films": [
+  {
+   "h": 3.5155951371127223,
+   "t_inf": 25.53961470396747,
+   "faces": "face 6",
+   "text": "3516 W/m2K from CFD"
+  },
+  {
+   "h": 3.4968518274643117,
+   "t_inf": 25.53961470396747,
+   "faces": "face 7",
+   "text": "3497 W/m2K from CFD"
+  },
+  {
+   "h": 3.93414967580479,
+   "t_inf": 25.53961470396747,
+   "faces": "face 9",
+   "text": "3934 W/m2K from CFD"
+  },
+  {
+   "h": 5.04666084689483,
+   "t_inf": 25.53961470396747,
+   "faces": "face 10",
+   "text": "5047 W/m2K from CFD"
+  },
+  {
+   "h": 2.5640512523501644,
+   "t_inf": 25.53961470396747,
+   "faces": "face 11",
+   "text": "2564 W/m2K from CFD"
+  },
+  {
+   "h": 2.499824907294,
+   "t_inf": 25.53961470396747,
+   "faces": "face 12",
+   "text": "2500 W/m2K from CFD"
+  },
+  {
+   "h": 2.8443314551242427,
+   "t_inf": 25.53961470396747,
+   "faces": "face 13",
+   "text": "2844 W/m2K from CFD"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 25.0,
+   "faces": "face 1",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 25.0,
+   "faces": "face 2",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 25.0,
+   "faces": "face 3",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 25.0,
+   "faces": "face 4",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 25.0,
+   "faces": "face 5",
+   "text": "still air"
+  },
+  {
+   "h": 0.005,
+   "t_inf": 25.0,
+   "faces": "face 8",
+   "text": "still air"
+  }
+ ],
+ "fixed": [],
+ "ambient": 25.0,
+ "initial": null,
+ "duration": 0.0,
+ "limit": 60.0,
+ "emissivity": 0.0,
+ "question": "Does it stay under 60 C with 150 W on the bottom and 2 L/min of water at 25 C flowing through it?",
+ "quality": "normal"
+}

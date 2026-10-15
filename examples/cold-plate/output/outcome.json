@@ -1,0 +1,343 @@
+{
+ "domain": "thermal",
+ "part": "../plate.py",
+ "question": "Does it stay under 60 C with 150 W on the bottom and 2 L/min of water at 25 C flowing through it?",
+ "verdict": "ok",
+ "headline": "With 2 L/min of water through it, the faces shed heat at 3712 W/(m2 K) on average, and 150 W brings the hottest point to 34.2 C against a limit of 60 C.",
+ "metrics": [
+  [
+   "max temperature",
+   "34.2 C"
+  ],
+  [
+   "limit",
+   "60 C"
+  ],
+  [
+   "mean h",
+   "3712 W/m2K"
+  ],
+  [
+   "pressure drop",
+   "838 Pa"
+  ],
+  [
+   "flow",
+   "2 L/min"
+  ]
+ ],
+ "confidence": "low",
+ "confidence_reasons": [
+  "grid convergence failed: pressure drop 344.2 -> 839.9 -> 838.5 Pa over 3 grids, grid convergence index 37% (observed order 2, extrapolated 836.1 Pa), so the grid is too coarse for this answer",
+  "residuals: largest final residual 0.0011 (T), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly",
+  "wall resolution: y+ on the walls averages 15.4, at most 42.9, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent",
+  "hand calculation: heat balance on a uniform skin gives 31.6 C; the FEA skin averages 32.8 C (18% of the rise). Biot 0.02: the part is nearly isothermal",
+  "convective heat transfer from RANS is commonly within 10 to 25% of measurements"
+ ],
+ "checks": [
+  {
+   "name": "mesh quality",
+   "status": "pass",
+   "summary": "24,383 cells, worst non orthogonality 45 degrees and skewness 2",
+   "detail": {
+    "cells": 24383,
+    "non_ortho": 45.138533,
+    "skewness": 2.028375
+   }
+  },
+  {
+   "name": "grid convergence",
+   "status": "fail",
+   "summary": "pressure drop 344.2 -> 839.9 -> 838.5 Pa over 3 grids, grid convergence index 37% (observed order 2, extrapolated 836.1 Pa), so the grid is too coarse for this answer",
+   "detail": {
+    "values_fine_to_coarse": [
+     838.461142,
+     839.947717,
+     344.174188
+    ],
+    "sizes": [
+     0.034486,
+     0.043992,
+     0.047173
+    ],
+    "order": 2.0,
+    "extrapolated": 836.091302,
+    "gci_fine": 0.369556,
+    "kind": "oscillatory"
+   }
+  },
+  {
+   "name": "iterative convergence",
+   "status": "pass",
+   "summary": "pressure drop swings 0.046% over the last fifth of 194 iterations",
+   "detail": {}
+  },
+  {
+   "name": "mass conservation",
+   "status": "pass",
+   "summary": "in 3.33e-05 m3/s, out 3.33e-05 m3/s (0.00013% apart)",
+   "detail": {
+    "in": 3.3e-05,
+    "out": 3.3e-05,
+    "error": 1e-06
+   }
+  },
+  {
+   "name": "residuals",
+   "status": "warn",
+   "summary": "largest final residual 0.0011 (T), every field fell at least 1.4 orders, close to converged, so the key number may still move slightly",
+   "detail": {
+    "fields": {
+     "Ux": {
+      "first": 1.0,
+      "last": 8e-05
+     },
+     "Uy": {
+      "first": 1.0,
+      "last": 0.000159
+     },
+     "Uz": {
+      "first": 1.0,
+      "last": 0.000611
+     },
+     "p": {
+      "first": 1.0,
+      "last": 2.5e-05
+     },
+     "omega": {
+      "first": 0.020541,
+      "last": 0.000881
+     },
+     "k": {
+      "first": 1.0,
+      "last": 0.000563
+     },
+     "T": {
+      "first": 1.0,
+      "last": 0.001054
+     }
+    },
+    "tolerance": 0.001,
+    "converged_flag": false
+   }
+  },
+  {
+   "name": "wall resolution",
+   "status": "warn",
+   "summary": "y+ on the walls averages 15.4, at most 42.9, for wall functions, so part of the wall sits in the buffer layer, where wall functions are least accurate, though the blended wall function keeps the error to a few percent",
+   "detail": {
+    "patches": {
+     "walls": {
+      "min": 1.055693,
+      "max": 42.860961,
+      "mean": 15.392866
+     }
+    },
+    "treatment": "wall functions"
+   }
+  },
+  {
+   "name": "flow regime",
+   "status": "pass",
+   "summary": "Re 5979 on the inlet's hydraulic diameter, turbulent",
+   "detail": {
+    "re": 5978.656355
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "info",
+   "summary": "a straight smooth duct of the same 7.85 mm hydraulic diameter and 185 mm length loses 193 Pa by Colebrook, and the part loses 838 Pa, 4.34 times that, the rest from turns, junctions and changes of section",
+   "detail": {
+    "straight_Pa": 193.260267,
+    "length_m": 0.184826,
+    "ratio": 4.338508
+   }
+  },
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "temperature rise at the hottest point settled: 9.22 -> 9.23 -> 9.23 C over 3 meshes, last change 0.0%",
+   "detail": {
+    "values": [
+     9.2245,
+     9.2254,
+     9.2264
+    ],
+    "last_change": 0.000108,
+    "tolerance": 0.02,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "energy balance",
+   "status": "pass",
+   "summary": "heat in 150 W, heat out through the surfaces 149 W (0.43% apart)",
+   "detail": {
+    "in_W": 150.0,
+    "out_W": 149.356667
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "warn",
+   "summary": "heat balance on a uniform skin gives 31.6 C; the FEA skin averages 32.8 C (18% of the rise). Biot 0.02: the part is nearly isothermal",
+   "detail": {
+    "lumped_surface_C": 31.643699,
+    "fea_surface_C": 32.817561,
+    "biot": 0.019921
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "temperatures between 31 and 34.2 C",
+   "detail": {}
+  },
+  {
+   "name": "lumped estimate",
+   "status": "info",
+   "summary": "the wetted area of 60 cm2 at the mean 3712 W/(m2 K) puts a part at one temperature at 32.3 C, and the FEA's hottest point is 34.2 C",
+   "detail": {
+    "uniform_C": 32.270117
+   }
+  },
+  {
+   "name": "heat transfer correlation",
+   "status": "info",
+   "summary": "Gnielinski's correlation for a straight tube gives 3575 W/(m2 K) at Re 5979 on the 7.85 mm hydraulic diameter, and the CFD averages 3712 W/(m2 K) over the wetted faces, which include entrance regions and turns that raise it",
+   "detail": {
+    "correlation_W_m2K": 3575.054605,
+    "cfd_W_m2K": 3712.417301
+   }
+  }
+ ],
+ "assumptions": [
+  "Wobbl guessed: The inlet is opening 0, the largest of passage 0's openings (49 mm2).",
+  "Wobbl guessed: The fluid leaves through opening 1, open to the surroundings.",
+  "Water at 25 C, density 997 kg/m3, viscosity 0.0008904 Pa s, conductivity 0.606 W/(m K), Prandtl 6.14.",
+  "The inlet is opening 0, the largest of passage 0's openings (49 mm2).",
+  "The fluid leaves through opening 1, open to the surroundings.",
+  "Steady, incompressible flow with the k omega SST turbulence model and blended wall functions.",
+  "Meshed by snappyHexMesh with 24,383 cells on the finest of 3 grids, without boundary layer cells.",
+  "The fluid enters at 25 C and warms by 1.08 C, so the films use 25.5 C.",
+  "Each face's heat transfer coefficient comes from the CFD with the walls at one uniform temperature, and faces the flow does not reach get still air at 5 W/(m2 K).",
+  "One way coupling, so the fluid's properties do not change with the part's temperature.",
+  "Aluminum 6061-T6: conductivity 167 W/(m K), specific heat 896 J/(kg K), density 2700 kg/m3.",
+  "Heat enters through bottom.",
+  "Surrounding air or coolant at 25 C does not heat up.",
+  "Radiation is ignored (conservative).",
+  "Contact resistance between parts and internal airflow are not modeled."
+ ],
+ "values": {
+  "mode": "internal",
+  "re": 5978.656355,
+  "model": "rans",
+  "cells": 24383,
+  "fluid": "water",
+  "levels": [
+   {
+    "cells": 24383,
+    "value": 838.461142,
+    "iterations": 194,
+    "t_mesh": 133.583976,
+    "t_solve": 140.042186
+   },
+   {
+    "cells": 11746,
+    "value": 839.947717,
+    "iterations": 169,
+    "t_mesh": 51.032476,
+    "t_solve": 45.961098
+   },
+   {
+    "cells": 9526,
+    "value": 344.174188,
+    "iterations": 154,
+    "t_mesh": 26.215935,
+    "t_solve": 74.610318
+   }
+  ],
+  "dp_Pa": 838.461142,
+  "dp_static_Pa": 858.572376,
+  "flow_m3_s": 3.3e-05,
+  "velocity_m_s": 0.680502,
+  "split": {
+   "opening 1": 1.0
+  },
+  "pump_power_W": 0.027949,
+  "hydraulic_diameter_m": 0.007846,
+  "t_max_C": 34.2264,
+  "limit_C": 60.0,
+  "h_mean_W_m2K": 3712.417301,
+  "fluid_rise_C": 1.079229,
+  "film_C": 25.539615,
+  "power_W": 150.0,
+  "faces": {
+   "6": {
+    "h_W_m2K": 3515.595137,
+    "wetted_mm2": 2510.582197
+   },
+   "7": {
+    "h_W_m2K": 3496.851827,
+    "wetted_mm2": 2510.661182
+   },
+   "9": {
+    "h_W_m2K": 3934.149676,
+    "wetted_mm2": 10.28845
+   },
+   "10": {
+    "h_W_m2K": 5046.660847,
+    "wetted_mm2": 865.680067
+   },
+   "11": {
+    "h_W_m2K": 2564.051252,
+    "wetted_mm2": 47.683877
+   },
+   "12": {
+    "h_W_m2K": 2499.824907,
+    "wetted_mm2": 48.00215
+   },
+   "13": {
+    "h_W_m2K": 2844.331455,
+    "wetted_mm2": 10.360322
+   }
+  },
+  "_figures": [
+   [
+    "temperature",
+    "The part's temperature with the hottest point marked"
+   ],
+   [
+    "pressure",
+    "Pressure on the part's walls"
+   ],
+   [
+    "velocity",
+    "Speed through the flow"
+   ]
+  ]
+ },
+ "images": {
+  "temperature": "heat/images/temperature.png",
+  "pressure": "flow/images/pressure.png",
+  "velocity": "flow/images/velocity.png"
+ },
+ "fixes": [],
+ "notes": [
+  "Built from plate.py with length=120, width=70, thickness=16, bore=8, pitch=40.",
+  "Built from plate.py with length=120, width=70, thickness=16, bore=8, pitch=40."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 414.495514,
+ "solver": "OpenFOAM v2412, snappyHexMesh and simpleFoam and CalculiX 2.23",
+ "criteria": [
+  {
+   "name": "temperature",
+   "value": "t_max_C",
+   "limit": 60.0,
+   "sense": "max"
+  }
+ ]
+}

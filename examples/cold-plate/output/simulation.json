@@ -1,0 +1,67 @@
+{
+ "thing": "plate.py",
+ "question": "Does it stay under 60 C with 150 W on the bottom and 2 L/min of water at 25 C flowing through it?",
+ "plan": {
+  "thing": "plate.py",
+  "question": "Does it stay under 60 C with 150 W on the bottom and 2 L/min of water at 25 C flowing through it?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "cooling"
+  ],
+  "reasons": [
+   {
+    "decided": "plate.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics cooling, as asked",
+    "override": "--physics cooling"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "objects": [
+   "water",
+   "plate.py"
+  ],
+  "environment": {
+   "fluid": "water",
+   "temperature": "25 C",
+   "speed": null,
+   "flow": "2 l/min",
+   "fan": "",
+   "direction": "+x",
+   "inlet": "the largest opening"
+  }
+ },
+ "steps": [
+  {
+   "analysis": "cooling",
+   "domain": "part",
+   "verdict": "ok",
+   "headline": "With 2 L/min of water through it, the faces shed heat at 3712 W/(m2 K) on average, and 150 W brings the hottest point to 34.2 C against a limit of 60 C.",
+   "confidence": "low",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": [
+    {
+     "assumed": "The inlet is opening 0, the largest of passage 0's openings (49 mm2)",
+     "override": "--inlet 'opening N'"
+    },
+    {
+     "assumed": "The fluid leaves through opening 1, open to the surroundings",
+     "override": "--inlet 'opening N'"
+    }
+   ]
+  }
+ ]
+}
