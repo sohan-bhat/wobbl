@@ -84,7 +84,9 @@ def test_mcp_lists_simulate_first_and_marks_the_scenario_tools():
     from wobbl.mcp.server import build_server
 
     tools = asyncio.run(build_server().list_tools())
-    assert [t.name for t in tools][:2] == ["simulate", "physics"]
+    names = [t.name for t in tools]
+    assert names[0] == "simulate"
+    assert {"physics", "solve_chemistry"} <= set(names[:3])
     by = {t.name: t.description for t in tools}
     assert by["solve_thermal"].startswith("Deprecated alias of simulate")
     assert not by["suggest_fix"].startswith("Deprecated")
