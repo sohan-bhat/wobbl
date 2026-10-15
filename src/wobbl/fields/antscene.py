@@ -99,9 +99,9 @@ def write(out: Path, *, title: str, question: str, scene, setup, feed: dict, msh
         mag = np.abs(e)
         top = float(np.nanpercentile(np.sqrt(np.sum(mag ** 2, axis=-1)), 97)) or 1.0
         ph = np.arange(FRAMES) / FRAMES * 2 * math.pi
-        # the field component with the most energy keeps its sign, so the wave reads as a wave
-        energy = np.nansum(mag ** 2, axis=(0, 1))
-        c = int(np.argmax(energy))
+        # the component along the feed keeps its sign, so the wave reads as a wave (the near field of a thin wire
+        # is mostly radial, which would hide it)
+        c = int(np.argmax(np.abs(np.asarray(feed["t"], float))))
         sig = np.real(e[..., c][None] * np.exp(1j * ph)[:, None, None]) / top
         sig = np.clip(sig, -1.0, 1.0)
         uu = np.linspace(plane["u0"], plane["u1"], nu) * mm
