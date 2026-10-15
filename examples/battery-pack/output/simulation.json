@@ -1,0 +1,57 @@
+{
+ "thing": "pack.py",
+ "question": "Will this battery pack overheat in a sealed box during a one hour discharge?",
+ "plan": {
+  "thing": "pack.py",
+  "question": "Will this battery pack overheat in a sealed box during a one hour discharge?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "heat"
+  ],
+  "reasons": [
+   {
+    "decided": "pack.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics heat, as asked",
+    "override": "--physics heat"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "fail",
+ "situation": {
+  "objects": [
+   "box"
+  ],
+  "environment": {
+   "ambient": "35 C",
+   "cooling": [
+    "5 W/m2K @ all"
+   ]
+  },
+  "loads": [
+   "6 W of heat"
+  ]
+ },
+ "steps": [
+  {
+   "analysis": "heat",
+   "domain": "part",
+   "verdict": "hot",
+   "headline": "Hottest point reaches 74.5 C (limit 60 C) at (18.5, 18.5, 31.8) mm after 60 min. It passes 60 C after about 21.1 min.",
+   "confidence": "high",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": []
+  }
+ ]
+}

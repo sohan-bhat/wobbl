@@ -1,0 +1,22 @@
+{
+ "part": "../pack.py",
+ "material": "li-ion-cell",
+ "power": 6000.0,
+ "heat_faces": "",
+ "films": [
+  {
+   "h": 0.005,
+   "t_inf": 35.0,
+   "faces": "all",
+   "text": "5 W/m2K @ all"
+  }
+ ],
+ "fixed": [],
+ "ambient": 35.0,
+ "initial": null,
+ "duration": 3600.0,
+ "limit": 60.0,
+ "emissivity": 0.9,
+ "question": "Will this battery pack overheat in a sealed box during a one hour discharge?",
+ "quality": "normal"
+}

@@ -100,7 +100,7 @@
      18.616107,
      32.456956
     ],
-    "t_solve": 25.120384
+    "t_solve": 68.780413
    },
    {
     "level": 1,
@@ -113,7 +113,7 @@
      18.493078,
      31.823386
     ],
-    "t_solve": 65.50935
+    "t_solve": 184.53449
    }
   ],
   "lumped_C": 72.182464,
@@ -152,6 +152,14 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 105.909335,
- "solver": "CalculiX 2.23"
+ "t_total": 305.713984,
+ "solver": "CalculiX 2.23",
+ "criteria": [
+  {
+   "name": "temperature",
+   "value": "t_max_C",
+   "limit": 60.0,
+   "sense": "max"
+  }
+ ]
 }

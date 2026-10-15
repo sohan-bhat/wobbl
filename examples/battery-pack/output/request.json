@@ -1,0 +1,33 @@
+{
+ "domain": "part",
+ "analysis": "heat",
+ "spec": {
+  "thing": "pack.py",
+  "kind": "parametric",
+  "question": "Will this battery pack overheat in a sealed box during a one hour discharge?",
+  "options": {
+   "power": [
+    "6 W"
+   ],
+   "film": [
+    "5 W/m2K @ all"
+   ],
+   "ambient": [
+    "35 C"
+   ],
+   "radiation": [
+    "0.9"
+   ],
+   "duration": [
+    "60 min"
+   ],
+   "limit": [
+    "60 C"
+   ],
+   "material": [
+    "li-ion-cell"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}
