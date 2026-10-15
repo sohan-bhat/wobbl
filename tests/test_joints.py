@@ -151,3 +151,145 @@ def test_bolts_are_read_from_plain_words():
     assert bolt_from_words("M6 bolts preloaded to 8 kN") == "M6 preload 8 kN"
     assert bolt_from_words("M12x1.5 8.8 at 30 lbf ft") == "M12x1.5 8.8 torque 30 lbf*ft"
     assert bolt_from_words("will it hold 200 N?") == ""
+
+
+# ----------------------------------------------------------------------------------------- unfamiliar assemblies
+# Five assemblies built here that no default was tuned for. Each is found, meshed and solved the way a user's would be.
+def lapped_plates(o):
+    a = o.addBox(0, 0, 0, 70, 30, 6)
+    b = o.addBox(40, 0, 6, 70, 30, 6)
+    for body, z in ((a, -1), (b, 5)):
+        for x in (50, 62):
+            o.cut([(3, body)], [(3, o.addCylinder(x, 15, z, 0, 0, 8, 3.3))])
+
+
+def six_bolt_flanges(o):
+    for k in range(2):
+        d = o.addCylinder(0, 0, 10 * k, 0, 0, 10, 50)
+        o.cut([(3, d)], [(3, o.addCylinder(0, 0, 10 * k - 1, 0, 0, 12, 15))])
+        for j in range(6):
+            a = math.pi / 6 + j * math.pi / 3
+            o.cut([(3, d)], [(3, o.addCylinder(38 * math.cos(a), 38 * math.sin(a), 10 * k - 1, 0, 0, 12, 5.5))])
+
+
+def shaft_clamp(o):
+    """A split collar on a shaft along y, its halves a tenth of a millimetre apart and drawn together by two bolts."""
+    o.addCylinder(0, 0, 0, 0, 80, 0, 10)
+    for lo, hi in ((-20.0, -0.05), (0.05, 20.0)):
+        h = o.addBox(-20, 25, lo, 40, 30, hi - lo)
+        o.cut([(3, h)], [(3, o.addCylinder(0, 20, 0, 0, 40, 0, 10))])
+        for x in (-15, 15):
+            o.cut([(3, h)], [(3, o.addCylinder(x, 40, lo - 1, 0, 0, hi - lo + 2, 3.3))])
+
+
+def press_fit_hub(o):
+    """A hub of 22 mm outer radius pressed on a shaft 0.02 mm larger in radius than its bore."""
+    o.addCylinder(0, 0, 0, 0, 0, 70, 10.02)
+    hub = o.addCylinder(0, 0, 20, 0, 0, 25, 22)
+    o.cut([(3, hub)], [(3, o.addCylinder(0, 0, 19, 0, 0, 27, 10.0))])
+
+
+def wall_bracket(o):
+    wall = o.addBox(0, 0, 0, 100, 10, 80)
+    flange = o.addBox(20, 10, 15, 60, 8, 50)
+    shelf = o.addBox(20, 18, 15, 60, 50, 8)
+    br, _ = o.fuse([(3, flange)], [(3, shelf)])
+    for x in (35, 65):
+        for z in (25, 55):
+            o.cut([(3, wall)], [(3, o.addCylinder(x, -1, z, 0, 20, 0, 4.5))])
+            o.cut(br, [(3, o.addCylinder(x, 9, z, 0, 12, 0, 4.5))])
+
+
+ASSEMBLIES = [
+    # id, builder, kind, material, fixtures, loads, bolt, bodies and pairs expected, what the answer must say
+    ("lapped-plates", lapped_plates, "bolts", "mild-steel", ["body 1 and x=min"], ["1.5 kN +x @ body 2 and x=max"],
+     ["M6 8.8 torque 8 N*m"], (2, 1), ("clamp", "slip")),
+    ("six-bolt-flanges", six_bolt_flanges, "bolts", "mild-steel", ["body 1 and bottom"], ["20 kN +z @ body 2 and top"],
+     ["M10 8.8 torque 30 N*m"], (2, 1), ("clamp", "separation")),
+    ("shaft-clamp", shaft_clamp, "bolts", "mild-steel", ["body 1 and y=min"], ["400 N +x @ body 3 and top"],
+     ["M6 8.8 torque 8 N*m"], (3, 3), ("clamp", "slip")),
+    ("press-fit-hub", press_fit_hub, "contact", "mild-steel", ["body 1 and z=min"], ["2 kN +z @ body 2 and top"],
+     [], (2, 1), ("slip",)),
+    ("wall-bracket", wall_bracket, "bolts", "6061-t6", ["body 1 and y=min"], ["1 kN -z @ body 2 and z=max"],
+     ["M8 8.8 torque 20 N*m"], (2, 1), ("clamp", "separation")),
+]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("case", ASSEMBLIES, ids=[c[0] for c in ASSEMBLIES])
+def test_unfamiliar_assemblies_are_found_solved_and_checked(case, tmp_path):
+    from wobbl.joints.assembly import prepare_assembly
+    from wobbl.joints.bolts import BoltStudy, run_bolts
+    from wobbl.joints.contact import ContactStudy, run_contact
+    from wobbl.validation import generality as G
+
+    name, build, kind, mat, fix, load, bolt, (bodies, pairs), words = case
+    part = G._step(tmp_path / f"{name}.step", build)
+    asm = prepare_assembly(part, tmp_path / "pre")
+    assert asm.n_bodies == bodies and len(asm.pairs) >= pairs
+    if kind == "bolts":
+        o = run_bolts(BoltStudy(str(part), mat, bolt, load, fix, quality="fast", budget=600), tmp_path / "run",
+                      render_images=False)
+        assert o.values["bolts"] and o.values["least_clamp_N"] == pytest.approx(o.values["least_clamp_N"])
+    else:
+        o = run_contact(ContactStudy(str(part), mat, load, fix, [], 0.2, quality="fast", budget=600),
+                        tmp_path / "run", render_images=False)
+    assert len(o.values["levels"]) == 2
+    names = {c.name for c in o.checks}
+    assert {"force balance", "contact convergence"} <= names
+    assert [c.name for c in o.checks if c.status == "fail" and c.name in {"force balance", "contact convergence"}] == []
+    assert any(w in o.headline.lower() or w in names for w in words), (o.headline, names)
+    print(name, o.verdict, o.headline)
+
+
+# ------------------------------------------------------------------------------------------------- time budget
+def _fake_world():
+    """An assembly of a fixed volume whose 'mesh' has a node count that follows the element size and the number of
+    elements round a circle, so the budget can be tested without gmsh or a solver."""
+    from types import SimpleNamespace
+
+    from wobbl.mesh.mesher import Sizing
+
+    asm = SimpleNamespace(prep=SimpleNamespace(volume=3.0e5))
+
+    def make(h, refine=0.75, curv=16):
+        return [Sizing(h=h * refine ** k, curvature=curv) for k in range(2)]
+
+    def mesh_fn(_asm, sizing):
+        return SimpleNamespace(n_nodes=int(1.45 * 3.0e5 * 6.5 / sizing.h ** 3 * 1.1 + 40 * sizing.curvature))
+
+    return asm, make, mesh_fn
+
+
+def test_a_mesh_is_coarsened_until_two_levels_fit_the_budget():
+    from wobbl.joints import budget as B
+
+    asm, make, mesh_fn = _fake_world()
+    loose = B.fit(asm, make, 10.0, None, 1e9, 60, 1, mesh_fn=mesh_fn)
+    tight = B.fit(asm, make, 10.0, None, 600.0, 60, 1, mesh_fn=mesh_fn)
+    assert loose.rung_index == 0 and loose.h[0] == pytest.approx(10.0) and not loose.notes
+    assert tight.rung_index > 0 and tight.h[0] > loose.h[0] and tight.nodes[0] < loose.nodes[0]
+    assert tight.predicted <= 600.0 and tight.mesh0.n_nodes == tight.nodes[0]
+    assert "coarsened" in tight.notes[0]
+    assert tight.timeout() >= 3 * 600.0 - tight.spent
+
+
+def test_a_mesh_size_the_user_sets_is_kept_and_only_reported():
+    from wobbl.joints import budget as B
+
+    asm, make, mesh_fn = _fake_world()
+    plan = B.fit(asm, make, 10.0, 6.0, 100.0, 60, 1, mesh_fn=mesh_fn)
+    assert plan.h[0] == 6.0 and plan.rung_index == 0 and plan.user_size
+    assert plan.predicted > 100.0 and "was kept" in plan.notes[0]
+
+
+def test_the_second_level_is_made_less_fine_when_the_first_was_slow():
+    from wobbl.joints import budget as B
+
+    asm, make, mesh_fn = _fake_world()
+    plan = B.fit(asm, make, 10.0, None, 1e9, 60, 1, mesh_fn=mesh_fn)
+    fast = B.second_level(plan, asm, make, 5.0, plan.nodes[0], 60, mesh_fn)
+    n_fast = fast.n_nodes
+    plan.budget, plan.spent = 1200.0, 0.0
+    slow = B.second_level(plan, asm, make, 600.0, plan.nodes[0], 60, mesh_fn)
+    assert slow.n_nodes < n_fast and plan.h[1] > 0.75 * plan.h[0] - 1e-9

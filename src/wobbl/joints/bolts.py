@@ -618,9 +618,9 @@ def evaluate(study: BoltStudy, asm: Assembly, lines: list[BoltLine], r: dict, le
                         f"kN against the {', '.join(fmt(b['preload_target'] / 1000) for b in r['bolts'])} kN asked, "
                         f"within {100 * worst_pre:.2g}%", {"error": worst_pre}))
     hand = []
-    for ln, b, (fa, fq) in zip(lines, r["bolts"], group_loads(lines, F, M)):
+    for i, (ln, b, (fa, fq)) in enumerate(zip(lines, r["bolts"], group_loads(lines, F, M))):
         tapped = r["mat_of"][ln.bodies[-1]] if ln.tapped else None
-        hand.append(V.check(ln.bolt, ln.clamp, ln.outer, r["E_parts"][lines.index(ln)], b["preload"], fa, fq,
+        hand.append(V.check(ln.bolt, ln.clamp, ln.outer, r["E_parts"][i], b["preload"], fa, fq,
                             study.friction, engagement=ln.engagement or None,
                             thread_strength=tapped.tensile_strength if tapped else None))
     # stiffness of the clamped parts: the FEA's against VDI's cone
