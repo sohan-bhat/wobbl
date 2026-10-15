@@ -122,3 +122,42 @@ def test_examples_with_playback(tmp_path):
         assert build_scene(d), name
         h, _ = load(d / "scene.wobbl")
         assert h["verdict"]["word"] and h["timeline"]["frames"] > 1, name
+
+
+def _names(h):
+    return {o.get("name") for o in h["objects"]}
+
+
+def test_rocket_flies_its_own_airframe(tmp_path):
+    from wobbl.motion.spec import read_spec
+    from wobbl.motion.study import run_motion
+    spec = {"name": "tiny", "rocket": {"mass": "0.6 kg", "diameter": "41 mm", "length": "0.9 m", "cg": "0.55 m",
+                                       "cd": 0.5},
+            "nose": {"shape": "cone", "length": "15 cm"},
+            "fins": {"count": 4, "root": "9 cm", "tip": "4 cm", "span": "5 cm", "sweep": "4 cm"},
+            "motor": {"name": "G", "loaded_mass": "0.12 kg", "propellant": "0.06 kg", "length": "12 cm",
+                      "thrust": [[0, 0], [0.05, 120], [1.0, 90], [1.3, 0]]},
+            "launch": {"rail_length": "1 m", "rail_angle": "3 deg", "wind": "3 m/s"},
+            "drogue": {"diameter": "45 cm", "cd": 1.5}}
+    run_motion(read_spec(spec, "how high does it go?"), tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    names = _names(h)
+    assert {"rocket", "nose", "fins", "exhaust", "drogue parachute", "launch rail", "wind"} <= names
+    rocket = next(o for o in h["objects"] if o.get("name") == "rocket")
+    assert rocket["pose"]["pos"]["shape"][0] == h["timeline"]["frames"]
+    assert {r["name"] for r in h["readouts"]} >= {"altitude", "speed", "Mach", "thrust"}
+
+
+def test_thrown_ball_is_drawn_at_its_size(tmp_path):
+    from wobbl.motion.spec import MotionStudy
+    from wobbl.motion.study import run_motion
+    st = MotionStudy(name="ball", mass=0.43, diameter=0.22, cd=0.25, height=1.5, speed=20, angle=35,
+                     question="how far does a kicked ball go?")
+    run_motion(st, tmp_path)
+    h, blob = load(tmp_path / "scene.wobbl")
+    names = _names(h)
+    assert {"ball", "weight", "drag", "path"} <= names and "cliff" not in names
+    from wobbl.viz.scene import array
+    ball = next(o for o in h["objects"] if o.get("name") == "ball")
+    X = array(h, blob, ball["pos"])
+    assert 0.15 < np.ptp(X[:, 0]) < 0.3

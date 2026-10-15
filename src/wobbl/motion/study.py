@@ -224,7 +224,8 @@ def analyze(st: MotionStudy, progress=None) -> Analysis:
         verdict, head, metrics = _rocket_answer(st, fl, by, rv, pts)
     else:
         verdict, head, metrics = _body_answer(st, fl, checks)
-    values.update({"flight_time_s": end.t, "impact_speed_mps": _speed(end.y), "distance_m": end.y[X],
+    values.update({"diameter_m": st.diameter, "flight_time_s": end.t, "impact_speed_mps": _speed(end.y),
+                   "distance_m": end.y[X],
                    "max_speed_mps": max(_speed(p["y"]) for p in pts), "max_mach": max(p["mach"] for p in pts)})
     if apo is not None:
         values.setdefault("apogee_m", apo.y[Z])
