@@ -1,0 +1,24 @@
+{
+ "domain": "mechanism",
+ "analysis": "drive",
+ "spec": {
+  "thing": "fourbar",
+  "kind": "fourbar",
+  "question": "Does this wiper linkage sweep 95 degrees, and can a 45 rpm wiper motor drive it over dry glass?",
+  "options": {
+   "set": [
+    "speed=45 rpm",
+    "ground=300",
+    "crank=80",
+    "coupler=300",
+    "rocker=110",
+    "link_mass=80,250,300",
+    "stall_torque=25",
+    "no_load_speed=45rpm",
+    "load=6",
+    "sweep=95"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

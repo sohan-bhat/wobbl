@@ -1,10 +1,11 @@
 MARGINAL. The rocker swings 94.3 degrees, from 50.1 to 144, as the crank turns, and the transmission angle stays between 35.5 and 130 degrees. Outside 40 to 140 degrees it drives stiffly and wears its pins. The motor turns the crank at 39 rpm on average and peaks at 5.41 N m.
 
-Confidence: high. passed hand calculation, virtual work, time step convergence, energy account, constraint drift
+Confidence: high. passed hand calculation, virtual work, time step convergence, energy account, constraint drift, virtual work from the weights and loads
 sweep: 94.3 deg
 transmission: 35.5 to 130 deg
 worst advantage: 1.1x
 peak torque: 5.41 N m
+time ratio: 1.05 : 1
 
 Checks:
   [pass] hand calculation: Freudenstein's equation puts the rocker within 6.62e-04 degrees of MuJoCo's at every crank angle through the turn
@@ -12,12 +13,14 @@ Checks:
   [pass] time step convergence: peak crank torque 5.41 N m with the normal step and 5.41 N m with half the step (0.0052% apart)
   [pass] energy account: the work of the forces (drives 49.7 J, loads -48.7 J, constraints -0.00142 J) matches the change in kinetic and potential energy, 0.931 J, to 6.9e-05% of the largest energy flow
   [pass] constraint drift: the linkage loop held together to 0.00211 mm at worst (0.0026% of 80 mm)
+  [pass] virtual work from the weights and loads: turning crank slowly, the weights, loads and dampers do 13.7 W at most, so T = sum(F . v) / w asks 5.45 N m at peak, and MuJoCo's drive gives 5.44 N m (0.32% of the peak apart)
 
 Assumptions:
   - Links 300 mm ground, 80 mm crank, 300 mm coupler and 110 mm rocker, a crank rocker linkage, flat and stacked so the links never touch.
   - The rocker's load is a drag of 6 N m against its motion, as from a wiper blade or a door.
   - The motor, which stalls at 25 N m and turns 45 rpm with no load, drives the crank at full voltage, with its rotor felt through the gearbox as 1061 kg cm2, a 20 ms mechanical time constant.
   - Pins are frictionless and have no play.
+  - The motor's current is not known, so none is reported. Give stall_current or a supply voltage with the motor's values to see it.
   - Bodies are rigid, so links do not bend. A long or thin printed link flexes and rings more than this shows.
   - Contacts are stiff springs that let parts sink into each other by the depth the contact check reports.
   - Joints and gears have no backlash, and friction acts only where the inputs give it.

@@ -1,0 +1,44 @@
+{
+ "thing": "fourbar",
+ "question": "Does this wiper linkage sweep 95 degrees, and can a 45 rpm wiper motor drive it over dry glass?",
+ "plan": {
+  "thing": "fourbar",
+  "question": "Does this wiper linkage sweep 95 degrees, and can a 45 rpm wiper motor drive it over dry glass?",
+  "domain": "mechanism",
+  "kind": "fourbar",
+  "analyses": [
+   "drive"
+  ],
+  "reasons": [
+   {
+    "decided": "the words \"linkage\", \"fourbar\", \"wiper\" point to mechanism (fourbar)",
+    "override": "--domain mechanism"
+   },
+   {
+    "decided": "physics drive from \"can a 45 rpm wiper motor drive\"",
+    "override": "--physics drive"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "mechanism",
+    "score": 5
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "marginal",
+ "situation": {},
+ "steps": [
+  {
+   "analysis": "drive",
+   "domain": "mechanism",
+   "verdict": "marginal",
+   "headline": "The rocker swings 94.3 degrees, from 50.1 to 144, as the crank turns, and the transmission angle stays between 35.5 and 130 degrees. Outside 40 to 140 degrees it drives stiffly and wears its pins. The motor turns the crank at 39 rpm on average and peaks at 5.41 N m.",
+   "confidence": "high",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": []
+  }
+ ]
+}

@@ -20,11 +20,15 @@
   [
    "peak torque",
    "5.41 N m"
+  ],
+  [
+   "time ratio",
+   "1.05 : 1"
   ]
  ],
  "confidence": "high",
  "confidence_reasons": [
-  "passed hand calculation, virtual work, time step convergence, energy account, constraint drift"
+  "passed hand calculation, virtual work, time step convergence, energy account, constraint drift, virtual work from the weights and loads"
  ],
  "checks": [
   {
@@ -77,6 +81,16 @@
     "max": 2e-06,
     "relative": 2.6e-05
    }
+  },
+  {
+   "name": "virtual work from the weights and loads",
+   "status": "pass",
+   "summary": "turning crank slowly, the weights, loads and dampers do 13.7 W at most, so T = sum(F . v) / w asks 5.45 N m at peak, and MuJoCo's drive gives 5.44 N m (0.32% of the peak apart)",
+   "detail": {
+    "error": 0.003201,
+    "hand_peak": 5.44683,
+    "sim_peak": 5.443366
+   }
   }
  ],
  "assumptions": [
@@ -84,6 +98,7 @@
   "The rocker's load is a drag of 6 N m against its motion, as from a wiper blade or a door.",
   "The motor, which stalls at 25 N m and turns 45 rpm with no load, drives the crank at full voltage, with its rotor felt through the gearbox as 1061 kg cm2, a 20 ms mechanical time constant.",
   "Pins are frictionless and have no play.",
+  "The motor's current is not known, so none is reported. Give stall_current or a supply voltage with the motor's values to see it.",
   "Bodies are rigid, so links do not bend. A long or thin printed link flexes and rings more than this shows.",
   "Contacts are stiff springs that let parts sink into each other by the depth the contact check reports.",
   "Joints and gears have no backlash, and friction acts only where the inputs give it."
@@ -110,6 +125,13 @@
   "rms_torque_Nm": 3.597311,
   "mean_crank_rpm": 39.008321,
   "stalled": false,
+  "quick_return_ratio": 1.047264,
+  "mean_rpm": 39.008321,
+  "peak_rpm": 44.544884,
+  "peak_mech_power_W": 19.984671,
+  "mean_mech_power_W": 13.246924,
+  "peak_usage": 0.216513,
+  "worst_usage": 0.216513,
   "_figures": [
    [
     "angles",
@@ -155,8 +177,9 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 12.738,
+ "t_total": 16.608,
  "solver": "MuJoCo 3.10.0",
+ "criteria": [],
  "events": [
   {
    "name": "motor on",
@@ -199,7 +222,7 @@
    "detail": "50.1 deg"
   }
  ],
- "runtime_s": 12.738,
+ "runtime_s": 16.608,
  "model": {
   "bodies": 3,
   "joints": 3,

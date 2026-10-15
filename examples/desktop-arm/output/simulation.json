@@ -1,0 +1,54 @@
+{
+ "thing": "arm",
+ "question": "Can these hobby servos lift a 500 g payload through this desktop arm's pick and place?",
+ "plan": {
+  "thing": "arm",
+  "question": "Can these hobby servos lift a 500 g payload through this desktop arm's pick and place?",
+  "domain": "mechanism",
+  "kind": "arm",
+  "analyses": [
+   "torque"
+  ],
+  "reasons": [
+   {
+    "decided": "the words \"servos\", \"pick and place\" point to mechanism (arm)",
+    "override": "--domain mechanism"
+   },
+   {
+    "decided": "physics torque, as asked",
+    "override": "--physics torque"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "mechanism",
+    "score": 2
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "fail",
+ "situation": {
+  "objects": [
+   "table",
+   "payload"
+  ]
+ },
+ "steps": [
+  {
+   "analysis": "torque",
+   "domain": "mechanism",
+   "verdict": "fails",
+   "headline": "The shoulder servo stalls. Carrying 500 g through this move needs 1.35 N m (13.7 kg cm) almost at rest, where the TowerPro MG996R at 6 V gives 1.07 N m (11 kg cm). The hand hits the table at 0.241 s.",
+   "confidence": "high",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": [
+    {
+     "assumed": "servo not named, so Wobbl assumed a TowerPro MG996R at every joint",
+     "override": "--set servo=..."
+    }
+   ]
+  }
+ ]
+}

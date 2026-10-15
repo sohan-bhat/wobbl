@@ -8,11 +8,12 @@ heat: 362% of rated
 
 Checks:
   [pass] hand statics: at the pick pose the moments of the weights about each joint come to shoulder 1.29 N m, elbow 0.671 N m, wrist 0 N m, and MuJoCo's inverse dynamics needs 1.29, 0.671, 0 N m (1.7e-14% apart)
-  [pass] forward run: the run with the servos' real limits falls 83.4 degrees behind the move, as the inverse dynamics says it must
-  [pass] time step convergence: how far the shoulder falls behind 58.7 deg with the normal step and 58.8 deg with half the step (0.023% apart)
-  [pass] energy account: the work of the forces (drives 0.604 J, constraints -0.91 J) matches the change in kinetic and potential energy, -0.307 J, to 0.11% of the largest energy flow
+  [pass] forward run: the run with the servos' real limits falls 84.1 degrees behind the move, as the inverse dynamics says it must
+  [pass] time step convergence: how far the shoulder falls behind 58.8 deg with the normal step and 58.7 deg with half the step (0.031% apart)
+  [pass] energy account: the work of the forces (drives 0.521 J, constraints -0.826 J) matches the change in kinetic and potential energy, -0.305 J, to 0.13% of the largest energy flow
 
 Assumptions:
+  - Wobbl guessed: servo not named, so Wobbl assumed a TowerPro MG996R at every joint.
   - The arm has a TowerPro MG996R at 6 V at the base, shoulder and elbow and a TowerPro MG90S at 6 V at the wrist. Each can carry 33% of its stall torque continuously unless a rating is given.
   - The move picks at 200, 0, 40 mm, lifts 80 mm, swings over to 0, 200, 40 mm and lowers, each step in 1.2 s on a minimum jerk profile, then holds 0.5 s. The heating estimate repeats that loaded cycle.
   - The servos follow the move by computed torque, as a well tuned controller would, and a hobby servo's own loop lags a little more.

@@ -1,0 +1,30 @@
+{
+ "domain": "mechanism",
+ "analysis": "torque",
+ "spec": {
+  "thing": "arm",
+  "kind": "arm",
+  "question": "Can these hobby servos lift a 500 g payload through this desktop arm's pick and place?",
+  "options": {
+   "servo": [
+    "mg996r"
+   ],
+   "payload": [
+    "500g"
+   ],
+   "set": [
+    "payload=500 g",
+    "wrist_servo=mg90s",
+    "links=120,120,60",
+    "link_mass=60,50,30",
+    "gripper=40g",
+    "pick=200,0,40",
+    "place=0,200,40",
+    "lift=80",
+    "move_time=1.2",
+    "dwell=0.5"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

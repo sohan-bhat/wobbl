@@ -47,44 +47,45 @@
   {
    "name": "forward run",
    "status": "pass",
-   "summary": "the run with the servos' real limits falls 83.4 degrees behind the move, as the inverse dynamics says it must",
+   "summary": "the run with the servos' real limits falls 84.1 degrees behind the move, as the inverse dynamics says it must",
    "detail": {
     "lag_deg": {
-     "base": 55.184339,
-     "shoulder": 58.740469,
-     "elbow": 83.36873,
-     "wrist": 49.985129
+     "base": 58.967549,
+     "shoulder": 58.750544,
+     "elbow": 84.136914,
+     "wrist": 57.708923
     }
    }
   },
   {
    "name": "time step convergence",
    "status": "pass",
-   "summary": "how far the shoulder falls behind 58.7 deg with the normal step and 58.8 deg with half the step (0.023% apart)",
+   "summary": "how far the shoulder falls behind 58.8 deg with the normal step and 58.7 deg with half the step (0.031% apart)",
    "detail": {
-    "normal": 58.740469,
-    "half": 58.754114,
-    "change": 0.000232
+    "normal": 58.750544,
+    "half": 58.732514,
+    "change": 0.000307
    }
   },
   {
    "name": "energy account",
    "status": "pass",
-   "summary": "the work of the forces (drives 0.604 J, constraints -0.91 J) matches the change in kinetic and potential energy, -0.307 J, to 0.11% of the largest energy flow",
+   "summary": "the work of the forces (drives 0.521 J, constraints -0.826 J) matches the change in kinetic and potential energy, -0.305 J, to 0.13% of the largest energy flow",
    "detail": {
-    "scale_J": 1.067203,
-    "drives": 0.603532,
+    "scale_J": 0.982675,
+    "drives": 0.520714,
     "loads": 0.0,
     "gear losses": 0.0,
     "damping": 0.0,
-    "constraints": -0.910213,
-    "delta_E_J": -0.306679,
-    "worst": 0.00106,
-    "end": 2e-06
+    "constraints": -0.825616,
+    "delta_E_J": -0.304562,
+    "worst": 0.00132,
+    "end": 0.000346
    }
   }
  ],
  "assumptions": [
+  "Wobbl guessed: servo not named, so Wobbl assumed a TowerPro MG996R at every joint.",
   "The arm has a TowerPro MG996R at 6 V at the base, shoulder and elbow and a TowerPro MG90S at 6 V at the wrist. Each can carry 33% of its stall torque continuously unless a rating is given.",
   "The move picks at 200, 0, 40 mm, lifts 80 mm, swings over to 0, 200, 40 mm and lowers, each step in 1.2 s on a minimum jerk profile, then holds 0.5 s. The heating estimate repeats that loaded cycle.",
   "The servos follow the move by computed torque, as a well tuned controller would, and a hobby servo's own loop lags a little more.",
@@ -104,7 +105,7 @@
     "rms_Nm": 0.0684,
     "rated_Nm": 0.359577,
     "hold_Nm": 0.0,
-    "lag_deg": 55.184339,
+    "lag_deg": 58.967549,
     "motor": "TowerPro MG996R at 6 V"
    },
    "shoulder": {
@@ -115,7 +116,7 @@
     "rms_Nm": 1.302668,
     "rated_Nm": 0.359577,
     "hold_Nm": 1.287766,
-    "lag_deg": 58.740469,
+    "lag_deg": 58.750544,
     "motor": "TowerPro MG996R at 6 V"
    },
    "elbow": {
@@ -126,7 +127,7 @@
     "rms_Nm": 0.686409,
     "rated_Nm": 0.359577,
     "hold_Nm": 0.67064,
-    "lag_deg": 83.36873,
+    "lag_deg": 84.136914,
     "motor": "TowerPro MG996R at 6 V"
    },
    "wrist": {
@@ -137,7 +138,7 @@
     "rms_Nm": 0.012022,
     "rated_Nm": 0.071915,
     "hold_Nm": 0.0,
-    "lag_deg": 49.985129,
+    "lag_deg": 57.708923,
     "motor": "TowerPro MG90S at 6 V"
    }
   },
@@ -222,8 +223,9 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 39.405,
+ "t_total": 34.453,
  "solver": "MuJoCo 3.10.0",
+ "criteria": [],
  "events": [
   {
    "name": "shoulder servo at its limit",
@@ -252,13 +254,13 @@
   },
   {
    "name": "base servo at its limit",
-   "t_s": 0.28,
-   "detail": "asks 11.1 N m, gets 1.08 N m (11 kg cm)"
+   "t_s": 0.42,
+   "detail": "asks 3.35 N m (34.1 kg cm), gets 1.07 N m (11 kg cm)"
   },
   {
    "name": "the base touches the upper arm",
-   "t_s": 0.5,
-   "detail": "up to 156 N"
+   "t_s": 0.444,
+   "detail": "up to 141 N"
   },
   {
    "name": "lifted",
@@ -281,7 +283,7 @@
    "detail": ""
   }
  ],
- "runtime_s": 39.405,
+ "runtime_s": 34.453,
  "model": {
   "bodies": 5,
   "joints": 4,
