@@ -119,6 +119,32 @@ def next_sizing(planned: Sizing, prev: Sizing, n_prev: int, cap: int) -> Sizing 
     return None
 
 
+def peak_refinement(mesh, features, xyz) -> list:
+    """Refine around a governing stress the way the strength study refines its hot spots: half the local element
+    size, or a quarter of the radius of a fillet or hole the peak sits on, at most about seven times finer in one
+    step. Global refinement alone leaves a small fillet on the coarse mesh, so its stress keeps rising."""
+    from ..mesh.mesher import Refinement
+
+    xyz = np.asarray(xyz, float)
+    i = int(np.argmin(np.linalg.norm(mesh.X - xyz, axis=1)))
+    h = float(mesh.node_sizes()[i])
+    if not np.isfinite(h) or h <= 0:
+        return []
+    size = 0.5 * h
+    surfs = {int(s) for s in mesh.tri_surf[(mesh.tris == i).any(1)]}
+    radii = [features.faces[s].radius for s in surfs if s in features.faces and features.faces[s].radius]
+    if radii:
+        size = max(min(size, min(radii) / 4.0), 0.15 * h)
+    return [Refinement(size, points=[tuple(xyz)], radius=2.5 * h, grow=6 * size, label="response peak")]
+
+
+def with_refinements(sz: Sizing | None, refinements: list) -> Sizing | None:
+    if sz is None or not refinements:
+        return sz
+    return Sizing(h=sz.h, refinements=list(sz.refinements) + list(refinements), order=sz.order,
+                  curvature=sz.curvature, h_min=sz.h_min)
+
+
 def excluded_nodes(mesh, built, features, sizing: Sizing, measure: np.ndarray) -> tuple[np.ndarray, float]:
     """Nodes near supports, rigid attachments, loads on holes and sharp inside corners, where linear stress depends on
     the idealization rather than the part, and how far that reaches."""

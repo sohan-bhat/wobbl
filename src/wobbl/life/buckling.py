@@ -25,7 +25,8 @@ from ..structural.spec import StructuralStudy
 from ..units import fmt
 from ..verify.checks import Check, balance_check, confidence, convergence_check
 from . import ccx
-from .common import QUALITY, change, excluded_nodes, fit_first, governing, level_sizes, next_sizing, prepare
+from .common import (QUALITY, change, excluded_nodes, fit_first, governing, level_sizes, next_sizing,
+                     peak_refinement, prepare, with_refinements)
 from .knockdown import (Column, classify, column_curve, column_info, euler_check, johnson, knockdown,
                         separation_check)
 from .outcome import LifeOutcome, clean_work, save_study, verdict_for
@@ -65,9 +66,10 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
     q = QUALITY.get(base.quality, QUALITY["normal"])
     sizes = level_sizes(p, base.quality, base.mesh_size)
     n_modes = max(2, int(study.modes))
-    levels, last, stopped_by = [], None, "level limit"
+    levels, last, stopped_by, refine = [], None, "level limit", []
     for k, planned in enumerate(sizes):
-        sz = planned if last is None else next_sizing(planned, last[5], levels[-1]["n_nodes"], q["nodes"])
+        sz = planned if last is None else with_refinements(
+            next_sizing(planned, last[5], levels[-1]["n_nodes"], q["nodes"]), last[5].refinements + refine)
         if sz is None:
             stopped_by = "node limit"
             break
@@ -95,6 +97,12 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
         levels.append({"level": k, "n_nodes": mesh.n_nodes, "h": sz.h, "factor": pos[0], "factors": factors,
                        "t_solve": 0.0})
         last = (mesh, built, deck, factors, blocks, sz)
+        # the next mesh refines around the stress peak that sets the yield factor
+        n_k = mesh.n_nodes
+        meas_k, _ = failure_measure(StaticResult(blocks["DISP"][0][1][:n_k, :3], blocks["STRESS"][0][1][:n_k, :6],
+                                                 np.zeros((n_k, 3))), mat)
+        excl_k, _ = excluded_nodes(mesh, built, p.features, sz, meas_k)
+        refine = peak_refinement(mesh, p.features, mesh.X[governing(meas_k, excl_k)])
         say("check", f"level {k}: first buckling factor {pos[0]:.4g}"
                      + (f" ({100 * change([L['factor'] for L in levels]):.1f}% change)" if k else ""))
         if k >= 1 and change([L["factor"] for L in levels]) <= q["tol"]:

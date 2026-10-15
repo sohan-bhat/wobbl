@@ -29,7 +29,8 @@ from ..structural.build import build_static, tri_area_weights
 from ..structural.spec import SpecError
 from ..units import fmt
 from . import ccx, modal
-from .common import QUALITY, change, excluded_nodes, fit_first, governing, level_sizes, next_sizing, prepare
+from .common import (QUALITY, change, excluded_nodes, fit_first, governing, level_sizes, next_sizing,
+                     peak_refinement, prepare, with_refinements)
 from .outcome import LifeOutcome, clean_work, save_study
 from .vibspec import (VibrationStudy, default_damping, default_duration, parse_mass, parse_sine, seconds,
                       unit_vector)
@@ -70,9 +71,10 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
     q = QUALITY.get(base.quality, QUALITY["normal"])
     sizes = level_sizes(p, base.quality, base.mesh_size)
     sel = Selector(p.features.faces, p.features.bbox)
-    levels, last, stopped_by = [], None, "level limit"
+    levels, last, stopped_by, refine = [], None, "level limit", []
     for k, planned in enumerate(sizes):
-        sz = planned if last is None else next_sizing(planned, last[5], levels[-1]["n_nodes"], q["nodes"])
+        sz = planned if last is None else with_refinements(
+            next_sizing(planned, last[5], levels[-1]["n_nodes"], q["nodes"]), last[5].refinements + refine)
         if sz is None:
             stopped_by = "node limit"
             break
@@ -101,6 +103,9 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
         if last is not None:
             shutil.rmtree(last[-1], ignore_errors=True)   # an earlier level's solver files are not needed again
         last = (mesh, built, deck, modes, resp, sz, wl)
+        # the next mesh refines around this one's response peaks, where a small fillet needs it
+        refine = [r for key in ("harmonic", "random") if resp and key in resp
+                  for r in peak_refinement(mesh, p.features, resp[key]["xyz"])]
         say("check", f"level {k}: mode {watch + 1} at {fmt(modes.freq[watch])} Hz"
                      + (f", response {fmt(resp['stress'])} MPa" if resp else "")
                      + (f" ({100 * change([L['watch_Hz'] for L in levels]):.1f}% change)" if k else ""))
