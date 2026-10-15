@@ -30,65 +30,77 @@ def build(out: Path, pb: dict) -> Path | None:
     return fn(out, pb, o) if fn else None
 
 
-def _place(counts: dict, order: list, slots: np.ndarray, rng) -> dict:
-    """Slot index of every molecule of every species in a frame, species after species."""
-    at, k = {}, 0
-    for sp in order:
-        n = counts.get(sp, 0)
-        at[sp] = list(range(k, k + n))
-        k += n
-    return at
-
-
 def flame(out, pb, o):
+    """A burner with its flame through the sweep of equivalence ratio. The burned gas is colored by the run's
+    equilibrium temperature at each mixture and the unburned cone by the reactants'. Above the flame its products
+    hang as molecules in their solved shares, CO and NO among them."""
     fr = pb["frames"]
+    fl = pb.get("flame") or {}
     phi = np.array([f["phi"] for f in fr], float)
     TK = np.array([f["T_K"] for f in fr], float)
-    order = [sp for sp in sorted({k for f in fr for k in f["x"]}, key=lambda k: -max(f["x"].get(k, 0) for f in fr))
-             if sp in MOLECULES]
-    N = 80
-    counts = []
-    for f in fr:
-        x = np.array([f["x"].get(sp, 0) for sp in order])
-        raw = x / max(x.sum(), 1e-12) * N
-        c = np.floor(raw).astype(int)
-        c[np.argsort(-(raw - c))[: N - c.sum()]] += 1
-        counts.append(dict(zip(order, c)))
-    side = int(np.ceil(N ** (1 / 3)))
-    g = np.array([(i, j, k) for k in range(side) for j in range(side) for i in range(side)], float)[:N] * 4.2
+    T0 = float(fl.get("reactant_T_K") or 298.15)
+    n = len(fr)
+    s = Scene(f"A {fl.get('fuel', 'fuel')} flame in {fl.get('oxidizer', 'air')}", domain="combustion",
+              question=o.get("question", ""), length="mm",
+              source="Each frame is its own equilibrium solve at that equivalence ratio. The flame's shape is drawn "
+                     "for the eye, its colors and the molecules' shares are the run's.")
+    s.timeline(phi, unit="", label="equivalence ratio", seconds=12, between="interpolated")
+    # the burner
+    s.mesh(*lathe([(0, 0), (16, 0), (16, 6), (6, 8), (6, 90), (4.5, 90), (4.5, 10), (0, 10)], 32), name="burner",
+           color=P.STEEL, smooth=False)
+    s.body("cylinder", [3.5, 3], pos=[-13, 0, 18], quat=P.z_to([1, 0, 0]), color=P.DARK, name="air inlet", prop=True)
+    # the flame: an unburned inner cone in a burned envelope, taller and lazier as the mixture runs rich
+    tall = 1 + 0.9 * np.clip(phi - 1, 0, None) + 0.4 * np.clip(1 - phi, 0, None)
+    Xo, To = lathe([(0, 90), (6.2, 90)] + [((6.2 + 6 * np.sin(np.pi * z * 0.8)) * (1 - z) ** 0.55 + 0.2, 90 + 55 * z)
+                                           for z in np.linspace(0.05, 1, 14)] + [(0, 145)], 32)
+    Xi, Ti = lathe([(0, 90), (4.6, 90)] + [(4.6 * (1 - z), 90 + 16 * z) for z in np.linspace(0.1, 1, 6)], 32)
+    for X, T, name, temp, op in ((Xo, To, "flame", TK, 0.55), (Xi, Ti, "unburned cone", np.full(n, T0), 0.75)):
+        m = s.mesh(X, T, name=name, color="#ff9a3c", opacity=op)
+        m.color_by("gas temperature", np.outer(temp, np.ones(len(X))), unit="K", colormap="inferno",
+                   range=(T0, max(TK.max(), T0 + 1)))
+        m.deform(np.c_[np.zeros(len(X)), np.zeros(len(X)), X[:, 2] - 90], scale=tall - 1)
+        m.glow = np.clip((temp - 1000) / 1500, 0, 1)
+    s.notes = [x for x in s.notes if not x.startswith("Deformation")]
+    # the products above the flame
     rng = np.random.default_rng(7)
-    turn = rng.uniform(0, np.pi, N)
-    mx = {sp: max(c[sp] for c in counts) for sp in order}
-    els, slots = [], []
-    for sp in order:
-        for j in range(mx[sp]):
-            for a in MOLECULES[sp]:
-                els.append(a[0])
-                slots.append((sp, j, a[1], a[2]))
-    F = len(fr)
-    pos = np.full((F, len(els), 3), np.nan)
-    for f in range(F):
-        at = _place(counts[f], order, g, rng)
-        for i, (sp, j, dx, dy) in enumerate(slots):
-            if j < len(at[sp]):
-                k = at[sp][j]
-                c, s_ = np.cos(turn[k]), np.sin(turn[k])
-                pos[f, i] = g[k] + [dx * c - dy * s_, dx * s_ + dy * c, 0]
-    s = Scene("The burned gas as molecules", domain="combustion", question=o.get("question", ""), length="angstrom",
-              source="Each frame is its own equilibrium solve. The share of each molecule is the run's mole fraction, "
-                     "rounded to 80 molecules, and where they sit is drawn for the eye.")
-    s.timeline(phi, unit="", label="equivalence ratio", seconds=10, between="step")
-    s.atoms(els, pos, radius=0.75, name="burned gas")
-    box = g.max(0) + 2.5
-    P.wire_box(s, [-2.5, -2.5, -2.5], box, name="sample box")
+    sp_all = [k for k in MOLECULES if any(k in f["x"] for f in fr)]
+    trace = [k for k in ("CO", "NO") if k in sp_all]
+    main = [k for k in sp_all if k not in trace and max(f["x"].get(k, 0) for f in fr) > 1e-3]
+    N, K = 46, 10
+    count = {}
+    for k in main:
+        count[k] = np.array([round(f["x"].get(k, 0) / max(sum(f["x"].get(m, 0) for m in main), 1e-12) * N)
+                             for f in fr])
+    for k in trace:
+        x = np.array([f["x"].get(k, 0) for f in fr])
+        count[k] = np.ceil(x / max(x.max(), 1e-12) * K - 1e-9).astype(int)
+    els, pos = [], []
+    scale = 3.0
+    for k in main + trace:
+        for j in range(int(count[k].max())):
+            c = [rng.uniform(-20, 20), rng.uniform(-20, 20), rng.uniform(160, 215)]
+            a, b = rng.uniform(0, 2 * np.pi, 2)
+            R = np.array([[np.cos(a), -np.sin(a), 0], [np.sin(a), np.cos(a), 0], [0, 0, 1]]) @ \
+                np.array([[1, 0, 0], [0, np.cos(b), -np.sin(b)], [0, np.sin(b), np.cos(b)]])
+            on = (count[k] > j)
+            for e, dx, dy in MOLECULES[k]:
+                p = np.asarray(c) + R @ np.array([dx, dy, 0.0]) * scale
+                els.append(e)
+                pos.append(np.where(on[:, None], p, np.nan))
+    if els:
+        s.atoms(els, np.stack(pos, axis=1), radius=0.35 * scale, name="burned gas")
+        s.label("CO and NO molecules drawn to their own peak", [30, 0, 150], kind="note")
     s.readout("flame temperature", TK, unit="K", digits=4)
-    for sp in [x for x in ("CO2", "H2O", "CO", "NO", "O2") if x in order][:4]:
-        s.readout(sp, [f["x"].get(sp, 0) * 100 for f in fr], unit="%", digits=3)
+    for k in trace:
+        s.readout(f"{k}", [f["x"].get(k, 0) * 1e6 for f in fr], unit="ppm", digits=3)
+    for k in [x for x in ("CO2", "H2O", "O2") if x in main]:
+        s.readout(k, [f["x"].get(k, 0) * 100 for f in fr], unit="%", digits=3)
     here = pb["manifest"].get("operating_frame")
     if here is not None:
         s.event(float(phi[here]), "your mixture", f"{TK[here]:.4g} K")
+    s.ground(0, size=300, grid=20)
     verdict(s, o)
-    s.camera(target=box / 2 - 1, direction=(0.8, -1, 0.6), distance=float(np.linalg.norm(box)) * 1.7)
+    s.camera(target=[0, 0, 150], direction=(0.5, -1, 0.25), distance=330)
     return s.save(out)
 
 
