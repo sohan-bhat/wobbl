@@ -60,30 +60,46 @@ def test_a_pressure_limit_slows_the_fill_and_can_stop_it(tmp_path):
     assert capped.short or capped.times[-1] > free.times[-1] * 1.2
 
 
-def test_weld_line_forms_behind_a_hole_and_the_gate_goes_in_the_middle(tmp_path):
+@pytest.mark.parametrize("size", [1.6, 2.4])
+def test_weld_line_forms_behind_a_hole_and_the_gate_goes_in_the_middle(tmp_path, size):
     def plate(o):
         a = o.addBox(0, 0, 0, 80, 40, 2)
         c = o.addCylinder(40, 20, -1, 0, 0, 4, 6)
         o.cut([(3, a)], [(3, c)])
 
-    # a weld line behind a 6 mm radius hole needs a few elements around it, and where the mesher puts the nodes
-    # decides which side of that limit a given size lands on, so the next sizes are tried when one is too coarse
-    for k, size in enumerate((1.6, 1.4, 1.8)):
-        (tmp_path / str(k)).mkdir()
-        mesh = _mesh(tmp_path / str(k), plate, size)
-        hm = H.Mesh(mesh.X, mesh.tets, np.full(len(mesh.tets), 2.0))
-        gate = np.nonzero(mesh.X[:, 0] < 1e-6)[0]
-        res = H.fill(hm, H.Viscosity(m=2e4, n=0.35), H.FillSettings([gate], 80 * 40 * 2 / 1.0))
-        weld = H.weld_lines(hm, res.t_fill)
-        # the fronts split by the hole meet past its upstream side, in the band the hole shadows. Elsewhere the fill
-        # time is nearly flat or the elements are slivers, and which nodes read as a weld there follows the mesh each
-        # platform's gmsh makes, so the test asks that the line is found behind the hole and is not picky about the rest
-        behind = weld[(mesh.X[weld, 0] >= 40) & (mesh.X[weld, 0] <= 60) & (np.abs(mesh.X[weld, 1] - 20) < 10)]
-        if len(behind):
-            break
-    assert len(behind)
+    mesh = _mesh(tmp_path, plate, size)
+    hm = H.Mesh(mesh.X, mesh.tets, np.full(len(mesh.tets), 2.0))
+    gate = np.nonzero(mesh.X[:, 0] < 1e-6)[0]
+    res = H.fill(hm, H.Viscosity(m=2e4, n=0.35), H.FillSettings([gate], 80 * 40 * 2 / 1.0))
+    weld = H.weld_lines(hm, res.t_fill)
+    x, y = mesh.X[weld, 0], mesh.X[weld, 1]
+    # the hole splits the flow, and the two fronts meet in the strip it shadows, from its far side to a couple of
+    # hole diameters on, along the middle of the plate
+    assert len(weld) >= 5
+    assert x.min() >= 40 and x.max() <= 66
+    assert np.abs(y - 20).max() <= 10
+    assert abs(float(np.median(y)) - 20) < 3
+    # nothing at the gate, along the side walls or at the far end, where the melt runs straight
+    assert not ((x < 10) | (y < 3) | (y > 37) | (x > 75)).any()
     g = H.infer_gate(hm, np.unique(mesh.tris[:, :3]))
     assert abs(mesh.X[g, 0] - 40) < 15
+
+
+def test_weld_line_is_the_same_whatever_the_node_numbering(tmp_path):
+    def plate(o):
+        a = o.addBox(0, 0, 0, 80, 40, 2)
+        o.cut([(3, a)], [(3, o.addCylinder(40, 20, -1, 0, 0, 4, 6))])
+
+    mesh = _mesh(tmp_path, plate, 2.0)
+    hm = H.Mesh(mesh.X, mesh.tets, np.full(len(mesh.tets), 2.0))
+    gate = np.nonzero(mesh.X[:, 0] < 1e-6)[0]
+    t = H.fill(hm, H.Viscosity(m=2e4, n=0.35), H.FillSettings([gate], 80 * 40 * 2 / 1.0)).t_fill
+    first = {tuple(np.round(p, 6)) for p in mesh.X[H.weld_lines(hm, t)]}
+    perm = np.random.default_rng(3).permutation(len(mesh.X))
+    inv = np.argsort(perm)
+    hm2 = H.Mesh(mesh.X[perm], inv[mesh.tets], hm.thickness)
+    second = {tuple(np.round(p, 6)) for p in hm2.X[H.weld_lines(hm2, t[perm])]}
+    assert first == second and first
 
 
 def test_frozen_skin_depth_from_the_conduction_solution():

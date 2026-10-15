@@ -354,47 +354,68 @@ def infer_gate(mesh: Mesh, surface_nodes: np.ndarray, candidates: int = 120) -> 
     return int(near[int(np.argmin(d2.max(axis=1)))])
 
 
-def weld_lines(mesh: Mesh, t_fill: np.ndarray, angle: float = 135.0) -> np.ndarray:
-    """Nodes where two flow fronts meet: the fill time rises toward them from opposite sides, so the fill time
-    gradients of the elements around them point against each other by more than the angle."""
-    B, _ = geometry(mesh)
-    ok = np.isfinite(t_fill[mesh.tets]).all(axis=1)
-    g = np.einsum("eik,ei->ek", B, np.nan_to_num(t_fill)[mesh.tets])
-    gn = np.linalg.norm(g, axis=1)
-    use = np.nonzero(ok & (gn > 1e-12))[0]
-    u = g[use] / gn[use, None]
-    n = len(mesh.X)
-    inc = sp.csr_matrix((np.ones(4 * len(use)), (mesh.tets[use].ravel(), np.repeat(np.arange(len(use)), 4))),
-                        shape=(n, len(use)))
-    cos_a = math.cos(math.radians(angle))
-    weld = []
-    for i in range(n):
-        els = inc.indices[inc.indptr[i]:inc.indptr[i + 1]]
-        if len(els) < 2:
-            continue
-        d = u[els] @ u[els].T
-        if d.min() < cos_a:
-            weld.append(i)
-    weld = np.array(weld, dtype=int)
-    # right at the gate the fill time is nearly flat and the gradients around its corners point every way, which
-    # is a melt that has not formed a front yet and not two fronts meeting
-    if len(weld):
-        weld = weld[t_fill[weld] > 0.02 * np.nanmax(np.where(np.isfinite(t_fill), t_fill, np.nan))]
-    return _connected(mesh, weld)
+WELD_SPAN = 3.0       # wall thicknesses: the length over which two fronts are judged to be coming together
+WELD_TILT = 0.35      # sine of the least tilt, toward the line, of the flow on both of its sides
+WELD_STRAIGHT = 160.0  # degrees: the two sides lie on opposite sides of the line, within this of a straight line
 
 
-def _connected(mesh: Mesh, weld: np.ndarray, reach: float = 2.5) -> np.ndarray:
-    """Keep the weld nodes that have another within a couple of mesh edges. Two fronts meeting leave a line of
-    nodes, while one node alone is the noise of a poor element where the fill time is nearly flat, which differs
-    from one mesher to the next."""
-    if len(weld) < 2:
-        return weld
+def weld_scale(mesh: Mesh) -> float:
+    """The length a weld line is judged over, mm: a few walls thick, which is a property of the part, and never
+    under a few mesh edges, since below that the mesh cannot say which way the melt moves."""
+    t = mesh.tets
+    edge = float(np.median(np.linalg.norm(mesh.X[t[:, 0]] - mesh.X[t[:, 1]], axis=1)))
+    return max(WELD_SPAN * float(np.median(mesh.thickness)), 2.5 * edge)
+
+
+def smooth_flow_direction(mesh: Mesh, t_fill: np.ndarray, radius: float) -> tuple[np.ndarray, np.ndarray]:
+    """The direction the fill time rises at each node, from the element gradients within a radius of it weighted by
+    volume, and the size of that gradient. Averaging over a length of the part, not of the mesh, is what keeps
+    the direction from following where the mesher put its nodes."""
     from scipy.spatial import cKDTree
 
-    t = mesh.tets
-    edge = np.median(np.linalg.norm(mesh.X[t[:, 0]] - mesh.X[t[:, 1]], axis=1))
-    near = cKDTree(mesh.X[weld]).query_ball_point(mesh.X[weld], reach * edge)
-    # a copy of the node on the other face of the plate is not a neighbor along the line
-    have = np.array([any(np.linalg.norm(mesh.X[weld[j]][:2] - mesh.X[w][:2]) > 1e-9 for j in nb)
-                     for w, nb in zip(weld, near)])
-    return weld[have]
+    B, V = geometry(mesh)
+    ok = np.isfinite(t_fill[mesh.tets]).all(axis=1)
+    g = np.einsum("eik,ei->ek", B, np.nan_to_num(t_fill)[mesh.tets]) * ok[:, None]
+    w = V * ok
+    near = cKDTree(mesh.X).query_ball_tree(cKDTree(mesh.X[mesh.tets].mean(axis=1)), radius)
+    out = np.zeros((len(mesh.X), 3))
+    for i, e in enumerate(near):
+        if e:
+            e = np.asarray(e)
+            out[i] = (g[e] * w[e, None]).sum(axis=0) / max(float(w[e].sum()), 1e-300)
+    size = np.linalg.norm(out, axis=1)
+    return out / np.maximum(size, 1e-300)[:, None], size
+
+
+def weld_lines(mesh: Mesh, t_fill: np.ndarray, span: float | None = None, tilt: float = WELD_TILT,
+               straight: float = WELD_STRAIGHT) -> np.ndarray:
+    """Nodes where two flow fronts meet. Two fronts meeting leave a line the fill time rises toward from both sides,
+    so a node is on one when, about a span away on opposite sides of it, the melt moves toward it from each, by
+    at least the tilt (a sine, so 0.35 is 20 degrees across the line). The span is a few wall thicknesses, tied to
+    the part, and the flow direction on each side is averaged over half of it, so the answer follows the physics of
+    the fill and not the nodes of a particular mesh. Beside a wall, at the gate and where the melt runs straight
+    along a plate nothing converges, and where the part ends only one side is there, so none of those show up."""
+    from scipy.spatial import cKDTree
+
+    L = float(span) if span else weld_scale(mesh)
+    u, size = smooth_flow_direction(mesh, t_fill, 0.5 * L)
+    live = size > 0.2 * float(np.median(size[size > 0])) if (size > 0).any() else np.zeros(len(size), bool)
+    X = mesh.X
+    cos_line = math.cos(math.radians(straight))
+    weld = []
+    for i, p in enumerate(cKDTree(X).query_ball_point(X, 1.4 * L)):
+        p = np.asarray(p)
+        d = X[p] - X[i]
+        r = np.linalg.norm(d, axis=1)
+        k = (r >= 0.6 * L) & live[p]
+        if k.sum() < 2:
+            continue
+        p, d, r = p[k], d[k], r[k]
+        d /= r[:, None]
+        k = -np.einsum("ij,ij->i", u[p], d) > tilt           # the fill time rises toward node i from here
+        if k.sum() < 2:
+            continue
+        d = d[k]
+        if (d @ d.T).min() < cos_line:
+            weld.append(i)
+    return np.array(weld, dtype=int)
