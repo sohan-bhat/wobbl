@@ -143,7 +143,7 @@ def three_points(X: np.ndarray, bed: np.ndarray) -> tuple[int, int, int, np.ndar
 
 
 def solve(X: np.ndarray, tets: np.ndarray, E: np.ndarray, nu: float, shrink: np.ndarray, work: Path,
-          bed_tol: float = 1e-3, progress=None, alpha: np.ndarray | None = None) -> WarpSolve:
+          bed_tol: float = 1e-3, progress=None, alpha: np.ndarray | None = None, timeout: float = 3600.0) -> WarpSolve:
     """Held on the bed, then released, in one CalculiX run. X is in the build frame (layers in xy, the bed at the
     lowest z). E is per element (MPa) and shrink per node (the strain the layer locked in). The shrinkage acts as a
     thermal strain through an expansion coefficient of 1, scaled per element by alpha (1 unless given), so a sharp
@@ -194,7 +194,7 @@ def solve(X: np.ndarray, tets: np.ndarray, E: np.ndarray, nu: float, shrink: np.
         f.write("*STEP\n*STATIC\n*BOUNDARY, OP=NEW\n" + f"{a + 1},1,3\nHOLDB,2,3\n{c + 1},3,3\n")
         f.write("*TEMPERATURE\n" + lines + "*NODE FILE\nU\n*EL FILE\nS\n*END STEP\n")
     say("solve", f"CalculiX, {len(X):,} nodes, on the bed and off it")
-    log, t = _run(ccx, work, "warp", 3600)
+    log, t = _run(ccx, work, "warp", timeout)
     blocks = read_frd(work / "warp.frd", len(X))
     disp, stress = blocks.get("DISP", []), blocks.get("STRESS", [])
     if len(disp) < 2 or len(stress) < 2:

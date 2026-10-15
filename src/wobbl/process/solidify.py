@@ -70,6 +70,8 @@ class Model:
     dg_max: float = 0.2                # largest liquid fraction change of a node in one step
     dt0: float = 1e-3                  # first step, s
     dt_max: float = 0.0                # longest step, s, default a two hundredth of the run
+    deadline: float | None = None      # clock time after which the march is stopped (process.budget.OverBudget)
+    budget: float = 0.0                # s, only to word the stop
 
 
 @dataclass
@@ -236,6 +238,10 @@ def solve(model: Model, progress=None) -> Result:
     stats = {"iterations": 0, "unconverged": 0, "too_big": 0, "direct": 0}
     last_say = time.time()
     while t < model.duration - 1e-12:
+        if model.deadline is not None:
+            from .budget import check
+
+            check(model.deadline, "the freezing march", model.budget)
         dt = min(dt, model.duration - t, model.dt_max or model.duration / 200.0)
         Tn, gn = T, g
         Tk, gk = Tn.copy(), gn.copy()

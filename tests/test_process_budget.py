@@ -64,3 +64,27 @@ def test_a_case_that_outlives_its_limit_is_stopped_with_its_children(tmp_path):
         time.sleep(0.1)
     else:
         raise AssertionError("the child of the case is still running")
+
+
+def test_a_solve_past_its_hard_limit_stops_with_a_clear_message():
+    with pytest.raises(B.OverBudget, match="over four times the budget") as e:
+        B.check(time.time() - 1.0, "the mold fill", 600.0)
+    assert "40 min" in str(e.value) and "--budget" in e.value.hint
+    B.check(None, "the mold fill", 600.0)
+    B.check(B.deadline(600.0), "the mold fill", 600.0)
+
+
+def test_a_mold_fill_given_an_expired_deadline_stops_at_once(tmp_path):
+    import numpy as np
+
+    from wobbl.geometry.cad import prepare
+    from wobbl.mesh.mesher import Sizing, build_mesh
+    from wobbl.process import hele_shaw as H
+    from wobbl.validation import geometry as G
+
+    mesh = build_mesh(prepare(G.box(tmp_path / "strip.step", 40, 10, 2), tmp_path / "geo"), Sizing(h=4.0, order=1))
+    hm = H.Mesh(mesh.X, mesh.tets, np.full(len(mesh.tets), 2.0))
+    gate = np.nonzero(mesh.X[:, 0] < 1e-6)[0]
+    late = H.FillSettings([gate], 800.0, deadline=time.time() - 1.0, budget=600.0)
+    with pytest.raises(B.OverBudget):
+        H.fill(hm, H.Viscosity(m=2e4, n=0.35), late)

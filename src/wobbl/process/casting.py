@@ -128,7 +128,7 @@ class Solved:
 
 
 def solidify(study: CastingStudy, rm: RegionMesh, alloy: Alloy, mold: MoldMaterial, pour: float, duration: float,
-             finer_steps: float = 1.0, progress=None) -> Solved:
+             finer_steps: float = 1.0, progress=None, limit: float | None = None) -> Solved:
     mats = materials_for(alloy, mold, study.chills)
     mat_of_region = region_materials(rm)
     metal_el = np.isin(np.array(rm.kinds)[rm.region], ["casting", "riser"])
@@ -146,7 +146,7 @@ def solidify(study: CastingStudy, rm: RegionMesh, alloy: Alloy, mold: MoldMateri
                     duration=duration, watch=metal_nodes,
                     events={"liquidus": alloy.liquidus, "niyama": t_ny, "solidus": alloy.solidus},
                     gradient_event="niyama", stop_below=alloy.solidus - 2.0,
-                    dT_max=6.0 / finer_steps, dg_max=0.12 / finer_steps, dt0=0.01)
+                    dT_max=6.0 / finer_steps, dg_max=0.12 / finer_steps, dt0=0.01, deadline=limit, budget=study.budget)
     res = S.solve(model, progress)
     vol = np.abs(np.linalg.det(np.concatenate([np.ones((len(rm.tets), 4, 1)), rm.X[rm.tets]], axis=2))) / 6
     nv = np.zeros(len(rm.X))
@@ -259,7 +259,7 @@ def riser_for(xyz, t_hot: float, b_eff: float, X: np.ndarray, casting_nodes: np.
 
 
 def place_risers(study, prep, alloy, mold, pour, B, modulus, margin, duration, h, h_mold, alpha, say,
-                 rounds: int = 2, curvature: int = 12) -> list[Riser]:
+                 rounds: int = 2, curvature: int = 12, limit: float | None = None) -> list[Riser]:
     """Risers where the casting needs them. A coarse freeze without risers finds the last spot to freeze and every
     spot cut off from it; each gets a riser sized by the modulus rule. The casting is frozen again with them, and
     any region still cut off gets one more."""
@@ -269,7 +269,7 @@ def place_risers(study, prep, alloy, mold, pour, B, modulus, margin, duration, h
         say("risers", f"round {k + 1}: freezing a coarse mesh with {len(risers)} riser(s) to find hot spots")
         rm = build(prep, trial.risers, trial.chills, margin, 1.4 * h, h_mold,
                    0.6 * math.sqrt(alpha * B * modulus ** 2), curvature)
-        sv = solidify(trial, rm, alloy, mold, pour, duration)
+        sv = solidify(trial, rm, alloy, mold, pour, duration, limit=limit)
         fd = feeding(sv)
         t_cast = fd["t_casting_s"]
         if not np.isfinite(t_cast):
@@ -294,6 +294,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
     from ..verify.checks import convergence_check
 
     t0 = time.time()
+    limit = bud.deadline(study.budget)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     say = progress or (lambda a, b: None)
@@ -331,7 +332,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
     placed = []
     if searching:
         placed = place_risers(study, prep, alloy, mold, pour, B, modulus, margin, duration, h_r, h_mold, alpha, say,
-                              curvature=c_r)
+                              curvature=c_r, limit=limit)
         study = replace(study, risers=placed)
         foot = sum(math.pi * r.diameter ** 2 / 4 for r in study.risers)
         modulus = feats.volume / max(feats.surface_area - foot, 1e-9)
@@ -349,7 +350,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
         say("mesh", f"level {k}: metal elements {h_k:.3g} mm, sand up to {h_mold:.3g} mm")
         rm = build(prep, study.risers, study.chills, margin, h_k, h_mold, 0.6 * math.sqrt(alpha * t_est), c_r)
         say("solve", f"level {k}: {len(rm.X):,} nodes, freezing")
-        sv = solidify(study, rm, alloy, mold, pour, duration, progress=say)
+        sv = solidify(study, rm, alloy, mold, pour, duration, progress=say, limit=limit)
         runs.append((sv, feeding(sv)))
         if k >= 1 and abs(runs[-1][1]["t99_s"] / runs[-2][1]["t99_s"] - 1) < CONVERGED:
             break
@@ -357,7 +358,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
                      "seconds": round(time.time() - t_levels, 1)}
     sv, fd = runs[-1]
     say("check", "time step: level 0 again at half the step")
-    half = solidify(study, runs[0][0].base, alloy, mold, pour, duration, finer_steps=2.0)
+    half = solidify(study, runs[0][0].base, alloy, mold, pour, duration, finer_steps=2.0, limit=limit)
     fd_half = feeding(half)
     res, rm = sv.result, sv.rm
     t_sol = res.events["solidus"]

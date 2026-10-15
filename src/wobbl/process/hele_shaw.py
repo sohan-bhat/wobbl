@@ -115,6 +115,8 @@ class FillSettings:
     step_fill: float = 0.01            # share of the cavity filled per step
     picard: int = 25
     picard_tol: float = 1e-3        # change in gate pressure that ends the Picard iterations of a step
+    deadline: float | None = None   # clock time after which the fill is stopped (process.budget.OverBudget)
+    budget: float = 0.0             # s, only to word the stop
 
 
 @dataclass
@@ -213,6 +215,10 @@ def fill(mesh: Mesh, visc: Viscosity, s: FillSettings, progress=None) -> FillRes
     pressure_mode = False
     say("fill", f"{n:,} nodes, gate of {len(gate)} nodes")
     while f.min() < 1.0:
+        if s.deadline is not None:
+            from .budget import check
+
+            check(s.deadline, "the mold fill", s.budget)
         full = f >= 1.0 - 1e-12
         active = full[mesh.tets].any(axis=1)
         born[active & np.isnan(born)] = t

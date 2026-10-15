@@ -20,6 +20,7 @@ and the study reports the prediction beside what it measured.
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass, field
 
 DEFAULT_BUDGET = 600.0     # s, the time the mesh levels of one study may be predicted to take
@@ -147,3 +148,25 @@ def note(f: Fit) -> str:
         text += (f". It solved {done['levels']} levels of " + ", ".join(f"{n:,}" for n in done["nodes"]) +
                  f" nodes in {hhmm(done['seconds'])}")
     return text + ". The budget can be raised with --budget."
+
+
+HARD_SHARE = 4.0           # a study is stopped when it has run this many times its budget
+
+
+class OverBudget(RuntimeError):
+    """A solve ran past the hard limit, which is a few times the budget, since the cost laws are estimates. The
+    study stops with this instead of running on for hours."""
+
+    def __init__(self, what: str, limit: float):
+        super().__init__(f"{what} was still running after {hhmm(limit)}, over four times the budget, so it was stopped")
+        self.hint = "Raise --budget, or pass a larger --mesh-size, so the mesh is coarser"
+
+
+def deadline(budget: float) -> float:
+    """The clock time past which a study with this budget is stopped."""
+    return time.time() + HARD_SHARE * budget
+
+
+def check(limit: float | None, what: str, budget: float) -> None:
+    if limit is not None and time.time() > limit:
+        raise OverBudget(what, HARD_SHARE * budget)

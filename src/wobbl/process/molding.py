@@ -146,6 +146,7 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
     from ..verify.checks import convergence_check
 
     t0 = time.time()
+    limit = bud.deadline(study.budget)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     say = progress or (lambda a, b: None)
@@ -195,7 +196,8 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
             L_flow = float(np.nanmax(np.where(np.isfinite(dist), dist, np.nan)))
             t_fill_set = float(study.fill_time) if study.fill_time else float(np.clip(L_flow / FRONT_SPEED, 0.3, 5.0))
             flow = feats.volume / t_fill_set
-        settings = H.FillSettings(gsets, flow, study.p_max, 5.0 * t_fill_set, picard_tol=PICARD_TOL)
+        settings = H.FillSettings(gsets, flow, study.p_max, 5.0 * t_fill_set, picard_tol=PICARD_TOL,
+                                  deadline=limit, budget=study.budget)
         say("fill", f"level {k}: {mesh.n_nodes:,} nodes, melt at {fmt(melt)} C")
         iso = H.fill(hm, visc, settings, say)
         levels.append({"mesh": mesh, "hm": hm, "gsets": gsets, "iso": iso, "p_switch": _share_pressure(iso)})
@@ -207,10 +209,10 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
     mesh, hm, iso = lv["mesh"], lv["hm"], lv["iso"]
     say("fill", "again with a skin freezing on the mold walls")
     cold = H.fill(hm, visc, H.FillSettings(lv["gsets"], flow, study.p_max, 5.0 * t_fill_set, freeze=freeze,
-                                           picard_tol=PICARD_TOL), say)
+                                           picard_tol=PICARD_TOL, deadline=limit, budget=study.budget), say)
     say("check", "time step: level 0 again with twice the fill per step")
     half = H.fill(levels[0]["hm"], visc, H.FillSettings(levels[0]["gsets"], flow, study.p_max, 5.0 * t_fill_set,
-                                                       step_fill=0.02, picard_tol=PICARD_TOL))
+                                                       step_fill=0.02, picard_tol=PICARD_TOL, deadline=limit, budget=study.budget))
     checks: list[Check] = []
     p_iso, p_cold = lv["p_switch"], _share_pressure(cold)
     if len(levels) > 1:

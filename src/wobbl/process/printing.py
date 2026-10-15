@@ -85,7 +85,7 @@ def base_size(prep, study, thickness=None) -> float:
     return auto_sizing(prep, thickness=1.5 * thickness if thickness else None, max_nodes=40000).h
 
 
-def solve_level(prep, R, fil, study, eps_max, h, work, progress, curvature=16):
+def solve_level(prep, R, fil, study, eps_max, h, work, progress, curvature=16, limit=None):
     """One mesh level at element size h, with curvature elements round each full circle."""
     from ..mesh.mesher import Sizing, build_mesh
 
@@ -97,7 +97,7 @@ def solve_level(prep, R, fil, study, eps_max, h, work, progress, curvature=16):
     E = stiffness(Xb, mesh.tets, mesh.tris, props.E, study)
     shrink = W.shrinkage_profile(Xb[:, 2], eps_max)
     ws = W.solve(Xb, mesh.tets, E, props.nu, shrink, work, bed_tol=1e-3 * max(np.ptp(Xb, axis=0).max(), 1.0),
-                 progress=progress)
+                 progress=progress, timeout=max(60.0, limit - time.time()) if limit else 3600.0)
     m = W.measure(Xb, ws)
     return {"mesh": mesh, "X": Xb, "ws": ws, "m": m, "E": E, "shrink": shrink, "nodes": mesh.n_nodes,
             "flatness": m["flatness_mm"]}
@@ -109,6 +109,7 @@ def run_print_warp(study: W.WarpStudy, out_dir: str | Path, progress=None, keep:
     from ..verify.checks import convergence_check
 
     t0 = time.time()
+    limit = bud.deadline(study.budget)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     say = progress or (lambda a, b: None)
@@ -139,7 +140,7 @@ def run_print_warp(study: W.WarpStudy, out_dir: str | Path, progress=None, keep:
             R = W.to_build_frame(d)
             try:
                 lv = solve_level(prep, R, fil, study, eps_max, h0 * scales[0] * f_r, out / "work" / "orient", say,
-                                 c_r)
+                                 c_r, limit)
             except Exception as e:  # noqa: BLE001  a way it cannot lie is skipped and said
                 tried.append({"name": name, "direction": d.tolist(), "error": str(e)[:120]})
                 continue
@@ -162,7 +163,7 @@ def run_print_warp(study: W.WarpStudy, out_dir: str | Path, progress=None, keep:
                                                     h_k, time.time() - t_levels, study.budget, bfit.power):
             break
         say("mesh", f"level {k}")
-        levels.append(solve_level(prep, R, fil, study, eps_max, h_k, out / "work" / f"level{k}", say, c_r))
+        levels.append(solve_level(prep, R, fil, study, eps_max, h_k, out / "work" / f"level{k}", say, c_r, limit))
         if k >= 1 and abs(levels[-1]["flatness"] / levels[-2]["flatness"] - 1) < 0.03:
             break
     bfit.measured = {"levels": len(levels), "nodes": [L["nodes"] for L in levels],
