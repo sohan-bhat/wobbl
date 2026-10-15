@@ -120,3 +120,20 @@ def test_a_kicad_trace_antenna_becomes_sheets_a_board_and_a_port(tmp_path):
     assert fd["gap"] == pytest.approx(gap, rel=0.05)
     with pytest.raises(ValueError, match="feed"):
         antenna3d.from_board(pcb, {"frequency": "2.4GHz", "feed": "NOPE"}, tmp_path / "w2")
+
+
+# --- the 3D scene -------------------------------------------------------------------------------
+def test_pattern_balloon_grows_with_the_field_not_the_power():
+    from wobbl.fields import antscene
+
+    th = np.radians(np.arange(0, 181, 15.0))
+    ph = np.radians(np.arange(0, 360, 30.0))
+    d = 1.5 * np.sin(th)[:, None] ** 2 * np.ones((1, len(ph)))        # a short dipole's doughnut
+    d = np.maximum(d, 1e-9)
+    X, T, gdb = antscene.balloon(d, th, ph, 1.0, 10.0, (1.0, 2.0, 3.0))
+    r = np.linalg.norm(X - np.array([1.0, 2.0, 3.0]), axis=1)
+    assert r.max() == pytest.approx(10.0, rel=1e-6)                      # the peak reaches the stated radius
+    assert gdb.max() == pytest.approx(10 * math.log10(1.5), abs=1e-6)    # colored by gain in dBi
+    assert T.max() < len(X) and T.shape[1] == 3
+    ring = np.isclose(X[:, 2], 3.0, atol=1e-6)
+    assert np.allclose(r[ring], 10.0, rtol=1e-6)                         # the equator is the full radius

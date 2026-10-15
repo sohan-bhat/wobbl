@@ -34,6 +34,7 @@ from .scene import Domain, Scene, SceneError, mesh
 
 ETA0 = MU0 * C0
 QUALITY = {"fast": 1.3, "normal": 1.0, "fine": 0.8}   # element size factor
+GROWTH = 0.35         # how fast the air mesh coarsens away from a surface
 FACES = 3000          # surface elements a body or a sheet gets before its element size grows
 LINE_POINTS = 40      # samples of E across the port gap
 
@@ -511,6 +512,25 @@ def mesh_inputs(scene: Scene, s: WaveSetup, quality: str = "normal") -> dict:
     return {"R": R, "far": min(lam_min / 10, R / 5) * k, "surfaces": surf}
 
 
+FINE_STEP = 1 / (1 - 0.75 ** 2)       # coarse error over the change to a mesh 0.75 as large, for an error of h squared
+
+
+def mesh_shift(freqs, Z, f0: float, z_coarse: complex, z_fine: complex) -> float | None:
+    """How far, as a fraction of f0, a resonance moves up in frequency when the mesh gets finer. The finer mesh's
+    impedance at f0 is the coarse mesh's at a slightly different frequency, found from the impedance's slope there
+    along the sweep. None when the sweep has no samples to take a slope from."""
+    fs = list(freqs)
+    if len(fs) < 2:
+        return None
+    i = min(max((j for j in range(len(fs)) if fs[j] <= f0 * (1 + 1e-9)), default=0), len(fs) - 2)
+    slope = (Z[i + 1] - Z[i]) / (fs[i + 1] - fs[i])
+    if abs(slope) < 1e-30:
+        return None
+    d = complex(z_fine - z_coarse)
+    delta = (d * slope.conjugate()).real / abs(slope) ** 2       # the coarse mesh's frequency that looks like the fine
+    return float(-delta / f0)
+
+
 def _cpu() -> float:
     """CPU seconds this process and its children have used, which does not grow when the machine is busy."""
     import resource
@@ -715,7 +735,7 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
         for attempt in range(3):
             try:
                 return mesh(scene, s.metals, list(s.dielectrics), work / tag / "m.msh", k=kk,
-                            domain=Domain("sphere", radius=radius, max_size=lam_min / 10), sizes=sz, sheets=sheets)
+                            domain=Domain("sphere", radius=radius, max_size=lam_min / 10, growth=GROWTH), sizes=sz, sheets=sheets)
             except (SceneError, IsolatedTimeout):
                 raise
             except Exception as e:  # gmsh fails on a surface whose elements are too coarse for it
@@ -797,6 +817,7 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
                         f"{fmt(base['p_ff'])} W at {fmt(s.f0 / 1e6)} MHz ({100 * pf:.2g}% apart)",
                         {"worst": worst, "far_field_vs_flux": pf}))
     extra = []
+    mesh_shift_value = None
     nodes = [msh.n_nodes]
     dofs = [base["dofs"]]
     if plan.verify:
@@ -806,11 +827,19 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
         nodes.append(m2.n_nodes)
         dofs.append(r2["dofs"])
         dz = abs(abs(r2["Z"]) - abs(base["Z"])) / abs(r2["Z"])
-        checks.append(Check("mesh convergence", "pass" if dz < 0.03 else ("warn" if dz < 0.08 else "fail"),
+        shift = mesh_shift(fs, Z, s.f0, base["Z"], r2["Z"])
+        worst_c = max(dz / 0.03, abs(shift) / 0.01 if shift is not None else 0.0)
+        moved = ("" if shift is None else
+                 f". Read as a shift of the whole response, the finer mesh moves a resonance {100 * shift:+.2g}% in "
+                 f"frequency, and since the error of first order edge elements falls with the square of the element "
+                 f"size, the coarse mesh's resonance is about {100 * shift * FINE_STEP:+.2g}% from the converged one")
+        checks.append(Check("mesh convergence", "pass" if worst_c < 1 else ("warn" if worst_c < 3 else "fail"),
                             f"the impedance at {fmt(s.f0 / 1e6)} MHz went from {_zs(base['Z'])} to {_zs(r2['Z'])} on a "
                             f"mesh a quarter finer ({100 * dz:.2g}% in magnitude, {fmt(base['dofs'])} and "
-                            f"{fmt(r2['dofs'])} unknowns)", {"z_coarse": [base["Z"].real, base["Z"].imag],
-                                                            "z_fine": [r2["Z"].real, r2["Z"].imag]}))
+                            f"{fmt(r2['dofs'])} unknowns){moved}",
+                            {"z_coarse": [base["Z"].real, base["Z"].imag], "z_fine": [r2["Z"].real, r2["Z"].imag],
+                             "resonance_shift": shift}))
+        mesh_shift_value = shift
         log("verify", "the working frequency with the boundary farther out")
         m3 = make("far", k, 1.4 * R)
         r3 = _solve(m3, s, s.f0, fd, sph, work / "far")
@@ -924,7 +953,7 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
               "radiated_power_W_per_A2": base["p_rad"], "input_power_W_per_A2": base["p_in"],
               "dielectric_loss_W_per_A2": base["p_diel"], "unknowns": dofs, "nodes": nodes,
               "air_radius_m": R, "sampling_radius_m": rs, "port_width_m": fd["width"], "port_gap_m": fd["gap"],
-              "plan": plan.to_dict(), "mesh_seconds": t_mesh,
+              "plan": plan.to_dict(), "mesh_seconds": t_mesh, "mesh_resonance_shift": mesh_shift_value,
               "solve_cpu_s": [rows[f]["cpu"] for f in fs], "solve_wall_s": [rows[f]["wall"] for f in fs],
               "_figures": [["s11", "S11 over the sweep"], ["impedance", "Input impedance"],
                            ["pattern", "Radiation pattern cuts"], ["field", "Field strength near the antenna"],

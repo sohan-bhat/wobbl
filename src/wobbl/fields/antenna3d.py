@@ -117,14 +117,14 @@ def dipole(p: dict, work: Path) -> Built:
     f0 = value(p, "frequency", 2.4e9, "frequency")
     lam = C0 / f0
     length = value(p, "length", 0.47 * lam * 1e3, "length")
-    dia = value(p, "diameter", max(lam / 300, 0.2e-3) * 1e3, "length")
-    gap = value(p, "gap", max(2 * dia / 2, lam / 200) * 1e3, "length")
+    dia = value(p, "diameter", lam / 120 * 1e3, "length")
+    gap = value(p, "gap", max(dia, lam / 120) * 1e3, "length")
     arm = (length - gap) / 2
     # value() gives meters and the solids are written in mm
     L, D, G = length * 1e3, dia * 1e3, gap * 1e3
     sc = _scene([("cyl", "arm 1", (0, 0, -L / 2), (0, 0, -G / 2), D / 2),
                  ("cyl", "arm 2", (0, 0, G / 2), (0, 0, L / 2), D / 2)], work)
-    s = _setup(p, f0, port=Port((0, 0, -gap / 2), (0, 0, gap / 2)), metals=[b.name for b in sc.bodies])
+    s = _setup(p, f0, port=Port((0, 0, -gap / 2), (0, 0, gap / 2), dia), metals=[b.name for b in sc.bodies])
     return Built("dipole", sc, s, "dipole", dims={"length": length, "diameter": dia, "gap": gap, "arm": arm},
                  ref={"length_wavelengths": length / lam})
 
@@ -134,11 +134,11 @@ def monopole(p: dict, work: Path) -> Built:
     f0 = value(p, "frequency", 2.4e9, "frequency")
     lam = C0 / f0
     length = value(p, "length", 0.24 * lam * 1e3, "length")
-    dia = value(p, "diameter", max(lam / 300, 0.2e-3) * 1e3, "length")
-    gap = value(p, "gap", max(dia, lam / 200) * 1e3, "length")
+    dia = value(p, "diameter", lam / 120 * 1e3, "length")
+    gap = value(p, "gap", max(dia, lam / 120) * 1e3, "length")
     gnd = value(p, "ground", 1.0 * lam * 1e3, "length")            # plate diameter
     sc = _scene([("cyl", "rod", (0, 0, gap * 1e3), (0, 0, (gap + length) * 1e3), dia * 1e3 / 2)], work, "rod")
-    s = _setup(p, f0, port=Port((0, 0, 0), (0, 0, gap)), metals=["rod"], sheets={"ground": [_disc(gnd / 2, 0.0, 64)]})
+    s = _setup(p, f0, port=Port((0, 0, 0), (0, 0, gap), dia), metals=["rod"], sheets={"ground": [_disc(gnd / 2, 0.0, 64)]})
     return Built("monopole", sc, s, "monopole over a ground plate",
                  dims={"length": length, "diameter": dia, "gap": gap, "ground": gnd},
                  ref={"length_wavelengths": length / lam, "ground_wavelengths": gnd / lam})
@@ -152,8 +152,8 @@ def loop(p: dict, work: Path) -> Built:
         R = value(p, "circumference", 0, "length") / (2 * math.pi)
     else:
         R = value(p, "radius", lam / (2 * math.pi) * 1e3, "length")
-    dia = value(p, "diameter", max(lam / 300, 0.2e-3) * 1e3, "length")
-    gap = value(p, "gap", max(dia, lam / 200) * 1e3, "length")
+    dia = value(p, "diameter", lam / 120 * 1e3, "length")
+    gap = value(p, "gap", max(dia, lam / 120) * 1e3, "length")
     if 2 * math.pi * R < 3 * dia or gap > 0.5 * R:
         raise ParamError("the loop is too small for its wire and feed gap. Make the radius larger or the wire thinner")
     sweep = 360 - math.degrees(gap / R)
@@ -161,7 +161,7 @@ def loop(p: dict, work: Path) -> Built:
     half = gap / R / 2
     a = (R * math.cos(half), -R * math.sin(half) * 1.0, 0.0)
     b = (R * math.cos(half), R * math.sin(half), 0.0)
-    s = _setup(p, f0, port=Port(a, b), metals=["ring"])
+    s = _setup(p, f0, port=Port(a, b, dia), metals=["ring"])
     return Built("loop", sc, s, "loop", dims={"radius": R, "diameter": dia, "gap": gap},
                  ref={"circumference_wavelengths": 2 * math.pi * R / lam})
 
@@ -219,7 +219,7 @@ def patch(p: dict, work: Path) -> Built:
     sc = _scene([("box", "substrate", (-G[0] / 2, -G[1] / 2, 0), (G[0] / 2, G[1] / 2, T))], work, "substrate")
     x_f = -L / 2 + feed                  # the length runs along x, the radiating edges are at x = +-L/2
     fr = patch_resonance(W, L, er, h)
-    s = _setup(p, f0, port=Port((x_f, 0.0, 0.0), (x_f, 0.0, h)), dielectrics={"substrate": (er, tand, name)},
+    s = _setup(p, f0, port=Port((x_f, 0.0, 0.0), (x_f, 0.0, h), min(1e-3, h)), dielectrics={"substrate": (er, tand, name)},
                hints=[0.96 * fr, 1.04 * fr], points=5,
                sheets={"ground": [_rect(-gw / 2, -gl / 2, gw / 2, gl / 2, 0.0)],
                        "patch": [_rect(-L / 2, -W / 2, L / 2, W / 2, h)]})

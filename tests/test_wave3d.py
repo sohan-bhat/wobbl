@@ -149,6 +149,16 @@ def test_sweep_adds_the_resonance_then_the_sharpest_bend():
     assert nxt is not None and "changes most" in nxt[1] and 0.9e9 < nxt[0] < 1.1e9
 
 
+def test_a_finer_mesh_that_lowers_the_reactance_moves_the_resonance_up():
+    f = [2.328e9, 2.4e9, 2.472e9]
+    Z = [71.7 + 8.2j, 81.3 + 26.8j, 92.3 + 45.2j]           # a dipole, 265 ohm per GHz of reactance
+    up = wave3d.mesh_shift(f, Z, 2.4e9, 81.3 + 26.8j, 80.6 + 24.1j)
+    assert up == pytest.approx(2.7 / 265e-3 / 2400, rel=0.15) and up > 0     # 2.7 ohm is about 10 MHz
+    assert wave3d.mesh_shift(f, Z, 2.4e9, 81.3 + 26.8j, 81.3 + 26.8j) == pytest.approx(0.0, abs=1e-12)
+    assert wave3d.mesh_shift([2.4e9], Z[:1], 2.4e9, Z[0], Z[0]) is None
+    assert wave3d.mesh_shift(f, Z, 2.472e9, Z[2], Z[2] - 3j) > 0         # the last sample takes its slope from the one before
+
+
 def test_setup_mistakes_say_what_to_do(tmp_path):
     sc = Scene([_rod("arm 1", 1, -0.071, -0.0005)], "")
     with pytest.raises(ValueError, match="needs a port"):

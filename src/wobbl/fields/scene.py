@@ -308,6 +308,7 @@ class Domain:
     shell: float = 1.25           # outer radius over inner radius for a shell
     max_size: float = 0.0         # m, cap on the element size in air (waves need a fraction of a wavelength)
     gap_cells: float = 1.5        # elements across the narrowest gap between two bodies
+    growth: float = 0.35          # how fast elements grow away from a surface (size gained per distance)
 
 
 @dataclass
@@ -517,7 +518,7 @@ def _size_fields(gmsh, scene, by_name, keep, names, owner_v, hole_surf, k, R, do
     for n, h in sizes.items():
         if n in sheet_names:
             used[n] = h * k
-    growth = 0.35
+    growth = dom.growth
     for n, ss in surf_of.items():
         if not ss or n not in used:
             continue

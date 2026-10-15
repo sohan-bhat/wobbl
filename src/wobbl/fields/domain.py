@@ -322,7 +322,7 @@ register(Analysis(
 
 register(Analysis(
     "board", "antenna", "Resonance, S11, gain and pattern of a trace antenna on the board, from a 3D full wave solve",
-    antenna_board, keywords=ANTENNA_WORDS, aliases=("radiation", "s11", "rf"),
+    antenna_board, keywords=ANTENNA_WORDS, aliases=("radiation", "s11", "rf"), covers=("parasitics",),
     options=ANTENNA_OPTS + (Option("feed", "The net that is the antenna (default one named ANT, RF or FEED)"),),
     example='wobbl simulate ifa.kicad_pcb "does the trace antenna resonate at 2.4 GHz?" --feed ANT'))
 
