@@ -1,0 +1,203 @@
+{
+ "domain": "warp",
+ "part": "../lid.py",
+ "question": "Will this long ABS lid warp or lift its corners when I print it on an open printer?",
+ "verdict": "fails",
+ "headline": "Warps 3.81 mm off flat, over the 0.8 mm tolerance, with a corner lifting 3.81 mm when it comes off the bed.",
+ "metrics": [
+  [
+   "flatness",
+   "3.81 mm"
+  ],
+  [
+   "tolerance",
+   "0.8 mm"
+  ],
+  [
+   "corner lift",
+   "3.81 mm"
+  ],
+  [
+   "stress on the bed",
+   "15.8 MPa"
+  ]
+ ],
+ "confidence": "medium",
+ "confidence_reasons": [
+  "process estimate: the warp model is fitted to 48 measured ABS plates (median error 9%, worst 39%)"
+ ],
+ "checks": [
+  {
+   "name": "mesh convergence",
+   "status": "pass",
+   "summary": "flatness after release settled: 3.79 -> 3.81 mm over 2 meshes, last change 0.4%",
+   "detail": {
+    "values": [
+     3.794587,
+     3.809114
+    ],
+    "last_change": 0.003814,
+    "tolerance": 0.05,
+    "stopped_by": ""
+   }
+  },
+  {
+   "name": "hand calculation",
+   "status": "pass",
+   "summary": "a free plate 14.5 mm thick with the same shrinkage curves to 0.557 1/m, 3.62 mm over its 220 by 60 mm footprint; the solve gives 3.81 mm (1.05x)",
+   "detail": {
+    "hand_mm": 3.619071,
+    "ratio": 1.052512
+   }
+  },
+  {
+   "name": "balance on the bed",
+   "status": "pass",
+   "summary": "the shrinkage loads itself, so the bed's pulls and pushes cancel to 3.3e-08 of 9668 N",
+   "detail": {
+    "net": 0.0
+   }
+  },
+  {
+   "name": "units and sanity",
+   "status": "pass",
+   "summary": "locked in shrinkage up to 0.72%, largest movement 7.58 mm on a 220 mm part",
+   "detail": {}
+  },
+  {
+   "name": "flatness",
+   "status": "fail",
+   "summary": "the face on the bed comes off 3.81 mm out of flat, its corners up to 3.81 mm, against a 0.8 mm tolerance",
+   "detail": {
+    "flatness_mm": 3.809114,
+    "tolerance_mm": 0.8
+   }
+  },
+  {
+   "name": "bed peel",
+   "status": "info",
+   "summary": "while it prints, the corner at (220, 60) mm pulls up on the bed with 339 N, about 0.369 MPa over its 34.2 mm patch",
+   "detail": {
+    "peel_total_N": 2021.77168,
+    "peel_corner_N": 338.528914,
+    "peel_corner_MPa": 0.369216,
+    "peel_corner_xy": [
+     220.0,
+     60.0
+    ],
+    "corner_radius_mm": 34.205263,
+    "bed_area_mm2": 13200.0
+   }
+  }
+ ],
+ "assumptions": [
+  "Wobbl guessed: bed temperature not given, so Wobbl assumed 100 C, usual for ABS.",
+  "Wobbl guessed: no enclosure mentioned, so the part cools in open air at 25 C.",
+  "Wobbl guessed: print direction not given, so the part prints the way it is drawn, layers along z.",
+  "Wobbl guessed: infill not given, so Wobbl treated the part as solid, as the calibration plates were.",
+  "ABS: E 2200 MPa, Poisson's ratio 0.35, expansion 90 per million per C, glass transition 105 C. Tg typical of ABS (Stratasys ABSplus lists 108 C); warp ramp fitted to Armillotta et al. 2018.",
+  "Printed with layers along z, into surroundings at 25 C (an open printer).",
+  "Each layer locks in the shrinkage from the glass transition to the surroundings, up to 0.72%, rising from nothing at the bed to all of it 11.5 mm up, a profile fitted to the 48 ABS plates of Armillotta et al. 2018 (R2 0.94).",
+  "The part is held flat on the bed until the print ends, then released; corners that peel during the print are not followed, so a part that lifts early warps more than this.",
+  "The part is solid.",
+  "Supports, the seam and the cooling fan are not modeled, and the layers are treated as one bonded solid."
+ ],
+ "values": {
+  "process": "print",
+  "filament": "abs",
+  "flatness_mm": 3.809114,
+  "tolerance_mm": 0.8,
+  "corner_lift_mm": 3.809114,
+  "lift_xyz": [
+   220.0,
+   60.0,
+   0.0
+  ],
+  "build": "layers along z",
+  "build_direction": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "environment_C": 25.0,
+  "shrinkage_max": 0.0072,
+  "stress_on_bed_MPa": 15.826241,
+  "stress_after_MPa": 2.868585,
+  "peel": {
+   "peel_total_N": 2021.77168,
+   "peel_corner_N": 338.528914,
+   "peel_corner_MPa": 0.369216,
+   "peel_corner_xy": [
+    220.0,
+    60.0
+   ],
+   "corner_radius_mm": 34.205263,
+   "bed_area_mm2": 13200.0
+  },
+  "orientations": [],
+  "levels": [
+   {
+    "nodes": 26082,
+    "flatness_mm": 3.794587
+   },
+   {
+    "nodes": 52227,
+    "flatness_mm": 3.809114
+   }
+  ],
+  "_figures": [
+   [
+    "warp",
+    "The part after it comes off the bed, warp drawn larger, lift marked"
+   ],
+   [
+    "flatness",
+    "Height of the face that sat on the bed, from its best plane"
+   ],
+   [
+    "stress",
+    "Stress the print carries while held on the bed"
+   ]
+  ]
+ },
+ "images": {
+  "warp": "images/warp.png",
+  "stress": "images/stress.png",
+  "flatness": "images/flatness.png"
+ },
+ "fixes": [
+  {
+   "kind": "enclosure",
+   "title": "Print in an enclosure near 45 C",
+   "summary": "The locked in shrinkage runs from the glass transition down to the air around the part, so air at 45 C instead of 25 C cuts the warp to about 2.86 mm.",
+   "auto": false
+  },
+  {
+   "kind": "material",
+   "title": "Print it in PETG",
+   "summary": "PETG locks in 0.33% against 0.72% here, for about 1.75 mm of warp, if its strength and heat resistance suit the part.",
+   "auto": false
+  },
+  {
+   "kind": "brim",
+   "title": "Add a brim and keep the bed hot",
+   "summary": "While it prints a corner pulls up with about 339 N. A 5 to 8 mm brim gives that corner more bed to hold, and a bed near 100 C keeps the first layers soft and stuck, which this model assumes; it does not change the warp after release.",
+   "auto": false
+  }
+ ],
+ "notes": [
+  "Built from lid.py with length=220, width=60, top=2.5, wall=2, lip=12."
+ ],
+ "report": "report.html",
+ "workdir": ".",
+ "t_total": 84.764909,
+ "solver": "CalculiX 2.23, 52,227 nodes",
+ "criteria": [
+  {
+   "name": "flatness",
+   "value": "flatness_mm",
+   "limit": 0.8,
+   "sense": "max"
+  }
+ ]
+}

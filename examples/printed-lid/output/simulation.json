@@ -1,0 +1,71 @@
+{
+ "thing": "lid.py",
+ "question": "Will this long ABS lid warp or lift its corners when I print it on an open printer?",
+ "plan": {
+  "thing": "lid.py",
+  "question": "Will this long ABS lid warp or lift its corners when I print it on an open printer?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "print"
+  ],
+  "reasons": [
+   {
+    "decided": "lid.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics print from \"warp\"",
+    "override": "--physics print"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "fail",
+ "situation": {
+  "environment": {
+   "printer": "open",
+   "bed_C": 100.0,
+   "air_C": 25.0,
+   "filament": "ABS"
+  },
+  "objects": [
+   "print bed"
+  ]
+ },
+ "steps": [
+  {
+   "analysis": "print",
+   "domain": "part",
+   "verdict": "fails",
+   "headline": "Warps 3.81 mm off flat, over the 0.8 mm tolerance, with a corner lifting 3.81 mm when it comes off the bed.",
+   "confidence": "medium",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a4f2acd6793533012/examples/printed-lid/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a4f2acd6793533012/examples/printed-lid/output/report.html",
+   "assumptions": [
+    {
+     "assumed": "bed temperature not given, so Wobbl assumed 100 C, usual for ABS",
+     "override": "--bed '100 C'"
+    },
+    {
+     "assumed": "no enclosure mentioned, so the part cools in open air at 25 C",
+     "override": "--chamber '45 C'"
+    },
+    {
+     "assumed": "print direction not given, so the part prints the way it is drawn, layers along z",
+     "override": "--print-direction auto"
+    },
+    {
+     "assumed": "infill not given, so Wobbl treated the part as solid, as the calibration plates were",
+     "override": "--infill 20"
+    }
+   ]
+  }
+ ]
+}

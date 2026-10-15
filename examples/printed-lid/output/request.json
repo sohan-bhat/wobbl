@@ -1,0 +1,18 @@
+{
+ "domain": "part",
+ "analysis": "print",
+ "spec": {
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a4f2acd6793533012/examples/printed-lid/lid.py",
+  "kind": "parametric",
+  "question": "Will this long ABS lid warp or lift its corners when I print it on an open printer?",
+  "options": {
+   "material": [
+    "abs"
+   ],
+   "filament": [
+    "abs"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}
