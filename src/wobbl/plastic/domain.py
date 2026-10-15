@@ -25,7 +25,8 @@ register(Analysis(
     plastic, dry=True, kinds=PART_KINDS, covers=("stress",), legacy="wobbl plastic",
     keywords=(r"\bplastic(?:ity|ally)?\b(?! part)", r"permanent(?:ly)?\s+(?:bend|set|deform)",
               r"bend\w*(?:\s+\w+)?\s+for good",
-              r"past yield", r"\bcollapse", r"limit load"),
+              r"past yield", r"\bcollapse", r"limit load",
+              r"spr(?:ing|ung)\s*-?back"),
     aliases=("plasticity", "collapse", "yield"),
     options=(Option("target", "Margin wanted on the collapse load", "1.5"),
              Option("curve", "Past yield: auto (the material's true curve), perfect (flat at yield), 'true 250@0, "
