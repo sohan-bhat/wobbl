@@ -241,20 +241,24 @@ def results(asm, study, mesh, built, pairs, springs, move_sets, floating, mat_of
         # the peak away from a pressed rim, where it is mesh dependent; the whole face when nothing is left
         inner = ~excluded[nodes] if (~excluded[nodes] & touching).any() else np.ones(len(nodes), bool)
         i = int(np.argmax(np.where(inner, p, -1.0))) if len(p) else 0
-        # forces and area from CalculiX's own totals; the nodal values say where and how the faces press and slide
+        # forces and area from CalculiX's own totals; the nodal values say where and how the faces press and slide.
+        # CalculiX sums the force as a vector, so faces that wrap round a shaft or a bore cancel to nearly nothing
+        # while pressing hard. The pressing force is the integral of the pressure then, and the vector sum stays too.
+        net = float(tot.get("normal_force", ww @ p))
+        press = float(ww @ p) if net < 0.9 * float(ww @ p) else net
         per.append({"pair": fp.describe(), "slave": fp.slave, "master": fp.master,
-                    "normal_force_N": float(tot.get("normal_force", ww @ p)),
+                    "normal_force_N": press, "net_normal_force_N": net,
                     "shear_force_N": float(tot.get("shear_force", ww @ tau)),
                     "peak_pressure_MPa": float(p[i]) if len(p) else 0.0,
                     "edge_pressure_MPa": float(p.max()) if len(p) else 0.0,
-                    "mean_pressure_MPa": float(tot.get("normal_force", ww @ p)) / max(float(
+                    "mean_pressure_MPa": press / max(float(
                         tot.get("area", ww[touching].sum())), 1e-30),
                     "peak_xyz": mesh.X[nodes[i]].tolist() if len(p) else None,
                     "contact_area_mm2": float(tot.get("area", ww[touching].sum())), "area_mm2": float(ww.sum()),
                     "sliding_share": float(ww[sliding].sum() / max(ww[touching].sum(), 1e-30)),
                     # gross slip: the shear the pair carries against friction on its normal force
-                    "friction_use": float(tot["shear_force"] / (cp.mu * tot["normal_force"]))
-                    if cp.mu > 0 and tot.get("normal_force", 0) > 0 else 0.0,
+                    "friction_use": float(tot["shear_force"] / (cp.mu * press))
+                    if cp.mu > 0 and press > 0 and "shear_force" in tot else 0.0,
                     "max_opening_mm": float(opening[~touching].max()) if (~touching).any() else 0.0,
                     "max_slip_mm": float(slip.max()) if len(slip) else 0.0,
                     "penetration_mm": float(p[i] / cp.stiffness) if len(p) else 0.0,
