@@ -210,6 +210,9 @@ def cooled(out: Path) -> Path | None:
     pick = fluid[np.linspace(0, len(fluid) - 1, min(36, len(fluid))).astype(int)] if len(fluid) else fluid
     seeds = np.c_[pl.x0 + pick[:, 1] / (pl.nx - 1) * (pl.x1 - pl.x0), pl.y0 + pick[:, 0] / (pl.ny - 1) * (pl.y1 - pl.y0)]
     lines = trace(pl, np.vstack([_seeds(pl, 12), seeds]), steps=600)
+    if not lines:                        # nothing to see through to, so the part is drawn solid
+        m.opacity = 1.0
+        s.note("The flow's middle plane holds too little fluid to trace streamlines, so the part shows alone.")
     if lines:
         top = float(max(w.max() for _, w in lines))
         span = pl.x1 - pl.x0
@@ -218,7 +221,7 @@ def cooled(out: Path) -> Path | None:
                 spacing=span / 14, name="fluid", width=1.6)
     verdict(s, o, _first(o))
     size = float(np.ptp(X, 0).max())
-    s.camera(target=X.mean(0), direction=(0.4, -0.8, 1.0), distance=size * 2.2)
+    s.camera(target=X.mean(0), direction=(0.4, -0.8, 1.0), distance=size * 2.6)
     return s.save(out)
 
 

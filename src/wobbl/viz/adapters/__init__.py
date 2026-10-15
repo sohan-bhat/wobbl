@@ -29,6 +29,9 @@ def build_scene(out_dir: str | Path):
     if domain == "thermal" and (out / "fields.npz").exists():
         from . import thermal
         return thermal.build(out)
+    if kind == "cooling" and (out / "heat" / "fields.npz").exists():
+        from . import thermal
+        return thermal.cooled(out)
     if kind == "channel" and (out / "fields.npz").exists():
         from . import thermal
         return thermal.fan_sink(out)

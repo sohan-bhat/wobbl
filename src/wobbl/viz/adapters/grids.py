@@ -194,6 +194,7 @@ def build_flow(out: Path, pb: dict) -> Path | None:
         cx, cy = np.meshgrid(np.linspace(x0, x1, shape[1]), np.linspace(y0, y1, shape[0]))
         h = (y1 - y0) / shape[0]
         pts = np.c_[cx[solid], cy[solid], np.zeros(int(solid.sum()))]
+        pts = pts[:: max(1, len(pts) // 3000)]          # thousands of instanced spheres stall a software renderer
         s.points(pts, color="#9aa0a6", size=h * 0.6, name="solid")
     zf = (x1 - x0) * 0.004
     s.points(np.concatenate([P_, np.full(P_.shape[:2] + (1,), zf)], axis=2), values=S_ / k, field="particle speed",
