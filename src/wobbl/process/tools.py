@@ -31,7 +31,7 @@ def _temp(text, default=None):
 
 def casting_study(path: str, alloy: str = "a356", risers=(), chills=(), mold: str = "sand", pour: str = "",
                   mold_temp: str = "", question: str = "", quality: str = "normal", params: dict | None = None,
-                  mesh_size: float | None = None):
+                  mesh_size: float | None = None, budget: float = 600.0):
     """risers: riser texts, 'auto' (the default when there are none) to place them over the hot spots, or 'none'
     to freeze the bare casting."""
     from .casting import CastingStudy
@@ -44,7 +44,7 @@ def casting_study(path: str, alloy: str = "a356", risers=(), chills=(), mold: st
     return CastingStudy(str(Path(path).expanduser().resolve()), alloy, mold, _temp(pour), _temp(mold_temp, 25.0),
                         risers=[parse_riser(r) for r in given], chills=[parse_chill(c) for c in chills or []],
                         question=question, quality=quality, params=dict(params or {}),
-                        auto_risers=not given and "none" not in words, mesh_size=mesh_size)
+                        auto_risers=not given and "none" not in words, mesh_size=mesh_size, budget=budget)
 
 
 def solve_casting_tool(path: str, alloy: str = "a356", risers: list[str] | None = None,

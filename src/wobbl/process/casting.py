@@ -27,6 +27,7 @@ from ..units import fmt
 from ..verify.checks import Check, confidence
 from . import solidify as S
 from .data import Alloy, MoldMaterial, get_alloy, get_mold
+from . import budget as bud
 from .regions import Chill, RegionMesh, Riser, build, split_interfaces
 
 FEED_TOL = 0.01          # of the casting's freezing time: a path may climb this much and still feed
@@ -56,6 +57,13 @@ class CastingStudy:
     params: dict = field(default_factory=dict)
     auto_risers: bool = False          # place risers over the hot spots when none are given
     mesh_size: float | None = None     # metal element size, mm, instead of the automatic one
+    budget: float = bud.DEFAULT_BUDGET  # s, what the mesh levels may be predicted to take (process.budget)
+
+
+# element size of each level against the base size, coarse to fine. The first two always run, so the mesh
+# convergence check always has two meshes to compare, and a third only when the pair has not converged and the
+# budget allows it
+LEVELS = {"fast": [1.0, 0.72], "normal": [1.0, 0.72, 0.52]}
 
 
 def effective_heat(alloy: Alloy, pour: float) -> tuple[float, float]:
@@ -251,7 +259,7 @@ def riser_for(xyz, t_hot: float, b_eff: float, X: np.ndarray, casting_nodes: np.
 
 
 def place_risers(study, prep, alloy, mold, pour, B, modulus, margin, duration, h, h_mold, alpha, say,
-                 rounds: int = 2) -> list[Riser]:
+                 rounds: int = 2, curvature: int = 12) -> list[Riser]:
     """Risers where the casting needs them. A coarse freeze without risers finds the last spot to freeze and every
     spot cut off from it; each gets a riser sized by the modulus rule. The casting is frozen again with them, and
     any region still cut off gets one more."""
@@ -260,7 +268,7 @@ def place_risers(study, prep, alloy, mold, pour, B, modulus, margin, duration, h
         trial = replace(study, risers=list(risers), auto_risers=False)
         say("risers", f"round {k + 1}: freezing a coarse mesh with {len(risers)} riser(s) to find hot spots")
         rm = build(prep, trial.risers, trial.chills, margin, 1.4 * h, h_mold,
-                   0.6 * math.sqrt(alpha * B * modulus ** 2))
+                   0.6 * math.sqrt(alpha * B * modulus ** 2), curvature)
         sv = solidify(trial, rm, alloy, mold, pour, duration)
         fd = feeding(sv)
         t_cast = fd["t_casting_s"]
@@ -307,9 +315,23 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
     h, h_mold = mesh_sizes(feats, study.quality)
     if study.mesh_size:
         h, h_mold = float(study.mesh_size), max(3.0 * float(study.mesh_size), 6.0)
+    scales = LEVELS["fast" if study.quality == "fast" else "normal"]
+    band = 0.6 * math.sqrt(alpha * t_est)
+    say("budget", "meshing coarsely to predict the cost of the mesh levels")
+    pilots = [build(prep, study.risers, study.chills, margin, h * scales[0] * f_p, max(h_mold, 3.0 * h * scales[0] * f_p),
+                    band, c_p) for f_p, c_p in bud.PILOTS]
+    searching = study.auto_risers and not study.risers
+    # besides its levels the study freezes the first one again at half the step, and finds its risers on two
+    # coarse meshes when none were given
+    bfit = bud.fit(bud.CASTING, (len(pilots[0].X), len(pilots[1].X)), h, scales, study.budget, bool(study.mesh_size),
+                   extra=lambda n: bud.CASTING.solve(n) * 1.5 + (2 * bud.CASTING.level(n / 2.7) if searching else 0.0))
+    say("budget", bud.note(bfit).split(". The budget")[0])
+    f_r, c_r = bfit.factor, min(bfit.curvature, 12)
+    h_r, h_mold = h * f_r, max(h_mold, 3.0 * h * f_r)
     placed = []
-    if study.auto_risers and not study.risers:
-        placed = place_risers(study, prep, alloy, mold, pour, B, modulus, margin, duration, h, h_mold, alpha, say)
+    if searching:
+        placed = place_risers(study, prep, alloy, mold, pour, B, modulus, margin, duration, h_r, h_mold, alpha, say,
+                              curvature=c_r)
         study = replace(study, risers=placed)
         foot = sum(math.pi * r.diameter ** 2 / 4 for r in study.risers)
         modulus = feats.volume / max(feats.surface_area - foot, 1e-9)
@@ -317,16 +339,22 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
         t_est = B * max([modulus] + [r.modulus for r in study.risers]) ** 2
         margin = float(np.clip(3.0 * math.sqrt(alpha * 1.5 * t_est), 15.0, 80.0))
         duration = max(10.0 * t_est, 60.0)
-    factors = [1.0] if study.quality == "fast" else [1.0, 0.72, 0.52]
     runs = []
-    for k, f in enumerate(factors):
-        say("mesh", f"level {k}: metal elements {h * f:.3g} mm, sand up to {h_mold:.3g} mm")
-        rm = build(prep, study.risers, study.chills, margin, h * f, h_mold, 0.6 * math.sqrt(alpha * t_est))
+    t_levels = time.time()
+    for k, sc in enumerate(scales):
+        h_k = h_r * sc
+        if k >= bud.MIN_LEVELS and not bud.room_for(bud.CASTING, len(runs[-1][0].rm.X), h_r * scales[k - 1], c_r, h_k,
+                                                    time.time() - t_levels, study.budget, bfit.power):
+            break
+        say("mesh", f"level {k}: metal elements {h_k:.3g} mm, sand up to {h_mold:.3g} mm")
+        rm = build(prep, study.risers, study.chills, margin, h_k, h_mold, 0.6 * math.sqrt(alpha * t_est), c_r)
         say("solve", f"level {k}: {len(rm.X):,} nodes, freezing")
         sv = solidify(study, rm, alloy, mold, pour, duration, progress=say)
         runs.append((sv, feeding(sv)))
         if k >= 1 and abs(runs[-1][1]["t99_s"] / runs[-2][1]["t99_s"] - 1) < CONVERGED:
             break
+    bfit.measured = {"levels": len(runs), "nodes": [len(r[0].rm.X) for r in runs],
+                     "seconds": round(time.time() - t_levels, 1)}
     sv, fd = runs[-1]
     say("check", "time step: level 0 again at half the step")
     half = solidify(study, runs[0][0].base, alloy, mold, pour, duration, finer_steps=2.0)
@@ -340,7 +368,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
     if solid:
         checks.append(convergence_check([r[1]["t99_s"] for r in runs], 0.05,
                                         "time for 99% of the casting to freeze", "s",
-                                        "the last level" if len(runs) == len(factors) else "", min_levels=2))
+                                        "the last level" if len(runs) == len(scales) else "", min_levels=2))
         t_a, t_b = runs[0][1]["t99_s"], fd_half["t99_s"]
         dt_ch = abs(t_b - t_a) / t_a
         st = "pass" if dt_ch < 0.03 else ("warn" if dt_ch < 0.08 else "fail")
@@ -466,6 +494,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
         "which assumes well degassed metal.",
         "Risers are blind cylinders sitting on the casting and poured at the same temperature. The part is cast "
         "the way it is drawn, with +z up.",
+        bud.note(bfit),
     ]
     if placed:
         assumptions.insert(0, f"No risers were given, so Wobbl placed {len(placed)} over the hot spots of a coarse "
@@ -490,6 +519,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
               "risers": [r.text() for r in study.risers], "risers_placed": bool(placed),
               "pockets": [{k: v for k, v in q.items() if k != "nodes"} for q in pockets],
               "porosity_max_pct": por_max, "porosity_xyz": por_xyz, "last_xyz": fd["last_xyz"],
+              "budget": bfit.to_dict(),
               "levels": [{"nodes": len(r[0].rm.X), "t_casting_s": r[1]["t_casting_s"], "t99_s": r[1]["t99_s"],
                           "steps": r[0].result.steps} for r in runs],
               "_figures": [["freezing", "Time to freeze, cut through the last spot to freeze"],

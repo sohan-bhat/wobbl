@@ -50,8 +50,9 @@ class CostLaw:
 PRINT = CostLaw(1.0e-3, 3.6e-5, 1.43, 2.0)
 # casting, one implicit march of the metal and the sand: 13.9 thousand nodes in about 80 s
 CASTING = CostLaw(1.0e-3, 1.4e-3, 1.15, 2.0)
-# mold filling, the fill of one level, a march of steps that each solve a pressure on the filled nodes
-MOLDING = CostLaw(1.0e-3, 4.0e-4, 1.35, 8.0)
+# mold filling, the fill of one level, a march of steps that each solve a pressure on the filled nodes: 1.2 thousand
+# nodes in 14 s and 4.2 thousand in 67 s
+MOLDING = CostLaw(1.0e-3, 1.8e-3, 1.26, 8.0)
 
 
 @dataclass

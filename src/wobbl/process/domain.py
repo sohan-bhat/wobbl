@@ -51,7 +51,7 @@ def casting(job):
     quality = "fast" if job.quick else (job.value("quality") or "normal")
     st = casting_study(str(job.path), alloy, risers, chills, mold, pour or "", job.value("mold-temp") or "",
                        job.question, quality, dict(p.split("=", 1) for p in job.values("param") if "=" in p),
-                       job.number("mesh-size"))
+                       job.number("mesh-size"), job.number("budget", 600.0) or 600.0)
     job.situate(environment={"process": "sand casting", "alloy": alloy, "pour": pour or "the alloy's usual"},
                 objects=["sand mold"] + [f"riser {r}" for r in risers if r.lower() not in ("none", "auto")] +
                 [f"chill {c}" for c in chills])
@@ -218,7 +218,7 @@ def molding(job):
                       [parse_gate(g) for g in gates], float(p_max), job.question,
                       "fast" if job.quick else (job.value("quality") or "normal"),
                       params=dict(p.split("=", 1) for p in job.values("param") if "=" in p),
-                      mesh_size=job.number("mesh-size"))
+                      mesh_size=job.number("mesh-size"), budget=job.number("budget", 600.0) or 600.0)
     job.situate(environment={"process": "injection molding", "resin": resin, "machine_MPa": p_max},
                 objects=["mold", "gate"])
     job.ready()

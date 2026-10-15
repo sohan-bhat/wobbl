@@ -25,6 +25,7 @@ from scipy.spatial import cKDTree
 
 from ..units import fmt
 from ..verify.checks import Check, confidence
+from . import budget as bud
 from . import hele_shaw as H
 from .data import Resin, parse_resin
 
@@ -70,6 +71,14 @@ class MoldingStudy:
     scale: float = 1.0
     params: dict = field(default_factory=dict)
     mesh_size: float | None = None
+    budget: float = bud.DEFAULT_BUDGET   # s, what the mesh levels may be predicted to take (process.budget)
+
+
+# element size of each level against the base size, coarse to fine. The first two always run, so the mesh
+# convergence check always has two meshes to compare. A third is meshed only when the pair has not converged and
+# the budget allows it
+LEVELS = {"fast": [1.0, 0.72], "normal": [1.0, 0.72, 0.52]}
+CONVERGED = 0.03        # change in the switch pressure between meshes that ends the refinement
 
 
 def element_thickness(mesh, feats) -> np.ndarray:
@@ -152,11 +161,23 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
     h0 = float(study.mesh_size) if study.mesh_size else max(1.5 * t_wall, size / 60.0)
     visc = H.Viscosity(resin, melt)
     freeze = {"alpha": resin.diffusivity * 1e6, "ratio": H.frozen_skin_ratio(resin, melt, mold)}
-    factors = [1.0] if study.quality == "fast" else [1.0, 0.72]
+    scales = LEVELS["fast" if study.quality == "fast" else "normal"]
+    say("budget", "meshing coarsely to predict the cost of the mesh levels")
+    pilots = [build_mesh(prep, Sizing(h=h0 * scales[0] * f_p, order=1, curvature=c_p)) for f_p, c_p in bud.PILOTS]
+    bfit = bud.fit(bud.MOLDING, (pilots[0].n_nodes, pilots[1].n_nodes), h0, scales, study.budget,
+                   bool(study.mesh_size), extra=lambda n: 2 * bud.MOLDING.solve(n))
+    say("budget", bud.note(bfit).split(". The budget")[0])
+    f_r, c_r = bfit.factor, bfit.curvature
     levels, gates_xyz, flow, t_fill_set, L_flow = [], [], None, None, None
-    for k, f in enumerate(factors):
+    t_levels = time.time()
+    for k, sc in enumerate(scales):
+        f = sc * f_r
+        if k >= bud.MIN_LEVELS and not bud.room_for(bud.MOLDING, levels[-1]["mesh"].n_nodes,
+                                                    h0 * scales[k - 1] * f_r, c_r, h0 * f,
+                                                    time.time() - t_levels, study.budget, bfit.power):
+            break
         say("mesh", f"level {k}: element size {h0 * f:.3g} mm")
-        mesh = build_mesh(prep, Sizing(h=h0 * f, order=1))
+        mesh = build_mesh(prep, Sizing(h=h0 * f, order=1, curvature=c_r))
         th = element_thickness(mesh, feats)
         hm = H.Mesh(mesh.X, mesh.tets[:, :4], th)
         surf = np.unique(mesh.tris[:, :3])
@@ -178,6 +199,10 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
         say("fill", f"level {k}: {mesh.n_nodes:,} nodes, melt at {fmt(melt)} C")
         iso = H.fill(hm, visc, settings, say)
         levels.append({"mesh": mesh, "hm": hm, "gsets": gsets, "iso": iso, "p_switch": _share_pressure(iso)})
+        if k >= 1 and abs(levels[-1]["p_switch"] / max(levels[-2]["p_switch"], 1e-12) - 1) < CONVERGED:
+            break
+    bfit.measured = {"levels": len(levels), "nodes": [int(L["mesh"].n_nodes) for L in levels],
+                     "seconds": round(time.time() - t_levels, 1)}
     lv = levels[-1]
     mesh, hm, iso = lv["mesh"], lv["hm"], lv["iso"]
     say("fill", "again with a skin freezing on the mold walls")
@@ -275,6 +300,7 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
         "conduction into a wall at the mold temperature brings the melt to its no flow temperature, without the "
         "heat the moving melt brings back. The real fill sits between them.",
         f"The machine holds at most {fmt(study.p_max)} MPa at the gate; past it the flow falls instead.",
+        bud.note(bfit),
     ]
     imgs = molding_images(out, mesh, iso, cold, lv["gsets"], study.p_max, gates_xyz)
     notes = list(prep.notes)
@@ -293,6 +319,7 @@ def run_molding(study: MoldingStudy, out_dir: str | Path, progress=None, keep: b
                               "nodes": len(c)} for c in lines[:8]],
               "air_traps": [mesh.X[i].tolist() for i in traps[:8]],
               "levels": [{"nodes": int(L["mesh"].n_nodes), "p_switch_MPa": L["p_switch"]} for L in levels],
+              "budget": bfit.to_dict(),
               "_figures": [["fill", "Time for the melt to reach each point, gate marked"],
                            ["pressure", "Gate pressure over the fill, hot and frozen skin bounds"]]}
     np.savez_compressed(out / "fields.npz", X=mesh.X.astype(np.float32), t_fill=iso.t_fill.astype(np.float32),

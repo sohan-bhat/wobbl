@@ -146,7 +146,7 @@ def split_interfaces(X: np.ndarray, tets: np.ndarray, metal: np.ndarray):
 
 
 def build(prep: PreparedGeometry, risers: list[Riser], chills: list[Chill], margin, h_metal: float,
-          h_mold: float, band: float = 0.0) -> RegionMesh:
+          h_mold: float, band: float = 0.0, curvature: int = 12) -> RegionMesh:
     """margin is the mold thickness around everything, mm, one value or one per axis (0 leaves those sides of the
     block flush with the part and insulated, as in a slice of a long casting). The mold keeps the metal's element
     size for band mm from the metal, the depth heat reaches while it freezes, and coarsens beyond."""
@@ -156,12 +156,12 @@ def build(prep: PreparedGeometry, risers: list[Riser], chills: list[Chill], marg
         raise GeometryError("a casting study needs a solid CAD part (STEP, IGES, BREP or .py) to build the mold "
                             "around; an STL mesh cannot be combined with risers and sand")
     try:
-        return run_isolated(_build, prep, risers, chills, margin, h_metal, h_mold, band, timeout=600)
+        return run_isolated(_build, prep, risers, chills, margin, h_metal, h_mold, band, curvature, timeout=600)
     except (IsolatedCrash, IsolatedTimeout) as e:
         raise GeometryError(f"could not mesh the casting with its mold ({e})") from e
 
 
-def _build(prep, risers, chills, margin, h_metal, h_mold, band=0.0) -> RegionMesh:
+def _build(prep, risers, chills, margin, h_metal, h_mold, band=0.0, curvature=12) -> RegionMesh:
     from ..geometry.cad import gmsh_session, load_into_session
 
     t0 = time.time()
@@ -226,7 +226,7 @@ def _build(prep, risers, chills, margin, h_metal, h_mold, band=0.0) -> RegionMes
         # sizes: fine on the metal, coarse at the mold's outer corners, graded in between
         opt = gmsh.option.setNumber
         opt("Mesh.MeshSizeMax", h_mold)
-        opt("Mesh.MeshSizeFromCurvature", 12)
+        opt("Mesh.MeshSizeFromCurvature", curvature)
         opt("Mesh.MeshSizeExtendFromBoundary", 1)
         opt("Mesh.MeshSizeFromPoints", 1)
         opt("Mesh.Algorithm", 6)
