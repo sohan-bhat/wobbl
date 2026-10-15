@@ -1,0 +1,1010 @@
+{
+ "items": 60,
+ "succeeded": 60,
+ "rows": [
+  {
+   "thing": "caffeine",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "caffeine (C8H10N4O2, 194.19 g/mol), by GFN2-xTB: its strongest IR band is at 1712 cm-1, the C=O stretch, its dipole is 3.98 D, dissolving in water is worth -43.9 kJ/mol. At 298 K its entropy is 470.8 ",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 33.8
+  },
+  {
+   "thing": "CCO",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "ethanol (C2H6O, 46.07 g/mol), by GFN2-xTB: its strongest IR band is at 342 cm-1, the C-C-O bend, its dipole is 2.00 D, dissolving in water is worth -17.2 kJ/mol. At 298 K its entropy is 269.5 J/(mol K",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 1.1
+  },
+  {
+   "thing": "c1ccccc1",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "benzene (C6H6, 78.11 g/mol), by GFN2-xTB: its strongest IR band is at 3084 cm-1, the C-H stretch, its dipole is 0.00 D, dissolving in water is worth -2.1 kJ/mol. At 298 K its entropy is 270.7 J/(mol K",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "pass"
+   },
+   "seconds": 1.2
+  },
+  {
+   "thing": "aspirin",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "aspirin (C9H8O4, 180.16 g/mol), by GFN2-xTB: its strongest IR band is at 1757 cm-1, the C=O stretch, its dipole is 1.98 D, dissolving in water is worth -50.8 kJ/mol. At 298 K its entropy is 445.7 J/(m",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 12.0
+  },
+  {
+   "thing": "acetone",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "acetone (C3H6O, 58.08 g/mol), by GFN2-xTB: its strongest IR band is at 1784 cm-1, the C=O stretch, its dipole is 3.40 D, dissolving in water is worth -14.1 kJ/mol. At 298 K its entropy is 294.2 J/(mol",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 2.0
+  },
+  {
+   "thing": "toluene",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "toluene (C7H8, 92.14 g/mol), by GFN2-xTB: its strongest IR band is at 3080 cm-1, the C-H stretch, its dipole is 0.54 D, dissolving in water is worth -3.0 kJ/mol. At 298 K its entropy is 313.0 J/(mol K",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 2.0
+  },
+  {
+   "thing": "phenol",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "phenol (C6H6O, 94.11 g/mol), by GFN2-xTB: its strongest IR band is at 432 cm-1, the O-C-C bend, its dipole is 1.51 D, dissolving in water is worth -17.9 kJ/mol. At 298 K its entropy is 313.9 J/(mol K)",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 1.3
+  },
+  {
+   "thing": "urea",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "urea (CH4N2O, 60.06 g/mol), by GFN2-xTB: its strongest IR band is at 1775 cm-1, the C=O stretch, its dipole is 4.54 D, dissolving in water is worth -50.2 kJ/mol. At 298 K its entropy is 276.1 J/(mol K",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 1.2
+  },
+  {
+   "thing": "CC(=O)O",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "acetic acid (C2H4O2, 60.05 g/mol), by GFN2-xTB: its strongest IR band is at 1803 cm-1, the C=O stretch, its dipole is 2.03 D, dissolving in water is worth -30.5 kJ/mol. At 298 K its entropy is 296.0 J",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 0.6
+  },
+  {
+   "thing": "naphthalene",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "naphthalene (C10H8, 128.17 g/mol), by GFN2-xTB: its strongest IR band is at 3079 cm-1, the C-H stretch, its dipole is 0.00 D, dissolving in water is worth -4.1 kJ/mol. At 298 K its entropy is 337.2 J/",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 2.3
+  },
+  {
+   "thing": "CC(C)CC(C)(C)C",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "C8H18 (C8H18, 114.23 g/mol), by GFN2-xTB: its strongest IR band is at 3035 cm-1, the C-H stretch, its dipole is 0.02 D, dissolving in water is worth -1.4 kJ/mol. At 298 K its entropy is 407.6 J/(mol K",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 5.6
+  },
+  {
+   "thing": "C1CCCCC1",
+   "question": "",
+   "what": "organic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "cyclohexane (C6H12, 84.16 g/mol), by GFN2-xTB: its strongest IR band is at 2986 cm-1, the C-H stretch, its dipole is 0.00 D, dissolving in water is worth -0.3 kJ/mol. At 298 K its entropy is 296.7 J/(",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 3.1
+  },
+  {
+   "thing": "water",
+   "question": "",
+   "what": "inorganic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "water (H2O, 18.02 g/mol), by GFN2-xTB: its strongest IR band is at 1539 cm-1, the H-O-H bend, its dipole is 2.22 D, dissolving in water is worth -38.0 kJ/mol. At 298 K its entropy is 188.5 J/(mol K) a",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "pass"
+   },
+   "seconds": 0.2
+  },
+  {
+   "thing": "NH3",
+   "question": "",
+   "what": "inorganic",
+   "ok": true,
+   "confidence": "medium",
+   "verdict": "ok",
+   "headline": "ammonia (H3N, 17.03 g/mol), by GFN2-xTB: its strongest IR band is at 1160 cm-1, the H-N-H bend, its dipole is 1.78 D, dissolving in water is worth -16.7 kJ/mol. At 298 K its entropy is 192.2 J/(mol K)",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "warn"
+   },
+   "seconds": 0.3
+  },
+  {
+   "thing": "CO2",
+   "question": "",
+   "what": "inorganic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "carbon dioxide (CO2, 44.01 g/mol), by GFN2-xTB: its strongest IR band is at 2593 cm-1, the C=O stretch, its dipole is 0.00 D, dissolving in water is worth 7.8 kJ/mol. At 298 K its entropy is 214.2 J/(",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "pass"
+   },
+   "seconds": 0.3
+  },
+  {
+   "thing": "H2SO4",
+   "question": "",
+   "what": "inorganic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "sulfuric acid (H2O4S, 98.08 g/mol), by GFN2-xTB: its strongest IR band is at 1345 cm-1, the S=O stretch, its dipole is 3.36 D, dissolving in water is worth -81.7 kJ/mol. At 298 K its entropy is 303.7 ",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 1.5
+  },
+  {
+   "thing": "SO2",
+   "question": "",
+   "what": "inorganic",
+   "ok": true,
+   "confidence": "medium",
+   "verdict": "ok",
+   "headline": "sulfur dioxide (O2S, 64.07 g/mol), by GFN2-xTB: its strongest IR band is at 1261 cm-1, the S=O stretch, its dipole is 3.22 D, dissolving in water is worth -25.2 kJ/mol. At 298 K its entropy is 248.6 J",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "warn"
+   },
+   "seconds": 0.3
+  },
+  {
+   "thing": "O3",
+   "question": "",
+   "what": "inorganic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "ozone (O3, 48.00 g/mol), by GFN2-xTB: its strongest IR band is at 1329 cm-1, the O-O stretch, its dipole is 1.12 D, dissolving in water is worth 13.8 kJ/mol. At 298 K its entropy is 237.5 J/(mol K) an",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "pass"
+   },
+   "seconds": 0.3
+  },
+  {
+   "thing": "HCN",
+   "question": "",
+   "what": "inorganic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "hydrogen cyanide (CHN, 27.03 g/mol), by GFN2-xTB: its strongest IR band is at 2295 cm-1, the C#N stretch, its dipole is 2.62 D, dissolving in water is worth -17.9 kJ/mol. At 298 K its entropy is 200.9",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "pass"
+   },
+   "seconds": 0.2
+  },
+  {
+   "thing": "H2O2",
+   "question": "",
+   "what": "inorganic",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "hydrogen peroxide (H2O2, 34.01 g/mol), by GFN2-xTB: its strongest IR band is at 254 cm-1, the O-O-H bend, its dipole is 0.00 D, dissolving in water is worth -42.1 kJ/mol. At 298 K its entropy is 229.6",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 0.5
+  },
+  {
+   "thing": "NO2",
+   "question": "",
+   "what": "radical",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "nitrogen dioxide (NO2, 46.01 g/mol), by GFN2-xTB: its strongest IR band is at 1931 cm-1, the N=O stretch, its dipole is 0.81 D, dissolving in water is worth 0.0 kJ/mol. At 298 K its entropy is 239.6 J",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 0.3
+  },
+  {
+   "thing": "oxygen",
+   "question": "",
+   "what": "gas",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "oxygen (O2, 32.00 g/mol), by GFN2-xTB: its strongest IR band is at 1629 cm-1, the O=O stretch, its dipole is 0.00 D, dissolving in water is worth 19.8 kJ/mol. At 298 K its entropy is 205.0 J/(mol K) a",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "pass"
+   },
+   "seconds": 0.2
+  },
+  {
+   "thing": "nitrogen",
+   "question": "",
+   "what": "gas",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "nitrogen (N2, 28.01 g/mol), by GFN2-xTB: its strongest IR band is at 2438 cm-1, the N#N stretch, its dipole is 0.00 D, dissolving in water is worth -25.2 kJ/mol. At 298 K its entropy is 191.5 J/(mol K",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "pass"
+   },
+   "seconds": 0.2
+  },
+  {
+   "thing": "methane",
+   "question": "",
+   "what": "gas",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "methane (CH4, 16.04 g/mol), by GFN2-xTB: its strongest IR band is at 3104 cm-1, the C-H stretch, its dipole is 0.00 D, dissolving in water is worth 0.7 kJ/mol. At 298 K its entropy is 185.8 J/(mol K) ",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info",
+    "reference data": "pass"
+   },
+   "seconds": 0.3
+  },
+  {
+   "thing": "NH4+",
+   "question": "",
+   "what": "ion",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "ammonium (H4N+, 18.04 g/mol), by GFN2-xTB: its strongest IR band is at 1339 cm-1, the H-N-H bend, its dipole is 0.00 D, dissolving in water is worth -361.3 kJ/mol. At 298 K its entropy is 186.2 J/(mol",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 0.4
+  },
+  {
+   "thing": "[OH-]",
+   "question": "",
+   "what": "ion",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "hydroxide (HO-, 17.01 g/mol), by GFN2-xTB: its strongest IR band is at 3398 cm-1, the O-H stretch, its dipole is 3.09 D, dissolving in water is worth -384.0 kJ/mol. At 298 K its entropy is 172.5 J/(mo",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 0.2
+  },
+  {
+   "thing": "NO3-",
+   "question": "",
+   "what": "ion",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "nitrate (NO3-, 62.00 g/mol), by GFN2-xTB: its strongest IR band is at 1523 cm-1, the N=O stretch, its dipole is 0.00 D, dissolving in water is worth -257.3 kJ/mol. At 298 K its entropy is 245.4 J/(mol",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 0.4
+  },
+  {
+   "thing": "SO4^2-",
+   "question": "",
+   "what": "ion",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "sulfate (O4S^2-, 96.07 g/mol), by GFN2-xTB: its strongest IR band is at 1007 cm-1, the S-O stretch, its dipole is 0.00 D, dissolving in water is worth -1067.0 kJ/mol. At 298 K its entropy is 267.8 J/(",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 1.0
+  },
+  {
+   "thing": "CC(=O)[O-]",
+   "question": "",
+   "what": "ion",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "acetate (C2H3O2-, 59.04 g/mol), by GFN2-xTB: its strongest IR band is at 1773 cm-1, the C=O stretch, its dipole is 7.14 D, dissolving in water is worth -279.1 kJ/mol. At 298 K its entropy is 268.5 J/(",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 1.6
+  },
+  {
+   "thing": "table salt",
+   "question": "",
+   "what": "salt",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Sodium chloride in the rock salt structure by Born-Mayer ionic model: lattice constant 5.660 A, density 2.14 g/cm3, bulk modulus 22 GPa and lattice energy 753 kJ/mol. Measured, the lattice constant is",
+   "physics": "",
+   "checks": {
+    "equation of state": "pass",
+    "reference data": "pass",
+    "lattice energy": "pass"
+   },
+   "seconds": 1.1
+  },
+  {
+   "thing": "KCl",
+   "question": "",
+   "what": "salt",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Potassium chloride in the rock salt structure by Born-Mayer ionic model: lattice constant 6.380 A, density 1.91 g/cm3, bulk modulus 16 GPa and lattice energy 679 kJ/mol. Measured, the lattice constant",
+   "physics": "",
+   "checks": {
+    "equation of state": "pass",
+    "reference data": "pass",
+    "lattice energy": "pass"
+   },
+   "seconds": 0.8
+  },
+  {
+   "thing": "MgO",
+   "question": "",
+   "what": "salt",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Magnesium oxide in the rock salt structure by Born-Mayer ionic model: lattice constant 4.240 A, density 3.51 g/cm3, bulk modulus 184 GPa and lattice energy 3836 kJ/mol. Measured, the lattice constant ",
+   "physics": "",
+   "checks": {
+    "equation of state": "pass",
+    "reference data": "pass",
+    "lattice energy": "pass"
+   },
+   "seconds": 0.4
+  },
+  {
+   "thing": "calcium fluoride",
+   "question": "",
+   "what": "salt",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Calcium fluoride in the fluorite structure by Born-Mayer ionic model: lattice constant 5.612 A, density 2.93 g/cm3, bulk modulus 61 GPa and lattice energy 2472 kJ/mol. Measured, the lattice constant i",
+   "physics": "",
+   "checks": {
+    "equation of state": "pass",
+    "reference data": "pass",
+    "lattice energy": "pass"
+   },
+   "seconds": 0.6
+  },
+  {
+   "thing": "NaHCO3",
+   "question": "",
+   "what": "salt",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "sodium bicarbonate (CHNaO3, 84.01 g/mol) has no crystal structure on file in Wobbl. Its heat of formation is -950.8 kJ/mol and its entropy 101.7 J/(mol K) (NBS tables). Dissolving it in water takes +1",
+   "physics": "",
+   "checks": {
+    "data": "pass"
+   },
+   "seconds": 0.0
+  },
+  {
+   "thing": "copper",
+   "question": "",
+   "what": "metal",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Fcc copper by EMT: lattice constant 3.590 A, density 9.12 g/cm3, bulk modulus 133 GPa and cohesive energy 3.52 eV per atom. Measured, the lattice constant is 3.610 A.",
+   "physics": "",
+   "checks": {
+    "equation of state": "pass",
+    "reference data": "pass"
+   },
+   "seconds": 0.2
+  },
+  {
+   "thing": "gold",
+   "question": "",
+   "what": "metal",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Fcc gold by EMT: lattice constant 4.056 A, density 19.6 g/cm3, bulk modulus 173 GPa and cohesive energy 3.80 eV per atom. Measured, the lattice constant is 4.080 A.",
+   "physics": "",
+   "checks": {
+    "equation of state": "pass",
+    "reference data": "pass"
+   },
+   "seconds": 0.1
+  },
+  {
+   "thing": "aluminium",
+   "question": "",
+   "what": "metal",
+   "ok": true,
+   "confidence": "medium",
+   "verdict": "ok",
+   "headline": "Fcc aluminum by EMT: lattice constant 3.996 A, density 2.81 g/cm3, bulk modulus 35 GPa and cohesive energy 3.28 eV per atom. Measured, the lattice constant is 4.050 A.",
+   "physics": "",
+   "checks": {
+    "equation of state": "pass",
+    "reference data": "warn"
+   },
+   "seconds": 0.2
+  },
+  {
+   "thing": "Fe",
+   "question": "",
+   "what": "metal",
+   "ok": true,
+   "confidence": "medium",
+   "verdict": "ok",
+   "headline": "Bcc iron: measured lattice constant 2.870 A, bulk modulus 168 GPa, cohesive energy 4.28 eV per atom. Wobbl did not compute these, since bcc iron has no fitted potential in Wobbl.",
+   "physics": "",
+   "checks": {
+    "method": "info"
+   },
+   "seconds": 0.0
+  },
+  {
+   "thing": "Ni",
+   "question": "",
+   "what": "metal",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Fcc nickel by EMT: lattice constant 3.486 A, density 9.2 g/cm3, bulk modulus 176 GPa and cohesive energy 4.45 eV per atom. Measured, the lattice constant is 3.520 A.",
+   "physics": "",
+   "checks": {
+    "equation of state": "pass",
+    "reference data": "pass"
+   },
+   "seconds": 0.2
+  },
+  {
+   "thing": "argon",
+   "question": "",
+   "what": "noble gas",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Fcc argon by Lennard-Jones: lattice constant 5.280 A, density 1.8 g/cm3, bulk modulus 3 GPa and cohesive energy 0.08 eV per atom. Measured, the lattice constant is 5.260 A.",
+   "physics": "",
+   "checks": {
+    "equation of state": "pass",
+    "reference data": "pass"
+   },
+   "seconds": 0.5
+  },
+  {
+   "thing": "glycine",
+   "question": "",
+   "what": "biomolecule",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "glycine (C2H5NO2, 75.07 g/mol), by GFN2-xTB: its strongest IR band is at 1796 cm-1, the C=O stretch, its dipole is 2.76 D, dissolving in water is worth -39.5 kJ/mol. At 298 K its entropy is 310.6 J/(m",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 2.8
+  },
+  {
+   "thing": "alanine",
+   "question": "",
+   "what": "biomolecule",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "alanine (C3H7NO2, 89.09 g/mol), by GFN2-xTB: its strongest IR band is at 1799 cm-1, the C=O stretch, its dipole is 3.01 D, dissolving in water is worth -39.0 kJ/mol. At 298 K its entropy is 337.9 J/(m",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 3.3
+  },
+  {
+   "thing": "adenine",
+   "question": "",
+   "what": "biomolecule",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "adenine (C5H5N5, 135.13 g/mol), by GFN2-xTB: its strongest IR band is at 1602 cm-1, the C:C stretch, its dipole is 2.29 D, dissolving in water is worth -58.3 kJ/mol. At 298 K its entropy is 362.4 J/(m",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 4.1
+  },
+  {
+   "thing": "NCC(=O)NCC(=O)O",
+   "question": "",
+   "what": "biomolecule",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "C4H8N2O3 (C4H8N2O3, 132.12 g/mol), by GFN2-xTB: its strongest IR band is at 1797 cm-1, the C=O stretch, its dipole is 4.93 D, dissolving in water is worth -60.0 kJ/mol. At 298 K its entropy is 404.9 J",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 7.9
+  },
+  {
+   "thing": "OC[C@H]1OC(O)[C@H](O)[C@@H]1O",
+   "question": "",
+   "what": "biomolecule",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "C5H10O5 (C5H10O5, 150.13 g/mol), by GFN2-xTB: its strongest IR band is at 624 cm-1, the O-C-O bend, its dipole is 3.16 D, dissolving in water is worth -59.6 kJ/mol. At 298 K its entropy is 400.5 J/(mo",
+   "physics": "properties",
+   "checks": {
+    "geometry convergence": "pass",
+    "minimum": "pass",
+    "SCF convergence": "pass",
+    "thermochemistry": "info"
+   },
+   "seconds": 13.1
+  },
+  {
+   "thing": "methane and air",
+   "question": "",
+   "what": "mixture",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Adiabatic flame temperature 2225 K (1952 C) for methane in air at an equivalence ratio of 1, with 0.898% CO and 0.188% NO at equilibrium.",
+   "physics": "",
+   "checks": {
+    "element balance": "pass",
+    "energy balance": "pass",
+    "thermo data": "pass",
+    "no dissociation bound": "pass",
+    "flammability": "pass"
+   },
+   "seconds": 0.8
+  },
+  {
+   "thing": "hydrogen and oxygen",
+   "question": "",
+   "what": "mixture",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Adiabatic flame temperature 3077 K (2804 C) for hydrogen in oxygen at an equivalence ratio of 1.",
+   "physics": "",
+   "checks": {
+    "element balance": "pass",
+    "energy balance": "pass",
+    "thermo data": "pass",
+    "no dissociation bound": "pass"
+   },
+   "seconds": 0.3
+  },
+  {
+   "thing": "2 H2 + O2 -> 2 H2O",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "2 H2(g) + O2(g) -> 2 H2O(l) releases 571.7 kJ per mole as written and goes forward on its own at 298 K (dG = -474.3 kJ, K = 10^83). With the water made as vapour it releases 483.6 kJ. Left to keep its",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "adiabatic energy balance": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.0
+  },
+  {
+   "thing": "baking soda and vinegar",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "CH3COOH(aq) + NaHCO3(s) -> CH3COONa(aq) + H2O(l) + CO2(g) takes in 31.1 kJ per mole as written and goes forward on its own at 298 K (dG = -13.3 kJ, K = 214). At equilibrium 99.5% of it reacts at 1.01 ",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.1
+  },
+  {
+   "thing": "sodium in water",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "2 Na(s) + 2 H2O(l) -> 2 NaOH(aq) + H2(g) releases 368.6 kJ per mole as written and goes forward on its own at 298 K (dG = -364.0 kJ, K = 10^64). In 1 kg of water it warms the solution by 88.1 K. It gi",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.0
+  },
+  {
+   "thing": "thermite",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "2 Al(s) + Fe2O3(s) -> Al2O3(s) + 2 Fe(s) releases 850.4 kJ per mole as written and goes forward on its own at 298 K (dG = -838.9 kJ, K = 10^147). Left to keep its own heat it reaches 3139 K, where boi",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "adiabatic energy balance": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 1.5
+  },
+  {
+   "thing": "N2 + 3 H2 <=> 2 NH3 at 700 K and 200 bar",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "N2(g) + 3 H2(g) -> 2 NH3(g) releases 105.4 kJ per mole as written and is uphill at standard conditions at 700 K (dG = 54.4 kJ, K = 10^-4). At equilibrium 45.8% of it reacts at 200 bar. It goes forward",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "adiabatic energy balance": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.1
+  },
+  {
+   "thing": "HCl + NaOH",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "HCl(aq) + NaOH(aq) -> NaCl(aq) + H2O(l) releases 55.8 kJ per mole as written and goes forward on its own at 298 K (dG = -79.9 kJ, K = 10^14). In 1 kg of water it warms the solution by 13.3 K.",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.1
+  },
+  {
+   "thing": "CaCO3 -> CaO + CO2",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "CaCO3(s) -> CaO(s) + CO2(g) takes in 178.3 kJ per mole as written and is uphill at standard conditions at 298 K (dG = 130.9 kJ, K = 10^-23). It goes forward above about 1166 K. It gives off 24.5 L of ",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 1.2
+  },
+  {
+   "thing": "2 H2O2 -> 2 H2O + O2",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "2 H2O2(g) -> 2 H2O(l) + O2(g) releases 299.0 kJ per mole as written and goes forward on its own at 298 K (dG = -262.1 kJ, K = 10^46). With the water made as vapour it releases 211.0 kJ. Left to keep i",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "adiabatic energy balance": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.0
+  },
+  {
+   "thing": "photosynthesis",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "6 CO2(g) + 6 H2O(l) -> C6H12O6(s) + 6 O2(g) takes in 2802.7 kJ per mole as written and is uphill at standard conditions at 298 K (dG = 2880.0 kJ, K = 10^-505).",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.0
+  },
+  {
+   "thing": "silver nitrate and sodium chloride",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "AgNO3(aq) + NaCl(aq) -> AgCl(s) + NaNO3(aq) releases 65.5 kJ per mole as written and goes forward on its own at 298 K (dG = -55.7 kJ, K = 10^10). In 1 kg of water it warms the solution by 15.7 K.",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.3
+  },
+  {
+   "thing": "zinc and hydrochloric acid",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "Zn(s) + 2 HCl(aq) -> ZnCl2(aq) + H2(g) releases 153.9 kJ per mole as written and goes forward on its own at 298 K (dG = -147.0 kJ, K = 10^26). In 729 g of hydrochloric acid at 10% it warms the solutio",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.1
+  },
+  {
+   "thing": "burning magnesium",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "medium",
+   "verdict": "ok",
+   "headline": "2 Mg(s) + O2(g) -> 2 MgO(s) releases 1202.5 kJ per mole as written and goes forward on its own at 298 K (dG = -1138.0 kJ, K = 10^199). Left to keep its own heat it reaches 3553 K.",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "adiabatic energy balance": "warn",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.2
+  },
+  {
+   "thing": "C3H8 + O2 -> CO2 + H2O",
+   "question": "",
+   "what": "reaction",
+   "ok": true,
+   "confidence": "high",
+   "verdict": "ok",
+   "headline": "C3H8(g) + 5 O2(g) -> 3 CO2(g) + 4 H2O(l) releases 2219.2 kJ per mole as written and goes forward on its own at 298 K (dG = -2107.4 kJ, K = 10^369). With the water made as vapour it releases 2043.1 kJ.",
+   "physics": "",
+   "checks": {
+    "element and charge balance": "pass",
+    "data": "pass",
+    "adiabatic energy balance": "pass",
+    "equilibrium": "pass"
+   },
+   "seconds": 0.1
+  }
+ ]
+}
