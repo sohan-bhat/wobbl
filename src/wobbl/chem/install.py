@@ -109,6 +109,11 @@ def load_pkg(name: str):
         return None
     importlib.invalidate_caches()
     try:
+        from .slim import preload
+        preload(name, pkg_dir(name))
+    except OSError:
+        return None
+    try:
         return importlib.import_module(name)
     except ImportError:
         return None
@@ -274,6 +279,12 @@ def install_pkg(name: str, log: Log = print, force: bool = False) -> dict:
                     os.chmod(stage / info.filename, mode)
         unpacked = tree_size(stage)
         prune_pkg(name, stage)
+        from . import slim
+        slim.prune_files(name, stage)
+        if name == "rdkit":
+            slim.prune_native(name, stage)
+        if name == "tblite":
+            slim.accelerate_tblite(stage)
         info = {"name": name, "version": p.pinned, "wheel": f["filename"], "download_bytes": int(f["size"]),
                 "unpacked_bytes": unpacked, "installed_bytes": tree_size(stage), "path": str(dest)}
         (stage / marker.name).write_text(json.dumps(info, indent=1))
