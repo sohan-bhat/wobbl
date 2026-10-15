@@ -111,7 +111,7 @@ def compare_with_models(built):
             return []
         return [Check("quarter wave estimate", "info",
                       f"the arm is {fmt(built.dims['arm'] * 1e3)} mm, a quarter of a wavelength in a medium of "
-                      f"permittivity about {(2.99792458e8 / (4 * built.dims['arm'] * res[0])) ** -2:.2g} at the solved "
+                      f"permittivity about {(2.99792458e8 / (4 * built.dims['arm'] * res[0])) ** 2:.2g} at the solved "
                       f"resonance of {fmt(res[0] / 1e6)} MHz")]
 
     return {"patch": patch, "invf": invf}.get(built.kind)
