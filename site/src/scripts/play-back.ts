@@ -85,20 +85,26 @@ export function inWorker(canvas: HTMLCanvasElement, kind: string, w: number, h: 
 /** The drawing on the page itself, with each file decoded in the shared worker. */
 export async function onPage(canvas: HTMLCanvasElement, kind: string, w: number, h: number, px: number,
   dec: ReturnType<typeof decoder>): Promise<Back> {
-  const { createStage } = await import('./play-draw.js');
+  const [{ createStage }, { loadModels }] = await Promise.all([import('./play-draw.js'), import('./play-models.js')]);
   const stage = createStage({ canvas, w, h, px, kind });
   const parts: any[] = [];
-  let lit: Promise<void> | null = null;
+  let lit: Promise<void> | null = null, last: Record<string, any> | null = null;
   return {
     async add(row, file, run, top) {
-      // the studio light comes from the site's env folder, two levels above the data the part comes from
-      lit ||= stage.light(new URL('../../env/studio.rgbe', abs(file)).href);
+      // the studio light and the models come from the site's root, two levels above the data the part comes from
+      const root = new URL('../../', abs(file)).href;
+      lit ||= stage.light(new URL('env/studio.rgbe', root).href);
+      const models = loadModels(root, run.example).catch(() => null);
       const [d] = await Promise.all([dec.decode(file, run), lit]);
       if (parts[row]) stage.remove(parts[row]);
-      parts[row] = stage.add({ run, arrays: d.arrays, top, row });
+      const part = stage.add({ run, arrays: d.arrays, top, row });
+      parts[row] = part;
+      // the part waits a moment for its models, then goes on without; late ones are drawn in when they come
+      const dressed = models.then((x) => { stage.dress(part, x); stage.compile(); if (last) stage.frame(last); });
+      await Promise.race([dressed, new Promise((ok) => setTimeout(ok, 2500))]);
       stage.compile();
     },
-    frame: (f) => stage.frame(f),
+    frame: (f) => { last = f; stage.frame(f); },
     probe: async (row, origin, dir) => stage.probe(row, origin, dir),
     size: (nw, nh, npx) => stage.size(nw, nh, npx),
     dispose: () => stage.dispose(),

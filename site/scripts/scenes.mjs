@@ -125,7 +125,10 @@ export function syncScenes(site) {
       const { h, arr } = readScene(new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength));
       const file = `${rel.replace(/[^a-z0-9]+/gi, '-')}.${hash(bytes)}.wobbl`;
       writeFileSync(join(out, file), bytes);
-      scenes[rel] = { file, bytes: bytes.length, title: h.title ?? '', frames: h.timeline?.frames ?? 1, play: scenePlay(h, arr) };
+      const play = scenePlay(h, arr);
+      // the example the run belongs to, as public/models/manifest.json names it (play-models.js exampleOf)
+      play.example = rel.replace(/\/output[^/]*(\/.*)?$/, '');
+      scenes[rel] = { file, bytes: bytes.length, title: h.title ?? '', frames: h.timeline?.frames ?? 1, play };
     } catch (e) {
       scenes[rel] = { broken: String(e.stack ?? e.message ?? e) };
     }

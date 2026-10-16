@@ -11,6 +11,7 @@ import {
 } from 'three';
 import { LIT, arrow, edgeLines } from './play-draw.js';
 import { FINISHES, SRGB, finishOf, studioShader } from './play-look.js';
+import { instance } from './play-models.js';
 import { contactShadow } from './contact-shadow.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
 
@@ -536,6 +537,7 @@ export function sceneParts({ arrays, run }) {
         if (it.f) {
           const c = [0, 0, 0];
           colorOf(it.f, series(o.field.values, a, b, k), c, 0);
+          it.model?.tint(c);
           const ta = it.mesh.geometry.getAttribute('tint');
           if (ta.array[0] !== c[0] || ta.array[1] !== c[1] || ta.array[2] !== c[2]) {
             for (let i = 0; i < ta.count; i++) ta.array.set(c, i * 3);
@@ -599,11 +601,12 @@ export function sceneParts({ arrays, run }) {
       if (under && top <= bottom + tol && top >= bottom - 0.25 * (sb.hi[2] - sb.lo[2] + R * 0.1)) floor = Math.max(floor, top);
     }
     if (!Number.isFinite(floor)) return;
-    const casters = new Set();
+    const casters = shadowCasters;
     for (const it of items) {
       if (it.o.prop || !['mesh', 'body', 'points', 'atoms'].includes(it.o.kind)) continue;
       casters.add(it.mesh);
       if (it.bonds) casters.add(it.bonds);
+      for (const m of it.model?.meshes || []) casters.add(m);
     }
     if (!casters.size) return;
     const size = Math.max(fx1 - fx0, fy1 - fy0) * 1.5 + R * 0.12;
@@ -623,5 +626,43 @@ export function sceneParts({ arrays, run }) {
     shadow?.dispose();
     scene.traverse((x) => { x.geometry?.dispose?.(); x.material?.dispose?.(); });
   }
-  return { scene, set, probe, shade, dispose };
+  // ---- the Blender models (play-models.js) in place of the plain shapes ----
+  const shadowCasters = new Set();
+  /** Hide an object's own shape and its outlines, keeping it for the probe and the bounds. */
+  function hideShape(it) {
+    it.mesh.material.visible = false;
+    for (const c of it.mesh.children) if (c.isLineSegments) c.visible = false;
+  }
+  /** Put the models loadModels found in place: each under its object, so it moves as the object does. */
+  function dress(loaded) {
+    if (!loaded) return;
+    const { spec, models } = loaded;
+    const pick = (name, index) => items.filter((it) => (index !== undefined ? it.oi === index : it.o.name === name)
+      && (it.o.kind === 'mesh' || it.o.kind === 'body'));
+    for (const e of spec.replace || []) {
+      const g = models.get(e.file);
+      if (!g) continue;
+      for (const it of pick(e.object, e.index)) {
+        if (it.model) continue;
+        const m = instance(g, e);
+        hideShape(it);
+        it.mesh.add(m.group);
+        it.model = m;
+        m.tint(it.base);
+        if (shadowCasters.has(it.mesh)) for (const x of m.meshes) shadowCasters.add(x);
+      }
+    }
+    for (const name of spec.hide || []) for (const it of pick(name)) hideShape(it);
+    for (const e of spec.add || []) {
+      const g = models.get(e.file);
+      if (!g) continue;
+      const m = instance(g, e), at = e.parent ? pick(e.parent)[0] : null;
+      (at ? at.mesh : scene).add(m.group);
+    }
+    // everything is brought to the frame again, so a tinted model takes its field's color
+    key = '';
+    shadowDirty = true;
+  }
+
+  return { scene, set, probe, shade, dispose, dress };
 }

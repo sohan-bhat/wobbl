@@ -9,6 +9,7 @@ import {
   SRGBColorSpace, Vector3, WebGLRenderer,
 } from 'three';
 import { sceneParts } from './play-scene.js';
+import { instance } from './play-models.js';
 import {
   FINISHES, LOOK, SRGB, aimKey, decodeStudioBytes, depthMaterial, finishOf, finishShader, keyLight, loadStudio, studioEnvironment,
   studioShader, turnStudio,
@@ -570,10 +571,24 @@ export function createStage({ canvas, w, h, px, kind }) {
     for (const p of parts) p.scene.environment = env.texture;
   }
 
+  /**
+   * Put a part's models in (play-models.js loadModels): a scene's in place of its shapes, a strength or heat
+   * run's round the part in its own millimetre frame.
+   */
+  function dress(part, loaded) {
+    if (!loaded || !parts.includes(part)) return;
+    if (part.sp) { part.sp.dress(loaded); return; }
+    for (const e of loaded.spec.add || []) {
+      const g = loaded.models.get(e.file);
+      if (g) part.scene.add(instance(g, e).group);
+    }
+  }
+
   return {
     add,
     remove,
     light,
+    dress,
     /**
      * f.camera: { position, target, fov, aspect }; f.views: one [x, y, w, h] per part; f.k: the load
      * fraction or the warm up's share of the steady rise; f.heat: { i0, i1, mix } for a run with frames;

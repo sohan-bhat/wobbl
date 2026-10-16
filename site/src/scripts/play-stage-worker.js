@@ -4,6 +4,7 @@
 // draws the latest of them once per display frame.
 import { createStage } from './play-draw.js';
 import { decodePlay, decodeScene } from './play.js';
+import { loadModels } from './play-models.js';
 
 let stage = null, latest = null, queued = false, lit = null;
 const parts = [];
@@ -32,11 +33,21 @@ self.onmessage = async (e) => {
       stage = createStage({ canvas: m.canvas, w: m.w, h: m.h, px: m.px, kind: m.kind });
     } else if (m.type === 'part') {
       // the studio light comes from the site's env folder, two levels above the data the part comes from
-      lit ||= stage?.light(new URL('../../env/studio.rgbe', m.file).href);
+      const root = new URL('../../', m.file).href;
+      lit ||= stage?.light(new URL('env/studio.rgbe', root).href);
+      // the Blender models, fetched alongside; the part waits a moment for them, then goes on without
+      const models = loadModels(root, m.run.example).catch(() => null);
       const [{ arrays }] = await Promise.all([load(m.file, m.run), lit]);
       if (!stage) throw new Error('the drawing worker has no WebGL');
       if (parts[m.row]) stage.remove(parts[m.row]);
-      parts[m.row] = stage.add({ run: m.run, arrays, top: m.top, row: m.row });
+      const part = stage.add({ run: m.run, arrays, top: m.top, row: m.row });
+      parts[m.row] = part;
+      const dressed = models.then((x) => {
+        stage?.dress(part, x);
+        stage?.compile();
+        if (latest && !queued) { queued = true; later(draw); }
+      });
+      await Promise.race([dressed, new Promise((ok) => setTimeout(ok, 2500))]);
       stage.compile();
       self.postMessage({ type: 'part', id: m.id });
     } else if (m.type === 'frame') {

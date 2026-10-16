@@ -46,6 +46,8 @@ export function playRuns(example: string): Record<string, PlayRun> | null {
     if (runs && typeof bend === 'number') for (const r of Object.values(runs)) if (r.kind === 'strength') r.exag = bend;
     // what the part is made of and where it is held, from each run's own study, so the stage can draw its surface
     for (const [rel, r] of Object.entries(runs ?? {})) {
+      // the example as public/models/manifest.json names it, for the models drawn round the part
+      (r as PlayRun & { example?: string }).example = rel.replace(/\/output[^/]*(\/.*)?$/, '');
       const st = resolve(process.cwd(), '../examples', rel, 'study.json');
       if (!existsSync(st)) continue;
       try {
