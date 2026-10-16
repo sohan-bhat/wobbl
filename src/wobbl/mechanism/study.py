@@ -384,5 +384,11 @@ def run_mechanism(target: str, params: dict | None, out_dir: str | Path, questio
     if a.run is not None and a.run.poses:
         o.values["playback"] = "playback.json"
         write_playback(out / "playback.json", a.run, mech, o)
+    if is_template(target) and not params.get("quick"):
+        from .sweep import write as write_sweep
+
+        say("sweep", "solving again over the input the question turns on")
+        if write_sweep(out, part, params, question or mech.question, say):
+            o.values["sweep"] = "sweep.json"
     o.runtime_s = o.t_total = round(time.time() - t0, 3)
     return o.write(out)
