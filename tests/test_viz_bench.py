@@ -139,8 +139,9 @@ def test_the_question_picks_the_input():
     c = parse_spice("V1 vin 0 12\nR1 vin a 1k\nCCABLE a 0 1u\nRLOAD vin 0 6\n.end\n")
     bind(c)
     by_word = S.choose(c, "is it stable driving the cable?")
-    assert by_word.ref == "CCABLE" and by_word.unit == "F" and by_word.design in by_word.values
-    assert by_word.values[0] < 1e-6 < by_word.values[-1]
+    assert by_word.ref == "CCABLE" and by_word.unit == "uF" and by_word.design == 1 and 1 in by_word.values
+    assert by_word.values[0] < 1 < by_word.values[-1]
+    assert by_word.make(4.7).element("CCABLE").value == 4.7e-6
     sup = S.choose(c, "does anything burn?")
     assert sup.kind == "supply" and sup.design == 12 and sup.values[0] == 0 and sup.values[-1] == 18
     cc = sup.make(6.0)

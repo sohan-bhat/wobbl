@@ -127,14 +127,15 @@ def choose(c: Circuit, question: str = "") -> Input | None:
         by_word = len(tag) >= 3 and (tag in words or any(w.startswith(tag) for w in words))
         by_value = e.letter == "r" and any(abs(v - e.value) <= 0.01 * e.value for _, v in vals)
         if by_word or by_value:
-            v0 = float(e.value)
+            k = 1e6 if e.letter in "cl" else 1.0          # capacitors in uF and inductors in uH read plainly
+            v0 = float(e.value) * k
             below, above = (3.0, 1.0) if e.letter == "c" else (1.0, 1.0)
 
-            def part(x, e=e):
+            def part(x, e=e, k=k):
                 cc = c.copy()
-                set_value(cc.element(e.name), x)
+                set_value(cc.element(e.name), x / k)
                 return cc
-            unit = {"r": "ohm", "c": "F", "l": "H"}[e.letter]
+            unit = {"r": "ohm", "c": "uF", "l": "uH"}[e.letter]
             what = {"r": "resistance", "c": "capacitance", "l": "inductance"}[e.letter]
             return Input(f"{e.ref} {what}", unit, decades(v0, below, above), v0, part, e.name, "part")
     src = _main_supply(c)
