@@ -57,7 +57,7 @@ def part_surface(X: np.ndarray, tris: np.ndarray, target: int = 3000) -> dict:
 def write(path: Path, *, part: dict, origin, normal, steps: list[dict], starts: list, growth: tuple,
           lives: np.ndarray,
           percentiles: dict, target: float | None, pof: float | None, inspection: dict, verdict: str,
-          headline: str, material: str, spectrum: str, end: str) -> str:
+          headline: str, material: str, spectrum: str, end: str, sweep: dict | None = None) -> str:
     """Write playback.json. ``steps`` hold, per solved crack, its size, the cycle count when the nominal crack
     reached it, the largest K and the fronts (points and K_I, K_II, K_III along each)."""
     size, cycles = growth
@@ -90,6 +90,9 @@ def write(path: Path, *, part: dict, origin, normal, steps: list[dict], starts: 
                  "target_cycles": target, "failed_before_target": pof, "cdf": cdf,
                  "inspection": {k: _n(v, 3) for k, v in inspection.items()}},
     }
+    if sweep:
+        doc["sweep"] = {k: ([_n(x, 4) if x is not None else None for x in v] if isinstance(v, list) else v)
+                        for k, v in sweep.items()}
     Path(path).write_text(json.dumps(doc, separators=(",", ":"), allow_nan=False))
     return str(path)
 

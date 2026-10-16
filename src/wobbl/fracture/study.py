@@ -24,7 +24,8 @@ from ..units import fmt
 from ..verify.checks import Check, balance_check, confidence
 from . import handbook as H
 from .growth import GrowthLaw, law_for, parse_spectrum
-from .life import CrackPath, LifeInputs, Scatter, growth_curve, inspection, lives, monte_carlo, wheeler_reference
+from .life import (CrackPath, LifeInputs, Scatter, growth_curve, inspection, lives, load_sweep, monte_carlo,
+                   wheeler_reference)
 from .spec import FractureStudy
 
 P10 = 1.2816      # standard normal quantile of the smallest tenth
@@ -146,8 +147,12 @@ def run_fracture(st: FractureStudy, out_dir: str | Path, progress=None, quick: b
               "_figures": [["path", "The crack path, colored by the cycle count when the front passed"],
                            ["growth", "Crack size against cycles for the nominal part"],
                            ["life", "How lives spread over many parts"]]}
+    sweep = load_sweep(cpath, inp, spec.a, scatter, st.target_life)
+    sweep.update(load_N=float(sum(abs(float(ld.magnitude)) for ld in sst.loads
+                                  if ld.kind in ("force", "remote", "bolt"))),
+                 kc=law.kc, target=st.target_life, max_pof=st.max_pof)
     values["playback"] = _playback(out, unc, res_path, curve, n_at, mc, insp, st, first, verdict, head, material,
-                                   spectrum)
+                                   spectrum, sweep)
     _scene(out, unc, st, features)
     o = GenericOutcome("fracture", str(Path(st.part).resolve()), st.question, verdict, head, metrics, level, reasons,
                        checks, assumptions, values, images, fixes, prep.notes + res_path.notes,
@@ -442,7 +447,8 @@ def _sides(res_path, first) -> list[dict]:
     return out
 
 
-def _playback(out, unc, res_path, curve, n_at, mc, insp, st, first, verdict, head, material, spectrum) -> str:
+def _playback(out, unc, res_path, curve, n_at, mc, insp, st, first, verdict, head, material, spectrum,
+              sweep=None) -> str:
     """playback.json, the run in a form a viewer can animate."""
     from . import playback
 
@@ -453,7 +459,7 @@ def _playback(out, unc, res_path, curve, n_at, mc, insp, st, first, verdict, hea
                        starts=[s["start"] for s in _sides(res_path, first)],
                        growth=curve, lives=mc.lives, percentiles=mc.percentiles, target=st.target_life, pof=mc.pof,
                        inspection=insp, verdict=verdict, headline=head, material=material.name,
-                       spectrum=spectrum.describe(), end=res_path.end)
+                       spectrum=spectrum.describe(), end=res_path.end, sweep=sweep)
     except Exception:  # noqa: BLE001  the playback is a convenience, never a reason to fail
         return ""
     return "playback.json"

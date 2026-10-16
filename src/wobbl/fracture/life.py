@@ -245,6 +245,27 @@ def monte_carlo(path: CrackPath, inp: LifeInputs, a_med: float, scatter: Scatter
     return res
 
 
+def load_sweep(path: CrackPath, inp: LifeInputs, a_med: float, scatter: Scatter, target: float | None = None,
+               factors=None) -> dict:
+    """Lives at every load scaled by each factor: K scales with the load, so the same surrogate and the same
+    sampled parts give the nominal life, B1, B10 and the share failing before the target at each one. This is
+    the table a load slider reads."""
+    f = np.asarray(factors if factors is not None else np.r_[np.linspace(0.3, 1.0, 15), np.linspace(1.05, 2.0, 20)],
+                   float)
+    d = scatter.draw(a_med, inp.law.kc)
+    out = {"factor": [], "nominal": [], "B1": [], "B10": [], "pof": []}
+    for x in f:
+        life, _ = lives(path, inp, d["a0"], d["scale"] * x, d["cmult"], d["kc"])
+        nom = float(lives(path, inp, a_med, x, 1.0, inp.law.kc)[0][0])
+        out["factor"].append(round(float(x), 5))
+        out["nominal"].append(nom if np.isfinite(nom) else None)
+        for name, q in (("B1", 0.01), ("B10", 0.1)):
+            v = float(np.quantile(life, q))
+            out[name].append(v if np.isfinite(v) else None)
+        out["pof"].append(float((life < target).mean()) if target else None)
+    return out
+
+
 def _quantile_band(srt: np.ndarray, p: float) -> tuple[float, float]:
     """90% band of a sample quantile from the binomial spread of the rank it sits at."""
     n = srt.size
