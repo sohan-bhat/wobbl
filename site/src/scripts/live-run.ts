@@ -109,7 +109,15 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   let free = false;
   const frameAt = (run: any, p: number) => {
     const F = run.input.t.length, a = Math.min(Math.max(Math.floor(p), 0), F - 1), b = Math.min(a + 1, F - 1);
-    return { a, b, k: run.input.between === 'step' ? 0 : Math.min(Math.max(p - a, 0), 1) };
+    return { a, b, k: Math.min(Math.max(p - a, 0), 1) };
+  };
+  // the frame position of an input value, read between the saved frames around it
+  const posOf = (ts: number[], v: number) => {
+    const up = ts[ts.length - 1] >= ts[0];
+    for (let i = 1; i < ts.length; i++) {
+      if (up ? v <= ts[i] : v >= ts[i]) return i - 1 + (ts[i] === ts[i - 1] ? 0 : Math.min(Math.max((v - ts[i - 1]) / (ts[i] - ts[i - 1]), 0), 1));
+    }
+    return ts.length - 1;
   };
   const along = (run: any, vs: (number | null)[], p: number) => {
     const { a, b, k } = frameAt(run, p), x = vs[a] ?? NaN, y = vs[b] ?? NaN;
@@ -152,7 +160,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       if (ev) put(eventEl, ev.text);
     }
     if (slider) {
-      if (!slider.matches(':active')) slider.value = String(pos[0]);
+      if (!slider.matches(':active')) slider.value = String(along(r0, inp.t, pos[0]));
       const rq = r0.q, v = rq ? along(r0, rq.values, pos[0]) : NaN;
       slider.setAttribute('aria-valuetext', `${now.textContent}${rq ? `, ${rq.name} ${sig(v, rq.digits)}${rq.unit ? ` ${rq.unit}` : ''}` : ''}`);
     }
@@ -537,7 +545,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     };
     if (slider) {
       slider.disabled = false;
-      on(slider, 'input', () => goTo(Number(slider.value)));
+      on(slider, 'input', () => goTo(posOf(data.panes[shown[0]].run.input.t, Number(slider.value))));
     }
     if (!probeEl || !canvas) return;
     let hover: PointerEvent | null = null, pr = 0, asked = 0;

@@ -124,7 +124,11 @@ const rows = sp ? sceneShown.map((pn) => ({ name: pn.name, at: pn.at, v: paneVal
 const panes = sp ? sceneShown.map((pn) => ({ name: pn.name, pic: pn.poster ? { src: pn.poster.src, srcset: '', width: pn.poster.width, height: pn.poster.height } : null }))
   : shown.map((pane) => ({ name: pane.name, pic: pane.poster ? picture(pane.poster) : null }));
 const T0 = sp ? inp!.t[0] : 0, T1 = sp ? inp!.t[inp!.t.length - 1] : 0;
-const homeAt = sp ? inp!.home / Math.max(inp!.t.length - 1, 1) : 0;
+// the slider runs along the input's own value, so equal moves are equal changes even where the saved
+// frames sit closer together
+const homeT = sp ? (() => { const a = Math.floor(inp!.home), b = Math.min(a + 1, inp!.t.length - 1);
+  return inp!.t[a] + (inp!.t[b] - inp!.t[a]) * (inp!.home - a); })() : 0;
+const homeAt = sp && T1 !== T0 ? (homeT - T0) / (T1 - T0) : 0;
 // the slider moves every pane along the same input; panes that are values along one input have none
 const sliding = !!sp && inp!.t.length > 1 && !(sp.alts && !beside.length);
 // the choices for the right pane, as buttons, when there are more than two
@@ -186,7 +190,7 @@ const data = JSON.stringify(sp ? {
         </p>
         {sliding && (
           <div class="lrun-slider">
-            <input type="range" min="0" max={inp!.t.length - 1} step={inp!.between === 'exact' ? 'any' : '1'} value={inp!.home} disabled
+            <input type="range" min={Math.min(T0, T1)} max={Math.max(T0, T1)} step={Math.abs(T1 - T0) / 2000} value={homeT} disabled
                    aria-label={label} aria-valuetext={total} />
             <div class="lrun-ticks lrun-sticks" aria-hidden="true">
               <span style="left: 0">{inputText(T0)}</span>

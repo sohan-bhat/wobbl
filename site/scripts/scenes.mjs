@@ -78,7 +78,7 @@ export function scenePlay(h, arr) {
     const v = q.values;
     for (let f = 1; f < F; f++) {
       if (!(v[f] > q.limit) || !(v[f - 1] <= q.limit)) continue;
-      const x = tl.between === 'step' ? t[f] : t[f - 1] + ((q.limit - v[f - 1]) / (v[f] - v[f - 1])) * (t[f] - t[f - 1]);
+      const x = t[f - 1] + ((q.limit - v[f - 1]) / (v[f] - v[f - 1])) * (t[f] - t[f - 1]);
       event = { at: r6(tPos(x)), text: `Passes the ${short(q.limit)}${q.unit ? ` ${q.unit}` : ''} limit at ${short(x)}${tl.unit ? ` ${tl.unit}` : ''}` };
       break;
     }
