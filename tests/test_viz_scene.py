@@ -85,3 +85,16 @@ def test_rigid_bodies_keep_quaternions_continuous():
     h, blob = load(s.to_bytes())
     Q = array(h, blob, h["objects"][0]["quat"])
     assert (np.sum(Q[1:] * Q[:-1], axis=1) > 0).all()
+
+
+def test_readout_target_marks_marginal_with_or_without_a_limit():
+    s = Scene("check", domain="test")
+    s.timeline([1.0, 2.0, 3.0], unit="N", label="load", kind="input", design=2.0)
+    s.readout("stress", [10.0, 20.0, 30.0], unit="MPa", limit=40.0, target=15.0)
+    s.readout("mass flux", [1.0, 2.0, 3.0], target=1.5)
+    s.readout("plain", [1.0, 2.0, 3.0], limit=4.0)
+    h, _ = load(s.to_bytes())
+    ro = {r["name"]: r for r in h["readouts"]}
+    assert ro["stress"]["limit"] == 40.0 and ro["stress"]["target"] == 15.0
+    assert ro["mass flux"]["target"] == 1.5 and "limit" not in ro["mass flux"]
+    assert "target" not in ro["plain"]

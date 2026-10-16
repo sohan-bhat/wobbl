@@ -13,7 +13,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .ttl{position:absolute;left:12px;right:12px;top:10px;font:600 14px/1.25 Archivo,"Helvetica Neue",Arial,sans-serif;letter-spacing:.01em;pointer-events:none;text-shadow:0 1px 2px #000;max-width:60%}
 .ro{position:absolute;left:12px;top:38px;display:grid;gap:2px;pointer-events:none;z-index:1}
 .ro div{background:rgba(14,15,17,.82);border-left:2px solid var(--y);padding:3px 8px;white-space:nowrap}
-.ro b{font-weight:500;font-variant-numeric:tabular-nums}.ro span{color:var(--mut)}.ro .over{border-color:var(--fail)}.ro .over b{color:var(--fail)}
+.ro b{font-weight:500;font-variant-numeric:tabular-nums}.ro span{color:var(--mut)}.ro .over{border-color:var(--fail)}.ro .over b{color:var(--fail)}.ro .near{border-color:var(--warn)}.ro .near b{color:var(--warn)}
 .lb{position:absolute;left:0;top:0;pointer-events:none;transform:translate(-50%,-50%)}
 .lb i{position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--y);box-shadow:0 0 0 2px #111}
 .lb span{position:absolute;left:10px;top:-10px;white-space:nowrap;background:var(--y);color:#111;padding:1px 6px;font-weight:500}

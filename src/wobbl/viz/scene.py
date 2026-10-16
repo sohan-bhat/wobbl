@@ -184,9 +184,10 @@ class Scene:
         self.labels.append(d)
         return self
 
-    def readout(self, name: str, values, *, unit: str = "", digits: int = 3, limit=None) -> "Scene":
+    def readout(self, name: str, values, *, unit: str = "", digits: int = 3, limit=None, target=None) -> "Scene":
         """A named number per frame that ticks with playback, such as load, peak stress or chamber pressure. Above
-        limit (one number, or one per frame such as a motor's torque at its speed) it shows in red."""
+        limit (one number, or one per frame such as a motor's torque at its speed) it shows in red. Above target
+        (0.8 of limit when not given, and it may come without a limit) the viewer calls the input marginal."""
         v = np.asarray(values, float).ravel()
         if len(v) != self.n:
             raise ValueError(f"readout {name!r}: {len(v)} values for {self.n} frames")
@@ -195,6 +196,8 @@ class Scene:
             d["lim"] = np.asarray(limit, float).ravel()
         elif limit is not None:
             d["limit"] = _f(limit)
+        if target is not None:
+            d["target"] = _f(target)
         self.readouts.append(d)
         return self
 

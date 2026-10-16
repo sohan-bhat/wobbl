@@ -54,7 +54,12 @@ async function mount(host, opt = {}) {
     if (tl.label) ui.vals[tl.label] = tv;
     for (const [i, r] of S.readouts.entries()) {
       const v = series(r.values, a, b, k), e = ui.ro[i], lim = r.limits ? series(r.limits, a, b, k) : r.limit;
-      if (e) { e.v.textContent = fmt(v, r.digits); e.box.classList.toggle('over', lim !== undefined && v > lim + 1e-12); }
+      if (e) {
+        const over = lim !== undefined && v > lim + 1e-12;
+        e.v.textContent = fmt(v, r.digits);
+        e.box.classList.toggle('over', over);
+        e.box.classList.toggle('near', !over && r.target !== undefined && v > r.target + 1e-12);
+      }
       ui.vals[r.name] = `${fmt(v, r.digits)}${r.unit ? ' ' + r.unit : ''}`;
     }
     ui.out.textContent = tv;
@@ -85,9 +90,13 @@ async function mount(host, opt = {}) {
     const v = r ? series(r.values, a, b, k) : pk;
     ui.num.textContent = Number.isFinite(v) ? fmt(v, r ? r.digits : f0.digits) : '–';
     let word = '', tone = '', worst = -Infinity, warn = false;
-    const weigh = (x, L, m) => { if (!(L > 0) || !Number.isFinite(x)) return; worst = Math.max(worst, x / L); warn ||= x > m; };
+    const weigh = (x, L, m) => {
+      if (!Number.isFinite(x)) return;
+      if (L > 0) worst = Math.max(worst, x / L); else if (m > 0) worst = Math.max(worst, 0); else return;
+      warn ||= x > m;
+    };
     if (ui.lim !== null) weigh(pk, ui.lim, ui.tgt);
-    for (const q of S.readouts) if (q.limit !== undefined || q.limits) { const L = q.limits ? series(q.limits, a, b, k) : q.limit; weigh(series(q.values, a, b, k), L, L * 0.8); }
+    for (const q of S.readouts) if (q.limit !== undefined || q.limits || q.target !== undefined) { const L = q.limits ? series(q.limits, a, b, k) : q.limit; weigh(series(q.values, a, b, k), L, q.target ?? L * 0.8); }
     if (S.verdict && (!input || (worst === -Infinity && Math.abs(p - pos0) < 1e-6))) { word = S.verdict.word; tone = { pass: 'holds', warn: 'marginal', fail: 'fails' }[S.verdict.tone] || 'info'; }
     else if (worst > -Infinity) { tone = worst > 1 + 1e-9 ? 'fails' : warn ? 'marginal' : 'holds'; word = { holds: 'OK', marginal: 'Marginal', fails: 'Fails' }[tone]; }
     ui.vd.textContent = word; ui.vd.dataset.v = tone; ui.vd.style.visibility = word ? '' : 'hidden';
