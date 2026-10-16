@@ -41,7 +41,7 @@ These four commands install Wobbl, add the solvers, check the install and answer
 question that needs no files.
 
 ```sh
-pipx install wobbl
+npm i -g wobbl
 wobbl setup
 wobbl doctor
 wobbl "will a blue LED on 5V with a 47 ohm resistor fry?"

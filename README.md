@@ -70,15 +70,27 @@ Claude Code, Codex, Cursor and Gemini CLI.
 
 ## Quick start
 
-Wobbl needs Python 3.10 or newer and installs from PyPI.
+Install it with npm, which needs Node 18 or newer and nothing else.
 
 ```sh
-pipx install wobbl
-# or: uv tool install wobbl
+npm i -g wobbl
 
 wobbl setup     # solvers into ~/.wobbl, MCP server and skill for your agents
 wobbl doctor    # check every piece
 ```
+
+Wobbl is a Python package, and npm installs the newest one from PyPI for good with
+uv or pipx, or with a pinned uv it downloads and checks when you have neither.
+That needs no Python of your own. It shows one line per step and keeps the full
+installer output in `~/.wobbl/logs/install.log`. If you already use pipx or uv,
+install from PyPI directly with Python 3.10 or newer.
+
+```sh
+pipx install wobbl
+# or: uv tool install wobbl
+```
+
+To try it without installing anything first, `npx wobbl setup` does both steps.
 
 `wobbl setup` downloads a pinned micromamba and installs the solvers from
 conda-forge into `~/.wobbl` (about 70 MB, no admin rights). Use
