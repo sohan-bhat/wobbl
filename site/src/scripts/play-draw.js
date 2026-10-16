@@ -7,6 +7,7 @@ import {
   BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
   PerspectiveCamera, Scene, ShaderMaterial, SphereGeometry, Vector3, WebGLRenderer,
 } from 'three';
+import { sceneParts } from './play-scene.js';
 
 const TURBO = /* glsl */ `
 vec3 ramp(float x) {
@@ -87,8 +88,21 @@ void main() {
   gl_Position = projectionMatrix * mv;
 }`;
 
+// The light every playback surface is drawn in: a key light and a fill from the viewer's side, and a small
+// highlight, so a strength run, a heat run and a scene all read the same. spec scales the highlight, which a
+// prop keeps low so it reads matte.
+export const LIT = /* glsl */ `
+vec3 lit(vec3 c, vec3 n, vec3 v, float spec) {
+  vec3 l1 = normalize(vec3(0.35, 0.55, 0.75));
+  vec3 l2 = normalize(vec3(-0.7, -0.1, 0.45));
+  float d = 0.42 + 0.6 * max(dot(n, l1), 0.0) + 0.22 * max(dot(n, l2), 0.0);
+  float s = spec * 0.16 * pow(max(dot(n, normalize(l1 + v)), 0.0), 28.0);
+  return c * d + vec3(s);
+}`;
+
 const FRAG = /* glsl */ `
 uniform float uPx;
+${LIT}
 varying vec3 vC;
 varying float vE;
 varying vec3 vN;
@@ -109,11 +123,7 @@ void main() {
   vec3 v = normalize(vV);
   vec3 n = normalize(vN);
   n = faceforward(n, -v, n);
-  vec3 l1 = normalize(vec3(0.35, 0.55, 0.75));
-  vec3 l2 = normalize(vec3(-0.7, -0.1, 0.45));
-  float d = 0.42 + 0.6 * max(dot(n, l1), 0.0) + 0.22 * max(dot(n, l2), 0.0);
-  float s = 0.16 * pow(max(dot(n, normalize(l1 + v)), 0.0), 28.0);
-  vec3 col = vC * d + vec3(s);
+  vec3 col = lit(vC, n, v, 1.0);
   if (vE > 0.5) {
     float k = mod(gl_FragCoord.x - gl_FragCoord.y, 9.0 * uPx);
     if (k < 2.5 * uPx) col = mix(col, vec3(0.055, 0.059, 0.067), 0.72);
@@ -135,10 +145,10 @@ const heatMaterial = (uniforms) => new ShaderMaterial({
 });
 
 /** The load as an arrow: a solid one, and a faint copy that shows through the part when it is behind it. */
-function arrow() {
+export function arrow(color = YELLOW) {
   const g = new Group();
-  const solid = new MeshBasicMaterial({ color: YELLOW });
-  const ghost = new MeshBasicMaterial({ color: YELLOW, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false });
+  const solid = new MeshBasicMaterial({ color });
+  const ghost = new MeshBasicMaterial({ color, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false });
   const parts = {};
   for (const [k, geo] of Object.entries({ shaft: new CylinderGeometry(1, 1, 1, 12), head: new ConeGeometry(3, 8, 20) })) {
     const m = new Mesh(geo, solid);
@@ -169,6 +179,13 @@ export function createStage({ canvas, w, h, px, kind }) {
   const parts = [];
 
   function add({ run, arrays, top, row = 0 }) {
+    if (kind === 'scene') {
+      // a scene brings its own objects to the slider's position; the light, the camera and the views are these
+      const sp = sceneParts({ arrays, run });
+      const part = { run, arrays, scene: sp.scene, sp, row, uniforms: { uK: { value: 0 }, uPx: { value: px } }, load: null };
+      parts.push(part);
+      return part;
+    }
     const scene = new Scene();
     const geo = new BufferGeometry();
     geo.setIndex(new BufferAttribute(arrays.index, 1));
@@ -292,6 +309,7 @@ export function createStage({ canvas, w, h, px, kind }) {
       parts.forEach((part) => {
         const [x, y, vw, vh] = f.views[part.row];
         part.uniforms.uK.value = f.k;
+        if (part.sp) part.sp.set(f.scene);
         if (part.load) aim(part, f.k, f.radius);
         if (f.heat) {
           frames(part, f.heat.i0, f.heat.i1);
@@ -309,6 +327,11 @@ export function createStage({ canvas, w, h, px, kind }) {
       renderer.setPixelRatio(npx);
       renderer.setSize(nw, nh, false);
       for (const p of parts) p.uniforms.uPx.value = npx;
+    },
+    /** What the main field reads under a ray (origin and dir in the scene's units) in view row, or null. */
+    probe(row, origin, dir) {
+      const part = parts.find((p) => p.row === row);
+      return part && part.sp ? part.sp.probe(origin, dir) : null;
     },
     compile() {
       for (const p of parts) renderer.compile(p.scene, camera);
