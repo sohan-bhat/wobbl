@@ -30,6 +30,7 @@ suggests stiffening the tip enough to lift mode 3 above 480 Hz, which takes abou
 stiffness, or mounting it softly enough to drop under hover. A wider and deeper pad with the motor
 sitting lower is usually the cheaper way to stiffen that tip.
 
-The report opens with a 3D view of the four mode shapes nearest the excitation, each oscillating in
-turn with its frequency beside it, saved as `output/scene.wobbl`. The run also writes
-`output/playback.json` with the arm's surface and those mode shapes, for the website to play back.
+The report opens with a 3D view of the arm with a rotor speed slider from 5000 to 12000 rpm. At each speed
+the arm takes the shape of the mode driven hardest, colored by how far each spot moves against its static
+motion, saved as `output/scene.wobbl`. The run also writes `output/playback.json` with the arm's surface and
+the mode shapes nearest the excitation.

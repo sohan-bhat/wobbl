@@ -29,4 +29,6 @@ gives the spread above. Wobbl suggests cutting the stress at the bore by 21%, th
 smaller load, a steel lug, or inspecting every 41,700 cycles.
 
 `output/playback.json` holds the part's surface, every solved front with its K and the cycle count when
-it passed, the growth curve and the spread of lives, for a viewer to play the crack back.
+it passed, the growth curve, the spread of lives and the lives at each load. The report's 3D view shows the
+crack at the end of its path with a load slider. K scales exactly with the load, and the life of one part in a
+hundred and the share failing before the target follow it.

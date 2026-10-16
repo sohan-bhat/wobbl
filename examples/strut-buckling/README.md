@@ -27,7 +27,7 @@ the buckling load. Wobbl solves the column curve backwards for the fixes. About 
 stiffness gets there, as does a strut 554 mm long, and a brace that holds it sideways at mid length
 does far more, since it halves the buckling length.
 
-The report opens with a 3D view of the load climbing to 95% of the buckling load, the stress coloring
-the tube and its bow growing from a crookedness of a thousandth of its length, saved as
-`output/scene.wobbl`. The run also writes `output/playback.json` with the tube's surface, its first
-buckling shape and the bow at each load, for the website to play back.
+The report opens with a 3D view of the tube with a load slider up to 95% of the buckling load, the stress
+coloring the tube and its bow grown from a crookedness of a thousandth of its length, saved as
+`output/scene.wobbl`. The run also writes `output/playback.json` with the tube's surface, its stress, its
+first buckling shape and the bow at each load.

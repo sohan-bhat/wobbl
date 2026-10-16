@@ -31,5 +31,6 @@ fatigue lives scatter by a factor of three to ten. Halving the stress at the fil
 times the wall there, would meet the casting's factor of 2. The strength result itself is medium
 confidence, because a rigid motor would carry the pull differently, and this answer inherits that.
 
-The run also writes `output/playback.json`, with the damage building block by block over the ten
-years, for the website to play back.
+The run also writes `output/playback.json`, with the damage building block by block over the ten years and
+the damage at every scale of the duty's loads. The report's 3D view has a duty load slider, with the mount
+colored by each spot's share of its fatigue strength and the damage at the fillet read out.

@@ -20,6 +20,7 @@ corner landing on a linear tet copy of the mesh, using the housing's mirror symm
 are the same, runs the worst ones again on quadratic tets, and refines the mesh around the peak of the worst.
 Each run is checked by momentum (the floor's impulse against the change of momentum) and by energy.
 
-The run also writes `output/playback.json` and `output/scene.wobbl`: the housing falling, landing on its worst
-corner and the stress flashing through it, with the accelerometer's reading at the battery mount, frame by
-frame, from the solved motion.
+The run also writes `output/playback.json` with the solved impact frame by frame, and `output/scene.wobbl`, a
+3D model of the housing on the floor at the instant of its peak stress. A slider sets the drop height. The
+impact of a linear elastic part scales with its landing speed, so the stress, the shape, the accelerometer at the
+battery mount and the verdict follow the height exactly.
