@@ -255,7 +255,9 @@ export function metrics(run: Run): [string, string][] {
   const rows: [string, string][] = o.domain === 'strength'
     ? [['Peak stress', `${fmt3(o.governing_MPa!)} MPa`], ['Safety factor', o.safety_factor!.toFixed(2)], ['Target', `${o.target_sf}`]]
     : (o.metrics ?? []).slice(0, 3).map(([k, v]) => [k[0].toUpperCase() + k.slice(1), v]);
-  return [...rows.map(([k, v]) => [k, v.replace(/ /g, ' ')] as [string, string]), ['Confidence', o.confidence]];
+  // a number of four or more figures before its unit gets thousands separators, as every number on the site
+  const sep = (v: string) => v.replace(/(?<![\d.,])(\d{4,})(?=(?:\.\d+)?\s*[A-Za-z%°])/g, (n) => Number(n).toLocaleString('en-US'));
+  return [...rows.map(([k, v]) => [k, sep(v).replace(/ /g, ' ')] as [string, string]), ['Confidence', o.confidence]];
 }
 
 /** Three significant figures, the way Wobbl prints them: 124, 52.3, 9.82. */

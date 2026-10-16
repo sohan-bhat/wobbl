@@ -61,10 +61,14 @@ const sceneShown = scenePanes.length > 1 ? [scenePanes[0], scenePanes[1]] : scen
 const levelOf = (v: number) => {
   const q = sp?.q;
   if (!q || q.limit === null || !Number.isFinite(v)) return 'info';
-  return v > q.limit ? 'fails' : q.target !== null && v > q.target ? 'marginal' : 'holds';
+  return v > q.limit ? 'fails' : q.named && q.target !== null && v > q.target ? 'marginal' : 'holds';
 };
 const paneValue = (pn: ScenePane) => (pn.play.q ? lerpAt(pn.play.q.values, pn.home) : NaN);
-const paneVerdict = (pn: ScenePane) => (pn.asked ? pn.verdict : levelOf(paneValue(pn)));
+const paneVerdict = (pn: ScenePane) => {
+  if (pn.asked) return pn.verdict;
+  const lv = levelOf(paneValue(pn));
+  return lv === 'holds' && pn.verdict === 'ok' ? 'ok' : lv === 'info' ? pn.verdict : lv;
+};
 
 const kind = sc ? 'scene' : lead!.kind;
 const m = sp ? (sp.q ? { lo: sp.q.lo, top: sp.q.top, marks: sp.q.marks } : { lo: 0, top: 1, marks: [] }) : meter(lead!);

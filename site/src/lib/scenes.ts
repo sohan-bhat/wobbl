@@ -10,7 +10,7 @@ import type { Run } from './examples';
 
 export interface Reading {
   name: string; unit: string; digits: number; values: (number | null)[]; lo: number; top: number;
-  limit: number | null; target: number | null; limitLabel: string; field: boolean; marks: { at: number; text: string }[];
+  limit: number | null; target: number | null; limitLabel: string; field: boolean; named: boolean; marks: { at: number; text: string }[];
 }
 export interface ScenePlay {
   kind: 'scene'; title: string; domain: string;

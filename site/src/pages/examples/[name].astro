@@ -69,6 +69,13 @@ for (const r of ex.runs) {
         </>
       ))}
     </div>
+    <div class="ex-notes prose">
+      {notes.trim() && <h2>About this example</h2>}
+      {notes.trim() && <Fragment set:html={notes} />}
+      <h2>Run it yourself</h2>
+      <Term code={`git clone https://github.com/sohan-bhat/wobbl\ncd wobbl/examples/${ex.name} && ./run.sh`} />
+      <p>The part, the script and every output are in <a href={repoUrl(`examples/${ex.name}`, true)}>examples/{ex.name}</a> on GitHub.</p>
+    </div>
     {folded.map(({ f, html: fh }) => (
       <section class="ex-fold" aria-labelledby={`fold-${f.name}`}>
         <h2 class="ex-h" id={`fold-${f.name}`}>{f.title}</h2>
@@ -81,13 +88,6 @@ for (const r of ex.runs) {
         </div>
       </section>
     ))}
-    <div class="ex-notes prose">
-      {notes.trim() && <h2>About this example</h2>}
-      {notes.trim() && <Fragment set:html={notes} />}
-      <h2>Run it yourself</h2>
-      <Term code={`git clone https://github.com/sohan-bhat/wobbl\ncd wobbl/examples/${ex.name} && ./run.sh`} />
-      <p>The part, the script and every output are in <a href={repoUrl(`examples/${ex.name}`, true)}>examples/{ex.name}</a> on GitHub.</p>
-    </div>
     <nav class="pager" aria-label="More examples">
       {prev && <a class="pager-prev" href={url(`examples/${prev.name}/`)}><span>Previous</span>{prev.title}</a>}
       {next && <a class="pager-next" href={url(`examples/${next.name}/`)}><span>Next</span>{next.title}</a>}

@@ -92,7 +92,9 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     if (sceneRun) {
       const q = r.q;
       if (!q || q.limit === null || !Number.isFinite(v)) return 'info';
-      return v > q.limit ? 'fails' : q.target !== null && v > q.target ? 'marginal' : 'holds';
+      // a target the scene named makes a reading past it marginal; without one the run's own verdict never
+      // calls a reading under its limit anything but holding
+      return v > q.limit ? 'fails' : q.named && q.target !== null && v > q.target ? 'marginal' : 'holds';
     }
     if (strength) return v >= r.allowable_MPa ? 'fails' : v >= r.allowable_MPa / r.target_sf ? 'marginal' : 'holds';
     return v > r.limit_C ? 'fails' : v >= r.limit_C - 5 ? 'marginal' : 'holds';
@@ -133,7 +135,8 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       if (rq) set(q('[data-fill]', el), 'data-level', lv === 'info' ? 'holds' : lv);
       if ((end || free) && (atHome || lv !== 'info')) {
         set(w, 'data-verdict', lv);
-        put(w, atHome ? (p.verdict ?? '').toUpperCase() : verdictWord[lv] ?? '');
+        // in the run's own words: a run that reads ok away from its limit says OK, not HOLDS
+        put(w, atHome ? (p.verdict ?? '').toUpperCase() : lv === 'holds' && p.verdict === 'ok' ? 'OK' : verdictWord[lv] ?? '');
         if (w.hasAttribute('data-hide')) { w.removeAttribute('data-hide'); if (end && !free) w.setAttribute('data-land', ''); }
       } else {
         set(w, 'data-hide', '');
