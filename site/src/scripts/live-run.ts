@@ -10,6 +10,7 @@
 import { Orbit, corners, fitTo, orbitControls } from './orbit.js';
 import { decoder, inWorker, offscreen, onPage, webgl, type Back } from './play-back';
 import { num, sig } from './scene-file.js';
+import { aimAt, cameraOf, followAt, insetView, mainOrbit, tubeScale } from './scene-view.js';
 
 interface Ev { k: number; text: string }
 interface Poster { src: string; srcset: string; width: number; height: number; alt: string }
@@ -272,14 +273,47 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   function fitCamera() {
     const [, , vw, vh] = views()[0];
     orbit!.aspect = vw / vh;
+    if (sceneRun) {
+      // a scene frames its subject, or follows it, as its stills do (scene-view.js), from where the camera now looks
+      const { a, b, k } = frameAt(lead, pos[0]);
+      const v = [Math.cos(orbit!.el) * Math.cos(orbit!.az), Math.cos(orbit!.el) * Math.sin(orbit!.az), Math.sin(orbit!.el)];
+      const o = mainOrbit({ ...lead, camera: { ...lead.camera, view: v }, follow: lead.follow && { ...lead.follow, dir: v } }, vw, vh, a, b, k);
+      Object.assign(orbit!, { target: o.target, dist: o.dist, near: o.near, far: o.far, minDist: o.minDist, maxDist: o.maxDist });
+      orbit!.update();
+      return;
+    }
     fitTo(orbit!, box, radius * 1.2);
   }
   function homeCamera() {
-    const v = lead.camera.view;
+    const v = sceneRun && lead.follow?.dir ? lead.follow.dir : lead.camera.view, l = Math.hypot(v[0], v[1], v[2]) || 1;
     orbit!.az = Math.atan2(v[1], v[0]);
-    orbit!.el = Math.asin(Math.max(-1, Math.min(1, v[2])));
+    orbit!.el = Math.asin(Math.max(-1, Math.min(1, v[2] / l)));
     fitCamera();
   }
+  /** Each pane's camera, the inset beside a view that follows its subject, and the scene state each is drawn at. */
+  function sceneFrame(f: any) {
+    const follows = !!lead.follow;
+    f.scenes = shown.map((pi, row) => {
+      const r = data.panes[pi].run, { a, b, k: kk } = frameAt(r, pos[row]), T = r.input.t;
+      return { a, b, k: kk, t: kk ? T[a] + (T[b] - T[a]) * kk : T[a], bend: look.bend, mag: follows ? false : look.mag };
+    });
+    if (!follows || !orbit) return;
+    const vs = views();
+    f.cameras = [];
+    f.insets = [];
+    insets.length = 0;
+    shown.forEach((pi, row) => {
+      const r = data.panes[pi].run, { a, b, k: kk } = frameAt(r, pos[row]), [, , vw, vh] = vs[row];
+      const ins = insetView(r, vw, vh, orbit!.az, orbit!.el);
+      aimAt(orbit!, followAt(r, a, b, kk) ?? orbit!.target, vw, vh, ins?.rect);
+      f.cameras.push(cameraOf(orbit!));
+      insets.push(ins);
+      f.scenes[row].tube = tubeScale(r, orbit!, vh);
+      if (!ins) { f.insets.push(null); return; }
+      f.insets.push({ rect: ins.rect, camera: cameraOf(ins.orbit), scene: { ...f.scenes[row], mag: look.mag, tube: 1 } });
+    });
+  }
+  const insets: any[] = [];
 
   function draw() {
     pending = 0;
@@ -291,10 +325,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     };
     if (sceneRun) {
       // each pane's scene at its own place along the input
-      f.scenes = shown.map((pi, row) => {
-        const r = data.panes[pi].run, { a, b, k: kk } = frameAt(r, pos[row]), T = r.input.t;
-        return { a, b, k: kk, t: kk ? T[a] + (T[b] - T[a]) * kk : T[a], bend: look.bend, mag: look.mag };
-      });
+      sceneFrame(f);
       f.k = 1;
     } else if (!strength) {
       if (lead.transient) {
@@ -336,9 +367,24 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
         at = r.hot_xyz;
       }
       if (!at || !orbit) { mark.hidden = true; return; }
+      if (sceneRun && lead.follow) {
+        const r = data.panes[shown[row]].run, { a, b, k: kk } = frameAt(r, pos[row]);
+        aimAt(orbit, followAt(r, a, b, kk) ?? orbit.target, vw, vh, insets[row]?.rect);
+      }
       const [x, y, z] = orbit.project(at);
-      const sx = ((x + 1) / 2) * vw, sy = ((1 - y) / 2) * vh;
-      mark.hidden = !(z < 1 && sx > 6 && sy > 6 && sx < vw - 6 && sy < vh - 6);
+      let sx = ((x + 1) / 2) * vw, sy = ((1 - y) / 2) * vh;
+      let shows = z < 1 && sx > 6 && sy > 6 && sx < vw - 6 && sy < vh - 6;
+      const ins = insets[row];
+      const inside = (r: number[], x: number, y: number) => x > r[0] && x < r[0] + r[2] && y > r[1] && y < r[1] + r[3];
+      if (ins && shows && inside(ins.rect, sx, sy)) shows = false;
+      if (!shows && ins) {
+        // a peak out of the close view is marked where it shows in the inset
+        const [ix, iy, iw, ih] = ins.rect, [u, w2, z2] = ins.orbit.project(at);
+        sx = ix + ((u + 1) / 2) * iw;
+        sy = iy + ((1 - w2) / 2) * ih;
+        shows = z2 < 1 && sx > ix + 4 && sy > iy + 4 && sx < ix + iw - 4 && sy < iy + ih - 4;
+      }
+      mark.hidden = !shows;
       mark.style.translate = `${sx.toFixed(1)}px ${sy.toFixed(1)}px`;
     });
   }
@@ -483,6 +529,9 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       pr = 0;
       if (!hover || !orbit || !back) return;
       const e = hover, r = canvas!.getBoundingClientRect();
+      const ir = insets[0]?.rect;
+      const px = e.clientX - r.left, py = e.clientY - r.top;
+      if (ir && px > ir[0] && px < ir[0] + ir[2] && py > ir[1] && py < ir[1] + ir[3]) { probeEl.hidden = true; return; }
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = 1 - ((e.clientY - r.top) / r.height) * 2;
       const { origin, dir } = orbit.ray(nx, ny), id = ++asked;
       const hit = await back.probe(0, origin, dir).catch(() => null);

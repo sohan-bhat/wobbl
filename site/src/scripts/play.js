@@ -276,9 +276,9 @@ function denoise(pos, tri, n, passes = 4) {
   }
 }
 
-/** A polyline as a round tube: positions, normals, triangles and, for each vertex, the point it rings. */
+/** A polyline as a round tube: positions, normals, triangles and, for each vertex, the point it rings and where that is. */
 function tubes(P, runs, radius, seg = 10) {
-  const pos = [], nrm = [], idx = [], pt = [], run = [];
+  const pos = [], nrm = [], idx = [], pt = [], run = [], axis = [];
   let p0 = 0;
   runs.forEach((r, ri) => {
     const pts = [];
@@ -313,6 +313,7 @@ function tubes(P, runs, radius, seg = 10) {
         nrm.push(Math.round(d[0] * 127), Math.round(d[1] * 127), Math.round(d[2] * 127));
         pt.push(p.i);
         run.push(ri);
+        axis.push(p.q[0], p.q[1], p.q[2]);
       }
       if (i) {
         const r0 = base + (i - 1) * seg, r1 = base + i * seg;
@@ -323,7 +324,7 @@ function tubes(P, runs, radius, seg = 10) {
       }
     });
   });
-  return { position: new Float32Array(pos), normal: new Int8Array(nrm), index: new Uint32Array(idx), point: new Uint32Array(pt), run: new Uint16Array(run) };
+  return { position: new Float32Array(pos), normal: new Int8Array(nrm), index: new Uint32Array(idx), point: new Uint32Array(pt), run: new Uint16Array(run), axis: new Float32Array(axis) };
 }
 
 /**

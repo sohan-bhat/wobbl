@@ -4,7 +4,7 @@
 // file on its own; the pages never load it.
 import { createStage } from './play-draw.js';
 import { decodeScene } from './play.js';
-import { Orbit, corners, fitTo } from './orbit.js';
+import { aimAt, cameraOf, followAt, insetView, mainOrbit, tubeScale } from './scene-view.js';
 
 async function gunzip(bytes) {
   if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return bytes.buffer;
@@ -23,17 +23,18 @@ globalThis.drawScenePoster = async ({ b64, run, w, h, px, sizes }) => {
   stage.compile();
   const { lo, hi } = run.bounds;
   const radius = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2;
-  const target = [0, 1, 2].map((i) => (lo[i] + hi[i]) / 2);
-  const v = run.camera.view;
-  const orbit = new Orbit({ target, az: Math.atan2(v[1], v[0]), el: Math.asin(Math.max(-1, Math.min(1, v[2]))), dist: radius * 4,
-    fov: run.camera.fov, aspect: w / h, near: radius / 50, far: radius * 40, minDist: radius * 1.1, maxDist: radius * 8 });
-  fitTo(orbit, corners(lo, hi), radius * 1.2);
   const T = run.input.t, p = run.input.home, a = Math.floor(p), b = Math.min(a + 1, T.length - 1);
   const k = run.input.between === 'step' ? 0 : p - a;
+  // the camera the page opens on (scene-view.js): the subject framed, or followed with the whole scene inset
+  const orbit = mainOrbit(run, w, h, a, b, k), ins = insetView(run, w, h, orbit.az, orbit.el);
+  const scene = { a, b, k, t: k ? T[a] + (T[b] - T[a]) * k : T[a], bend: true, mag: !run.follow };
+  if (run.follow) {
+    aimAt(orbit, followAt(run, a, b, k), w, h, ins && ins.rect);
+    scene.tube = tubeScale(run, orbit, h);
+  }
   stage.frame({
-    camera: { position: orbit.eye, target: orbit.target, fov: orbit.fov, aspect: orbit.aspect, near: orbit.near, far: orbit.far },
-    views: [[0, 0, w, h]], k: 1, radius,
-    scenes: [{ a, b, k, t: k ? T[a] + (T[b] - T[a]) * k : T[a], bend: true, mag: true }],
+    camera: cameraOf(orbit), views: [[0, 0, w, h]], k: 1, radius, scenes: [scene],
+    insets: ins ? [{ rect: ins.rect, camera: cameraOf(ins.orbit), scene: { ...scene, mag: true, tube: 1 } }] : null,
   });
   // onto the page's own background, at each size asked for, straight after the frame is drawn
   const out = sizes.map((s) => {
