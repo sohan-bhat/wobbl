@@ -100,11 +100,15 @@ def _template(job, kind: str, text: str, params: dict):
         val = re.search(r"assumed (\S+)", g)
         job.assume(g, f"--set {key}={val.group(1)}" if val else "")
     p.update({k: v for k, v in params.items() if k not in ("ambient", "parasitics")})
+    if "ambient" in params:              # the air around the part, which the MOSFET template heats into
+        from .study import _ambient
+        p["ambient"] = _ambient(params)
     if p:
         job.use("set", [f"{a}={b}" for a, b in p.items()])
     job.ready()
     o = run_circuit(tpl, p, job.out, job.question)
-    job.situate(objects=["breadboard"], environment={"ambient": "25 C"}, circuit={"template": tpl})
+    job.situate(objects=["breadboard"], environment={"ambient": f"{p.get('ambient', 25)} C"},
+                circuit={"template": tpl})
     return o
 
 

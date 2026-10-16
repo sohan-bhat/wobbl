@@ -184,20 +184,10 @@ def run_circuit(template: str, params: dict, out_dir: str | Path, question: str 
         checks.append(Check("hand calculation", "pass" if err < 0.02 else "warn",
                             f"conduction loss I_rms^2 R = {fmt(pc_hand)} W; ngspice average of V x I = {fmt(pc_sim)} W "
                             f"({100 * err:.2g}% apart)"))
-        trf = float(p.get("switching_time", 40e-9))
-        psw = 0.5 * p["vbus"] * p["current"] * trf * f * 2 if f > 0 else 0.0
-        ta = float(p.get("ambient", 25))
-        theta = float(p.get("theta_ja", 62))
-        tjmax = float(p.get("tj_max", 150))
+        theta, ta, tjmax = float(p.get("theta_ja", 62)), float(p.get("ambient", 25)), float(p.get("tj_max", 150))
         tc = float(p.get("rds_tempco", 0.006))
-        tj = ta
-        for _ in range(50):
-            ptot = pc_sim * (1 + tc * (tj - 25)) + psw
-            tj_new = ta + ptot * theta
-            if abs(tj_new - tj) < 1e-3:
-                break
-            tj = tj_new if tj_new < 1000 else 1000
-        runaway = tj >= 999
+        trf = float(p.get("switching_time", 40e-9))
+        tj, ptot, psw, runaway = junction(p, pc_sim)
         checks.append(Check("thermal loop", "fail" if runaway else "pass",
                             "on resistance rises with temperature faster than the heat can leave: thermal runaway"
                             if runaway else f"junction settles at {fmt(tj)} C after the on resistance warms up "
@@ -222,7 +212,7 @@ def run_circuit(template: str, params: dict, out_dir: str | Path, question: str 
     try:      # every part of the template's netlist against its ratings, and playback.json, like any circuit
         from .pictures import template_parts
         values["parts"] = template_parts(tpl.netlist, tpl.analysis, tpl.tran, out, float(p.get("ambient", 25)),
-                                         verdict)
+                                         verdict, template, p, question)
     except Exception:  # noqa: BLE001  the template's own answer stands without them
         pass
     out_o = GenericOutcome("circuit", template, question, verdict, head, metrics, "high", [], checks, assumptions,
@@ -235,6 +225,24 @@ def run_circuit(template: str, params: dict, out_dir: str | Path, question: str 
         out_o.values["_figures"].append(["ringing", "Switch node with and without the board's parasitics"])
     (out / "netlist.cir").write_text(tpl.netlist)
     return out_o.write(out)
+
+
+def junction(p: dict, pc: float) -> tuple[float, float, float, bool]:
+    """A switching MOSFET's junction temperature from its conduction loss at 25 C and its switching loss, with
+    the on resistance warming up until the two settle: (junction C, total W, switching W, thermal runaway)."""
+    f = float(p.get("frequency") or 0)
+    trf = float(p.get("switching_time", 40e-9))
+    psw = 0.5 * p["vbus"] * p["current"] * trf * f * 2 if f > 0 else 0.0
+    ta, theta = float(p.get("ambient", 25)), float(p.get("theta_ja", 62))
+    tc = float(p.get("rds_tempco", 0.006))
+    tj, ptot = ta, pc + psw
+    for _ in range(50):
+        ptot = pc * (1 + tc * (tj - 25)) + psw
+        tj_new = ta + ptot * theta
+        if abs(tj_new - tj) < 1e-3:
+            break
+        tj = tj_new if tj_new < 1000 else 1000
+    return tj, ptot, psw, tj >= 999
 
 
 def _step_check(a: float, b: float, label: str) -> Check:
