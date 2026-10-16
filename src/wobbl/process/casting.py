@@ -511,7 +511,7 @@ def run_casting(study: CastingStudy, out_dir: str | Path, progress=None, keep: b
     imgs = casting_images(out, sv, t_sol, gp if gp is not None else ny, gp is not None, fd, por_xyz)
     notes = list(prep.notes)
     try:
-        casting_scene(out, sv, fd, verdict, head, study.question)
+        casting_scene(out, sv, fd, verdict, head, study.question, study.risers, por_max, alloy.shrinkage)
     except Exception as e:  # noqa: BLE001  the answer stands without its animation
         notes.append(f"the 3D view was not written: {e}")
     metrics = [("freezes in", f"{fmt(t_cast / 60)} min" if solid else "not frozen"),
@@ -586,9 +586,148 @@ def casting_fixes(study, fd, ratio, B, por_max, por_xyz, t_ratio, rm, cn) -> lis
     return fixes
 
 
-def casting_scene(out: Path, sv: Solved, fd: dict, verdict: str, head: str, question: str) -> Path:
-    """The metal cut open through its last spot to freeze, its solid fraction growing in from the mold walls frame by
-    frame, from each node's own times to start and finish freezing."""
+RISER_SCALE = np.round(np.linspace(0.5, 1.6, 23), 3)       # times the risers' size, on the slider
+RISER_RULE = 1.2                                          # a riser should freeze this much later than the casting
+
+
+def riser_scene(out: Path, V: np.ndarray, F: np.ndarray, tl: np.ndarray, ts: np.ndarray, risers: list[Riser],
+                t_cast: float, t_riser: float, por_max: float | None, shrinkage: float, verdict: str, head: str,
+                question: str, box=None, hot=None, budget: int = 450_000) -> Path:
+    """The metal cut open through its last spot to freeze, with a slider over the risers' size.
+
+    A riser's freezing time goes with the square of its modulus by Chvorinov's rule, and a blind cylinder's modulus
+    goes with its size, so each riser scaled k times freezes at k squared times its solved time. The casting keeps
+    the times it froze at in the solve. Its cut is colored by when each spot freezes against the riser, past 1 cut
+    off from feed and past 1 over 1.2 short of the rule of thumb, the run's lines for fails and marginal. Metal still
+    liquid when the risers freeze shrinks with nothing to feed it, so the worst porosity is that unfed fraction of
+    the alloy's shrinkage where it is larger than the Niyama porosity the solve found."""
+    from ..viz import Scene
+
+    k = RISER_SCALE
+    tr = t_riser * k ** 2
+    single = len(risers) == 1
+    x, unit, label = (k * risers[0].diameter, "mm", "riser diameter") if single else (100 * k, "%", "riser size")
+    s = Scene("Casting cut open through its last spot to freeze", domain="casting", question=question,
+              source="The casting freezes as the solve found. Each riser's freezing time is its solved one scaled by "
+                     "the square of its size, Chvorinov's rule for a riser of the same shape.")
+    s.timeline(x, unit=unit, label=label, between="interpolated", kind="input", design=float(x[np.argmin(np.abs(k - 1))]),
+               note="the riser scaled as a whole, its height with its diameter")
+    if box is not None:
+        lo, hi = (np.asarray(v, float) for v in box)
+        s.body("box", list(hi - lo), pos=list((lo + hi) / 2), color="#c2a878", opacity=0.12, name="sand mold",
+               prop=True)
+    # the cut's vertices inside a riser belong to it, not to the casting the riser feeds
+    inside = np.zeros(len(V), bool)
+    for r in risers:
+        ax = "xyz".index(r.axis)
+        foot = np.asarray(r.at, float)
+        rad = np.linalg.norm(np.delete(V - foot, ax, axis=1), axis=1)
+        up = V[:, ax] - foot[ax]
+        inside |= (rad <= r.diameter / 2 + 1e-6) & (up > 1e-6) & (up <= r.height + 1e-6)
+    keep = ~inside[F].any(axis=1)
+    used = np.unique(F[keep])
+    lut = np.full(len(V), -1)
+    lut[used] = np.arange(len(used))
+    Vc, Fc, tsc, tlc = V[used], lut[F[keep]], ts[used], tl[used]
+    # the casting is frozen through by t_cast, so a cut vertex shared with the metal of a riser foot counts no later
+    ts_fin = np.minimum(np.where(np.isfinite(tsc), tsc, t_cast), t_cast)
+    part = s.mesh(Vc, Fc, name="casting, cut open")
+    against = ts_fin[None, :] / tr[:, None]
+    part.color_by("freezes against the riser", against, unit="x riser", colormap="inferno",
+                  range=(0.0, 1.25), limit=1.0, limit_label="riser freezes first",
+                  target=1.0 / RISER_RULE)
+    # each riser as a cylinder on its foot, growing from it
+    for j, r in enumerate(risers):
+        ax = "xyz".index(r.axis)
+        th = np.linspace(0, 2 * np.pi, 33)[:-1]
+        ring = np.c_[np.cos(th), np.sin(th)] * r.diameter / 2
+        pts = []
+        for hgt in (0.0, r.height):
+            q = np.insert(ring, ax, hgt, axis=1)
+            pts.append(q)
+        X0 = np.vstack(pts + [np.insert(np.zeros((1, 2)), ax, r.height, axis=1)]) + np.asarray(r.at, float)
+        n = len(th)
+        T = [[i, (i + 1) % n, n + i] for i in range(n)] + [[(i + 1) % n, n + (i + 1) % n, n + i] for i in range(n)]
+        T += [[n + i, n + (i + 1) % n, 2 * n] for i in range(n)]
+        foot = np.asarray(r.at, float)
+        U = (X0 - foot)[None, :, :] * (k - 1)[:, None, None]
+        rm_ = s.mesh(X0, np.array(T), name="riser" if j == 0 else f"riser {j + 1}", color="#b9bdc4", opacity=0.55,
+                     smooth=False)
+        rm_.deform(U)
+    ratio = tr / t_cast
+    s.readout("riser freezes at", tr / 60.0, unit="min", digits=3)
+    s.readout("riser time ratio", ratio, digits=3)
+    # metal still liquid when the risers freeze is fed by nothing
+    fs = np.clip((tr[:, None] - tlc[None, :]) / np.maximum(ts_fin - tlc, 1e-9)[None, :], 0.0, 1.0)
+    unfed = 100.0 * shrinkage * (1.0 - fs.min(axis=1))
+    por = np.maximum(unfed, por_max or 0.0)
+    s.readout("worst porosity", por, unit="%", digits=3, limit=1.0, target=0.1)
+    tmax = float(ts_fin.max())
+    for level, name, kind in ((1.0, "riser freezes first", "fail"), (1.0 / RISER_RULE, "riser outlasts it 1.2x",
+                                                                     "info")):
+        kk = math.sqrt(tmax / (t_riser * level))
+        if k[0] <= kk <= k[-1]:
+            s.event(float(np.interp(kk, k, x)), name, f"at {fmt(float(np.interp(kk, k, x)))} {unit}", kind=kind)
+    if hot is not None:
+        s.label("last to freeze", hot, kind="note")
+    s.note("The casting's own freezing is kept as solved with the risers at their placed size. A riser this much "
+           "larger or smaller also changes how long the metal under it stays hot, which this scaling leaves out.")
+    s.verdict(verdict.upper(), head, {"ok": "pass", "marginal": "warn", "fails": "fail"}.get(verdict, "info"))
+    return s.save(out, budget=budget)
+
+
+def riser_scene_from_stored(out: Path) -> Path | None:
+    """The riser slider for a run saved before it had one, from its stored scene and outcome: each cut vertex's
+    times to start and finish freezing are read back from its solid fraction frames, which grow linearly between
+    them."""
+    import json
+
+    from ..viz.scene import array, load
+    from .regions import parse_riser
+
+    out = Path(out)
+    o = json.loads((out / "outcome.json").read_text())
+    v = o.get("values") or {}
+    risers = [parse_riser(t) for t in v.get("risers") or []]
+    if not risers or not v.get("t_riser_s"):
+        return None
+    h, blob = load((out / "scene.wobbl").read_bytes())
+    if h["timeline"].get("kind") == "input":
+        return None                                  # already a slider
+    mesh = next(ob for ob in h["objects"] if ob["kind"] == "mesh" and "frames" in ob.get("field", {}))
+    V, F = array(h, blob, mesh["pos"]), array(h, blob, mesh["tri"]).astype(int)
+    fr = array(h, blob, mesh["field"]["frames"])
+    t = np.asarray(h["timeline"]["t"], float) * 60.0
+
+    def cross(level):
+        """The time each vertex's solid fraction passes level, by straight lines between frames."""
+        above = fr >= level
+        j = np.where(above.any(axis=0), above.argmax(axis=0), -1)
+        out_ = np.full(fr.shape[1], np.inf)
+        ok = j > 0
+        a, b = fr[j[ok] - 1, np.where(ok)[0]], fr[j[ok], np.where(ok)[0]]
+        out_[ok] = t[j[ok] - 1] + (level - a) / np.maximum(b - a, 1e-9) * (t[j[ok]] - t[j[ok] - 1])
+        out_[j == 0] = t[0]
+        return out_
+
+    ta, tb = cross(0.25), cross(0.75)
+    rate = 0.5 / np.maximum(tb - ta, 1e-9)
+    tl = np.maximum(ta - 0.25 / rate, 0.0)
+    ts = tb + 0.25 / rate
+    box = next(([np.asarray(ob["pos"]) - np.asarray(ob["size"]) / 2, np.asarray(ob["pos"]) + np.asarray(ob["size"]) / 2]
+                for ob in h["objects"] if ob.get("name") == "sand mold"), None)
+    hot = next((lb["at"] for lb in h.get("labels", []) if lb["text"] == "last to freeze"), None)
+    head = (h.get("verdict") or {}).get("line") or o.get("headline", "")
+    return riser_scene(out, V, F, tl, ts, risers, float(v["t_casting_s"]), float(v["t_riser_s"]),
+                       v.get("porosity_max_pct"), get_alloy(v.get("alloy", "a356")).shrinkage, o["verdict"], head,
+                       o.get("question", ""), box=box, hot=hot)
+
+
+def casting_scene(out: Path, sv: Solved, fd: dict, verdict: str, head: str, question: str, risers=(),
+                  por_max: float | None = None, shrinkage: float = 0.0) -> Path:
+    """The metal cut open through its last spot to freeze. With risers it is a slider over their size (riser_scene),
+    without them its solid fraction grows in from the mold walls frame by frame, from each node's own times to start
+    and finish freezing."""
     from ..viz import Scene
     from .render import cut_surface, plane_through
 
@@ -604,6 +743,9 @@ def casting_scene(out: Path, sv: Solved, fd: dict, verdict: str, head: str, ques
     tl, ts = vals["tl"], vals["ts"]
     tl = np.where(tl < 0, 0.0, tl)                 # metal that started below the liquidus starts freezing at once
     ts = np.where(ts < 0, np.inf, ts)              # metal still freezing when the run stopped
+    if risers and fd.get("t_riser_s"):
+        return riser_scene(out, V, F, tl, ts, list(risers), float(fd["t_casting_s"]), float(fd["t_riser_s"]), por_max,
+                           shrinkage, verdict, head, question, box=rm.box, hot=hot)
     t_end = float(np.nanmax(ev["solidus"][used]))
     t = np.linspace(0.0, 1.05 * t_end, 72)
     span = np.maximum(ts - tl, 1e-9)

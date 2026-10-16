@@ -117,4 +117,32 @@ def test_a_small_casting_end_to_end(tmp_path):
     from wobbl.viz import load
     head, _ = load(tmp_path / "out" / "scene.wobbl")
     assert head["domain"] == "casting" and head["timeline"]["frames"] > 10
+    assert head["timeline"]["kind"] == "input" and head["timeline"]["label"] == "riser diameter"
     assert not (tmp_path / "out" / "work").exists()
+
+
+def test_riser_slider_scales_the_riser_by_chvorinov(tmp_path):
+    """A riser k times its size freezes at k squared times its solved time, the cut turns marginal and then fails
+    as it shrinks, and the metal still liquid when it freezes is left unfed."""
+    from wobbl.viz import load
+    g = np.linspace(0, 10, 11)
+    X, Y = np.meshgrid(g, g)
+    V = np.c_[X.ravel(), np.zeros(X.size), Y.ravel()]
+    idx = np.arange(121).reshape(11, 11)
+    F = np.r_[np.c_[idx[:-1, :-1].ravel(), idx[:-1, 1:].ravel(), idx[1:, 1:].ravel()],
+              np.c_[idx[:-1, :-1].ravel(), idx[1:, 1:].ravel(), idx[1:, :-1].ravel()]]
+    ts = 50.0 + 5.0 * V[:, 2]                      # freezes last at the top, 100 s
+    tl = ts - 20.0
+    r = parse_riser("d=20 h=30 at 5,0,10")
+    C.riser_scene(tmp_path, V, F, tl, ts, [r], 100.0, 110.0, 0.05, 0.06, "ok", "Sound.", "q")
+    h, _ = load(tmp_path / "scene.wobbl")
+    tl_ = h["timeline"]
+    assert tl_["kind"] == "input" and tl_["design"] == pytest.approx(20.0) and tl_["unit"] == "mm"
+    ro = {q["name"]: q for q in h["readouts"]}
+    k = np.asarray(tl_["t"]) / 20.0
+    assert ro["riser time ratio"]["values"] == pytest.approx(1.1 * k ** 2, rel=1e-3)
+    por = np.asarray(ro["worst porosity"]["values"])
+    assert por[-1] == pytest.approx(0.05) and por[0] > 1.0     # a half size riser leaves the top unfed
+    f = h["fields"][0]
+    assert f["limit"] == 1.0 and f["target"] == pytest.approx(1 / 1.2)
+    assert any(e["name"] == "riser freezes first" for e in h["events"])
