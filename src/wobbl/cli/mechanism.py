@@ -10,27 +10,17 @@ from . import ui
 
 
 def show_mechanism(o):
-    ui.console.print()
-    ui.verdict_panel(o.verdict.upper(), o.verdict, o.headline, list(o.metrics), o.confidence, o.confidence_reasons)
-    ui.section("checks")
-    ui.checks_table(o.checks)
-    if o.events:
-        ui.section("events")
-        for e in o.events:
-            ui.console.print(f"  {e['t_s']:8.3f} s  {e['name']}" + (f"  [dim]{e['detail']}[/dim]" if e.get("detail")
-                                                                    else ""))
-    if o.fixes:
-        ui.section("how to fix it")
-        for f in o.fixes:
-            ui.console.print(f"  [bold]{f['title']}[/bold]")
-            ui.console.print(f"  [dim]{f['summary']}[/dim]")
-    ui.section("assumptions")
-    ui.bullets(o.assumptions)
-    ui.section("files")
-    for k, v in o.images.items():
-        ui.console.print(f"  {k:<13} {v}")
-    ui.console.print(f"  trajectory    {Path(o.workdir) / 'trajectory.csv'}")
-    ui.console.print(f"  report        {o.report}\n")
+    from rich.text import Text
+
+    def events():
+        if o.events:
+            ui.section("events")
+            ui.hanging([(f"{e['t_s']:8.3f} s", Text(e["name"]) + Text(f"  {e['detail']}" if e.get("detail") else "",
+                                                                       style="dim")) for e in o.events],
+                       lead_style="")
+
+    ui.outcome(o, extra=events, files_rows=[*o.images.items(), ("trajectory", Path(o.workdir) / "trajectory.csv"),
+                                            ("report", o.report)])
 
 
 def _run(target: str, params: dict, out, question: str, as_json: bool, guesses=()):

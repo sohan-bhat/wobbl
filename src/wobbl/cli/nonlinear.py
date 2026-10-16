@@ -13,22 +13,7 @@ STYLE = {"holds": "holds", "yields": "marginal", "marginal": "marginal", "collap
 
 
 def show(o):
-    ui.console.print()
-    ui.verdict_panel(o.verdict.upper(), STYLE.get(o.verdict, o.verdict), o.headline, list(o.metrics)[:6],
-                     o.confidence, o.confidence_reasons)
-    ui.section("checks")
-    ui.checks_table(o.checks)
-    if o.fixes:
-        ui.section("how to fix it")
-        for f in o.fixes:
-            ui.console.print(f"  [bold]{f['title']}[/bold]")
-            ui.console.print(f"  [dim]{f['summary']}[/dim]")
-    ui.section("assumptions")
-    ui.bullets(o.assumptions)
-    ui.section("files")
-    for k, v in o.images.items():
-        ui.console.print(f"  {k:<12} {v}")
-    ui.console.print(f"  report       {o.report}\n")
+    ui.outcome(o, style=STYLE.get(o.verdict, o.verdict), metrics=list(o.metrics)[:6])
 
 
 def _finish(o, as_json):

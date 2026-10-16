@@ -10,21 +10,7 @@ from . import ui
 
 
 def show_generic(o):
-    ui.console.print()
-    ui.verdict_panel(o.verdict.upper(), o.verdict, o.headline, list(o.metrics), o.confidence, o.confidence_reasons)
-    ui.section("checks")
-    ui.checks_table(o.checks)
-    if o.fixes:
-        ui.section("how to fix it")
-        for f in o.fixes:
-            ui.console.print(f"  [bold]{f['title']}[/bold]")
-            ui.console.print(f"  [dim]{f['summary']}[/dim]")
-    ui.section("assumptions")
-    ui.bullets(o.assumptions)
-    ui.section("files")
-    for k, v in o.images.items():
-        ui.console.print(f"  {k:<12} {v}")
-    ui.console.print(f"  report       {o.report}\n")
+    ui.outcome(o)
 
 
 def _run(path, material, power, heat_faces, films, ambient, fixed, duration, limit, radiation, out, question,
