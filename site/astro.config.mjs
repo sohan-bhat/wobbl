@@ -3,11 +3,19 @@
 import { defineConfig } from 'astro/config';
 import { fileURLToPath } from 'node:url';
 import { syncScenes } from './scripts/scenes.mjs';
+import { drawPosters } from './scripts/posters.mjs';
 
-// Every example's scene.wobbl and the viewer that plays it, copied into public/data/scenes before each dev or build.
+// Every example's scene.wobbl and the viewer that plays it, copied into public/data/scenes before each dev or build,
+// with a poster of each for the gallery's cards.
 const scenes = {
   name: 'wobbl-scenes',
-  hooks: { 'astro:config:setup': () => { syncScenes(fileURLToPath(new URL('.', import.meta.url))); } },
+  hooks: {
+    'astro:config:setup': async () => {
+      const site = fileURLToPath(new URL('.', import.meta.url));
+      syncScenes(site);
+      await drawPosters(site);
+    },
+  },
 };
 
 export default defineConfig({

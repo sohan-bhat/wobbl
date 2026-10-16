@@ -37,6 +37,12 @@ jobs:
           node-version-file: site/.nvmrc
           cache: npm
           cache-dependency-path: site/package-lock.json
+      # the gallery's posters, drawn in the runner's Chrome and kept by the hash of each scene and the viewer
+      - uses: actions/cache@v4
+        with:
+          path: site/.cache/posters
+          key: posters-${{ hashFiles('examples/**/scene.wobbl', 'src/wobbl/viz/viewer/**', 'site/scripts/posters.mjs') }}
+          restore-keys: posters-
       - name: Build the site and its search index
         run: |
           npm ci --no-audit --no-fund
