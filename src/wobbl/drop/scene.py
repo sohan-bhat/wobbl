@@ -1,9 +1,9 @@
-"""A drop run as a 3D scene: the part falls, lands on its worst side and the stress flashes through it.
+"""A drop run as a 3D model you set the drop height of: the part on the floor at the instant of its peak stress.
 
-Frames before the impact are the free fall from the drop height, exact for a body without drag. Frames after it
-are the solved motion: the part's travel plus its elastic shape, drawn larger so it shows, with the stress the
-study compares with the strength. The playback spends most of its time on the impact, which lasts about a
-millisecond, so the timeline's labels carry the real times.
+The part is linear elastic and the floor pushes back in proportion to how far the part sinks into it, so the whole
+impact scales with the landing speed, which goes as the square root of the height. Every height's peak state is
+the solved one scaled by that, exactly up to gravity's pull during the millisecond of contact. The slider moves
+the height, and the stress, the elastic shape, the accelerometer and the verdict follow.
 """
 from __future__ import annotations
 
@@ -28,66 +28,90 @@ def rotation_to_down(d: np.ndarray) -> np.ndarray:
     return np.eye(3) + vx + vx @ vx * (1.0 / (1.0 + c))
 
 
+def heights(H: float, n: int = 41) -> np.ndarray:
+    """Drop heights from a tenth of the asked one to twice it, with the asked one among them."""
+    return np.unique(np.r_[np.linspace(0.1 * H, 2.0 * H, n), H])
+
+
+def height_sweep(s, X, tris, S_peak, el_peak, H: float, allow: float, *, target: float | None = None,
+                 g_peak: float = 0.0, force_peak: float = 0.0, node: int | None = None, watch_at=None,
+                 measure: str = "von Mises", floor_key: str = "", landing: str = "", zone=None):
+    """Fill scene s with the part resting on the floor in its peak state, scaled to each drop height. X is the
+    part already turned so it lands along -z with its first touch at z = 0, S_peak the stress at each vertex at
+    the peak and el_peak the elastic displacement then (without the part's travel). zone marks the contact patch,
+    whose stress is the local crush of an idealized landing: it is left uncolored and out of the peak."""
+    h = heights(H)
+    k = np.sqrt(h / H)
+    S_peak, el_peak = np.array(S_peak, float), np.asarray(el_peak, float)
+    if zone is not None and np.any(zone) and not np.all(zone):
+        S_peak[np.asarray(zone, bool)] = np.nan
+    gov = float(np.nanmax(S_peak))
+    s.timeline(h / 1000, unit="m", label="drop height", between="interpolated", kind="input", design=H / 1000)
+    mesh = s.mesh(X, tris, name="part", keep=[] if node is None else [int(node)], max_vertices=12000)
+    mesh.color_by(measure, S_peak, scale=k, unit="MPa", range=(0.0, allow), limit=allow, limit_label="strength")
+    if target and target > 1:
+        s.fields[-1]["target"] = float(allow / target)
+    span = float(np.ptp(X, axis=0).max())
+    emax = float(np.abs(el_peak).max() * k.max()) if el_peak.size else 0.0
+    ex = float(f"{max(1.0, 0.03 * span / emax):.2g}") if emax > 0 else 1.0
+    mesh.deform(el_peak, scale=k, exaggerate=ex)
+    s.ground(0.0, size=4 * span, grid=span / 4, color=FLOOR_COLOR.get(floor_key, "#8a8d91"))
+    s.readout("peak stress", gov * k, unit="MPa", limit=allow)
+    s.readout("safety factor", allow / np.maximum(gov * k, 1e-30), digits=3)
+    v = np.sqrt(2 * G * h) / 1000
+    s.readout("landing speed", v, unit="m/s", digits=3)
+    if g_peak > 0:
+        s.readout("accelerometer", g_peak * k, unit="g", digits=4)
+    if force_peak > 0:
+        s.readout("floor force", force_peak * k, unit="N", digits=4)
+    if gov > 0 and allow > 0:
+        h_fail = H * (allow / gov) ** 2
+        if h[0] < h_fail < h[-1]:
+            s.event(h_fail / 1000, "reaches its strength", f"from {h_fail / 1000:.3g} m", kind="fail")
+    if node is not None:
+        s.label("peak {peak stress}", X[int(node)], kind="peak")
+    if zone is not None and np.any(zone) and not np.all(zone):
+        s.label("contact patch, a local dent left out", X[np.asarray(zone, bool)].mean(0), kind="note")
+    if watch_at is not None:
+        s.label("accelerometer {accelerometer}" if g_peak > 0 else "watched spot", watch_at, kind="note")
+    if landing:
+        s.note(f"It lands {landing.replace(' down', '')} first, its worst landing, and each height shows the "
+               "instant of its peak stress.")
+    s.note("The impact of a linear elastic part scales with its landing speed, the square root of the height, so "
+           "each height is the solved impact scaled exactly, up to gravity during the millisecond of contact.")
+    return mesh
+
+
 def write_scene(out: Path, model, hist, ev: dict, d, H: float, v0: float, floor, name: str, watch, gov: float,
                 allow: float, verdict: str, headline: str, question: str = "", part: str = "",
-                measure: str = "von Mises", fall_frames: int = 20, impact_frames: int = 60) -> Path:
+                measure: str = "von Mises", target: float | None = None) -> Path:
     from ..viz import Scene
 
     R = rotation_to_down(d)
     X = model.X @ R.T
     shift = np.array([0.0, 0.0, -X[:, 2].min()])
     X = X + shift - np.array([*X[:, :2].mean(0), 0.0])
-    t_fall = float(np.sqrt(2 * H / G))
-    tf = np.linspace(-t_fall, 0.0, fall_frames, endpoint=False)
-    rise = v0 * (-tf) - 0.5 * G * tf ** 2                     # height above first touch during the fall
-    pick = np.unique(np.linspace(0, len(hist.frames_t) - 1, min(impact_frames, len(hist.frames_t))).round()
-                     .astype(int))
-    pick = np.union1d(pick, [int(ev["frame"])])                # always the frame of the peak
-    ti = np.asarray(hist.frames_t)[pick] - hist.t_contact[0]
-    t = np.concatenate([tf, ti])
-    U = np.array([hist.frames_u[i].astype(float) @ R.T for i in pick])     # (fi,n,3) world frame
+    f = int(ev["frame"])
+    U = hist.frames_u[f].astype(float) @ R.T
     m = model.mass
-    trans = (U * m[None, :, None]).sum(1) / m.sum()
-    elastic = U - trans[:, None, :]
-    pos = np.concatenate([np.column_stack([np.zeros(fall_frames), np.zeros(fall_frames), rise]), trans])
-    el = np.concatenate([np.zeros((fall_frames, *elastic.shape[1:])), elastic])
-    S = np.concatenate([np.zeros((fall_frames, len(X))), ev["S"][pick]])
-    title = f"{(Path(part).stem or 'part').replace('_', ' ').replace('-', ' ').capitalize()} dropped {H / 1000:g} m"
+    el = U - (U * m[:, None]).sum(0) / m.sum()
+    t = hist.t - hist.t_contact[0]
+    title = f"{(Path(part).stem or 'part').replace('_', ' ').replace('-', ' ').capitalize()} dropped on " \
+            f"{floor.name.lower()}"
     s = Scene(title, domain="drop", question=question,
-              source="Free fall before first touch, then the solved impact: explicit time integration of the part "
-                     "on the floor. The impact lasts about a millisecond and is slowed down to be seen.")
-    s.timeline(t, unit="s", label="time", seconds=8, between="interpolated",
-               note="The fall plays fast and the impact slowly; the times are real.")
-    mesh = s.mesh(X, model.tris, name="part", keep=[int(ev["node"])], max_vertices=12000)
-    mesh.color_by(measure, S, unit="MPa",
-                  range=(0.0, max(allow, gov)), limit=allow, limit_label="strength")
-    span = float(np.ptp(X, axis=0).max())
-    emax = float(np.abs(elastic).max()) if elastic.size else 0.0
-    ex = float(f"{max(1.0, 0.03 * span / emax):.2g}") if emax > 0 else 1.0
-    mesh.deform(el, exaggerate=ex)
-    mesh.move(pos)
-    s.ground(0.0, size=4 * span, grid=span / 4, color=FLOOR_COLOR.get(floor.key, "#8a8d91"))
-    acc = np.interp(ti, hist.t - hist.t_contact[0], ev["acc_f"]) / G
-    force = np.interp(ti, hist.t - hist.t_contact[0], hist.force)
-    s.readout("accelerometer", np.concatenate([np.zeros(fall_frames), acc]), unit="g", digits=4)
-    s.readout("floor force", np.concatenate([np.zeros(fall_frames), force]), unit="N", digits=4)
-    s.readout("peak stress", S.max(1), unit="MPa", limit=allow)
-    vi = hist.com_v[np.clip(np.searchsorted(hist.t, np.asarray(hist.frames_t)[pick]), 0, len(hist.t) - 1)]
-    s.readout("speed", np.concatenate([G * (tf + t_fall), np.linalg.norm(vi, axis=1)]) / 1000, unit="m/s", digits=3)
-    s.event(0.0, "impact", f"lands {name.replace(' down', '')} first at {v0 / 1000:.3g} m/s", kind="info")
-    t_peak = float(hist.frames_t[ev["frame"]] - hist.t_contact[0])
-    s.event(t_peak, "peak stress", f"{gov:.3g} MPa", kind="fail" if gov > allow else "info")
-    t_off = hist.t_contact[1] - hist.t_contact[0]
-    if t_off > 0:
-        s.event(float(t_off), "leaves the floor", f"after {1e3 * t_off:.3g} ms", kind="info")
-    g = X[int(ev["node"])]
-    s.label("peak {peak stress}", g, kind="peak", t0=0.0)
-    w = X[np.asarray(watch)].mean(0)
-    s.label("accelerometer {accelerometer}", w, kind="note", t0=0.0)
+              source="The solved impact of the part on the floor by explicit time integration, at the instant of "
+                     "peak stress, scaled to each drop height by the landing speed.")
+    height_sweep(s, X, model.tris, ev["S"][f], el, H, allow, target=target,
+                 g_peak=float(ev["g_watch"]), force_peak=float(np.max(hist.force)) if len(t) else 0.0,
+                 node=int(ev["node"]), watch_at=X[np.asarray(watch)].mean(0), measure=measure,
+                 floor_key=floor.key, landing=name, zone=ev.get("zone"))
     tone = {"holds": "pass", "marginal": "warn", "fails": "fail"}.get(verdict, "info")
     s.verdict({"holds": "SURVIVES", "marginal": "MARGINAL", "fails": "FAILS"}.get(verdict, verdict.upper()),
               headline.split(". ")[0] + ".", tone)
-    s.camera(target=(0.0, 0.0, 0.3 * span), direction=(1.0, -1.4, 0.6), distance=3.6 * span, fov=30)
+    span = float(np.ptp(X, axis=0).max())
+    s.camera(target=(0.0, 0.0, 0.5 * float(X[:, 2].max())), direction=(1.0, -1.4, 0.6), distance=3.4 * span, fov=30,
+             presets=[{"name": "contact", "target": X[int(ev["node"])], "direction": (1.0, -1.0, 0.35),
+                       "distance": 1.4 * span}])
     return s.save(out)
 
 

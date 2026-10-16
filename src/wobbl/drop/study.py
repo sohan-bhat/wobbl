@@ -472,7 +472,7 @@ def run_drop(study: DropStudy, out_dir: str | Path, progress=None, pre=None, ren
     try:
         from .scene import write_scene
         write_scene(out, model, hist, ev, d, H, v0, floor, name, watch, gov, allow, verdict, head, study.question,
-                    study.part, measure)
+                    study.part, measure, target)
     except Exception as e:  # noqa: BLE001  the 3D view is a bonus, never a reason to fail
         import os
         if os.environ.get("WOBBL_DEBUG"):
