@@ -600,7 +600,7 @@
    "P_Pa": 101325.0,
    "zpe_kJ_mol": 478.712568,
    "H_corr_kJ_mol": 516.532298,
-   "S_J_molK": 470.809566,
+   "S_J_molK": 470.809567,
    "G_corr_kJ_mol": 376.160426,
    "Cp_J_molK": 211.015539,
    "symmetry_number": 1,
@@ -639,7 +639,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 22.407508,
+ "t_total": 99.154561,
  "solver": "GFN2-xTB with tblite , RDKit conformers and ASE",
  "criteria": []
 }

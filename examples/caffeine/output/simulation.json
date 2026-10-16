@@ -12,7 +12,7 @@
   ],
   "reasons": [
    {
-    "decided": "domain chemistry, as asked",
+    "decided": "the words \"caffeine\", \"IR spectrum\" point to chemistry (molecule)",
     "override": "--domain chemistry"
    },
    {
@@ -53,8 +53,8 @@
    "verdict": "ok",
    "headline": "caffeine (C8H10N4O2, 194.19 g/mol), by GFN2-xTB: its strongest IR band is at 1712 cm-1, the C=O stretch, its dipole is 3.98 D, dissolving in water is worth -43.9 kJ/mol. At 298 K its entropy is 470.8 J/(mol K) and its heat capacity 211.0 J/(mol K).",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/caffeine/output/structure",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/caffeine/output/structure/report.html",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/caffeine/output/structure",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/caffeine/output/structure/report.html",
    "assumptions": [
     {
      "assumed": "temperature not given: assumed 25 C (298.15 K)",
@@ -68,8 +68,8 @@
    "verdict": "ok",
    "headline": "caffeine (C8H10N4O2, 194.19 g/mol), by GFN2-xTB: its strongest IR band is at 1712 cm-1, the C=O stretch, its dipole is 3.98 D, dissolving in water is worth -43.9 kJ/mol. At 298 K its entropy is 470.8 J/(mol K) and its heat capacity 211.0 J/(mol K).",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/caffeine/output/spectrum",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/caffeine/output/spectrum/report.html",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/caffeine/output/spectrum",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/caffeine/output/spectrum/report.html",
    "assumptions": []
   }
  ]

@@ -155,7 +155,7 @@
     2.779973
    ],
    [
-    3.872484,
+    3.872485,
     -1.01009,
     -0.425129
    ],
@@ -599,20 +599,20 @@
   "thermo": {
    "T_K": 298.15,
    "P_Pa": 101325.0,
-   "zpe_kJ_mol": 478.71257,
-   "H_corr_kJ_mol": 516.532299,
-   "S_J_molK": 470.80956,
-   "G_corr_kJ_mol": 376.160429,
-   "Cp_J_molK": 211.015538,
+   "zpe_kJ_mol": 478.712569,
+   "H_corr_kJ_mol": 516.532298,
+   "S_J_molK": 470.809563,
+   "G_corr_kJ_mol": 376.160427,
+   "Cp_J_molK": 211.015539,
    "symmetry_number": 1,
    "parts": {
     "S_translation": 174.457445,
     "S_rotation": 130.737695,
-    "S_vibration": 165.61442,
+    "S_vibration": 165.614424,
     "S_electronic": 0.0,
     "Cp_translation": 20.786157,
     "Cp_rotation": 12.471694,
-    "Cp_vibration": 177.757687
+    "Cp_vibration": 177.757688
    }
   },
   "G_total_eV": -1143.183948,
@@ -640,7 +640,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 25.392263,
+ "t_total": 127.648773,
  "solver": "GFN2-xTB with tblite , RDKit conformers and ASE",
  "criteria": []
 }
