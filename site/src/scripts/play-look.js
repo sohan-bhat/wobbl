@@ -15,7 +15,7 @@ import {
 export const LOOK = {
   uEnvRot: { value: new Matrix3() },
   uEnvI: { value: 0.9 },
-  uExposure: { value: 1.6 },
+  uExposure: { value: 1.3 },
 };
 
 // The big octabox sits at u 0.65 of the photograph. Turned to u 0.4 it is up to the front right of the camera,
@@ -23,11 +23,12 @@ export const LOOK = {
 const KEY_U = 0.65, KEY_AT = 0.4;
 
 /**
- * Turn the studio with the camera: z is up in every scene, y in the photograph, and the camera's own turn
- * about z is taken out so the light keeps its place on screen as the part is orbited.
+ * Set the studio for a view from azimuth az (about z, the camera's side of the part): z is up in every scene
+ * and y in the photograph, and the big softbox goes up to the front right of a camera on that side. The stage
+ * sets it from the view a part opens on and keeps it as the part is orbited, as a studio stays put while a
+ * photographer walks round a product.
  */
-export function turnStudio(camPos, target) {
-  const az = Math.atan2(camPos[1] - target[1], camPos[0] - target[0]);
+export function turnStudio(az) {
   const c = Math.cos(-az), s = Math.sin(-az);
   const f = 2 * Math.PI * (KEY_U - KEY_AT), cf = Math.cos(f), sf = Math.sin(f);
   // world (z up) turned by -az about z, then into the photograph's frame (x, z, -y), then turned in its xz plane
@@ -247,7 +248,7 @@ float vnoise(vec3 x) {
   return mix(mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }
-float grainAt(vec3 p) { return vnoise(p) * 0.65 + vnoise(p * 2.13 + 7.1) * 0.35; }`;
+float grainAt(vec3 p) { return vnoise(p); }`;
 
 /**
  * A field colored or plain lit material's surface finish: a fine bump from value noise at the finish's grain
@@ -295,38 +296,37 @@ export function finishShader(shader, finish, mm) {
 // gives the part's own soft shadows, a rib across its base and a pin across its link, which image light alone
 // cannot. It moves with the camera like the studio, and its shadow covers what the camera sees.
 
-const KEY = new Vector3(0.5, 0.62, 0.6).normalize();
-const _r = new Vector3(), _u = new Vector3(), _f = new Vector3(), _d = new Vector3();
+const _d = new Vector3();
 
 export function keyLight(size = 1024) {
   const l = new DirectionalLight(0xffffff, 1.6);
   l.castShadow = true;
   l.shadow.mapSize.set(size, size);
-  l.shadow.radius = 4;
-  l.shadow.blurSamples = 12;
+  l.shadow.radius = 6;
+  l.shadow.blurSamples = 10;
   l.matrixAutoUpdate = true;
   return l;
 }
 
-/** Put the key light up to the front right of camera, its shadow box round what the camera sees of target. */
-export function aimKey(l, camera, target) {
-  const e = camera.matrixWorld.elements;
-  _r.set(e[0], e[1], e[2]).normalize();
-  _u.set(e[4], e[5], e[6]).normalize();
-  _f.set(e[8], e[9], e[10]).normalize();
-  _d.set(0, 0, 0).addScaledVector(_r, KEY.x).addScaledVector(_u, KEY.y).addScaledVector(_f, KEY.z).normalize();
-  const dist = camera.position.distanceTo(target);
-  const r = dist * Math.tan((camera.fov * Math.PI) / 360) * 1.25;
+/**
+ * Put the key light up to the front right of a camera at azimuth az, where the studio's softbox is, its shadow
+ * box r round target. Returns a key that changes only when the shadow has to be drawn again.
+ */
+export function aimKey(l, az, target, r) {
+  const s = Math.sin(az), c = Math.cos(az);
+  // half the camera's right (-sin, cos), more toward the camera (cos, sin), and up
+  _d.set(-0.5 * s + 0.6 * c, 0.5 * c + 0.6 * s, 0.62).normalize();
   l.position.copy(target).addScaledVector(_d, r * 3);
   l.target.position.copy(target);
   l.target.updateMatrixWorld();
-  const c = l.shadow.camera;
-  c.left = -r; c.right = r; c.top = r; c.bottom = -r;
-  c.near = r * 0.5; c.far = r * 6;
-  c.updateProjectionMatrix();
+  const cam = l.shadow.camera;
+  cam.left = -r; cam.right = r; cam.top = r; cam.bottom = -r;
+  cam.near = r * 0.5; cam.far = r * 6;
+  cam.updateProjectionMatrix();
   l.shadow.bias = -0.0004;
   l.shadow.normalBias = r * 0.004;
   l.updateMatrixWorld();
+  return `${target.x.toPrecision(5)},${target.y.toPrecision(5)},${target.z.toPrecision(5)},${r.toPrecision(5)},${az}`;
 }
 
 /**

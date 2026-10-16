@@ -5,7 +5,7 @@
 // changes uniforms, except a heat run's frames, which are copied in as the clock passes them.
 import {
   BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
-  MeshPhysicalMaterial, LineSegments, NoToneMapping, PCFSoftShadowMap, ShadowMaterial, PMREMGenerator, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial,
+  MeshPhysicalMaterial, LineSegments, NoToneMapping, VSMShadowMap, ShadowMaterial, PMREMGenerator, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial,
   SRGBColorSpace, Vector3, WebGLRenderer,
 } from 'three';
 import { sceneParts } from './play-scene.js';
@@ -145,6 +145,9 @@ vec3 edgeTone(vec3 col) {
 
 const FRAG = /* glsl */ `
 uniform float uPx;
+#ifdef EDGE
+uniform float uEdgeA;
+#endif
 ${LIT}
 varying vec3 vC;
 varying float vE;
@@ -186,7 +189,11 @@ void main() {
     col = mix(col, vec3(0.055, 0.059, 0.067), 0.55 * (1.0 - smoothstep(0.6 * w, 1.6 * w, d)));
   }
 #endif
+#ifdef EDGE
+  gl_FragColor = vec4(col, uEdgeA);
+#else
   gl_FragColor = vec4(col, 1.0);
+#endif
 }`;
 
 const YELLOW = 0xffd400;
@@ -204,6 +211,8 @@ vec3 fieldColor(vec3 c) {
 }`;
 
 const INK = 'vec3(0.0042, 0.0047, 0.0056)';
+export const FIELD_SPEC = { value: 0.45 };
+export const EDGE_ALPHA = { value: 0.4 };
 
 function stressShader(sh) {
   sh.vertexShader = sh.vertexShader
@@ -291,6 +300,8 @@ function partMaterial(kind, uniforms, finish, mm = 1) {
   const f = FINISHES[finish] || FINISHES.painted;
   const m = new MeshPhysicalMaterial({
     color: 0xffffff, metalness: f.metalness, roughness: f.roughness, clearcoat: f.clearcoat, clearcoatRoughness: 0.16,
+    // a softer reflection than bare paint would give, so a white softbox never washes a hot spot out
+    specularIntensity: FIELD_SPEC.value,
     side: DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
   });
   m.onBeforeCompile = (sh) => {
@@ -306,9 +317,12 @@ function partMaterial(kind, uniforms, finish, mm = 1) {
 
 /** The outlines of a strength or heat part: the same field, lit the old simple way and darkened. */
 function partEdgeMaterial(kind, uniforms) {
+  uniforms.uEdgeA = { value: EDGE_ALPHA.value };
   return new ShaderMaterial({
     vertexShader: kind === 'strength' ? STRESS_VERT : HEAT_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms,
     defines: kind === 'strength' ? { EDGE: '' } : { EDGE: '', HEAT: '' }, extensions: { derivatives: true },
+    // faint, as a real part's edges only catch a little light: enough to keep a fin apart from the next
+    transparent: true, depthWrite: false,
   });
 }
 
@@ -364,8 +378,10 @@ export function createStage({ canvas, w, h, px, kind }) {
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = NoToneMapping;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = PCFSoftShadowMap;
-  let env = null;
+  renderer.shadowMap.type = VSMShadowMap;
+  // the key light's shadow is drawn only when the part moves or the light does, not as the camera orbits
+  renderer.shadowMap.autoUpdate = false;
+  let env = null, studioAz = null;
   const lookAt = new Vector3();
   renderer.setPixelRatio(px);
   renderer.setSize(w, h, false);
@@ -405,7 +421,7 @@ export function createStage({ canvas, w, h, px, kind }) {
       sp.scene.environment = env && env.texture;
       const key = keyLight(px > 1.5 ? 2048 : 1024);
       sp.scene.add(key, key.target);
-      const part = { run, arrays, scene: sp.scene, sp, row, key, uniforms: { uK: { value: 0 }, uPx: { value: px } }, load: null };
+      const part = { run, arrays, scene: sp.scene, sp, row, key, dirty: true, uniforms: { uK: { value: 0 }, uPx: { value: px } }, load: null };
       parts.push(part);
       return part;
     }
@@ -482,7 +498,7 @@ export function createStage({ canvas, w, h, px, kind }) {
       load = arrow();
       scene.add(load);
     }
-    const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, key, pair: [-1, -1] };
+    const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, key, dirty: true, pair: [-1, -1] };
     parts.push(part);
     return part;
   }
@@ -495,7 +511,6 @@ export function createStage({ canvas, w, h, px, kind }) {
 
   /** Put the camera where a frame says: { position, target, fov, aspect, near, far }, with the studio turned with it. */
   function look(c) {
-    turnStudio(c.position, c.target);
     lookAt.fromArray(c.target);
     camera.position.fromArray(c.position);
     camera.lookAt(c.target[0], c.target[1], c.target[2]);
@@ -577,6 +592,7 @@ export function createStage({ canvas, w, h, px, kind }) {
    */
   function dress(part, loaded) {
     if (!loaded || !parts.includes(part)) return;
+    part.dirty = true;
     if (part.sp) { part.sp.dress(loaded); return; }
     for (const e of loaded.spec.add || []) {
       const g = loaded.models.get(e.file);
@@ -595,6 +611,11 @@ export function createStage({ canvas, w, h, px, kind }) {
      * f.radius: the part's radius in mm, for the arrow.
      */
     frame(f) {
+      // the studio is set from the view the stage opens on and stays put as the camera orbits
+      if (studioAz === null) {
+        studioAz = Math.atan2(f.camera.position[1] - f.camera.target[1], f.camera.position[0] - f.camera.target[0]);
+        turnStudio(studioAz);
+      }
       look(f.camera);
       renderer.setScissor(0, 0, cssW, cssH);
       renderer.setViewport(0, 0, cssW, cssH);
@@ -621,7 +642,14 @@ export function createStage({ canvas, w, h, px, kind }) {
         glow.material.uniforms.uAspect.value = vw / vh;
         renderer.render(backdrop, camera);
         renderer.clearDepth();
-        aimKey(part.key, camera, lookAt);
+        // the shadow box covers what the camera sees round its target; drawn again only when something moved
+        const r = camera.position.distanceTo(lookAt) * Math.tan((camera.fov * Math.PI) / 360) * 1.25;
+        const box = aimKey(part.key, studioAz, lookAt, r);
+        const state = part.sp ? JSON.stringify(f.scenes ? f.scenes[part.row] : f.scene) : `${f.k},${f.bend},${f.heat ? `${f.heat.i0},${f.heat.i1},${f.heat.mix}` : ''}`;
+        if (part.dirty || box !== part.box || state !== part.state) renderer.shadowMap.needsUpdate = true;
+        part.dirty = false;
+        part.box = box;
+        part.state = state;
         renderer.render(part.scene, camera);
         const ins = f.insets && f.insets[part.row];
         if (ins && part.sp) {
@@ -638,7 +666,7 @@ export function createStage({ canvas, w, h, px, kind }) {
           look(ins.camera);
           renderer.setViewport(bx, by, iw, ih);
           renderer.clearDepth();
-          aimKey(part.key, camera, lookAt);
+          // the inset keeps the main view's shadow, which it is too small to show
           renderer.render(part.scene, camera);
           look(f.cameras ? f.cameras[part.row] : f.camera);
         }

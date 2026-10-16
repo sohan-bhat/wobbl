@@ -5,7 +5,7 @@
 // to the page, which shows only the peak marker and the probe.
 import {
   BackSide, Box3, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, CustomBlending, CylinderGeometry,
-  DoubleSide, DataTexture, Group, InstancedBufferAttribute, LinearFilter, InstancedMesh, LineBasicMaterial, LineSegments,
+  DoubleSide, DataTexture, FrontSide, Group, InstancedBufferAttribute, LinearFilter, InstancedMesh, LineBasicMaterial, LineSegments,
   Matrix4, Mesh, MeshPhysicalMaterial, OneFactor, OneMinusSrcAlphaFactor, PlaneGeometry, Quaternion, Raycaster, Scene,
   ShaderMaterial, SphereGeometry, TorusGeometry, Vector3,
 } from 'three';
@@ -194,7 +194,7 @@ function material(o, { prop = false, shell = false, field = null, tube = false, 
   const f = FINISHES[finish] || FINISHES.painted;
   const m = new MeshPhysicalMaterial({
     metalness: f.metalness, roughness: f.roughness, clearcoat: f.clearcoat, clearcoatRoughness: 0.12,
-    side: cut ? BackSide : DoubleSide,
+    side: cut ? BackSide : glass ? FrontSide : DoubleSide,
     // a cut open shell gives way to whatever it touches, such as the plate a part sits on
     polygonOffset: cut, polygonOffsetFactor: cut ? 2 : 0, polygonOffsetUnits: cut ? 2 : 0,
   });

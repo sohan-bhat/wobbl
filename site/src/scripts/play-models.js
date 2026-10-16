@@ -8,7 +8,7 @@
 //   replace: [{ object, index?, file, tint?: [material names], scale?, matrix? }],
 //   add: [{ file, parent?, scale?, matrix? }],     world frame, or the named object's frame
 //   hide: [object names] } } }
-import { CustomBlending, DoubleSide, Group, ImageBitmapLoader, OneFactor, OneMinusSrcAlphaFactor, SRGBColorSpace } from 'three';
+import { CustomBlending, FrontSide, Group, ImageBitmapLoader, OneFactor, OneMinusSrcAlphaFactor, SRGBColorSpace } from 'three';
 import { studioShader } from './play-look.js';
 
 const manifests = new Map(), files = new Map();
@@ -84,7 +84,7 @@ function prepare(m) {
     out = m.clone();
     const alpha = Math.min(0.3, Math.max(0.08, 1 - m.transmission + 0.08));
     out.transmission = 0;
-    Object.assign(out, { transparent: true, depthWrite: false, side: DoubleSide, blending: CustomBlending, blendSrc: OneFactor, blendDst: OneMinusSrcAlphaFactor });
+    Object.assign(out, { transparent: true, depthWrite: false, side: FrontSide, blending: CustomBlending, blendSrc: OneFactor, blendDst: OneMinusSrcAlphaFactor });
     out.onBeforeCompile = (sh) => {
       studioShader(sh);
       sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
