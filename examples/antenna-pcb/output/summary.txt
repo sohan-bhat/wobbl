@@ -9,7 +9,7 @@ mesh: 72624 unknowns
 
 Checks:
   [pass] power balance: the power flowing out through a sphere around the antenna matches the power fed in less the dielectric loss to 1.3% or better at all 8 frequencies (worst at 1800 MHz, 11.9 W out against 11.2 W for 1 A at the port), and the far field carries 16 W at 2400 MHz (5.3% apart)
-  [info] run time: predicted 10 min from the 11,053 node mesh before any solve, took 7 min for 8 frequencies. It gave up 2 fewer frequencies in the sweep; a coarser mesh (the 'fast' quality); no verification solves on finer or larger meshes to fit the 15 min budget
+  [info] run time: predicted 10 min from the 11,053 node mesh before any solve, took 5 min for 8 frequencies. It gave up 2 fewer frequencies in the sweep; a coarser mesh (the 'fast' quality); no verification solves on finer or larger meshes to fit the 15 min budget
 
 Assumptions:
   - Fed by a lumped port, a 0.5 mm wide strip across the 0.6 mm gap from (-9, 3.6, 1.583) to (-9, 3, 1.583) mm carrying 1 A. The impedance is the voltage across the gap over that current, so it holds the gap's capacitance and the strip's inductance.

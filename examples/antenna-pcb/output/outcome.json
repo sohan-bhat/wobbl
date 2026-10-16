@@ -43,10 +43,10 @@
   {
    "name": "run time",
    "status": "info",
-   "summary": "predicted 10 min from the 11,053 node mesh before any solve, took 7 min for 8 frequencies. It gave up 2 fewer frequencies in the sweep; a coarser mesh (the 'fast' quality); no verification solves on finer or larger meshes to fit the 15 min budget",
+   "summary": "predicted 10 min from the 11,053 node mesh before any solve, took 5 min for 8 frequencies. It gave up 2 fewer frequencies in the sweep; a coarser mesh (the 'fast' quality); no verification solves on finer or larger meshes to fit the 15 min budget",
    "detail": {
     "predicted_s": 618.941121,
-    "took_s": 420.503189
+    "took_s": 296.181235
    }
   }
  ],
@@ -173,28 +173,28 @@
     "no verification solves on finer or larger meshes"
    ]
   },
-  "mesh_seconds": 27.22693,
+  "mesh_seconds": 12.079701,
   "mesh_resonance_shift": null,
-  "peak_memory_bytes": 979939328.0,
+  "peak_memory_bytes": 980004864.0,
   "solve_cpu_s": [
-   74.042279,
-   70.491593,
-   64.826775,
-   89.259936,
-   78.707533,
-   65.349343,
-   92.35833,
-   63.392196
+   57.430404,
+   70.670777,
+   81.897457,
+   89.854637,
+   112.303646,
+   90.587035,
+   76.346357,
+   68.904118
   ],
   "solve_wall_s": [
-   41.95244,
-   42.833259,
-   37.729867,
-   86.575613,
-   42.323939,
-   37.053925,
-   66.00584,
-   38.651712
+   22.155268,
+   27.80902,
+   40.360113,
+   37.285771,
+   53.800454,
+   43.365999,
+   31.335444,
+   27.642266
   ],
   "_figures": [
    [
@@ -236,7 +236,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 427.116469,
+ "t_total": 301.862254,
  "solver": "GetDP 3.5.0 with gmsh",
  "criteria": []
 }
