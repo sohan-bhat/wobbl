@@ -215,11 +215,21 @@ function material(o, { prop = false, shell = false, field = null, tube = false, 
 }
 
 /** What an object is made of, from its name and what it is: a pin is bare steel, a motor's can black paint. */
-function finishFor(o, run, pane) {
+function finishFor(o, run, pane, title) {
   const n = (o.name || '').toLowerCase();
   if (pane || /glass|windshield|window|pane\b|beaker|jar/.test(n)) return 'glass';
   if (/exhaust|flame|plume|fire|spark|glow/.test(n)) return 'emissive';
-  if (!o.prop && o.field && run.material) return finishOf(run.material);
+  if (!o.prop && o.field) {
+    // a part colored by its field keeps the map readable: its finish is the material its run names, or what its
+    // name says, never a bare mirror metal
+    if (run.material) return finishOf(run.material);
+    // the object's name, the example's (steel-hook) and the scene's title (an aluminum strut) say what it is
+    const said = `${n} ${run.example || ''} ${title || ''}`.toLowerCase(), named = finishOf(said);
+    if (named !== 'painted') return named;
+    if (/hook|bolt|shaft|spring|rod\b|strut|beam|wire/.test(said)) return 'steel';
+    if (/casing|closure|nozzle|bracket|plate|frame/.test(said)) return 'aluminum_machined';
+    return 'painted';
+  }
   if (/\bpin\b|shaft|axle|bolt|screw|nut\b|washer|rail|spindle|rod\b|spring|wire|hook|chain|bearing/.test(n)) return 'steel_bare';
   if (/nozzle|closure|casing|plate|flange|bracket|frame|stand|saddle/.test(n)) return o.prop ? 'aluminum_bare' : 'aluminum_machined';
   if (/motor|gearbox|housing|can\b/.test(n)) return 'paint_black';
@@ -288,7 +298,7 @@ export function sceneParts({ arrays, run }) {
     let rgb = bytes(o.color || '#9aa0a6');
     // a see through pane (a windshield) is glass
     const z = o.kind === 'body' && o.size, pane = o.prop && z && (o.shape === 'plane' || (o.shape === 'box' && Math.min(...z) < 0.05 * Math.max(...z)));
-    const fin = o.kind === 'ground' ? 'floor' : finishFor(o, run, pane && (o.opacity ?? 1) < 1), glass = fin === 'glass' && o.kind !== 'mesh' || (fin === 'glass' && (o.opacity ?? 1) < 1);
+    const fin = o.kind === 'ground' ? 'floor' : finishFor(o, run, pane && (o.opacity ?? 1) < 1, h.title), glass = fin === 'glass' && o.kind !== 'mesh' || (fin === 'glass' && (o.opacity ?? 1) < 1);
     const metal = (FINISHES[fin] || FINISHES.painted).metalness > 0.5;
     if (o.prop && o.kind !== 'ground' && !metal && !glass) {
       // a prop is a little darker and grayer, so it stays behind the part the run is about

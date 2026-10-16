@@ -128,6 +128,11 @@ export function syncScenes(site) {
       const play = scenePlay(h, arr);
       // the example the run belongs to, as public/models/manifest.json names it (play-models.js exampleOf)
       play.example = rel.replace(/\/output[^/]*(\/.*)?$/, '');
+      // what the part is made of, from the run's own study, for its surface finish on the stage (play-look.js)
+      const study = join(ex, rel, 'study.json');
+      if (existsSync(study)) {
+        try { const m = JSON.parse(readFileSync(study, 'utf-8')).material; if (typeof m === 'string') play.material = m; } catch { /* the default finish */ }
+      }
       scenes[rel] = { file, bytes: bytes.length, title: h.title ?? '', frames: h.timeline?.frames ?? 1, play };
     } catch (e) {
       scenes[rel] = { broken: String(e.stack ?? e.message ?? e) };
