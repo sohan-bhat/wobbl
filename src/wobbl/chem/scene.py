@@ -234,11 +234,11 @@ def _modes(pb: dict, o: dict, el, pos, vib, name):
               unit="A", digits=2)
     if (pb.get("properties") or {}).get("dipole_D") is not None:
         s.readout("dipole", np.full(len(t), pb["properties"]["dipole_D"]), unit="D", digits=3)
-    top = float(pos[:, 2].max()) + 2.5
-    for k, v in enumerate(vib):
-        s.label(v["name"] + (", the strongest IR band" if k == best else ""), [0, 0, top], t0=k + 1 - 0.45,
-                t1=k + 1 + 0.45, kind="peak" if k == best else "note")
     c = pos.mean(0)
+    low = [float(c[0]), float(c[1]), float(pos[:, 2].min()) - 2.5]
+    for k, v in enumerate(vib):
+        s.label(v["name"] + (", the strongest IR band" if k == best else ""), low, t0=k + 1 - 0.45,
+                t1=k + 1 + 0.45, kind="peak" if k == best else "note")
     size = float(np.ptp(pos, axis=0).max()) + 3
     s.camera(target=c, direction=(0.2, -1, 0.5), distance=size * 2.4,
              presets=[{"name": "Front", "target": c, "dir": (0, -1, 0.05), "dist": size * 2.4},
