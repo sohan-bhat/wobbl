@@ -9,7 +9,7 @@
 //   add: [{ file, parent?, scale?, matrix? }],     world frame, or the named object's frame
 //   hide: [object names] } } }
 import {
-  AlwaysStencilFunc, CustomBlending, EqualStencilFunc, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
+  AlwaysStencilFunc, Box3, CustomBlending, Ray, Vector3, EqualStencilFunc, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
   OneFactor, OneMinusSrcAlphaFactor, ReplaceStencilOp, SRGBColorSpace,
 } from 'three';
 import { studioShader } from './play-look.js';
@@ -119,7 +119,7 @@ export function subject(m) {
   return m;
 }
 
-const ghosts = new WeakMap();
+const ghosts = new WeakMap(), veils = new WeakMap();
 function ghostOf(p) {
   if (ghosts.has(p)) return ghosts.get(p);
   const g = p.clone();
@@ -128,6 +128,18 @@ function ghostOf(p) {
   ghosts.set(p, g);
   return g;
 }
+// a model standing between the camera and the part (a plate the part hangs under, seen from above) is drawn
+// faint all over, as a sheet of glass, so the view of the part is not a view of a wall
+function veilOf(p) {
+  if (veils.has(p)) return veils.get(p);
+  const g = p.clone();
+  g.onBeforeCompile = studioShader;
+  Object.assign(g, { transparent: true, opacity: 0.07, depthWrite: false, stencilWrite: false });
+  veils.set(p, g);
+  return g;
+}
+
+const _ray = new Ray(), _hit = new Vector3();
 
 /**
  * One copy of a model, turned from glTF's y up back to the scene's z up, with its own copies of the materials the
@@ -176,14 +188,30 @@ export function instance(gltf, entry) {
     if (mats.every((m) => m.transparent)) return;
     const ghost = o.clone();
     ghost.material = Array.isArray(o.material) ? mats.map((m) => (m.transparent ? m : tintedGhost(m))) : tintedGhost(o.material);
+    ghost.userData.over = ghost.material;
+    ghost.userData.veil = Array.isArray(o.material) ? mats.map((m) => (m.transparent ? m : veilOf(m))) : veilOf(o.material);
     Object.assign(ghost, { castShadow: false, receiveShadow: false, renderOrder: 2 });
     ghost.children.length = 0;
     extra.push([o, ghost]);
   });
   for (const [o, ghost] of extra) o.parent.add(ghost);
-  let last = '';
+  let last = '', veiled = false, box = null;
   return {
     group, meshes,
+    /**
+     * Veil the model when it stands between the camera at from and the part's center at to (Vector3s, in the
+     * scene's frame), and draw it whole again when it does not.
+     */
+    veil(from, to) {
+      if (!box) { group.updateWorldMatrix(true, true); box = new Box3().setFromObject(group); }
+      const d = from.distanceTo(to);
+      _ray.origin.copy(from);
+      _ray.direction.subVectors(to, from).normalize();
+      const on = !!_ray.intersectBox(box, _hit) && _hit.distanceTo(from) < d * 0.98 && !box.containsPoint(to);
+      if (on === veiled) return;
+      veiled = on;
+      for (const [o, g] of extra) { o.visible = !on; g.material = on ? g.userData.veil : g.userData.over; }
+    },
     /** Paint the tinted materials a color given as sRGB bytes. */
     tint(rgb) {
       const key = rgb.join(',');

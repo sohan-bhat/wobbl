@@ -499,7 +499,9 @@ export function createStage({ canvas, w, h, px, kind }) {
       load = arrow();
       scene.add(load);
     }
-    const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, key, dirty: true, pair: [-1, -1] };
+    const lo = run.mesh.bounds_min, hi = run.mesh.bounds_max;
+    const center = new Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2);
+    const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, key, dirty: true, pair: [-1, -1], extras: [], center };
     parts.push(part);
     return part;
   }
@@ -597,7 +599,10 @@ export function createStage({ canvas, w, h, px, kind }) {
     if (part.sp) { part.sp.dress(loaded); return; }
     for (const e of loaded.spec.add || []) {
       const g = loaded.models.get(e.file);
-      if (g) part.scene.add(instance(g, e).group);
+      if (!g) continue;
+      const m = instance(g, e);
+      part.scene.add(m.group);
+      part.extras.push(m);
     }
   }
 
@@ -651,6 +656,9 @@ export function createStage({ canvas, w, h, px, kind }) {
         part.dirty = false;
         part.box = box;
         part.state = state;
+        // a model between the camera and the part is veiled (play-models.js)
+        if (part.sp) part.sp.veil(camera.position);
+        else for (const m of part.extras) m.veil(camera.position, part.center);
         renderer.render(part.scene, camera);
         const ins = f.insets && f.insets[part.row];
         if (ins && part.sp) {

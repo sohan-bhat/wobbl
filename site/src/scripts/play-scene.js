@@ -666,11 +666,19 @@ export function sceneParts({ arrays, run }) {
       if (!g) continue;
       const m = instance(g, e), at = e.parent ? pick(e.parent)[0] : null;
       (at ? at.mesh : scene).add(m.group);
+      if (!at) adds.push(m);
     }
     // everything is brought to the frame again, so a tinted model takes its field's color
     key = '';
     shadowDirty = true;
   }
 
-  return { scene, set, probe, shade, dispose, dress };
+  // the models added round the subject, veiled when one stands between the camera and the subject
+  const adds = [], sbox = run.subject || run.bounds;
+  const middle = new Vector3(...[0, 1, 2].map((k) => (sbox.lo[k] + sbox.hi[k]) / 2));
+  function veil(from) {
+    for (const m of adds) m.veil(from, middle);
+  }
+
+  return { scene, set, probe, shade, dispose, dress, veil };
 }
