@@ -304,7 +304,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 58.645196,
+ "t_total": 302.358149,
  "solver": "ngspice 41",
  "criteria": []
 }

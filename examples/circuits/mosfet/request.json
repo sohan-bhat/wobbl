@@ -1,0 +1,22 @@
+{
+ "domain": "circuit",
+ "analysis": "ratings",
+ "spec": {
+  "thing": "a MOSFET with 8 mOhm Rds on switching 15 A at 20 kHz",
+  "kind": "mosfet",
+  "question": "How hot does this MOSFET get switching 15 A at 20 kHz in a 50 C box?",
+  "options": {
+   "ambient": [
+    "50"
+   ],
+   "set": [
+    "current=15",
+    "rds_on=8m",
+    "frequency=20k",
+    "theta_ja=40",
+    "ambient=50.0"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

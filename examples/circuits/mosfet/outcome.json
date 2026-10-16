@@ -177,7 +177,7 @@
    "rds_on": 0.008,
    "frequency": 20000.0,
    "theta_ja": "40",
-   "ambient": "50",
+   "ambient": 50.0,
    "vbus": 12.0,
    "duty": 0.5
   },
@@ -204,7 +204,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 3.378527,
+ "t_total": 51.601937,
  "solver": "ngspice 41",
  "criteria": []
 }

@@ -1,0 +1,17 @@
+{
+ "domain": "circuit",
+ "analysis": "ratings",
+ "spec": {
+  "thing": "a blue LED on 5 V with a 47 ohm resistor",
+  "kind": "led",
+  "question": "Will a blue LED on 5 V with a 47 ohm resistor fry?",
+  "options": {
+   "set": [
+    "supply=5V",
+    "resistor=47",
+    "led=blue"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

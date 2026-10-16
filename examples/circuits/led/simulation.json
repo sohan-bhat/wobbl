@@ -1,0 +1,54 @@
+{
+ "thing": "a blue LED on 5 V with a 47 ohm resistor",
+ "question": "Will a blue LED on 5 V with a 47 ohm resistor fry?",
+ "plan": {
+  "thing": "a blue LED on 5 V with a 47 ohm resistor",
+  "question": "Will a blue LED on 5 V with a 47 ohm resistor fry?",
+  "domain": "circuit",
+  "kind": "led",
+  "analyses": [
+   "ratings"
+  ],
+  "reasons": [
+   {
+    "decided": "the words \"LED\", \"resistor\", \"5 V\" point to circuit (led)",
+    "override": "--domain circuit"
+   },
+   {
+    "decided": "physics ratings from \"fry\"",
+    "override": "--physics ratings"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "circuit",
+    "score": 13
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "fail",
+ "situation": {
+  "objects": [
+   "breadboard"
+  ],
+  "environment": {
+   "ambient": "25 C"
+  },
+  "circuit": {
+   "template": "led"
+  }
+ },
+ "steps": [
+  {
+   "analysis": "ratings",
+   "domain": "circuit",
+   "verdict": "fails",
+   "headline": "The LED fries: 36.9 mA through it, above its 30 mA rating (1.2x).",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/led",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/led/report.html",
+   "assumptions": []
+  }
+ ]
+}

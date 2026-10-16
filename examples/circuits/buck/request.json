@@ -1,0 +1,21 @@
+{
+ "domain": "circuit",
+ "analysis": "transient",
+ "spec": {
+  "thing": "12 V to 5 V buck converter at 2 A",
+  "kind": "buck",
+  "question": "What is the ripple on this 12 V to 5 V buck at 2 A?",
+  "options": {
+   "set": [
+    "vin=12",
+    "vout=5",
+    "current=2",
+    "frequency=500k",
+    "inductor=10u",
+    "capacitor=22u",
+    "max_ripple=0.05"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

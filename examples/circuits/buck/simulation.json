@@ -1,0 +1,54 @@
+{
+ "thing": "12 V to 5 V buck converter at 2 A",
+ "question": "What is the ripple on this 12 V to 5 V buck at 2 A?",
+ "plan": {
+  "thing": "12 V to 5 V buck converter at 2 A",
+  "question": "What is the ripple on this 12 V to 5 V buck at 2 A?",
+  "domain": "circuit",
+  "kind": "buck",
+  "analyses": [
+   "transient"
+  ],
+  "reasons": [
+   {
+    "decided": "the words \"ripple\", \"buck\", \"converter\" point to circuit (buck)",
+    "override": "--domain circuit"
+   },
+   {
+    "decided": "physics transient from \"ripple\"",
+    "override": "--physics transient"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "circuit",
+    "score": 10
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "objects": [
+   "breadboard"
+  ],
+  "environment": {
+   "ambient": "25 C"
+  },
+  "circuit": {
+   "template": "buck"
+  }
+ },
+ "steps": [
+  {
+   "analysis": "transient",
+   "domain": "circuit",
+   "verdict": "ok",
+   "headline": "Output ripple 8.56 mV peak to peak on 5.07 V (within the 50 mV limit); inductor ripple 0.604 A, peak 2.33 A.",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/buck",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/buck/report.html",
+   "assumptions": []
+  }
+ ]
+}

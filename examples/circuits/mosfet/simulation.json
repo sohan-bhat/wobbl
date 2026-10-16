@@ -1,0 +1,55 @@
+{
+ "thing": "a MOSFET with 8 mOhm Rds on switching 15 A at 20 kHz",
+ "question": "How hot does this MOSFET get switching 15 A at 20 kHz in a 50 C box?",
+ "plan": {
+  "thing": "a MOSFET with 8 mOhm Rds on switching 15 A at 20 kHz",
+  "question": "How hot does this MOSFET get switching 15 A at 20 kHz in a 50 C box?",
+  "domain": "circuit",
+  "kind": "mosfet",
+  "analyses": [
+   "ratings"
+  ],
+  "reasons": [
+   {
+    "decided": "the words \"MOSFET\" point to circuit (mosfet)",
+    "override": "--domain circuit"
+   },
+   {
+    "decided": "physics ratings from \"hot\"",
+    "override": "--physics ratings"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "circuit",
+    "score": 3
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "objects": [
+   "box",
+   "breadboard"
+  ],
+  "environment": {
+   "ambient": "50.0 C"
+  },
+  "circuit": {
+   "template": "mosfet"
+  }
+ },
+ "steps": [
+  {
+   "analysis": "ratings",
+   "domain": "circuit",
+   "verdict": "ok",
+   "headline": "Junction reaches about 110 C (1.51 W: 1.37 W conduction, 0.144 W switching) with 40 C/W to 50 C air; limit 150 C.",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/mosfet",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/mosfet/report.html",
+   "assumptions": []
+  }
+ ]
+}
