@@ -135,7 +135,8 @@ def simulate_circuit(source: str, question: str = "", params: dict | None = None
     from .pictures import draw
     o = _outcome(c, source, question, verdict, head, stress, checks, extra, values, main, probes, fixes, runs,
                  t0, out, sections, ta)
-    o.images.update(draw(out, c, main, stress, verdict))
+    o.images.update(draw(out, c, main, stress, verdict, question=question, ambient=ta,
+                         corners="tolerance" in values))
     from .draw import FIGURES
     o.values["_figures"] = FIGURES + o.values.get("_figures", [])
     try:

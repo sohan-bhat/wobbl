@@ -59,9 +59,10 @@ def key_reading(c: Circuit, w: Wave, stress: list[Stress]) -> dict | None:
             "note": it.note or f"{100 * it.use:.0f}% of its rating"}
 
 
-def draw(out: Path, c: Circuit, w: Wave, stress: list[Stress], verdict: str) -> dict[str, str]:
-    """setup.svg and schematic.svg from draw.write_circuit; a drawing that cannot be made is left out."""
-    board(out, c, w, stress)
+def draw(out: Path, c: Circuit, w: Wave, stress: list[Stress], verdict: str, **sweep) -> dict[str, str]:
+    """setup.svg and schematic.svg from draw.write_circuit; a drawing that cannot be made is left out. sweep
+    passes the question and ambient on to the 3D board's input sweep."""
+    board(out, c, w, stress, **sweep)
     try:
         from .draw import write_circuit
         return write_circuit(Path(out) / "images", c, wave_data(c, w), verdict, key_reading(c, w, stress))
@@ -69,18 +70,20 @@ def draw(out: Path, c: Circuit, w: Wave, stress: list[Stress], verdict: str) -> 
         return {}
 
 
-def board(out: Path, c: Circuit, w: Wave, stress: list[Stress]) -> None:
-    """board.json, the board plan the interactive 3D view (wobbl.viz) is built from; it never costs the result."""
+def board(out: Path, c: Circuit, w: Wave, stress: list[Stress], **sweep) -> None:
+    """board.json, the board plan the interactive 3D view (wobbl.viz) is built from, with the circuit solved
+    across the input its question points at (sweep.py). It never costs the result."""
     try:
         from ..viz.adapters.circuits import write_board
-        write_board(out, c, w, stress)
+        write_board(out, c, w, stress, **sweep)
     except Exception:  # noqa: BLE001
         import os
         if os.environ.get("WOBBL_DEBUG"):
             raise
 
 
-def template_parts(netlist: str, analysis: str, tran, out: Path, ambient: float, verdict: str) -> dict:
+def template_parts(netlist: str, analysis: str, tran, out: Path, ambient: float, verdict: str,
+                   template: str = "", params: dict | None = None, question: str = "") -> dict:
     """A template's own netlist run instrumented, so its result carries every part against its ratings and a
     playback.json like any other circuit. The template's verdict and numbers are its own and stay as they are."""
     from .bind import bind
@@ -92,15 +95,26 @@ def template_parts(netlist: str, analysis: str, tran, out: Path, ambient: float,
     c = parse_spice(netlist)
     bind(c)
     work = Path(out) / "work"
-    if analysis == "tran" and tran:
-        step, stop = tran
-        start = max(0.0, stop - 20000 * step)        # a long switching run keeps only its settled end
-        w = run(materialize(c, "tran"), [f"tran {step:.6e} {stop:.6e} {start:.6e} {step:.6e} uic"], work,
-                "parts")[0]
-        w.window = w.t >= w.t[0] + 0.5 * (w.t[-1] - w.t[0])
-    else:
-        w = run_op(c, work, "parts")
+    def solve(cc, tag="parts", longer=1):
+        """The template's own run of a circuit; longer stretches a transient so a changed part settles too."""
+        if analysis == "tran" and tran:
+            step, stop = tran[0], tran[1] * longer
+            start = max(0.0, stop - 20000 * step)        # a long switching run keeps only its settled end
+            wv = run(materialize(cc, "tran"), [f"tran {step:.6e} {stop:.6e} {start:.6e} {step:.6e} uic"], work,
+                     tag)[0]
+            wv.window = wv.t >= wv.t[0] + 0.5 * (wv.t[-1] - wv.t[0])
+            return wv
+        return run_op(cc, work, tag)
+
+    def build(p):
+        from .templates import TEMPLATES
+        cc = parse_spice(TEMPLATES[template](p).netlist)
+        bind(cc)
+        return cc
+
+    w = solve(c)
     stress = evaluate(c, w, ambient)
     write_playback(out, c, w, stress, verdict)
-    board(out, c, w, stress)
+    board(out, c, w, stress, question=question, ambient=ambient,
+          template=(template, dict(params or {}), build, solve) if template else None)
     return {s.ref: s.to_dict() for s in stress}
