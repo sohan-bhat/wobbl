@@ -1,9 +1,10 @@
 ---
-// The examples gallery: every example with its playback or result image, domain, question and verdict.
+// The examples gallery: every example as one still picture and its domain, question and verdict, the whole
+// card one link to the example's page, where its run plays. A scene run's picture is the view its page opens
+// on, drawn by scripts/posters.mjs, and a strength or heat run's is Wobbl's own heatmap.
 import Base from '../../layouts/Base.astro';
 import RunImage from '../../components/RunImage.astro';
-import SceneView from '../../components/SceneView.astro';
-import { viewerScene } from '../../lib/scenes';
+import { sceneRun } from '../../lib/scenes';
 import { COLOR, examples, metrics } from '../../lib/examples';
 import { url } from '../../lib/site';
 const all = examples();
@@ -29,18 +30,16 @@ const all = examples();
             <span class="ex-v"><span class="vword" data-verdict={COLOR[r.outcome.verdict] ?? 'marginal'}>{r.outcome.verdict.toUpperCase()}</span> {v}</span>
           </>
         );
+        const scene = sceneRun(r);
         return (
-          viewerScene(r) ? (
-            <li class="ex-card">
-              <SceneView rel={r.rel} card label={ex.title} />
-              <a class="ex-link" href={url(`examples/${ex.name}/`)}>{text}</a>
-            </li>
-          ) : (
-            <li><a class="ex-card" href={url(`examples/${ex.name}/`)}>
+          <li><a class="ex-card" href={url(`examples/${ex.name}/`)}>
+            {scene?.poster ? (
+              <img class="ex-poster" src={scene.poster.card} width="640" height="480" loading="lazy" decoding="async" alt="" />
+            ) : (
               <RunImage run={r} sizes="(min-width: 1100px) 300px, (min-width: 720px) 45vw, 100vw" compact />
-              {text}
-            </a></li>
-          )
+            )}
+            {text}
+          </a></li>
         );
       })}
     </ul>

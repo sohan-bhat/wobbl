@@ -1,16 +1,17 @@
-// Draws a poster of every example scene at build time, in Wobbl's own viewer in headless Chrome, so the
-// examples gallery shows each card at once and starts the live viewer only when someone reaches for it.
-// Each poster is the card's opening view as a 640 x 480 webp, beside the slider's label, value and place
-// the card shows under it. Posters are kept in .cache/posters by the hash of the scene and the viewer, so
-// only a new or changed scene is drawn again. Without Chrome the cards fall back to drawing in the page.
+// Draws a still of every scene run's view at build time, in headless Chrome, with the stage the example
+// page plays the scene on (src/scripts/play-draw.js through src/scripts/scene-poster.js, bundled here with
+// esbuild). Each still is the view the page opens on once its replay has run: the input at the value the
+// question asked about, the camera where the page puts it. The page shows the large one until its 3D view
+// takes over and the gallery's card shows the small one, as a plain picture. Stills are kept in
+// .cache/posters by the hash of the scene, its summary and the drawing code, so only a new or changed
+// scene is drawn again. Without Chrome the page starts on its live view and the card on Wobbl's own image.
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const VERSION = 1;                        // bump when the poster's look changes
-const W = 320, H = 240, SCALE = 2;        // the card's stage in CSS pixels, drawn at twice that
-// the card's quiet look, as scripts/scenes.ts gives it
-const QUIET = '.wv{border:0}.st{aspect-ratio:4/3;min-height:0;max-height:none}';
+const VERSION = 2;                        // bump when the stills' look changes outside the drawing code
+const W = 640, H = 480, PX = 2;           // the page's view in CSS pixels, drawn at twice that
+const SIZES = [[W * PX, H * PX], [W, H]]; // the page's still, then the card's
 
 async function browser() {
   let chromium;
@@ -24,61 +25,52 @@ async function browser() {
   return null;
 }
 
-/** One poster: the opening view drawn by the viewer, and what its slider says. */
-async function draw(page, bytes) {
-  return page.evaluate(async ({ b64, W, QUIET }) => {
-    const host = document.createElement('div');
-    host.style.width = `${W}px`;
-    document.body.replaceChildren(host);
-    const v = await window.WobblView.mount(host, { src: b64, still: true });
-    if (!v) throw new Error('the scene did not load');
-    const st = document.createElement('style'); st.textContent = QUIET; host.shadowRoot.append(st);
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))));
-    const r = host.shadowRoot, c = r.querySelector('.st canvas'), i = r.querySelector('.ctl input');
-    const out = {
-      img: c.toDataURL('image/webp', 0.82), label: r.querySelector('.ctl label span')?.textContent ?? '',
-      value: r.querySelector('.ctl output')?.textContent ?? '', at: +i.max > 0 ? +i.value / +i.max : 0,
-      one: r.querySelector('.trk')?.hidden ?? true,
-    };
-    v.dispose();
-    return out;
-  }, { b64: bytes.toString('base64'), W, QUIET });
+/** The drawing code as one script for the page Chrome opens. */
+async function bundle(site) {
+  const { build } = await import('esbuild');
+  const r = await build({
+    entryPoints: [resolve(site, 'src/scripts/scene-poster.js')], bundle: true, format: 'iife', write: false,
+    minify: true, logLevel: 'silent', absWorkingDir: site,
+  });
+  return r.outputFiles[0].text;
 }
 
-/** Adds a poster to every scene in the manifest scripts/scenes.mjs wrote, drawing the ones not in the cache. */
+/** Adds stills to every scene in the manifest scripts/scenes.mjs wrote, drawing the ones not in the cache. */
 export async function drawPosters(site) {
   if (process.env.WOBBL_POSTERS === '0') return;
   const out = resolve(site, 'public/data/scenes'), cache = resolve(site, '.cache/posters');
   const mf = join(out, 'manifest.json');
   if (!existsSync(mf)) return;
   const m = JSON.parse(readFileSync(mf, 'utf-8'));
-  const js = readFileSync(join(out, m.viewer));
+  let js;
+  try { js = await bundle(site); } catch (err) { console.warn(`[posters] could not bundle the drawing code: ${err.message ?? err}`); return; }
   mkdirSync(cache, { recursive: true });
   const todo = [];
   for (const [rel, e] of Object.entries(m.scenes)) {
-    if (!e.file) continue;
+    if (!e.file || !e.play) continue;
     const bytes = readFileSync(join(out, e.file));
-    const key = createHash('sha1').update(String(VERSION)).update(js).update(bytes).digest('hex').slice(0, 16);
-    e.poster = e.file.replace(/\.wobbl$/, '.webp');
+    const key = createHash('sha1').update(String(VERSION)).update(js).update(bytes).update(JSON.stringify(e.play)).digest('hex').slice(0, 16);
     todo.push({ rel, e, bytes, key });
   }
-  const missing = todo.filter((t) => !existsSync(join(cache, `${t.key}.json`)));
+  const missing = todo.filter((t) => !existsSync(join(cache, `${t.key}.webp`)) || !existsSync(join(cache, `${t.key}.card.webp`)));
   let b = null;
   if (missing.length) {
     b = await browser();
-    if (!b) console.warn(`[posters] no Chrome found, so ${missing.length} cards draw their scene in the page instead`);
+    if (!b) console.warn(`[posters] no Chrome found, so ${missing.length} scenes start without a still`);
   }
   if (b) {
     const t0 = Date.now();
     try {
-      const page = await b.newPage({ viewport: { width: W + 40, height: H + 200 }, deviceScaleFactor: SCALE });
+      const page = await b.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+      page.on('pageerror', (err) => console.warn(`[posters] ${err.message}`));
       await page.setContent('<!doctype html><html><body style="margin:0;background:#0e0f11"></body></html>');
-      await page.addScriptTag({ content: js.toString('utf-8') });
+      await page.addScriptTag({ content: js });
       for (const t of missing) {
         try {
-          const p = await draw(page, t.bytes);
-          writeFileSync(join(cache, `${t.key}.webp`), Buffer.from(p.img.split(',')[1], 'base64'));
-          writeFileSync(join(cache, `${t.key}.json`), JSON.stringify({ label: p.label, value: p.value, at: p.at, one: p.one }));
+          const [big, small] = await page.evaluate((a) => globalThis.drawScenePoster(a),
+            { b64: t.bytes.toString('base64'), run: t.e.play, w: W, h: H, px: PX, sizes: SIZES });
+          writeFileSync(join(cache, `${t.key}.webp`), Buffer.from(big.split(',')[1], 'base64'));
+          writeFileSync(join(cache, `${t.key}.card.webp`), Buffer.from(small.split(',')[1], 'base64'));
         } catch (err) {
           console.warn(`[posters] ${t.rel}: ${err.message ?? err}`);
         }
@@ -89,12 +81,14 @@ export async function drawPosters(site) {
     console.log(`[posters] drew ${missing.length} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   }
   for (const t of todo) {
-    const info = join(cache, `${t.key}.json`);
-    if (!existsSync(info)) { delete t.e.poster; continue; }
+    if (!existsSync(join(cache, `${t.key}.webp`))) continue;
+    t.e.poster = t.e.file.replace(/\.wobbl$/, '.webp');
+    t.e.card = t.e.file.replace(/\.wobbl$/, '.card.webp');
     copyFileSync(join(cache, `${t.key}.webp`), join(out, t.e.poster));
-    Object.assign(t.e, { posterW: W * SCALE, posterH: H * SCALE, slider: JSON.parse(readFileSync(info, 'utf-8')) });
+    copyFileSync(join(cache, `${t.key}.card.webp`), join(out, t.e.card));
+    Object.assign(t.e, { posterW: SIZES[0][0], posterH: SIZES[0][1] });
   }
-  writeFileSync(mf, JSON.stringify(m, null, 1));
+  writeFileSync(mf, JSON.stringify(m));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
