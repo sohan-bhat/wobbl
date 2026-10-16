@@ -98,22 +98,59 @@ def test_operating_point_without_a_sweep_still_stands_on_the_bench(tmp_path):
     assert h["timeline"]["frames"] == 1 and "R1" in _names(h)
 
 
-def test_swept_supply_drives_the_timeline(tmp_path):
+def test_swept_input_is_a_slider_with_each_value_solved(tmp_path):
     parts = _parts()
     n = 25
-    sw = {"source": "V1", "unit": "V", "values": list(np.linspace(0, 9, n)), "plan": _board(parts, [])["plan"],
-          "parts": [list(np.linspace(0, p.get("current") or 0, n)) for p in parts], "wires": [],
-          "leads": [[list(np.linspace(0, 0.05, n)), list(np.linspace(0, -0.05, n))]],
-          "power": {"R1": list(np.linspace(0, 0.3, n) ** 2 / 0.3)}}
+    r = list(np.round(np.geomspace(15, 470, n), 3))
+    heat = [None] * len(parts)
+    heat[0] = list(np.linspace(1.6, 0.1, n))                   # the resistor past its rating below about 60 ohm
+    heat[1] = list(np.linspace(3.0, 0.2, n))
+    sw = {"input": {"label": "series resistor", "unit": "ohm", "values": r, "design": r[8], "ref": "resistor",
+                    "kind": "part"},
+          "source": "resistor", "unit": "ohm", "label": "series resistor", "values": r,
+          "plan": _board(parts, [])["plan"], "changed": ["R1"],
+          "parts": [list(np.linspace(p.get("current") or 0, 0, n)) for p in parts], "wires": [],
+          "leads": [[list(np.linspace(0.05, 0, n)), list(np.linspace(-0.05, 0, n))]], "heat": heat,
+          "readouts": [{"name": "LED current", "unit": "mA", "values": list(np.linspace(100, 4, n)), "limit": 30},
+                       {"name": "supply current", "unit": "mA", "values": list(np.linspace(100, 4, n)),
+                        "limit": None}]}
     (tmp_path / "board.json").write_text(json.dumps(_board(parts, [], sweep=sw)))
     _outcome(tmp_path, "circuit", "will a blue LED fry?", "fails")
     assert build_scene(tmp_path)
     h, _ = load(tmp_path / "scene.wobbl")
-    assert h["timeline"]["frames"] == n and h["timeline"]["unit"] == "V"
-    sup = next(r for r in h["readouts"] if r["name"] == "supply")
-    assert sup["values"][-1] == 9
+    tl = h["timeline"]
+    assert tl["frames"] == n and tl["kind"] == "input" and tl["unit"] == "ohm" and tl["design"] == r[8]
+    assert h["readouts"][0]["name"] == "LED current" and h["readouts"][0]["limit"] == 30
+    f = h["fields"][0]
+    assert f["limit"] == 1 and f["limit_label"]
+    ring = next(o for o in h["objects"] if o.get("name") == "R1 over rating")
+    assert ring["when"][0] is None and r[0] < ring["when"][1] < r[-1]      # over from the low end up to a value
+    texts = [lb["text"] for lb in h["labels"]]
+    assert "R1" in texts and not any("120" in t for t in texts)           # the swept part's value is the slider
+    assert "follow" not in h["camera"] and h["camera"]["presets"]
     led = next(o for o in h["objects"] if o.get("name") == "D1")
     assert led["color"] == "#34c759"                           # a model that names its color beats the question
+
+
+def test_the_question_picks_the_input():
+    from wobbl.circuits import sweep as S
+    from wobbl.circuits.bind import bind
+    from wobbl.circuits.netlist import parse_spice
+    c = parse_spice("V1 vin 0 12\nR1 vin a 1k\nCCABLE a 0 1u\nRLOAD vin 0 6\n.end\n")
+    bind(c)
+    by_word = S.choose(c, "is it stable driving the cable?")
+    assert by_word.ref == "CCABLE" and by_word.unit == "F" and by_word.design in by_word.values
+    assert by_word.values[0] < 1e-6 < by_word.values[-1]
+    sup = S.choose(c, "does anything burn?")
+    assert sup.kind == "supply" and sup.design == 12 and sup.values[0] == 0 and sup.values[-1] == 18
+    cc = sup.make(6.0)
+    assert "6" in " ".join(cc.element("V1").rest) and "12" in " ".join(c.element("V1").rest)
+    by_value = S.choose(c, "is a 1k resistor enough?")
+    assert by_value.ref == "R1"
+    t = S.template_input("led", {"supply": 5.0, "resistor": 47.0}, "a LED on 5 V with a 47 ohm resistor", dict)
+    assert t.ref == "resistor" and 47.0 in t.values and t.values[0] < 47 < t.values[-1]
+    t = S.template_input("buck", {"vin": 12.0, "current": 2.0}, "the ripple of a 12 V to 5 V buck at 2 A", dict)
+    assert t.ref == "current" and t.design == 2 and t.values[-1] == 3
 
 
 ARM = """<mujoco model="arm"><worldbody>

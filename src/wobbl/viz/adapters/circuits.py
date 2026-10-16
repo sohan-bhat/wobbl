@@ -1,12 +1,12 @@
-"""A circuit run as a scene: a bench with a breadboard, the real parts standing in the holes board.plan gives
-them, round wires between, and a bench supply with its leads. Current runs through every wire and lead as moving
-glows whose speed follows the solved current frame by frame. Each part warms from tan toward red by its power
-against its rating, an LED glows by its solved current, and a part that goes past its rating is flagged on itself
-at the moment it does.
+"""A circuit run as a hands on model: a bench with a breadboard, the real parts standing in the holes board.plan
+gives them, round wires between, and a bench supply with its leads. A slider sets the one input the question
+points at (the series resistor, the load current, a part's value or the supply), and every frame is the circuit
+solved at that value. Each part warms from tan toward red by its share of its limit, an LED glows by its solved
+current, the glows in each wire move at the current solved there, and a part past its rating is ringed on itself
+over the values where it is.
 
 board.json, written by the circuit run next to its outcome, holds the plan (circuits/board.py), the key reading
-and the run's time span. A transient plays its own time. An operating point is swept, the supply turned up from
-zero in solved steps, so the timeline shows where along the way a rating is crossed (circuit_frames.py).
+and the sweep (circuits/sweep.py), which circuit_frames.py turns into frames.
 """
 from __future__ import annotations
 
@@ -17,14 +17,14 @@ import numpy as np
 
 from .. import props_bench as B
 from ..scene import Scene
-from .circuit_frames import frames, sweep
+from .circuit_frames import frames
 from .common import read, verdict
 
 PITCH = 2.54                      # mm between breadboard holes
 LED = {"red": "#ff3b30", "green": "#34c759", "blue": "#2f7bff", "white": "#f2f2ee", "yellow": "#ffd60a",
        "amber": "#ff9f0a", "orange": "#ff9f0a", "ir": "#7a1f1f", "uv": "#8e5cff"}
 SPEED = 16.0                      # mm a second of playback for the largest current
-HEAT = "share of rating"
+HEAT = "share of its limit"
 
 
 def xy(x, y, z=0.0) -> np.ndarray:
@@ -51,14 +51,13 @@ def build(out: Path) -> Path | None:
     n = len(F["t"])
     s = Scene("The circuit on the bench", domain="circuit", question=o.get("question", ""),
               source="Parts sit in the holes the board plan gives them. The glows in each wire move at the current "
-                     "the run solved there, and each part warms by its solved power against its rating.")
-    if n > 1:
-        if F["unit"] == "s":
-            f, u = _time_unit(F["t"])
-            s.timeline(F["t"] * f, unit=u, label="time", seconds=8, between="interpolated")
-        else:
-            s.timeline(F["t"], unit="V", label=F["label"], seconds=8, between="interpolated",
-                       note="The supply is turned up from zero to its value in solved steps.")
+                     "solved there, and each part warms by its share of its limit, most often its rating.")
+    if n > 1 and F["kind"] == "sweep":
+        s.timeline(F["t"], unit=F["unit"], label=F["label"], between="step", kind="input", design=F["design"],
+                   note="Each step is the whole circuit solved again at that value.")
+    elif n > 1:
+        f, u = _time_unit(F["t"])
+        s.timeline(F["t"] * f, unit=u, label="time", seconds=8, between="interpolated")
     T = s.t
     bd = pl["board"]
     W, H = bd["width"] * PITCH, bd["height"] * PITCH
@@ -106,9 +105,15 @@ def build(out: Path) -> Path | None:
         if heat is not None and float(np.max(heat)) > 1:
             hot.append((p, mid, top, heat))
 
+    swept = (F.get("input") or {}).get("ref", "")
     for i, inst in enumerate(ins):
+        live = ""
+        if F["kind"] == "sweep" and inst.get("kind") == "supply":
+            volts = "" if inst["name"] == swept else next((f"{v} {u}" for v, u in inst.get("readings", [])
+                                                           if u == "V"), "")
+            live = f"{volts}  {{supply current}}".strip()
         instrument(s, inst, i, F["leads"][i] if i < len(F["leads"]) else [], peak, paths, speeds,
-                   x=W / 2 + 42.0 * (i - (len(ins) - 1) / 2))
+                   x=W / 2 + 42.0 * (i - (len(ins) - 1) / 2), live=live)
 
     live = [k for k, v in enumerate(speeds) if float(np.max(np.abs(v))) > 1e-9]
     if live:
@@ -118,20 +123,25 @@ def build(out: Path) -> Path | None:
     loaded = sorted((j for j, h in enumerate(F["heat"]) if h is not None), key=lambda j: -float(np.max(F["heat"][j])))
     named = {parts[j]["name"] for j in loaded[:2]} | {p["name"] for p in parts if p.get("kind") == "led" or
                                                        len(p.get("pins", [])) > 2}
+    changed = set((b.get("sweep") or {}).get("changed") or [])
     for p, at in labels:
         if p not in [h[0] for h in hot] and (p["name"] in named or len(parts) <= 6):
-            s.label(f"{p['name']} {p.get('label') or ''}".strip(), at, kind="note")
+            s.label(f"{p['name']} {'' if p['name'] in changed else p.get('label') or ''}".strip(), at, kind="note")
     for p, mid, top, heat in hot[:3]:
-        k = int(np.argmax(heat > 1))
-        t0 = float(T[k]) if n > 1 else None
+        t0, t1, k = over(T, heat)
         ring = s.body("torus", [5.5, 0.45], pos=mid + [0, 0, 0.6], color="#ff3b30", name=f"{p['name']} over rating")
         ring.light(np.ones(n))
-        if t0 is not None:
-            ring.show(t0, None)
-            s.label(f"{p['name']} {p.get('label') or ''}".strip(), mid + [0, 0, top + 6], t1=t0, kind="note")
-        s.label(f"{p['name']} past its rating, {{{p['name']} load}}", mid + [0, 0, top + 6], t0=t0, kind="fail")
-        s.event(t0 if t0 is not None else 0.0, f"{p['name']} past its rating",
-                f"{100 * float(heat[k]):.0f}% of its rating", kind="fail")
+        name = f"{p['name']} {'' if p['name'] in changed else p.get('label') or ''}".strip()
+        if n > 1:
+            ring.show(t0, t1)
+            if t0 is not None and t0 > T[0]:
+                s.label(name, mid + [0, 0, top + 6], t1=t0, kind="note")
+            if t1 is not None:
+                s.label(name, mid + [0, 0, top + 6], t0=t1, kind="note")
+        s.label(f"{p['name']} past its limit, {{{p['name']} load}}", mid + [0, 0, top + 6], t0=t0, t1=t1,
+                kind="fail")
+        s.event(float(T[k]), f"{p['name']} past its limit", f"{100 * float(heat[k]):.0f}% of its limit",
+                kind="fail")
 
     readouts(s, b, F, parts, ins, hot)
     verdict(s, o)
@@ -175,17 +185,29 @@ def place(s, p, pins, cur, heat, question: str = "") -> tuple:
         bd, top = B.module(s, pins, name), 2.0
     if heat is not None and bd is not None:
         bd.color_by(HEAT, np.asarray(heat, float), unit="", colormap="heat", range=(0, 1), limit=1,
-                    limit_label="its rating")
+                    limit_label="its limit")
     return bd, top
 
 
-def instrument(s, inst, i, leads, peak, paths, speeds, x: float = 0.0):
+def over(T, heat) -> tuple:
+    """The values over which a part is past its limit, as (from, until, index of its worst frame). From is None
+    when it is over from the first value and until is None when it stays over to the last."""
+    bad = np.asarray(heat, float) > 1
+    k = int(np.argmax(np.where(bad, heat, -np.inf)))
+    if len(T) < 2:
+        return None, None, k
+    a = int(np.argmax(bad))
+    b = a + int(np.argmin(bad[a:])) if not bad[a:].all() else len(T)
+    return (None if a == 0 else float(T[a])), (None if b >= len(T) else float(T[b])), k
+
+
+def instrument(s, inst, i, leads, peak, paths, speeds, x: float = 0.0, live: str = ""):
     """A bench supply, generator or meter behind the board facing the view, its leads arching over to their holes.
     Its reading sits just above its own case, so it stays clear of the readouts in the corner."""
     at = np.array([x, 30.0, 0.0])
     tips = B.supply(s, at, inst["name"], posts=2,
                     display={"generator": "#ffb347", "meter": "#9ad0ff", "current": "#9ad0ff"}.get(inst["kind"], "#7cf29a"))
-    read_ = "  ".join(f"{v} {u}" for v, u in inst.get("readings", []))
+    read_ = live or "  ".join(f"{v} {u}" for v, u in inst.get("readings", []))
     s.label(f"{inst['name']} {read_}".strip(), at + [0, -13.0, 21.0], kind="note")
     for j, ld in enumerate(inst.get("leads", [])):
         post = tips[0 if ld.get("post") == "+" else 1]
@@ -199,10 +221,16 @@ def instrument(s, inst, i, leads, peak, paths, speeds, x: float = 0.0):
 
 def readouts(s, b, F, parts, ins, hot):
     n = s.n
-    if F["kind"] == "sweep":
-        s.readout("supply", F["t"], unit="V", digits=3)
+    have = set()
+    for r in F.get("readouts", []):
+        v = np.asarray(r["values"], float)
+        if not np.isfinite(v).any():
+            continue
+        v = np.where(np.isfinite(v), v, np.nanmin(v))
+        s.readout(r["name"], v, unit=r.get("unit", ""), digits=3, limit=r.get("limit"))
+        have.add(r["name"])
     key = b.get("key")
-    if key:
+    if key and F["kind"] != "sweep":
         ser = key.get("series")
         if n > 1 and ser and len(ser) == n:
             v = np.asarray(ser, float)
@@ -213,19 +241,19 @@ def readouts(s, b, F, parts, ins, hot):
         if v is not None:
             s.readout(key["label"].lower(), v, unit=key.get("unit", ""), digits=3, limit=key.get("limit"))
     sup = next((k for k, x in enumerate(ins) if x.get("kind") == "supply"), None)
-    if sup is not None and F["leads"][sup]:
+    if sup is not None and F["leads"][sup] and "supply current" not in have:
         s.readout("supply current", np.abs(F["leads"][sup][0]) * 1000, unit="mA", digits=3)
     leds = [j for j, p in enumerate(parts) if p.get("kind") == "led"]
-    for j in leds[:1]:
+    for j in leds[:1] if "LED current" not in have else []:
         s.readout(f"{parts[j]['name']} current", np.abs(F["parts"][j]) * 1000, unit="mA", digits=3)
     order = sorted((j for j, h in enumerate(F["heat"]) if h is not None), key=lambda j: -float(np.max(F["heat"][j])))
     for j in order[:2]:
-        s.readout(f"{parts[j]['name']} load", 100 * np.asarray(F["heat"][j], float), unit="% of rating", digits=3,
+        s.readout(f"{parts[j]['name']} load", 100 * np.asarray(F["heat"][j], float), unit="% of limit", digits=3,
                   limit=100)
     for p, *_ in hot:
         j = parts.index(p)
         if j not in order[:2]:
-            s.readout(f"{p['name']} load", 100 * np.asarray(F["heat"][j], float), unit="% of rating", digits=3,
+            s.readout(f"{p['name']} load", 100 * np.asarray(F["heat"][j], float), unit="% of limit", digits=3,
                       limit=100)
 
 
@@ -244,19 +272,33 @@ def _key_frames(key, F, parts):
     return None
 
 
-def write_board(out, c, w, stress) -> Path | None:
+def write_board(out, c, w, stress, question: str = "", ambient: float = 25.0, template=None,
+                corners: bool = False) -> Path | None:
     """board.json for a finished circuit run: its board plan and key reading, which the 3D view is built from,
-    and for an operating point the supply sweep that gives the view its timeline."""
+    and the circuit solved across the input its question points at (circuits/sweep.py), which gives the view
+    its slider. template is (name, params, build, solve) for a template run, so the template itself rebuilds
+    the circuit at each value."""
+    from ...circuits import sweep as S
     from ...circuits.board import plan
     from ...circuits.pictures import key_reading, wave_data
     pl = plan(c, wave_data(c, w))
     doc = {"plan": pl, "key": key_reading(c, w, stress),
            "span": [float(w.t[0]), float(w.t[-1])] if getattr(w, "kind", "") == "tran" else None}
-    if getattr(w, "kind", "") != "tran":
-        try:
-            doc["sweep"] = sweep(c, pl, Path(out) / "work")
-        except Exception:  # noqa: BLE001  the sweep only adds a timeline to the view
-            doc["sweep"] = None
+    work = Path(out) / "work"
+    try:
+        if template:
+            name, params, build, solve = template
+            inp = S.template_input(name, params, question, build)
+            kw = {"rerun": lambda cc, tag: solve(cc, tag, 3),
+                  "measure": S.template_measure(name, params, inp.ref, ambient) if inp else None}
+        else:
+            inp, kw = S.choose(c, question), {"corners": corners}
+        doc["sweep"] = S.solve(inp, w, work, ambient, question=question, **kw) if inp else None
+    except Exception:  # noqa: BLE001  the sweep only adds the slider to the view
+        import os
+        if os.environ.get("WOBBL_DEBUG"):
+            raise
+        doc["sweep"] = None
     p = Path(out) / "board.json"
     p.write_text(json.dumps(doc, separators=(",", ":"), default=_num))
     return p
