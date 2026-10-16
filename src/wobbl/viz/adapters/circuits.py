@@ -112,6 +112,8 @@ def build(out: Path) -> Path | None:
             volts = "" if inst["name"] == swept else next((f"{v} {u}" for v, u in inst.get("readings", [])
                                                            if u == "V"), "")
             live = f"{volts}  {{supply current}}".strip()
+        elif F["kind"] == "sweep" and inst.get("kind") in ("meter", "current"):
+            live = " "                    # its reading is the asked value's, so only its name stays
         instrument(s, inst, i, F["leads"][i] if i < len(F["leads"]) else [], peak, paths, speeds,
                    x=W / 2 + 42.0 * (i - (len(ins) - 1) / 2), live=live)
 
