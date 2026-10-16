@@ -514,33 +514,127 @@ def run(scene: Scene, s: MagSetup, out_dir: str | Path, question: str = "", qual
 
 
 def _view(out, o, fine, pl, scene, s, F, tgt, title, question):
-    """The bodies as solved, the flux density on the slice with flux lines traced through it, and the force."""
+    """The bodies as solved and the flux density on the slice, with the coil current as the input (see current_view)."""
     try:
-        from ..viz import Scene
-
         from . import view as V
     except ImportError:
         return None
-    sc = Scene(f"{Path(title).stem} magnetic field", domain="magnetic", question=question, length="mm")
-    V.draw_bodies(sc, fine["msh"], {n: b.kind for n, b in s.bodies.items()})
-    if "slice_b" in fine:
-        b = fine["slice_b"]
-        V.slice_mesh(sc, pl, np.linalg.norm(b, axis=-1), "flux density", "T", cmap="inferno")
-        paths = V.stream(b[..., pl["iu"]], b[..., pl["iv"]], pl)
-        if paths:
-            sc.lines(paths, color="#e8e8e8", width=1.2, name="flux lines", flow=20.0)
+    if "slice_b" not in fine:
+        return None
+    b = fine["slice_b"]
     body = next(x for x in scene.bodies if x.name == tgt)
+    coils = [n for n, x in s.bodies.items() if x.kind == "coil"]
+    magnets = any(x.kind == "magnet" for x in s.bodies.values())
+    pl_mm = {k: (v * 1e3 if k in ("at", "u0", "u1", "v0", "v1") else v) for k, v in pl.items()}
+    return current_view(out, o, lambda sc: V.draw_bodies(sc, fine["msh"], {n: x.kind for n, x in s.bodies.items()}),
+                        pl_mm, np.linalg.norm(b, axis=-1), b[..., pl["iu"]], b[..., pl["iv"]], F,
+                        np.array(body.center) * 1e3, body.extent * 1e3,
+                        s.bodies[coils[0]].current if coils and not magnets else 0.0, title, question)
+
+
+def current_view(out, o, draw, pl, b, bu, bv, F, center, extent, current: float, title, question):
+    """The actuator as solved, with the coil current as the input the user moves: the flux density on the slice and
+    the force grow with it. With coils and steel alone the field is the solved one times I / I0 and the force times
+    (I / I0)^2, which holds while the steel stays below its knee, so the sweep runs up to the current where the
+    solved peak in the steel would reach it. With a magnet in the model the field is not proportional to the current
+    and the view shows the solved state alone. pl is the slice in mm, center and extent the target's in mm."""
+    from ..viz import Scene
+
+    from . import view as V
+    vals = o.values or {}
+    sat = vals.get("saturation") or {}
+    room = min([v["knee_T"] / v["b_max_T"] for v in sat.values() if v.get("b_max_T")] or [1.5])
+    knee = min([v["knee_T"] for v in sat.values() if v.get("knee_T")] or [0.0])
+    sc = Scene(f"{Path(title).stem} at the current you pick", domain="magnetic", question=question, length="mm",
+               source="The field and force are the solve at the coil's current. Other currents scale them, the field "
+                      "with the current and the force with its square, which holds while the steel stays below its "
+                      "knee.")
+    if current > 0:
+        top = current * float(np.clip(room, 1.0, 2.0))
+        amps = np.unique(np.r_[np.linspace(0.0, top, 25), current])
+        r = amps / current
+        sc.timeline(amps, unit="A", label="coil current", between="interpolated", kind="input", design=current)
+    else:
+        r = np.ones(1)
+    draw(sc)
+    g = np.asarray(b, float)
+    nv, nu = g.shape
+    U, W = np.meshgrid(np.linspace(pl["u0"], pl["u1"], nu), np.linspace(pl["v0"], pl["v1"], nv))
+    X = np.zeros((U.size, 3))
+    X[:, pl["iu"]], X[:, pl["iv"]], X[:, pl["ik"]] = U.ravel(), W.ravel(), pl["at"]
+    ok = np.isfinite(g).ravel()
+    idx = np.arange(nu * nv).reshape(nv, nu)
+    a_, b_, c_, d_ = idx[:-1, :-1].ravel(), idx[:-1, 1:].ravel(), idx[1:, 1:].ravel(), idx[1:, :-1].ravel()
+    keep = ok[a_] & ok[b_] & ok[c_] & ok[d_]
+    T = np.concatenate([np.c_[a_, b_, c_][keep], np.c_[a_, c_, d_][keep]])
+    if len(T):
+        m = sc.mesh(X, T, name="slice", max_vertices=len(X) + 1, opacity=0.92)
+        hi = max(float(np.nanmax(g)) * float(r.max()), knee or 0.0)
+        m.color_by("flux density", np.nan_to_num(g.ravel()), unit="T", colormap="inferno",
+                   scale=None if len(r) == 1 else r, range=(0.0, hi),
+                   limit=knee or None, limit_label="the steel's knee" if knee else "")
+    pl_m = {k: (v / 1e3 if k in ("at", "u0", "u1", "v0", "v1") else v) for k, v in pl.items()}
+    paths = V.stream(np.asarray(bu, float), np.asarray(bv, float), pl_m)        # it takes the slice in m
+    if paths:
+        sc.lines(paths, color="#e8e8e8", width=1.2, name="flux lines")
     Fm = float(np.linalg.norm(F))
+    need = next((c["limit"] for c in (o.criteria or []) if c.get("name") == "force" and c.get("sense") == "min"), 0.0)
     if Fm > 0:
-        size = 0.6 * body.extent * 1e3
-        sc.arrows([np.array(body.center) * 1e3], [F / Fm * size], labels=["{force}"], name="force")
-        sc.readout("force", [Fm], unit="N", limit=None)
-    for n, L in (o.values.get("inductance_H") or {}).items():
-        sc.readout(f"inductance of {n}", [L * 1e3], unit="mH")
+        size = 0.6 * extent
+        sc.arrows([np.asarray(center, float)], [np.asarray(F, float) / Fm * size], scale=r ** 2 if len(r) > 1 else None,
+                  labels=["{force}"], name="force")
+        sc.readout("force", Fm * r ** 2, unit="N")
+        if need:
+            sc.readout(f"{fmt(need)} N against the pull", 100 * need / np.maximum(Fm * r ** 2, 1e-12), unit="%",
+                       limit=100.0)
+            if len(r) > 1 and Fm > need:
+                sc.event(current * np.sqrt(need / Fm), f"pulls {fmt(need)} N", "the force reaches what is needed")
+    for n, L in (vals.get("inductance_H") or {}).items():
+        sc.readout(f"inductance of {n}", np.full(len(r), L * 1e3), unit="mH")
+    if sat and len(r) > 1:
+        sc.readout("peak in the steel", max(v["b_max_T"] for v in sat.values()) * r, unit="T", limit=knee or None)
     word, tn = V.tone(o.verdict)
     sc.verdict(word, o.headline, tn)
-    sc.note("Flux lines are traced through the solved in-plane field on the slice; their glow only shows direction.")
+    sc.note("Flux lines are traced through the solved in-plane field on the slice.")
     return sc.save(out)
+
+
+def view_from_files(out) -> Path | None:
+    """Rebuild a finished run's view from its playback.json and outcome.json, with the bodies as its earlier scene
+    drew them, for a run solved before the view took the coil current as its input."""
+    import json
+    from types import SimpleNamespace
+
+    from ..viz.scene import array, load
+    from ..viz.adapters.grids import unpack
+    out = Path(out)
+    pb = json.loads((out / "playback.json").read_text())
+    od = json.loads((out / "outcome.json").read_text())
+    o = SimpleNamespace(values=od.get("values") or {}, criteria=od.get("criteria") or [],
+                        verdict=od.get("verdict", ""), headline=od.get("headline", ""))
+    h, blob = load(out / "scene.wobbl")
+    meshes = [(ob, array(h, blob, ob["pos"]), array(h, blob, ob["tri"])) for ob in h["objects"]
+              if ob.get("kind") == "mesh" and ob.get("name") != "slice"]
+
+    def draw(sc):
+        for ob, X, T in meshes:
+            sc.mesh(X, T, name=ob.get("name", ""), color=ob.get("color", "#b9bdc4"), opacity=min(ob.get("opacity", 1.0), 0.4),
+                    max_vertices=6000)
+    pl = dict(pb["slice"])
+    pl.update(iu="xyz".index(pl["u"]), iv="xyz".index(pl["v"]), ik="xyz".index(pl["normal"]))
+    f = pb["force"]
+    body = next(x for x in pb["bodies"] if x["name"] == f["body"])
+    box = np.asarray(body["box_mm"], float)
+    coils = [x["name"] for x in pb["bodies"] if x["role"] == "coil"]
+    magnets = any(x["role"] == "magnet" for x in pb["bodies"])
+    cur = 0.0
+    if coils and not magnets:
+        L = (o.values.get("inductance_H") or {}).get(coils[0])
+        psi = (o.values.get("flux_linkage_Wb") or {}).get(coils[0])
+        cur = round(psi / L, 6) if L and psi else 0.0
+    return current_view(out, o, draw, pl, unpack(pb["b"]), unpack(pb["b_u"]), unpack(pb["b_v"]),
+                        np.asarray(f["force_N"], float), (box[:3] + box[3:]) / 2, float(np.ptp(box.reshape(2, 3), 0).max()),
+                        cur, od.get("part", "actuator"), od.get("question", ""))
 
 
 def _knee(b: MagBody) -> float:
