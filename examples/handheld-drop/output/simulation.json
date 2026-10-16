@@ -56,8 +56,8 @@
    "verdict": "fails",
    "headline": "Fails a 1.2 m drop onto concrete slab, worst landing -x-y-z corner down: peak von Mises stress 68.1 MPa at (-41.5, -23.2, 0) mm, safety factor 0.91 against 62 MPa (target 2). An accelerometer there reads 2503 g filtered at 10 kHz; the impact itself peaks at 2499 g over 0.704 ms. Confidence is medium.",
    "confidence": "medium",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-af831ad401cf865f2/examples/handheld-drop/output",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-af831ad401cf865f2/examples/handheld-drop/output/report.html",
+   "result_dir": "output",
+   "report": "output/report.html",
    "assumptions": [
     {
      "assumed": "landing not given, so every face and corner is tried (worst)",

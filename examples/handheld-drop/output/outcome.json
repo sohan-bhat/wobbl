@@ -108,7 +108,8 @@
   "The contact patch itself, within two elements of the first mesh of where the part meets the floor, is reported apart: its stress is the local crush of an ideally sharp landing.",
   "2% of the part's mass is added at the nodes of the smallest elements so they do not hold the time step down (selective mass scaling); the momentum and energy checks include it.",
   "Added mass: 45 g spread over 3916 nodes at 0,0,6 r=26.",
-  "Mirror symmetry of the part made these landings the same as one already run: -x face down stands for +x face down; -y face down stands for +y face down; -x-y-z corner down stands for -x+y-z corner down, +x-y-z corner down, +x+y-z corner down; -x-y+z corner down stands for -x+y+z corner down, +x-y+z corner down, +x+y+z corner down."
+  "Mirror symmetry of the part made these landings the same as one already run: -x face down stands for +x face down; -y face down stands for +y face down; -x-y-z corner down stands for -x+y-z corner down, +x-y-z corner down, +x+y-z corner down; -x-y+z corner down stands for -x+y+z corner down, +x-y+z corner down, +x+y+z corner down.",
+  "Predicted run time 26 min against a budget of 50 min, so the mesh was left as meshed. The whole study took 20 min"
  ],
  "values": {
   "height_mm": 1200.0,
@@ -220,7 +221,7 @@
     "pulse_ms": 0.708481,
     "steps": 5137,
     "dt": 0.0,
-    "t_run": 372.980334,
+    "t_run": 260.981861,
     "xyz": [
      -42.105902,
      -21.933343,
@@ -237,7 +238,7 @@
     "pulse_ms": 0.704265,
     "steps": 5315,
     "dt": 0.0,
-    "t_run": 491.85039,
+    "t_run": 357.293699,
     "xyz": [
      -41.4525,
      -23.201575,
@@ -293,7 +294,7 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 1698.132922,
+ "t_total": 1225.500733,
  "solver": "Wobbl explicit (numpy)",
  "criteria": [
   {

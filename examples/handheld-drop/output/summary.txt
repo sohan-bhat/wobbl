@@ -28,6 +28,7 @@ Assumptions:
   - 2% of the part's mass is added at the nodes of the smallest elements so they do not hold the time step down (selective mass scaling); the momentum and energy checks include it.
   - Added mass: 45 g spread over 3916 nodes at 0,0,6 r=26.
   - Mirror symmetry of the part made these landings the same as one already run: -x face down stands for +x face down; -y face down stands for +y face down; -x-y-z corner down stands for -x+y-z corner down, +x-y-z corner down, +x+y-z corner down; -x-y+z corner down stands for -x+y+z corner down, +x-y+z corner down, +x+y+z corner down.
+  - Predicted run time 26 min against a budget of 50 min, so the mesh was left as meshed. The whole study took 20 min
 
 Suggested fixes:
   - A material good for 136 MPa: The worst landing peaks at 68.1 MPa; reaching the 2 target takes a material whose von Mises vs yield strength is at least 136 MPa at a similar stiffness, or a tougher grade that yields instead of cracking.
