@@ -128,6 +128,8 @@ def material(name, color=(0.5, 0.5, 0.5), metal=0.0, rough=0.5, normal=None, nor
         base_map = os.path.join(TEX, c)
     m = bpy.data.materials.new(name)
     m['base'] = name
+    if pbr:
+        m['pbr'] = 1
     m.use_nodes = True
     nt = m.node_tree
     b = nt.nodes['Principled BSDF']
@@ -281,7 +283,7 @@ def mats(unit=1.0):
         'steel_zinc': lambda: material('steel_zinc', (0.74, 0.75, 0.77), 1.0, 0.34, None, 0.5, (0.26, 0.44), 60 * d),
         'steel_dark': lambda: material('steel_dark', (0.16, 0.16, 0.17), 1.0, 0.4, None, 0.5, (0.32, 0.5), 60 * d),
         'aluminum_cast': lambda: material('aluminum_cast', (0.40, 0.41, 0.42), 1.0, 0.6, 'cast_n.png', 1.0, (0.52, 0.7), 25 * d),
-        'aluminum_machined': lambda: material('aluminum_machined', (0.8, 0.81, 0.82), 1.0, 0.22, 'brushed_n.png', 0.35, (0.16, 0.3), 30 * d),
+        'aluminum_machined': lambda: material('aluminum_machined', (0.8, 0.81, 0.82), 1.0, 0.24, None, 0.12, (0.2, 0.3), 90 * d),
         'plastic_black': lambda: material('plastic_black', (0.03, 0.03, 0.032), 0.0, 0.45, None, 0.6, (0.38, 0.55), 60 * d),
         'rubber': lambda: material('rubber', (0.018, 0.018, 0.018), 0.0, 0.72, None, 0.7, (0.62, 0.85), 80 * d),
         'paint_white': lambda: material('paint_white', (0.82, 0.82, 0.8), 0.0, 0.22, 'peel_n.png', 0.08, (0.16, 0.3), 30 * d, coat=1.0, coat_rough=0.04),
@@ -299,6 +301,18 @@ def mats(unit=1.0):
         'concrete': lambda: material('concrete', (1, 1, 1), 0.0, 0.85, None, 0.8, None, 1.6 * d, pbr='Concrete034', tone=0.55),
         'wood': lambda: material('wood', (1, 1, 1), 0.0, 0.6, None, 0.6, None, 2.0 * d, pbr='Wood049', tone=0.8),
         'rock': lambda: material('rock', (1, 1, 1), 0.0, 0.8, None, 1.0, None, 1.0 * d, pbr='Rock030', tone=0.85),
+        'label': lambda: material('label', (0.78, 0.78, 0.76), 0.0, 0.42),
+        'plastic_white': lambda: material('plastic_white', (0.8, 0.8, 0.78), 0.0, 0.38, None, 0.5, (0.32, 0.46), 60 * d),
+        'aluminum_anodized_gold': lambda: material('aluminum_anodized_gold', (0.75, 0.6, 0.32), 1.0, 0.32, None, 0.4, (0.26, 0.4), 30 * d),
+        'paint_wall': lambda: material('paint_wall', (0.36, 0.36, 0.35), 0.0, 0.82, 'fine_n.png', 0.3, (0.75, 0.9), 20 * d),
+        'acrylic': lambda: material('acrylic', (0.92, 0.95, 0.96), 0.0, 0.04, transmission=1.0, ior=1.49),
+        'cardboard': lambda: material('cardboard', (0.45, 0.32, 0.19), 0.0, 0.85, 'fine_n.png', 0.4, (0.78, 0.92), 30 * d),
+        'tape': lambda: material('tape', (0.55, 0.42, 0.25), 0.0, 0.3),
+        'cast_iron': lambda: material('cast_iron', (0.035, 0.035, 0.037), 0.0, 0.6, 'cast_n.png', 0.8, (0.5, 0.7), 40 * d),
+        'pei': lambda: material('pei', (0.42, 0.27, 0.09), 0.25, 0.55, 'cast_n.png', 0.6, (0.45, 0.65), 50 * d),
+        'brass': lambda: material('brass', (0.86, 0.66, 0.36), 1.0, 0.28, None, 0.4, (0.22, 0.38), 40 * d),
+        'enamel_white': lambda: material('enamel_white', (0.85, 0.85, 0.83), 0.0, 0.4),
+        'concrete_polished': lambda: material('concrete_polished', (1, 1, 1), 0.0, 0.35, None, 0.5, None, 1.6 * d, pbr='Concrete034', tone=0.7),
         'glass': lambda: material('glass', (0.86, 0.93, 0.9), 0.0, 0.02, transmission=1.0, ior=1.52),
         'frit': lambda: material('frit', (0.012, 0.012, 0.012), 0.0, 0.32),
     }
@@ -312,6 +326,8 @@ def finish(ob, unit=1.0, ao=512, ao_distance=None):
             ob.data.materials[i] = m.copy()
     dens = max((m.get('uv_scale', 1.0) for m in ob.data.materials if m), default=1.0)
     uv_tiles(ob, dens)
+    if ao and any(m.get('pbr') for m in ob.data.materials if m):
+        ao = 512   # the same size as the scanned maps, so the exporter can pack occlusion with their roughness
     if ao:
         bake_ao(ob, ao, distance=ao_distance)
     return ob
