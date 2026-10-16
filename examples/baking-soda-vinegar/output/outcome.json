@@ -159,7 +159,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 5.927433,
+ "t_total": 27.189122,
  "solver": "Wobbl reaction thermochemistry on NASA Glenn and NBS data, equilibrium with Cantera",
  "criteria": []
 }

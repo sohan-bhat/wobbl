@@ -11,7 +11,7 @@
   ],
   "reasons": [
    {
-    "decided": "domain chemistry, as asked",
+    "decided": "the words \"baking soda and vinegar\" point to chemistry (reaction)",
     "override": "--domain chemistry"
    },
    {
@@ -45,8 +45,8 @@
    "verdict": "ok",
    "headline": "CH3COOH(aq) + NaHCO3(s) -> CH3COONa(aq) + H2O(l) + CO2(g) takes in 31.1 kJ per mole as written and goes forward on its own at 298 K (dG = -13.3 kJ, K = 214). At equilibrium 99.5% of it reacts at 1.01 bar. In 1201 g of vinegar at 5% it cools the solution by 6.2 K. It gives off 24.5 L of gas per mole at 298 K and 101 kPa.",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/baking-soda-vinegar/output",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/baking-soda-vinegar/output/report.html",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/baking-soda-vinegar/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/baking-soda-vinegar/output/report.html",
    "assumptions": [
     {
      "assumed": "temperature not given: assumed 25 C (298.15 K)",
