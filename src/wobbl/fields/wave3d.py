@@ -797,7 +797,8 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
     rows: dict[float, dict] = {}
 
     def at(f: float, i: int, n: int) -> dict:
-        r = _solve(msh, s, f, fd, sph, work / "base" / f"f{len(rows)}", pl if f == s.f0 else None, cuts=f == s.f0)
+        # every frequency keeps its slice and its full pattern, so the 3D view can show any one of them
+        r = _solve(msh, s, f, fd, sph, work / "base" / f"f{len(rows)}", pl, cuts=True)
         log("solve", f"{fmt(f / 1e6)} MHz ({i} of {n}), {r['dofs']:,} unknowns, Z = {_zs(r['Z'])}")
         rows[f] = r
         return r
@@ -1018,7 +1019,8 @@ def run(scene: Scene, setup: WaveSetup, out_dir, question: str = "", quality: st
     try:
         from . import antscene
         antscene.write(out, title=f"The {title or name} at {fmt(s.f0 / 1e6)} MHz", question=question, scene=scene, setup=s,
-                       feed=fd, msh=msh, plane=pl, base=base, gain_db=gdb, eff=eff, f0=s.f0,
+                       feed=fd, msh=msh, plane=pl, base=base, gain_db=gdb, eff=eff, f0=s.f0, rows=rows,
+                       z0=s.port.z0, resonance=res[0] if res else None,
                        verdict=({"ok": "WORKS", "marginal": "MARGINAL", "fails": "FAILS"}[verdict], head,
                                 {"ok": "pass", "marginal": "warn", "fails": "fail"}[verdict]))
     except Exception as e:  # noqa: BLE001  a picture must not lose a solved study

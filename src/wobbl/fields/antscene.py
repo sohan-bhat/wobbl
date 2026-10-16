@@ -1,9 +1,14 @@
 """The 3D scene of an antenna run: the real conductors the solver meshed, the feed, the electric field on a slice
-through the feed playing over one radio frequency cycle, and the radiation pattern as a balloon around the antenna.
+through the feed, and the radiation pattern as a balloon around the antenna.
+
+When the run kept every sweep frequency's slice and pattern, the scene is a slider over the frequency, opening at
+the working one: the slice shows the field strength solved at that frequency, the balloon its gain pattern, and
+S11, the impedance, the gain and the efficiency are read there. A run with only the working frequency plays that
+field over one radio frequency cycle instead.
 
 Everything drawn comes from the run. The conductor surfaces are the triangles the solver used, the slice is the
-field it solved (a phasor, played as Re(E e^(j w t))), and the balloon is its far field gain. Only the balloon's
-size is chosen for the eye, and the viewer says so.
+field it solved, and the balloon is its far field gain. Only the balloon's size is chosen for the eye, and the
+viewer says so.
 """
 from __future__ import annotations
 
@@ -63,16 +68,34 @@ def balloon(d: np.ndarray, th: np.ndarray, ph: np.ndarray, eff: float, radius: f
     return X, np.concatenate([np.c_[a, b, c], np.c_[a, c, e]]), 10 * np.log10(g.ravel())
 
 
+def _efficiency(r: dict) -> float:
+    return min(max((r["p_in"] - r["p_diel"]) / r["p_in"], 0.0), 1.0) if r.get("p_in", 0) > 0 else 0.0
+
+
 def write(out: Path, *, title: str, question: str, scene, setup, feed: dict, msh, plane: dict, base: dict, gain_db: float,
-          eff: float, verdict: tuple[str, str, str], f0: float, dims_note: str = "") -> Path:
+          eff: float, verdict: tuple[str, str, str], f0: float, dims_note: str = "", rows: dict | None = None,
+          z0: float = 50.0, resonance: float | None = None) -> Path:
     """Build and save scene.wobbl for one antenna run. base is the working frequency's solve (with its slice and
-    its pattern on a full sphere)."""
+    its pattern on a full sphere). rows, every sweep frequency's solve, makes it a frequency slider when each one
+    kept its slice and pattern."""
     mm = 1e3
-    s = VizScene(title, domain="antenna", question=question, length="mm",
-                 source="The conductors are the surfaces the solver meshed. The slice is the solved electric field "
-                        f"at {f0 / 1e9:.4g} GHz played over one cycle. The balloon is the far field gain, drawn with "
-                        "its radius growing with the field strength and sized to read, not to scale.")
-    s.timeline(np.arange(FRAMES) / FRAMES, unit="cycle", label="phase", seconds=5, between="interpolated")
+    fs = sorted(f for f, r in (rows or {}).items() if r.get("slice") is not None and r.get("d_sphere") is not None)
+    sweep = len(fs) > 1 and f0 in fs
+    nf = len(fs) if sweep else FRAMES
+    if sweep:
+        s = VizScene("The antenna at the frequency you pick", domain="antenna", question=question, length="mm",
+                     source="The conductors are the surfaces the solver meshed. The slice is the electric field "
+                            "solved at each frequency of the sweep, for 1 A at the feed, and read between them. The "
+                            "balloon is that frequency's far field gain, its radius growing with the field strength "
+                            "and sized to read, not to scale.")
+        s.timeline(np.array(fs) / 1e6, unit="MHz", label="frequency", between="interpolated", kind="input",
+                   design=f0 / 1e6)
+    else:
+        s = VizScene(title, domain="antenna", question=question, length="mm",
+                     source="The conductors are the surfaces the solver meshed. The slice is the solved electric "
+                            f"field at {f0 / 1e9:.4g} GHz played over one cycle. The balloon is the far field gain, "
+                            "drawn with its radius growing with the field strength and sized to read, not to scale.")
+        s.timeline(np.arange(FRAMES) / FRAMES, unit="cycle", label="phase", seconds=5, between="interpolated")
     # conductors, dielectric and the feed
     metal = {setup_name for setup_name in list(setup.metals) + list(setup.sheets)}
     tags = {msh.tags[n] for n in metal if n in msh.tags}
@@ -99,9 +122,14 @@ def write(out: Path, *, title: str, question: str, scene, setup, feed: dict, msh
         c = int(np.argmax(np.abs(np.asarray(feed["t"], float))))     # the component along the feed, so the wave reads
         ec = e[..., c]                                                # as a wave (a thin wire's near field is radial)
         top = float(np.nanpercentile(np.abs(ec), 92)) or 1.0
-        ph = np.arange(FRAMES) / FRAMES * 2 * math.pi
-        raw = np.real(ec[None] * np.exp(1j * ph)[:, None, None]) / top
-        sig = np.sign(raw) * np.sqrt(np.minimum(np.abs(raw), 1.0))      # square root keeps the far field visible
+        if sweep:
+            # the field strength along the feed at each frequency, against the working frequency's 92nd percentile
+            mags = np.stack([np.abs(rows[f]["slice"][..., c] + 1j * rows[f]["slice"][..., 3 + c]) for f in fs])
+            sig = np.sqrt(np.minimum(mags / top, 1.5))                 # square root keeps the far field visible
+        else:
+            ph = np.arange(FRAMES) / FRAMES * 2 * math.pi
+            raw = np.real(ec[None] * np.exp(1j * ph)[:, None, None]) / top
+            sig = np.sign(raw) * np.sqrt(np.minimum(np.abs(raw), 1.0))
         uu = np.linspace(plane["u0"], plane["u1"], nu) * mm
         vv = np.linspace(plane["v0"], plane["v1"], nv) * mm
         gu, gv = np.meshgrid(uu, vv)
@@ -113,22 +141,60 @@ def write(out: Path, *, title: str, question: str, scene, setup, feed: dict, msh
         keep = ok[q[0]] & ok[q[1]] & ok[q[2]] & ok[q[3]]
         tri = np.concatenate([np.c_[q[0], q[1], q[2]][keep], np.c_[q[0], q[2], q[3]][keep]])
         if len(tri):
-            vals = np.nan_to_num(sig.reshape(FRAMES, -1))
+            vals = np.nan_to_num(sig.reshape(nf, -1))
             m = s.mesh(P, tri, name="electric field", opacity=0.82, max_vertices=nu * nv + 1, smooth=True)
-            m.color_by(f"E{'xyz'[c]}", vals, unit="of the 92nd percentile, square rooted", colormap="coolwarm", range=[-1, 1], digits=2)
+            if sweep:
+                m.color_by(f"|E{'xyz'[c]}|", vals, unit=f"of the 92nd percentile at {f0 / 1e6:.4g} MHz, square rooted",
+                           colormap="inferno", range=[0, float(np.sqrt(1.5))], digits=2)
+            else:
+                m.color_by(f"E{'xyz'[c]}", vals, unit="of the 92nd percentile, square rooted", colormap="coolwarm",
+                           range=[-1, 1], digits=2)
     # the radiation pattern
     d = base.get("d_sphere")
     if d is not None:
         pts = np.array([a, b_, *(X * mm if len(X) else [])])
         center = 0.5 * (pts.min(0) + pts.max(0))
         rad = 0.5 * float(np.linalg.norm(pts.max(0) - pts.min(0))) + 0.1 * C0 / f0 * mm
-        Xb, Tb, gdb = balloon(d, base["sphere_theta"], base["sphere_phi"], eff, rad, center)
-        m = s.mesh(Xb, Tb, name="radiation pattern", opacity=0.28, max_vertices=len(Xb) + 1, smooth=True)
-        m.color_by("gain", np.tile(gdb, (FRAMES, 1)), unit="dBi", colormap="turbo",
-                   range=[max(gdb.max() - 30, -20), gdb.max()], digits=3)
-        s.label(f"peak gain {gain_db:.1f} dBi", Xb[int(np.argmax(gdb))].tolist(), kind="note")
-    s.readout("gain", np.full(FRAMES, gain_db), unit="dBi", digits=3)
-    s.readout("efficiency", np.full(FRAMES, 100 * eff), unit="%", digits=3)
+        if sweep:
+            # every frequency's balloon on one scale, so a pattern that gains or loses shows it in its size
+            effs = [_efficiency(rows[f]) for f in fs]
+            top_g = max(float(np.max(rows[f]["d_sphere"])) * e_ for f, e_ in zip(fs, effs))
+            made = []
+            for f, e_ in zip(fs, effs):
+                g = np.maximum(rows[f]["d_sphere"] * e_, 1e-6)
+                Xf, Tb, gf = balloon(g, base["sphere_theta"], base["sphere_phi"], 1.0, rad, center)
+                Xf = center + (Xf - center) * math.sqrt(float(g.max()) / top_g)
+                made.append((Xf, gf))
+            i0 = fs.index(f0)
+            Xb = made[i0][0]
+            m = s.mesh(Xb, Tb, name="radiation pattern", opacity=0.28, max_vertices=len(Xb) + 1, smooth=True)
+            m.deform(np.stack([Xf - Xb for Xf, _ in made]))
+            G = np.stack([gf for _, gf in made])
+            m.color_by("gain", G, unit="dBi", colormap="turbo", range=[max(float(G.max()) - 30, -20), float(G.max())],
+                       digits=3)
+            s.label("peak gain {peak gain}", Xb[int(np.argmax(made[i0][1]))].tolist(), kind="note")
+        else:
+            Xb, Tb, gdb = balloon(d, base["sphere_theta"], base["sphere_phi"], eff, rad, center)
+            m = s.mesh(Xb, Tb, name="radiation pattern", opacity=0.28, max_vertices=len(Xb) + 1, smooth=True)
+            m.color_by("gain", np.tile(gdb, (FRAMES, 1)), unit="dBi", colormap="turbo",
+                       range=[max(gdb.max() - 30, -20), gdb.max()], digits=3)
+            s.label(f"peak gain {gain_db:.1f} dBi", Xb[int(np.argmax(gdb))].tolist(), kind="note")
+    if sweep:
+        Z = np.array([rows[f]["Z"] for f in fs])
+        gam = np.abs((Z - z0) / (Z + z0))
+        s.readout("S11", 20 * np.log10(np.maximum(gam, 1e-6)), unit="dB", digits=3, limit=-10)
+        s.readout("power taken in", 100 * (1 - gam ** 2), unit="%", digits=3)
+        effs = np.array([_efficiency(rows[f]) for f in fs])
+        dmax = np.array([rows[f]["d_max"] if math.isfinite(rows[f]["d_max"]) else 0.0 for f in fs])
+        s.readout("peak gain", 10 * np.log10(np.maximum(dmax * effs, 1e-12)), unit="dBi", digits=3)
+        s.readout("efficiency", 100 * effs, unit="%", digits=3)
+        s.readout("resistance", Z.real, unit="ohm", digits=3)
+        s.readout("reactance", Z.imag, unit="ohm", digits=3)
+        if resonance and fs[0] <= resonance <= fs[-1]:
+            s.event(resonance / 1e6, "resonance", "the reactance crosses zero")
+    else:
+        s.readout("gain", np.full(FRAMES, gain_db), unit="dBi", digits=3)
+        s.readout("efficiency", np.full(FRAMES, 100 * eff), unit="%", digits=3)
     word, line, tone = verdict
     s.verdict(word, line, tone=tone)
     if dims_note:
