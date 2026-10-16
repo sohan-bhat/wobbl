@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 
 from ..simulate import Analysis, Option, register
 from ..simulate.intent import phrases
@@ -58,9 +59,21 @@ def trajectory(job):
     wind = job.value("wind") or ""
     if job.path is not None:
         st = study_from(name=job.value("name") or "", wind=wind, question=job.question, spec=str(job.path))
-    elif job.kind == "rocket":
-        raise ValueError("a rocket needs its spec, with its motor, nose, fins, balance point, rail and parachutes, "
-                         "as in examples/rocket-launch/rocket.toml")
+    elif job.kind == "rocket":   # no spec: a typical rocket for the motor the words name, written out to edit
+        from .spec import read_spec
+        from .typical import design, toml
+
+        spec, said = design(job.text)
+        job.out.mkdir(parents=True, exist_ok=True)
+        written = job.out / "rocket.toml"
+        written.write_text(toml(spec))
+        job.assume(f"no rocket spec given, so Wobbl flew {said}",
+                   f"your own rocket.toml first, as in examples/rocket-launch/rocket.toml, or edit {written}")
+        st = read_spec(spec, job.question)
+        st.name = job.value("name") or st.name
+        if wind:
+            from .spec import quantity
+            st.wind = quantity(wind, "speed", "--wind")
     else:
         r = read_flight(job.text)
         for k in ("name", "mass", "density", "diameter", "cd", "height", "speed", "angle"):
@@ -96,6 +109,15 @@ def motor(job):
     if job.path is not None:
         source = str(job.path)
     else:
+        if not job.values("grain"):   # nothing given: a typical hobby motor from the words, said as a guess
+            from ..chem.typical import design
+            flags, said = design(job.text)
+            flags = {k: job.value(k) or v for k, v in flags.items()}
+            job.assume(f"no motor spec given, so Wobbl designed {said}",
+                       " ".join(f"--{k} {shlex.quote(v)}" for k, v in flags.items()) +
+                       ", or pass your motor.toml first, as in examples/knsb-motor/motor.toml")
+            for k, v in flags.items():
+                job.options[k] = [v]
         source = spec_from_flags(job.value("propellant") or "", job.values("grain"), job.value("throat") or "",
                                  job.value("exit") or "", job.value("casing") or "", job.number("efficiency"))
     ms = read_spec(source, job.question)
