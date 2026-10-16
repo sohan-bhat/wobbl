@@ -722,3 +722,4 @@ html { scrollbar-color: #3a3e45 #0e0f11; scrollbar-width: thin; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+#search-ui.search-loading { min-height: 58px; }

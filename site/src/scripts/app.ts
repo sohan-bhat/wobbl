@@ -91,31 +91,50 @@ document.addEventListener('keydown', (e) => {
 // ---- search: Pagefind, loaded the first time the dialog opens ---------------------
 
 let searchReady = false;
-function openSearch() {
+// Astro swaps the head on every page change, which drops a stylesheet added at run time while the dialog
+// itself persists, so the Pagefind styles are put back each time the dialog opens
+function searchStyles(bundle: string): Promise<void> {
+  const have = document.getElementById('pagefind-ui-css') as HTMLLinkElement | null;
+  if (have) return Promise.resolve();
+  return new Promise((done) => {
+    const css = document.createElement('link');
+    css.id = 'pagefind-ui-css';
+    css.rel = 'stylesheet';
+    css.href = `${bundle}pagefind-ui.css`;
+    css.onload = css.onerror = () => done();
+    document.head.append(css);
+  });
+}
+function searchScript(bundle: string): Promise<boolean> {
+  return new Promise((done) => {
+    const js = document.createElement('script');
+    js.src = `${bundle}pagefind-ui.js`;
+    js.onload = () => done(true);
+    js.onerror = () => done(false);
+    document.head.append(js);
+  });
+}
+async function openSearch() {
   const dialog = $<HTMLDialogElement>('#search-dialog');
   if (!dialog) return;
   dialog.showModal();
   const mount = $('#search-ui')!;
+  const bundle = mount.dataset.bundle!;
+  const styled = searchStyles(bundle);
   if (!searchReady) {
     searchReady = true;
-    const bundle = mount.dataset.bundle!;
-    const css = document.createElement('link');
-    css.rel = 'stylesheet';
-    css.href = `${bundle}pagefind-ui.css`;
-    document.head.append(css);
-    const js = document.createElement('script');
-    js.src = `${bundle}pagefind-ui.js`;
-    js.onload = () => {
-      // @ts-expect-error: PagefindUI is a global from the script above
-      new PagefindUI({ element: '#search-ui', baseUrl: mount.dataset.base, bundlePath: bundle, showImages: false,
-        resetStyles: false, translations: { placeholder: 'Search the docs…' } });
-      mount.querySelector('input')?.focus();
-    };
-    js.onerror = () => { mount.textContent = 'Search is built with the site. Run npm run build to try it locally.'; };
-    document.head.append(js);
+    // the box is built only once its styles are in, so it never shows as a bare input
+    mount.classList.add('search-loading');
+    const [ok] = await Promise.all([searchScript(bundle), styled]);
+    mount.classList.remove('search-loading');
+    if (!ok) { mount.textContent = 'Search is built with the site. Run npm run build to try it locally.'; return; }
+    // @ts-expect-error: PagefindUI is a global from the script above
+    new PagefindUI({ element: '#search-ui', baseUrl: mount.dataset.base, bundlePath: bundle, showImages: false,
+      resetStyles: false, translations: { placeholder: 'Search the docs…' } });
   } else {
-    mount.querySelector('input')?.focus();
+    await styled;
   }
+  mount.querySelector('input')?.focus();
 }
 
 // ---- the docs menu on phones -----------------------------------------------------
