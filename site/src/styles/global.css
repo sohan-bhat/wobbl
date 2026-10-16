@@ -403,6 +403,10 @@ input[type="range"]:focus-visible { outline-offset: 2px; }
 .btn-outline { min-height: 40px; padding: 0 14px; }
 .btn-outline:hover, .copy:hover { border-color: var(--fg-2); }
 .btn-sm, .copy { --lip: 3px; min-height: 30px; padding: 0 10px; font-size: 12px; }
+/* The bending toggle, on the landing part and every example's view, with a box filled while the bending shows */
+.bend { display: inline-flex; align-items: center; gap: 8px; }
+.bend-box { width: 10px; height: 10px; flex: none; border: 1.5px solid currentColor; }
+.bend[aria-pressed="true"] .bend-box { background: var(--yellow); border-color: var(--yellow); }
 .copy[data-done] { --lip-color: #7a6600; background: var(--yellow); border-color: var(--yellow); color: var(--ink); }
 kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--line-2); color: var(--muted); }
 
@@ -627,6 +631,9 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .ex-h code { font-size: 0.78em; font-weight: 500; }
 .ex-fixes .fixes { margin-top: 28px; }
 .ex-card .run-metric p:first-child { font-size: clamp(2.4rem, 1.8rem + 1.4vw, 3.2rem); white-space: nowrap; }
+.ex-fold { margin-top: 96px; padding-top: 40px; border-top: 1px solid var(--line); }
+.ex-fold .ex-runs { margin-top: 32px; }
+.ex-fold-notes { margin-top: 48px; }
 .ex-notes { margin-top: 80px; padding-top: 8px; border-top: 1px solid var(--line); }
 
 /* A motion run's model: the effects it included, and how many state variables it solved */

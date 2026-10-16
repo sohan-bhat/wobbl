@@ -7,12 +7,15 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { url } from '../lib/site';
+import BENDING from '../data/bending.json';
 import { poster, posterSet } from '../lib/poster';
 import { WORD, fmt, reading, widths, type PartData } from '../scripts/reading';
 
 const man: PartData & { governing_MPa: number } =
   JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/cast-motor-mount.json'), 'utf-8'));
 const MAX = 4000;
+// the bending factor this part is drawn at everywhere on the site
+const BEND = BENDING['cast-motor-mount'];
 const r = reading(man, man.load_N, man.default_peak_MPa / man.load_N);
 const w = widths(man, MAX);
 // the browser reads what it needs of the manifest from the page instead of fetching it
@@ -44,7 +47,7 @@ const posterCamera = JSON.stringify({
     <div class="hint-hand" hidden aria-hidden="true">
       <svg viewBox="0 0 24 26" width="24" height="26"><circle class="hint-ring" cx="5" cy="4" r="4" /><path d="M5 4v15.5l4.1-3.7 2.9 6.4 2.7-1.2-2.9-6.3h5.6Z" /></svg>
     </div>
-    <button type="button" class="btn-outline btn-sm bend" id="bend" aria-pressed="true"><span class="bend-box" aria-hidden="true"></span>Bending &times;60</button>
+    <button type="button" class="btn-outline btn-sm bend" id="bend" aria-pressed="true" data-bend={BEND}><span class="bend-box" aria-hidden="true"></span>Bending &times;{BEND}</button>
   </div>
   <div class="part-controls">
     <div class="control">
@@ -52,7 +55,7 @@ const posterCamera = JSON.stringify({
       <input type="range" id="load" name="load" autocomplete="off" min="0" max={MAX} step="10" value={man.load_N}>
       <div class="legend" aria-hidden="true">
         <div class="legend-bar"><span class="legend-target"></span><span class="legend-peak" id="legend-peak" style={`left: ${Math.min(r.peak / man.allowable_MPa, 1) * 100}%`}></span></div>
-        <div class="legend-ticks"><span>0</span><span>{fmt(man.allowable_MPa / man.target_sf, 1)} target</span><span>{fmt(man.allowable_MPa)}&nbsp;MPa yield</span></div>
+        <div class="legend-ticks"><span>0</span><span>{fmt(man.allowable_MPa / man.target_sf, 1)} target</span><span>{fmt(man.allowable_MPa)}&nbsp;MPa limit</span></div>
       </div>
     </div>
     <div class="live">
@@ -85,10 +88,6 @@ const posterCamera = JSON.stringify({
   .hint-hand svg { display: block; overflow: visible; }
   .hint-hand path { fill: var(--fg); stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
   .hint-ring { fill: none; stroke: var(--yellow); stroke-width: 2; }
-
-  /* The bending toggle, with a box that is filled while the bending shows */
-  .bend-box { width: 10px; height: 10px; flex: none; border: 1.5px solid currentColor; }
-  .bend[aria-pressed="true"] .bend-box { background: var(--yellow); border-color: var(--yellow); }
 
   /* A note over the part, only near directions where the mesh reads off */
   .viewer-note {

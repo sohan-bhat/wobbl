@@ -27,7 +27,8 @@ export function initHero(viewer: HTMLElement): () => void {
   const out = { load: $('#load-out'), peak: $('#r-peak'), legend: $('#legend-peak') };
   const listeners = new Set<Listener>();
   const resetters = new Set<() => void>();
-  const BEND = 60; // displacement is drawn 60 times larger so the bending shows
+  // displacement is drawn this many times larger so the bending shows, the factor data/bending.json gives the part
+  const BEND = Number(bend.dataset.bend) || 60;
   const state: HeroState = { load: +loadIn.value, az: Math.round(man.pull.default_deg), el: 0, exag: BEND };
   const abort = new AbortController();
   let stop: (() => void) | null = null;

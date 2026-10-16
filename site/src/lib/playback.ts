@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { RUN_IMAGES, fixLabel, fmt3, type Example, type Run } from './examples';
 import { url } from './site';
+import BENDING from '../data/bending.json';
 
 interface Mesh { triangles: number; corners: number; nodes: number; linear: boolean; bounds_min: number[]; bounds_max: number[] }
 interface Base {
@@ -34,7 +35,11 @@ const cache = new Map<string, Record<string, PlayRun> | null>();
 export function playRuns(example: string): Record<string, PlayRun> | null {
   if (!cache.has(example)) {
     const f = resolve(DIR, `${example}.json`);
-    cache.set(example, existsSync(f) ? JSON.parse(readFileSync(f, 'utf-8')).runs : null);
+    const runs: Record<string, PlayRun> | null = existsSync(f) ? JSON.parse(readFileSync(f, 'utf-8')).runs : null;
+    // a part the site draws elsewhere too bends by the one factor data/bending.json gives it
+    const bend = (BENDING as Record<string, number | string>)[example];
+    if (runs && typeof bend === 'number') for (const r of Object.values(runs)) if (r.kind === 'strength') r.exag = bend;
+    cache.set(example, runs);
   }
   return cache.get(example)!;
 }
