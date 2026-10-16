@@ -1,15 +1,16 @@
 """The wobbl command line.
 
     wobbl simulate part.step "will it hold 200 N and stay under 60 C?"   any thing, any question
-    wobbl part.step "will it crack under 200 N?"                       the same, without the word simulate
     wobbl simulate "a 9 cm rock dropped from 300 m"                    words, names, formulas and specs too
     wobbl simulate --list                                              every domain, its physics and options
     wobbl inspect part.step                                            faces, holes, fillets, thickness
     wobbl check | report | fix | uncertainty | credibility | test-plan wobbl-out/part
     wobbl estimate | jobs | materials | validate | setup | doctor | mcp
 
-Every domain and scenario command (run, thermal, circuit, motion, mechanism, flow and the rest) still works
-as a hidden alias, so scripts keep running, but the help shows only simulate and the general verbs.
+Anything that is not a command goes to simulate as it is, so 'wobbl part.step "question"' and 'wobbl "question"'
+are a quiet alias that always does exactly what 'wobbl simulate' does with the same words. Every domain and
+scenario command (run, thermal, circuit, motion, mechanism, flow and the rest) still works as a hidden alias, so
+scripts keep running, but the help shows only simulate and the general verbs.
 """
 from __future__ import annotations
 
@@ -29,29 +30,31 @@ VISIBLE = ("simulate", "view", "inspect", "check", "report", "fix", "uncertainty
            "estimate", "jobs", "materials", "validate", "setup", "doctor", "mcp")
 
 
-def _routable(args) -> bool:
-    """Whether simulate can take a bare 'wobbl thing "question"', which needs an analysis registered for it."""
-    from ..simulate import RouteError, route
-    thing, rest = args[0], [a for a in args[1:] if not a.startswith("-")]
-    try:
-        route(thing, rest[0] if rest else "")
-    except (RouteError, KeyError, OSError):
-        return False
-    return True
+GROUP_FLAGS = ("-h", "--help", "-V", "--version")
+
+
+def _near_command(word: str, names) -> str | None:
+    """The command a lone word is a typo of, like doctr for doctor. A file, a question or a formula never is."""
+    import difflib
+    if not word or " " in word.strip() or "." in word or os.path.exists(word) or not word.isalpha():
+        return None
+    hit = difflib.get_close_matches(word.lower(), list(names), n=1, cutoff=0.8)
+    return hit[0] if hit else None
 
 
 class AskGroup(click.Group):
-    """Lets 'wobbl part.step "question"' and 'wobbl "question"' work next to the subcommands, through simulate."""
+    """Sends anything that is not a command to simulate, so 'wobbl part.step "question"' and 'wobbl "question"'
+    always behave exactly like 'wobbl simulate' with the same words."""
 
-    def resolve_command(self, ctx, args):
-        bare = args and args[0] not in self.commands and not args[0].startswith("-")
-        if bare and (" " in args[0].strip() or os.path.exists(args[0]) or "." in Path(args[0]).name):
-            if _routable(args):
-                return "simulate", self.commands["simulate"], list(args)
-            if " " in args[0].strip():
-                return "ask", self.commands["ask"], ["-", *args]  # a question with no file
-            return "ask", self.commands["ask"], args
-        return super().resolve_command(ctx, args)
+    def parse_args(self, ctx, args):
+        first = args[0] if args else None
+        if first is not None and first not in self.commands and first not in GROUP_FLAGS:
+            near = _near_command(first, [n for n, c in self.commands.items() if not c.hidden])
+            if near:
+                ui.fail(f"wobbl has no command '{first}'", f"Did you mean wobbl {near}? Or ask a question with "
+                                                           f'wobbl simulate "your question".')
+            args = ["simulate", *args]
+        return super().parse_args(ctx, args)
 
     def format_commands(self, ctx, formatter):
         rows = [(n, self.commands[n].get_short_help_str(limit=formatter.width - 22)) for n in VISIBLE
@@ -112,9 +115,14 @@ def _strength_options(f):
 def cli():
     """Wobbl: simulate anything before you build it.
 
-    Give simulate the thing and the question in plain words, as in
-    wobbl simulate part.step "will it hold 200 N and stay under 60 C?", and it
-    works out the physics.
+    \b
+    Ask in plain words, with or without a file
+      wobbl simulate "will a blue LED on 5V with a 47 ohm resistor fry?"
+      wobbl simulate bracket.step "will it hold 200 N and stay under 60 C?"
+      wobbl simulate --list
+
+    Wobbl works out the physics, runs a real solver, checks its answer and
+    says what it assumed. Start with wobbl setup, then wobbl doctor.
     """
 
 
@@ -224,10 +232,10 @@ def _strength(part, question, kw, interpret: bool):
     show_strength(o)
     pictures = getattr(o, "pictures", None)
     if pictures is not None:
-        with ui.console.status("  drawing the pictures", spinner="dots"):
+        with ui.status("drawing the pictures"):
             pictures.wait()
         if o.images.get("stress"):
-            ui.console.print(f"  heatmap  {o.images['stress']}  [dim](report updated)[/dim]")
+            ui.files([("heatmap", f"{o.images['stress']}  (report updated)")])
         ui.console.print()
 
 
@@ -250,29 +258,15 @@ def show_strength(o):
     from ..units import fmt_length, fmt_stress
 
     imp = o.imperial
-    word = {"holds": "HOLDS", "marginal": "MARGINAL", "fails": "FAILS"}[o.verdict]
-    ui.console.print()
-    ui.verdict_panel(word, o.verdict, o.headline,
-                     [("peak stress", fmt_stress(o.governing_MPa, imp)), ("safety factor", f"{o.safety_factor:.2f}"),
-                      ("target", f"{o.target_sf:g}"), ("max deflection", fmt_length(o.max_disp_mm, imp))],
-                     o.confidence, o.confidence_reasons)
-    ui.section("checks")
-    ui.checks_table(o.checks)
-    if o.fixes:
-        ui.section("how to fix it" if o.verdict != "holds" else "worth knowing")
-        for f in o.fixes:
-            ui.console.print(f"  [bold]{f['title']}[/bold]" + ("  [dim](auto)[/dim]" if f.get("auto") else ""))
-            ui.console.print(f"  [dim]{f['summary']}[/dim]")
-    ui.section("assumptions")
-    ui.bullets(o.assumptions[:8])
-    ui.section("files")
-    if o.images.get("stress"):
-        ui.console.print(f"  heatmap  {o.images['stress']}")
-    elif getattr(o, "pictures", None) is not None:
-        ui.console.print("  heatmap  [dim]drawing now, the report gains it in a moment[/dim]")
-    ui.console.print(f"  report   {o.report}")
-    ui.console.print(f"  summary  {Path(o.workdir) / 'summary.txt'}")
-    ui.console.print()
+    heatmap = o.images.get("stress") or ("drawing now, the report gains it in a moment"
+                                         if getattr(o, "pictures", None) is not None else "")
+    ui.outcome(o, word=o.verdict.upper(),
+               metrics=[("peak stress", fmt_stress(o.governing_MPa, imp)),
+                        ("safety factor", f"{o.safety_factor:.2f}"), ("target", f"{o.target_sf:g}"),
+                        ("max deflection", fmt_length(o.max_disp_mm, imp))],
+               fixes_title="how to fix it" if o.verdict != "holds" else "worth knowing", max_assumptions=8,
+               files_rows=[("heatmap", heatmap), ("report", o.report),
+                           ("summary", Path(o.workdir) / "summary.txt")])
 
 
 @cli.command()
@@ -366,7 +360,7 @@ def report(result_dir, open_it):
         from ..structural.report import write_outputs
         if not o.images.get("stress"):   # a run made without pictures gets them now, from its saved fields
             from ..structural.pipeline import pictures_from_fields
-            with ui.console.status("  drawing the pictures", spinner="dots"):
+            with ui.status("drawing the pictures"):
                 got = pictures_from_fields(o, Path(o.workdir))
             if got:
                 o.images.update(got)

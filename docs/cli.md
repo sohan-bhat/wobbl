@@ -9,8 +9,11 @@ keeps the shape of the command line and how new physics joins it.
 `wobbl simulate THING "question"` runs any physics on any thing. The thing is a file (a STEP, STL,
 BREP, IGES or parametric Python part, a SPICE netlist or KiCad schematic, a mechanism spec, a URDF or
 MJCF model, a rocket or motor spec), a folder (a finished result or an OpenFOAM case), a name, a
-formula, SMILES or an equation, or a sentence that describes it. `wobbl part.step "question"` and
-`wobbl "question"` do the same without the word simulate.
+formula, SMILES or an equation, or a sentence that describes it. `wobbl simulate "question"` works with
+no file at all. Anything that is not a command goes to simulate unchanged, so `wobbl part.step
+"question"` and `wobbl "question"` are a quiet alias that always does the same as the simulate form.
+A question that is not a simulation, like `wobbl simulate "hello"`, gets a short note on what Wobbl
+does with a few commands to try, and a part question with no file says which file to pass.
 
 | Option | What it does |
 |---|---|

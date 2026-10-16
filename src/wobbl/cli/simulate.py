@@ -108,20 +108,25 @@ def explicit(plan, steps) -> str:
     return " ".join(shlex.quote(p) for p in parts)
 
 
+def _overridable(rows) -> None:
+    """What Wobbl decided, each with the option that changes it on a dim line below."""
+    for decided, override in rows:
+        ui.say(decided)
+        if override:
+            ui.say(f"override with {override}", style="dim", indent=4)
+
+
 def show_plan(plan) -> None:
     ui.section("plan")
-    for decided, override in plan.reasons:
-        ui.console.print(f"  {decided}")
-        if override:
-            ui.console.print(f"  [dim]override with {override}[/dim]")
+    _overridable(plan.reasons)
 
 
 def show_step(step) -> None:
     o = step.outcome
     if step.error:
-        ui.console.print(f"  [red]{step.analysis.name} did not run: {step.error}[/red]")
+        ui.say(f"{step.analysis.name} did not run: {step.error}", style="red")
         if step.hint:
-            ui.console.print(f"  [dim]{step.hint}[/dim]")
+            ui.say(step.hint, style="dim")
         return
     if getattr(o, "domain", "") == "strength":
         from .main import show_strength
@@ -135,25 +140,19 @@ def show_step(step) -> None:
     if all(hasattr(o, k) for k in ("metrics", "checks", "assumptions", "images", "report")):
         from .thermal import show_generic
         return show_generic(o)
-    ui.console.print(f"  {step.get('verdict', '').upper()}  {step.get('headline', '')}")
+    ui.say(f"{step.get('verdict', '').upper()}  {step.get('headline', '')}")
 
 
 def show_many(plan, steps) -> None:
-    from rich.table import Table
-
     from ..simulate import overall
     word = overall(steps)
     style = {"pass": "holds", "marginal": "marginal", "fail": "fails"}.get(word, "marginal")
     ui.console.print()
     ui.verdict_panel(word.upper(), style, f"{len(steps)} physics on {Path(plan.thing).name or plan.thing}",
                      [(s.analysis.name, (s.get("verdict") or "error")) for s in steps], _lowest(steps),
-                     [f"{s.analysis.name}: {s.error or s.get('headline', '')}"[:110] for s in steps])
-    tb = Table(box=None, header_style="dim", padding=(0, 2))
-    for c in ("physics", "verdict", "confidence", "result"):
-        tb.add_column(c)
-    for s in steps:
-        tb.add_row(s.analysis.name, s.get("verdict") or "error", s.get("confidence") or "", str(s.job.out))
-    ui.console.print(tb)
+                     [f"{s.analysis.name}: {s.error or s.get('headline', '')}" for s in steps])
+    ui.section("results")
+    ui.files([(s.analysis.name, s.job.out) for s in steps])
 
 
 def _lowest(steps) -> str:
@@ -168,9 +167,8 @@ def show_readings(steps) -> None:
         return
     ui.section("what wobbl read from the question")
     many = len(steps) > 1
-    for name, k, vs in rows:
-        ui.console.print(f"  {name + '  ' if many else ''}{k} {', '.join(vs)}")
-        ui.console.print(f"  [dim]override with {' '.join(f'--{k} {shlex.quote(v)}' for v in vs)}[/dim]")
+    _overridable([(f"{name + '  ' if many else ''}{k} {', '.join(vs)}",
+                   " ".join(f"--{k} {shlex.quote(v)}" for v in vs)) for name, k, vs in rows])
 
 
 def show_guesses(steps, title: str = "what wobbl assumed") -> None:
@@ -179,10 +177,7 @@ def show_guesses(steps, title: str = "what wobbl assumed") -> None:
         return
     ui.section(title)
     many = len(steps) > 1
-    for name, t, o in rows:
-        ui.console.print(f"  {name + '  ' if many else ''}{t}")
-        if o:
-            ui.console.print(f"  [dim]override with {o}[/dim]")
+    _overridable([(f"{name + '  ' if many else ''}{t}", o) for name, t, o in rows])
 
 
 def show_catalog() -> None:
@@ -244,6 +239,84 @@ def start_job(plan, opts, remote: str, as_json: bool, out: str | None = None) ->
     ui.console.print(f"  follow it with wobbl jobs status {d.get('job_id', '')}\n")
 
 
+GREETING = re.compile(r"^\W*(?:hi|hello|hey|hiya|howdy|yo|sup|help|thanks|thank you|ok|okay|test)\b|"
+                      r"\b(?:what|how)\s+(?:do|does|can|could|would)\s+(?:you|u|yo?i?u|ya|wobbl|this|it)\b|"
+                      r"\bwho\s+are\s+(?:you|u)\b|\bwhat\s+(?:is|are)\s+(?:wobbl|you|this)\b", re.I)
+
+
+def part_question(text: str):
+    """The file only domain (a CAD part, say) whose physics a question with no file asks for, or None."""
+    from ..simulate.registry import analyses, domains
+    for d in domains():
+        if not d.extensions or d.words or d.recognize:
+            continue      # only domains that need their file; a circuit or a rocket can be described in words
+        for a in analyses(d.name):
+            if any(re.search(rx, text, re.I) for rx in a.keywords):
+                return d
+    return None
+
+
+def unrouted(thing: str, question: str, e, as_json: bool) -> None:
+    """A question Wobbl could not route: say which file a part question needs, and otherwise say what Wobbl does
+    instead of an error. Returns only when the error should stand, as for a file that does not exist."""
+    from ..simulate.router import _as_path
+    text = " ".join(x for x in (thing, question) if x).strip()
+    if _as_path(thing) is not None or "file not found" in str(e):
+        return
+    d = part_question(text)
+    if d is not None:
+        kinds = ", ".join(d.extensions)
+        ui.fail(f"this question is about a {d.name}, so Wobbl needs its file",
+                f'Pass the file first, as in wobbl simulate bracket.step "{text}". Wobbl reads {kinds} files.')
+    introduce(text, as_json)
+    sys.exit(0 if not text or GREETING.search(text) else 2)
+
+
+def introduce(text: str, as_json: bool) -> None:
+    """A short answer about what Wobbl does, with a few commands to try."""
+    examples = ['wobbl simulate "will a blue LED on 5V with a 47 ohm resistor fry?"',
+                'wobbl simulate "a 9 cm rock dropped from 300 m, how fast does it land?"',
+                'wobbl simulate bracket.step "will it hold 200 N?"']
+    unknown = bool(text) and not GREETING.search(text)
+    lead = f'Wobbl found nothing to simulate in "{text}".' if unknown else "Hi, this is Wobbl."
+    about = ("It simulates things before you build them. Give it a CAD part, a circuit, a mechanism, a rocket "
+             "or a few words, and ask your question in plain words. It picks the physics, runs a real solver, "
+             "checks its own answer and says what it assumed.")
+    if as_json:
+        click.echo(json.dumps({"simulated": False, "message": f"{lead} {about}", "examples": examples}, indent=1))
+        return
+    ui.console.print()
+    ui.say(lead, style="bold")
+    ui.say(about)
+    ui.section("try one of these")
+    for ex in examples:
+        ui.line(f"  {ex}")
+    ui.console.print()
+    ui.say("wobbl simulate --list shows everything Wobbl can simulate.", style="dim")
+    ui.console.print()
+
+
+def usual_time(plan, opts) -> float | None:
+    """How long this plan usually takes here, from the runs the estimator has measured, without meshing or
+    solving anything. None when any analysis has no measured or bundled time yet."""
+    try:
+        from ..jobs.workload import PRIORS, analysis_workload, history
+        total = 0.0
+        for a in plan.analyses:
+            w = analysis_workload(a, plan.thing, opts)
+            runs, _ = history(w)
+            times = sorted(r["measured_time"] for r in runs[-12:] if r.get("measured_time"))
+            if times:
+                total += times[len(times) // 2]
+            elif w.command.split()[0] in PRIORS:
+                total += PRIORS[w.command.split()[0]]
+            else:
+                return None
+        return total or None
+    except Exception:  # noqa: BLE001  an estimate is a nicety, never a reason to fail a run
+        return None
+
+
 def open_view(path: Path) -> None:
     import webbrowser
     webbrowser.open(Path(path).resolve().as_uri())
@@ -303,10 +376,12 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
         return show_catalog()
     thing, question, extra = split_args(args)
     if not thing and not question:
-        raise click.UsageError("pass the thing to simulate, e.g. wobbl simulate bracket.step \"will it hold 200 N?\"")
+        return introduce("", as_json)
     try:
         plan = route(thing, question, list(physics), domain, kind)
     except RouteError as e:
+        if not (physics or domain or kind):
+            unrouted(thing, question, e, as_json)
         ui.fail(str(e), e.hint)
     opts = options_from(material, loads, fixes, sets, extra)
     check_options(plan, opts)
@@ -328,9 +403,9 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
         show_guesses(steps, "what wobbl would assume")
         for s in steps:
             if s.error or s.hint:
-                ui.console.print(f"  [dim]{s.analysis.name}: {s.error or s.hint}[/dim]")
+                ui.say(f"{s.analysis.name}: {s.error or s.hint}", style="dim")
         ui.section("explicit form")
-        ui.console.print(f"  {explicit(plan, steps)}", soft_wrap=True)
+        ui.line(f"  {explicit(plan, steps)}")
         return
     if estimate_only:
         return show_estimate(plan, opts, as_json)
@@ -339,7 +414,8 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
     from .main import _out_dir
     out_dir = _out_dir(out_name(plan), out)
     try:
-        with ui.progress(not quiet and not as_json) as cb:
+        with ui.progress(not quiet and not as_json, eta=usual_time(plan, opts),
+                         start=("running", ", ".join(plan.names))) as cb:
             steps = run_plan(plan, opts, out_dir, cb, quick or no_images)
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e).strip("'\""), getattr(e, "hint", ""))
@@ -361,9 +437,9 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
     show_readings(steps)
     show_guesses(steps)
     ui.section("explicit form")
-    ui.console.print(f"  {cmd}", soft_wrap=True)
-    if page:
-        ui.console.print(f"\n  view     {page}")
-        if not no_open and sys.stdout.isatty():
-            open_view(page)
-    ui.console.print(f"  results  {out_dir}\n")
+    ui.line(f"  {cmd}")
+    ui.console.print()
+    ui.files([("view", page), ("results", out_dir)])
+    if page and not no_open and sys.stdout.isatty():
+        open_view(page)
+    ui.console.print()
