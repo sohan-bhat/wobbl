@@ -1,7 +1,7 @@
 {
   "name": "wobbl",
   "version": "0.1.1",
-  "description": "Simulate anything before you build it. Runs the Wobbl CLI and MCP server with npx.",
+  "description": "Simulate anything before you build it. Installs the Wobbl CLI and MCP server with npm or npx.",
   "keywords": [
     "simulation",
     "fea",
@@ -33,6 +33,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test test/launcher.test.js test/install.test.js test/progress.test.js"
+    "postinstall": "node lib/postinstall.js",
+    "test": "node --test test/launcher.test.js test/install.test.js test/postinstall.test.js test/progress.test.js"
   }
 }

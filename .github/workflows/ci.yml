@@ -103,6 +103,6 @@ jobs:
           npm pack --dry-run --json | node -e '
             const files = JSON.parse(require("fs").readFileSync(0, "utf8"))[0].files.map((f) => f.path).sort();
             console.log(files.join("\n"));
-            const want = ["LICENSE", "README.md", "bin/wobbl.js", "lib/progress.js", "package.json"];
+            const want = ["LICENSE", "README.md", "bin/wobbl.js", "lib/postinstall.js", "lib/progress.js", "package.json"];
             if (JSON.stringify(files) !== JSON.stringify(want)) process.exit(1);
           '
