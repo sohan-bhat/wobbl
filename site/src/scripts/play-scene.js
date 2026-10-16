@@ -4,7 +4,7 @@
 // are round tubes and props are solid and matte. The viewer's text labels and its readout list are left
 // to the page, which shows only the peak marker and the probe.
 import {
-  BackSide, Box3, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, CustomBlending, CylinderGeometry,
+  AdditiveBlending, BackSide, Box3, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, CustomBlending, CylinderGeometry,
   DoubleSide, DataTexture, FrontSide, Group, InstancedBufferAttribute, LinearFilter, InstancedMesh, LineBasicMaterial, LineSegments,
   Matrix4, Mesh, MeshPhysicalMaterial, OneFactor, OneMinusSrcAlphaFactor, PlaneGeometry, Quaternion, Raycaster, Scene,
   ShaderMaterial, SphereGeometry, TorusGeometry, Vector3,
@@ -174,7 +174,12 @@ ${SRGB}`)
     diffuseColor.rgb *= clamp(0.06 / max(y, 1e-4), 1.0, 4.5);
   }` : ''}`)
     .replace('#include <opaque_fragment>', `
-  ${unlit ? 'outgoingLight = diffuseColor.rgb * 1.5;' : ''}
+  ${unlit ? `{
+    // a flame or a plume glows: brightest where it is thickest along the view, white hot in the core and fading
+    // to nothing at its edges, added to what is behind it
+    float through = pow(clamp(abs(dot(normalize(vNormal), normalize(vViewPosition))), 0.0, 1.0), 1.4);
+    outgoingLight = mix(diffuseColor.rgb, vec3(1.0, 0.93, 0.8), 0.45 * through) * (0.35 + 1.6 * through);
+  }` : ''}
   outgoingLight = mix(outgoingLight, toLinear(uGlowC) * 1.6, uGlow);
   ${glass ? `// glass: what is behind shows through, the reflections stay whole (premultiplied, one minus alpha)
   outgoingLight = totalDiffuse * uAlpha + totalSpecular;
@@ -201,6 +206,7 @@ function material(o, { prop = false, shell = false, field = null, tube = false, 
   if (glass) {
     Object.assign(m, { transparent: true, depthWrite: false, blending: CustomBlending, blendSrc: OneFactor, blendDst: OneMinusSrcAlphaFactor });
   }
+  if (unlit) Object.assign(m, { transparent: true, depthWrite: false, blending: AdditiveBlending, side: FrontSide });
   const opts = { field: !!field, tube, glass, unlit, lift: !prop };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniforms);
