@@ -88,13 +88,21 @@ export function scenePlay(h, arr) {
   const repeats = (r) => q && r.values.every((v, i) => !Number.isFinite(q.values[i]) || Math.abs(v - q.values[i]) <= 0.01 * Math.max(Math.abs(q.values[i]), 1e-9));
   const also = h.readouts.filter((r) => !sameAsInput(r) && varies(r.values) && !repeats(r) && (!q || r.name !== q.name.replace(/^peak /, '') && r.name !== q.name))
     .slice(0, 2).map((r) => ({ name: r.name, unit: r.unit || '', digits: r.digits ?? 3, values: r.values.map(r6) }));
+  // named values along the input that the run compares, such as wet and dry glass or a box's modes: two or
+  // more marked moments that are neither a failure nor a warning. The page shows them side by side.
+  const named = (h.events || []).filter((e) => e.kind === 'info' && e.t !== null && e.t >= t[0] && e.t <= t[F - 1]);
+  const alts = named.length >= 2 ? named.map((e) => {
+    let at = tPos(e.t);
+    if (tl.between !== 'exact') at = Math.round(at);
+    return { name: cap(e.name), at: r6(at) };
+  }) : null;
   const exag = Math.max(1, ...h.objects.filter((o) => o.deform && !o.guide).map((o) => o.deform.exaggerate || 1));
   const cam = h.camera || {};
   const d = cam.dir || [0.62, -1.05, 0.62], l = Math.hypot(...d);
   return {
     kind: 'scene', title: h.title || '', domain: h.domain || '',
     input: { label: cap(tl.label || 'frame'), unit: tl.unit || '', t: t.map(r6), between: tl.between, kind: tl.kind || 'time', home: r6(home), design: tl.design ?? null },
-    q, peaks: peaks && peaks.map((p) => p && { v: p.v, p0: p.p0, pe: p.pe }), event, also,
+    q, peaks: peaks && peaks.map((p) => p && { v: p.v, p0: p.p0, pe: p.pe }), event, also, alts,
     exag: +exag.toPrecision(3), magnify: h.magnify ? { factor: h.magnify.factor, label: h.magnify.label || 'Drawn', groups: h.magnify.groups } : null,
     camera: { view: d.map((x) => x / l), fov: cam.fov || 30 }, bounds: sceneBounds(h, arr),
     verdict: h.verdict ? { word: h.verdict.word, tone: h.verdict.tone, line: h.verdict.line } : null,

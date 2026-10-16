@@ -112,6 +112,8 @@ const STOPS = {
   blues: '0b1a33 0f3b6e 1663a6 2f8fd1 6bb8e8 b6e0f7',
   gray: '303338 e6e6e6',
   heat: '9a9488 c9a05a e8742a f2401f',
+  // low in blue, high in red, as Wobbl's own plots draw a level or a pressure (matplotlib's RdBu_r)
+  RdBu: '053061 2166ac 4393c3 92c5de d1e5f0 f7f7f7 fddbc7 f4a582 d6604d b2182b 67001f',
 };
 function turbo(x) {
   const r = 0.13572138 + x * (4.6153926 + x * (-42.66032258 + x * (132.13108234 + x * (-152.94239396 + x * 59.28637943))));

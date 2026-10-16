@@ -18,6 +18,7 @@ export interface ScenePlay {
   q: Reading | null; peaks: ({ v: number; p0: number[]; pe: number[] } | null)[] | null;
   event: { at: number; text: string } | null;
   also: { name: string; unit: string; digits: number; values: (number | null)[] }[];
+  alts: { name: string; at: number }[] | null;
   exag: number; magnify: { factor: number; label: string } | null;
   camera: { view: number[]; fov: number }; bounds: { lo: number[]; hi: number[] };
   verdict: { word: string; tone: string; line: string } | null;

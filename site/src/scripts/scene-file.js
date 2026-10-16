@@ -54,6 +54,8 @@ const STOPS = {
   blues: '0b1a33 0f3b6e 1663a6 2f8fd1 6bb8e8 b6e0f7',
   gray: '303338 e6e6e6',
   heat: '9a9488 c9a05a e8742a f2401f',
+  // low in blue, high in red, as Wobbl's own plots draw a level or a pressure (matplotlib's RdBu_r)
+  RdBu: '053061 2166ac 4393c3 92c5de d1e5f0 f7f7f7 fddbc7 f4a582 d6604d b2182b 67001f',
 };
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 function turbo(x) {
@@ -242,7 +244,7 @@ function boundsOf(h, arr, keep) {
 /**
  * Small moving things a scene did not magnify itself, such as a rock falling 300 m, found and grown so they
  * show at the scene's size: every posed mesh or body the run is about whose own size is under half a percent
- * of the scene's, drawn about its own pose so it reaches about four percent. The page says so beside a
+ * of the scene's, drawn about its own pose so it reaches about eight percent. The page says so beside a
  * toggle that puts them back at their true size. Returns the scene's magnify entry, or null.
  */
 export function autoMagnify(h, arr, bounds) {
@@ -259,7 +261,7 @@ export function autoMagnify(h, arr, bounds) {
     if (ext > 0 && ext < R * 0.005) { small.push(i); if (ext > size) { size = ext; name = o.name || ''; } }
   });
   if (!small.length) return null;
-  const raw = (R * 0.04) / size, p = 10 ** Math.floor(Math.log10(raw));
+  const raw = (R * 0.08) / size, p = 10 ** Math.floor(Math.log10(raw));
   const factor = [1, 2, 5, 10].map((x) => x * p).reduce((a, b) => (Math.abs(b - raw) < Math.abs(a - raw) ? b : a));
   const label = name ? name[0].toUpperCase() + name.slice(1) : 'Drawn';
   return { factor, label, groups: [{ objects: small, anchor: null }] };
