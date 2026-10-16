@@ -61,3 +61,15 @@ def test_without_a_resistor_is_taken_at_its_word():
 def test_a_typical_motor_is_named_for_its_propellant_and_casing():
     steps = preview(route("a rocket thrust test", ""), {})
     assert steps[0].job.options["casing"] == ["6061-t6 od=54 wall=1.6 L=400 sf=2"]
+
+
+def test_a_radio_and_a_propeller_get_usual_values_and_a_heat_question_asks_for_its_power():
+    def said(words):
+        steps = preview(route(words, ""), {})
+        return [(t, o) for s in steps for t, o in s.job.assumptions], [s.error for s in steps if s.error]
+
+    assert not said("how far does a dipole antenna reach")[1]
+    guesses, errors = said("how much thrust does an apcsf_10x4.7 prop make")
+    assert any(o == "--rpm 6000" for _, o in guesses) and not errors
+    _, errors = said("will this enclosure overheat")
+    assert errors and errors[0].startswith("how much heat does it make?") and "--power '12 W'" in errors[0]

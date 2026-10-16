@@ -49,6 +49,7 @@ CASES = [
     ("drone with apcsf_10x4.7 props, 1.2 kg, 4 rotors, can it hover", "fluid", "prop", None),
     ("pressure drop through 20 m of 25 mm pipe at 30 L/min", "fluid", "pipe", None),
     ("solenoid with 800 turns at 0.6 A, does it pull 8 N", "field", "solenoid", None),
+    ("how far does a dipole antenna reach", "field", "dipole", ("antenna",)),
 ]
 
 
@@ -69,7 +70,7 @@ def test_free_form_words_route(words, domain, kind, physics):
 
 def test_a_phrase_outweighs_a_word():
     assert weight("thrust test") > weight("rocket")
-    assert weight("how far up") > weight("how high") > weight("apogee")
+    assert weight("how far up") > weight("how high") == weight("apogee")      # "how" carries no meaning
     w, said, _ = best(phrases("static fire"), "a rocket thrust test")
     assert said == "thrust test" and w == weight("thrust test")
 

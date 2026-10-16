@@ -279,11 +279,17 @@ def _antenna_params(job, extra: tuple = ()) -> dict:
     f = job.value("frequency")
     if not f:
         m = FREQUENCY.search(job.focus)
-        if not m:
-            raise ValueError("say the antenna's working frequency, for example 'at 2.4 GHz' in the question or "
-                             "--frequency 2.4GHz")
-        f = f"{m.group(1)} {m.group(2)}"
-        job.assume(f"the working frequency is {f}, read from the question", f"--frequency {m.group(1)}{m.group(2)}")
+        if m:
+            f = f"{m.group(1)} {m.group(2)}"
+            job.assume(f"the working frequency is {f}, read from the question",
+                       f"--frequency {m.group(1)}{m.group(2)}")
+        else:   # no frequency: the band the words name, or 2.4 GHz, where most hobby radios work
+            low = job.focus.lower()
+            band = next((b for rx, b in ((r"\blora\b|\b915\b", "915 MHz"), (r"\b868\b", "868 MHz"),
+                                         (r"\bgps\b|\bgnss\b", "1.575 GHz"), (r"\b5\s*ghz\b|wi-?fi 5", "5.8 GHz"))
+                         if re.search(rx, low)), "2.4 GHz")
+            f = job.value("frequency", band, "working frequency not given, so the band the words point to, or the "
+                                             "2.4 GHz WiFi and Bluetooth band")
     params = {"frequency": f, "quality": _quality(job)}
     for k in ("port", "budget") + extra:
         v = job.values(k) if k == "dielectric" else job.value(k)

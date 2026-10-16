@@ -57,10 +57,17 @@ def phrases(*names: str) -> tuple[str, ...]:
     return tuple(out)
 
 
+# words that carry no meaning of their own, so "how far" counts as one word and "thrust test" as two
+STOP = {"how", "does", "do", "did", "will", "would", "can", "could", "it", "its", "the", "a", "an", "my", "this",
+        "that", "of", "on", "in", "to", "for", "is", "are", "be", "get", "gets", "what", "much", "many", "from",
+        "onto", "with", "as", "or", "and"}
+
+
 def weight(matched: str) -> float:
-    """How much a match counts: one for a word, more for each word a phrase spans past the first, so a two word
-    phrase beats two loose words and a three word phrase beats a two word one."""
-    words = len(re.findall(r"[a-z0-9*]+", matched.lower()))
+    """How much a match counts: one for a word, more for each meaningful word a phrase spans past the first, so a
+    two word phrase beats two loose words and a three word phrase beats a two word one."""
+    words = len([w for w in re.findall(r"[a-z0-9*]+", matched.lower()) if w not in STOP]) or \
+        min(1, len(re.findall(r"[a-z0-9*]+", matched.lower())))
     if words == 0 or len(matched.strip()) < 2:
         return 0.25
     return 1.0 + 1.5 * (words - 1)

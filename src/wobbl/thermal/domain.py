@@ -13,7 +13,7 @@ def heat(job):
     r = read_thermal_question(job.focus)
     power = job.value("power") or r.get("power")
     if not power:
-        raise ValueError("the question has no heat load I can read. Say it like '12 W', or pass --power '12 W'")
+        raise ValueError("how much heat does it make? Say it like 12 W in the question, or pass --power '12 W' to set it")
     job.use("power", power)
     films = job.values("film")
     if not films:

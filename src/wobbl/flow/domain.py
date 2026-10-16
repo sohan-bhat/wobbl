@@ -48,8 +48,8 @@ def _fluid(job, w, default: str) -> tuple[str, float]:
 
 def _need(value, what: str, example: str):
     if not value:
-        raise ValueError(f"the question gives no {what}. Say it like '{example}', or pass --{what.split()[0]} "
-                         f"'{example}'")
+        raise ValueError(f"what {what} should Wobbl use? Say it like {example} in the question, or pass "
+                         f"--{what.split()[0]} '{example}' to set it")
     return value
 
 
@@ -106,8 +106,11 @@ def thrust(job):
     params = {"prop": prop, "mass": _pick(job, "mass", w.mass), "rotors": _pick(job, "rotors", w.rotors),
               "thrust": job.value("thrust"), "rpm": job.value("rpm"), "speed": _pick(job, "speed", w.speed),
               "max_rpm": job.value("max-rpm"), "question": job.question}
-    if not (params["mass"] or params["thrust"] or params["rpm"]):
-        raise ValueError("say what the propeller must do: a mass to hover like '1.2 kg', a thrust or an rpm")
+    if not (params["mass"] or params["thrust"] or params["rpm"]):   # nothing to do: spin it at a usual speed
+        inch = re.search(r"(\d+(?:\.\d+)?)x", prop)
+        rpm = f"{round(60000 / float(inch.group(1)) / 100) * 100:g}" if inch else "6000"
+        params["rpm"] = job.value("rpm", rpm, "nothing asked of the propeller, so Wobbl spun it with its tips near "
+                                              "80 m/s, in rpm")
     if params["mass"] and not params["rotors"]:
         params["rotors"] = job.value("rotors", "4", "number of rotors not given")
     job.situate(environment={"fluid": "air"}, objects=[f"{params.get('rotors') or 1} x {prop} propeller"])
@@ -263,7 +266,7 @@ def cooling(job):
     r = _words(job)
     power = job.value("power") or r.power
     if not power:
-        raise ValueError("the question has no heat load I can read. Say it like '15 W', or pass --power '15 W'")
+        raise ValueError("how much heat does it make? Say it like 15 W in the question, or pass --power '15 W' to set it")
     job.use("power", power)
     from ..structural.domain import material
     mat = material(job, "6061-t6")
