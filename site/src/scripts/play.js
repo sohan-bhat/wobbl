@@ -2,7 +2,7 @@
 // main thread. The files come from scripts/sitegen/export_playback.py, in the coding the landing page's
 // part uses (scripts/export_site_part.py), so the byte planes, the residuals and the smooth shading are
 // part.js's own.
-import { integers, planes, shade } from './part.js';
+import { creases, integers, planes, shade } from './part.js';
 import { readScene, skipped } from './scene-file.js';
 
 /** Nodes and triangles of the surface, and a reader for the integer fields stored on its nodes. */
@@ -92,7 +92,8 @@ export function decodePlay(run, buf) {
       nrm[v * 3 + k] = Math.round(normal[v * 3 + k] * 127);
     }
   }
-  const arrays = { position, normal: nrm, index: nv < 65536 ? Uint16Array.from(index) : index };
+  const ed = creases(tri, index, n);
+  const arrays = { position, normal: nrm, index: nv < 65536 ? Uint16Array.from(index) : index, edges: nv < 65536 ? Uint16Array.from(ed) : Uint32Array.from(ed) };
   const L = run.layout;
   if (run.kind === 'strength') {
     const qv = field('value'), qu = field('disp');
@@ -219,6 +220,62 @@ function taubin(pos, tri, n, passes = 10) {
   for (let p = 0; p < passes; p++) { step(0.5); step(-0.53); }
 }
 
+/**
+ * Bilateral mesh denoising (Fleishman, Drori and Cohen-Or 2003) of a thinned mesh: each vertex moves along its
+ * normal by a weighted mean of its neighbours' heights above its tangent plane, with neighbours far along the
+ * normal weighted down, so the ripples clustering leaves on flat faces and rims flatten out while real edges,
+ * where the neighbours sit far off the plane, stay sharp.
+ */
+function denoise(pos, tri, n, passes = 4) {
+  const start = new Uint32Array(n + 1);
+  for (let t = 0; t < tri.length; t += 3) for (let e = 0; e < 3; e++) start[tri[t + e] + 1] += 2;
+  for (let i = 0; i < n; i++) start[i + 1] += start[i];
+  const fill = start.slice(0, n), nb = new Uint32Array(start[n]);
+  for (let t = 0; t < tri.length; t += 3) {
+    for (let e = 0; e < 3; e++) {
+      const a = tri[t + e];
+      nb[fill[a]++] = tri[t + ((e + 1) % 3)];
+      nb[fill[a]++] = tri[t + ((e + 2) % 3)];
+    }
+  }
+  const vn = new Float32Array(n * 3), next = new Float32Array(pos.length);
+  for (let p = 0; p < passes; p++) {
+    vn.fill(0);
+    for (let t = 0; t < tri.length; t += 3) {
+      const a = tri[t] * 3, b = tri[t + 1] * 3, c = tri[t + 2] * 3;
+      const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+      const wx = pos[c] - pos[a], wy = pos[c + 1] - pos[a + 1], wz = pos[c + 2] - pos[a + 2];
+      const x = uy * wz - uz * wy, y = uz * wx - ux * wz, z = ux * wy - uy * wx;
+      for (const v of [a, b, c]) { vn[v] += x; vn[v + 1] += y; vn[v + 2] += z; }
+    }
+    next.set(pos);
+    for (let i = 0; i < n; i++) {
+      const s0 = start[i], s1 = start[i + 1];
+      if (s1 === s0) continue;
+      const o = i * 3, l = Math.hypot(vn[o], vn[o + 1], vn[o + 2]) || 1;
+      const nx = vn[o] / l, ny = vn[o + 1] / l, nz = vn[o + 2] / l;
+      // the spatial reach from the farthest neighbour, the height spread from the neighbours' heights
+      let far = 0, mean = 0, sq = 0;
+      for (let j = s0; j < s1; j++) {
+        const q = nb[j] * 3, dx = pos[q] - pos[o], dy = pos[q + 1] - pos[o + 1], dz = pos[q + 2] - pos[o + 2];
+        far = Math.max(far, dx * dx + dy * dy + dz * dz);
+        const h = dx * nx + dy * ny + dz * nz;
+        mean += h; sq += h * h;
+      }
+      const c = s1 - s0, sc2 = 2 * Math.max(far, 1e-30), ss = sq / c - (mean / c) ** 2, ss2 = 2 * Math.max(ss, far * 1e-4);
+      let sum = 0, w = 0;
+      for (let j = s0; j < s1; j++) {
+        const q = nb[j] * 3, dx = pos[q] - pos[o], dy = pos[q + 1] - pos[o + 1], dz = pos[q + 2] - pos[o + 2];
+        const h = dx * nx + dy * ny + dz * nz, k = Math.exp(-(dx * dx + dy * dy + dz * dz) / sc2 - (h * h) / ss2);
+        sum += k * h; w += k;
+      }
+      const m = w > 0 ? sum / w : 0;
+      next[o] = pos[o] + nx * m; next[o + 1] = pos[o + 1] + ny * m; next[o + 2] = pos[o + 2] + nz * m;
+    }
+    pos.set(next);
+  }
+}
+
 /** A polyline as a round tube: positions, normals, triangles and, for each vertex, the point it rings. */
 function tubes(P, runs, radius, seg = 10) {
   const pos = [], nrm = [], idx = [], pt = [], run = [];
@@ -286,8 +343,10 @@ export function decodeScene(run, buf) {
     if (o.kind === 'mesh') {
       const P = arr(o.pos), w = weld(P, arr(o.tri));
       // a part thinned to fit the file is smoothed a little along the zigzag its thinning left
-      if (w.n > 4000 && !o.flat) {
+      const thinned = w.n > 4000 && !o.flat;
+      if (thinned) {
         taubin(w.pos, w.tri, w.n);
+        denoise(w.pos, w.tri, w.n);
         for (let i = 0; i < P.length / 3; i++) { const k = w.id[i] * 3; P[i * 3] = w.pos[k]; P[i * 3 + 1] = w.pos[k + 1]; P[i * 3 + 2] = w.pos[k + 2]; }
       }
       const { index, vNode, normal } = shade(w.pos, w.tri, w.n);
@@ -307,7 +366,9 @@ export function decodeScene(run, buf) {
       let two = 0;
       for (const c of edges.values()) if (c === 2) two++;
       d.closed = edges.size > 0 && two / edges.size > 0.95;
-      Object.assign(d, { P, node, normal: nrm, index: nv < 65536 ? Uint16Array.from(index) : index });
+      // a thinned mesh is left without outlines, since its thinning breaks its edges into dashes
+      const ed = o.flat || thinned ? [] : creases(w.tri, index, w.n);
+      Object.assign(d, { P, node, normal: nrm, index: nv < 65536 ? Uint16Array.from(index) : index, edges: nv < 65536 ? Uint16Array.from(ed) : Uint32Array.from(ed) });
       if (o.field) d.fv = arr(o.field.values || o.field.frames);
       if (o.deform) d.du = arr(o.deform.values || o.deform.frames);
       if (o.reveal) d.rv = arr(o.reveal.values);

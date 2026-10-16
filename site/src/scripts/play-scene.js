@@ -5,15 +5,19 @@
 // to the page, which shows only the peak marker and the probe.
 import {
   BackSide, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, CylinderGeometry, DoubleSide,
-  Group, InstancedBufferAttribute, InstancedMesh, LineBasicMaterial, LineSegments, Matrix4, Mesh,
+  DataTexture, Group, InstancedBufferAttribute, LinearFilter, InstancedMesh, LineBasicMaterial, LineSegments, Matrix4, Mesh,
   PlaneGeometry, Quaternion, Raycaster, Scene, ShaderMaterial, SphereGeometry, TorusGeometry, Vector3,
 } from 'three';
-import { LIT, arrow } from './play-draw.js';
+import { LIT, arrow, edgeLines } from './play-draw.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
 
 const VERT = /* glsl */ `
 attribute vec3 tint;
 attribute float cutv;
+#ifdef FIELD
+attribute vec2 fval;
+varying vec2 vF;
+#endif
 varying vec3 vC;
 varying vec3 vN;
 varying vec3 vV;
@@ -31,6 +35,9 @@ void main() {
 #endif
   vC = c;
   vR = cutv;
+#ifdef FIELD
+  vF = fval;
+#endif
   vec4 mv = modelViewMatrix * p;
   vN = normalize(normalMatrix * n);
   vV = -mv.xyz;
@@ -48,6 +55,11 @@ varying vec3 vC;
 varying vec3 vN;
 varying vec3 vV;
 varying float vR;
+#ifdef FIELD
+uniform sampler2D uLut;
+uniform float uLimit;
+varying vec2 vF;
+#endif
 ${LIT}
 void main() {
   // a print rising layer by layer, or a line drawn up to the moment shown
@@ -55,7 +67,18 @@ void main() {
   vec3 v = normalize(vV);
   vec3 n = normalize(vN);
   n = faceforward(n, -v, n);
-  vec3 col = mix(lit(vC, n, v, uSpec), uGlowC, uGlow);
+  vec3 c = vC;
+#ifdef FIELD
+  // the field's value is carried across each triangle and only then looked up in the map, as ParaView does
+  // by default, so a contour runs straight across the faces instead of along the mesh's vertices
+  c = vF.y > 0.5 ? vec3(${NONE.map((x) => (x / 255).toFixed(4)).join(', ')})
+    : vF.x > uLimit ? vec3(${OVER.map((x) => (x / 255).toFixed(4)).join(', ')})
+    : texture2D(uLut, vec2(clamp(vF.x, 0.0, 1.0) * (255.0 / 256.0) + 0.5 / 256.0, 0.5)).rgb;
+#endif
+  vec3 col = mix(lit(c, n, v, uSpec), uGlowC, uGlow);
+#ifdef EDGE
+  col *= 0.4;
+#endif
   gl_FragColor = vec4(col, uAlpha);
 }`;
 
@@ -72,15 +95,25 @@ const BG = [14, 15, 17];
 const behind = (rgb, a) => rgb.map((c, i) => Math.round(BG[i] + (c - BG[i]) * Math.min(1, Math.max(a, 0.3) * 1.25)));
 const PROP = 0.62;
 
-function material(o, { prop = false, shell = false } = {}) {
+function material(o, { prop = false, shell = false, field = null } = {}) {
   // a closed shell is cut open whenever it was asked to be see through, an open surface when mostly clear
   const a = o.opacity ?? 1, cut = a < 1 && (shell || a < 0.5);
+  const uniforms = {
+    uCut: { value: 1e30 }, uSpec: { value: prop ? 0.25 : 1 }, uGlow: { value: 0 }, uGlowC: { value: new Color(1, 0.85, 0.2) },
+    uAlpha: { value: 1 },
+  };
+  if (field) {
+    const rgba = new Uint8Array(256 * 4);
+    for (let i = 0; i < 256; i++) { rgba.set(field.lut.subarray(i * 3, i * 3 + 3), i * 4); rgba[i * 4 + 3] = 255; }
+    const tex = new DataTexture(rgba, 256, 1);
+    tex.magFilter = LinearFilter;
+    tex.minFilter = LinearFilter;
+    tex.needsUpdate = true;
+    uniforms.uLut = { value: tex };
+    uniforms.uLimit = { value: field.limit !== undefined ? (field.limit - field.lo) / (field.hi - field.lo || 1) : 1e30 };
+  }
   return new ShaderMaterial({
-    vertexShader: VERT, fragmentShader: frag(),
-    uniforms: {
-      uCut: { value: 1e30 }, uSpec: { value: prop ? 0.25 : 1 }, uGlow: { value: 0 }, uGlowC: { value: new Color(1, 0.85, 0.2) },
-      uAlpha: { value: 1 },
-    },
+    vertexShader: VERT, fragmentShader: frag(), uniforms, defines: field ? { FIELD: '' } : {},
     side: cut ? BackSide : DoubleSide,
     // a cut open shell gives way to whatever it touches, such as the plate a part sits on
     polygonOffset: cut, polygonOffsetFactor: cut ? 2 : 0, polygonOffsetUnits: cut ? 2 : 0,
@@ -149,11 +182,17 @@ export function sceneParts({ arrays, run }) {
       const cut = new Float32Array(nv).fill(-1e30);
       if (d.rv) for (let v = 0; v < nv; v++) cut[v] = d.rv[d.node[v]];
       geo.setAttribute('cutv', new BufferAttribute(cut, 1));
+      if (it.f && d.fv) geo.setAttribute('fval', new BufferAttribute(new Float32Array(nv * 2), 2));
       it.n = d.P.length / 3;
       it.cur = d.P.slice();
       it.val = new Float32Array(it.n).fill(NaN);
-      it.mesh = new Mesh(geo, material(o, { prop: !!o.prop, shell: d.closed }));
+      it.mesh = new Mesh(geo, material(o, { prop: !!o.prop, shell: d.closed, field: it.f && d.fv ? it.f : null }));
       it.colored = false;
+      // a shell drawn cut open shows its inside, where outlines would only clutter it
+      if (it.mesh.material.side !== BackSide) {
+        const lines = edgeLines(geo, d.edges, it.mesh.material);
+        if (lines) it.mesh.add(lines);
+      }
     } else if (o.kind === 'body') {
       it.mesh = new Mesh(tinted(primitive(o.shape, o.size), it.base), material(o, { prop: !!o.prop, shell: o.shape !== 'plane' }));
       if (o.glow) it.mesh.material.uniforms.uGlowC.value.setRGB(...colorHex(o.color).map((v) => Math.min(1, v * 0.5 + 0.55)));
@@ -252,12 +291,33 @@ export function sceneParts({ arrays, run }) {
       else if (o.field.frames) for (let i = 0; i < n; i++) it.val[i] = at2(d.fv, n, a, b, k, i);
       else it.val.set(d.fv.subarray(0, n));
     }
-    if (d.fv || !it.colored) {
-      const t = geo.getAttribute('tint');
+    if (it.f && d.fv) {
+      // the value, and 1 where there is none: a vertex with no value next to ones with values takes their mean,
+      // so the gray of no value starts halfway along the edge instead of the map running down to its bottom color
+      const fa = geo.getAttribute('fval'), A = fa.array, f = it.f, span = f.hi - f.lo || 1;
+      let gaps = false;
       for (let v = 0; v < nv; v++) {
-        if (it.f && d.fv) colorOf(it.f, it.val[d.node[v]], t.array, v * 3);
-        else { t.array[v * 3] = it.base[0]; t.array[v * 3 + 1] = it.base[1]; t.array[v * 3 + 2] = it.base[2]; }
+        const x = it.val[d.node[v]], none = Number.isNaN(x);
+        A[v * 2] = none ? 0 : (x - f.lo) / span;
+        A[v * 2 + 1] = none ? 1 : 0;
+        gaps ||= none;
       }
+      if (gaps) {
+        const ix = d.index, sum = it.nanSum || (it.nanSum = new Float32Array(nv)), cnt = it.nanCnt || (it.nanCnt = new Uint16Array(nv));
+        sum.fill(0); cnt.fill(0);
+        for (let t = 0; t < ix.length; t += 3) {
+          for (let e = 0; e < 3; e++) {
+            const p = ix[t + e];
+            if (!A[p * 2 + 1]) continue;
+            for (const q of [ix[t + (e + 1) % 3], ix[t + (e + 2) % 3]]) if (!A[q * 2 + 1]) { sum[p] += A[q * 2]; cnt[p]++; }
+          }
+        }
+        for (let v = 0; v < nv; v++) if (cnt[v]) A[v * 2] = sum[v] / cnt[v];
+      }
+      fa.needsUpdate = true;
+    } else if (!it.colored) {
+      const t = geo.getAttribute('tint');
+      for (let v = 0; v < nv; v++) { t.array[v * 3] = it.base[0]; t.array[v * 3 + 1] = it.base[1]; t.array[v * 3 + 2] = it.base[2]; }
       t.needsUpdate = true;
       it.colored = true;
     }
