@@ -4,16 +4,22 @@
 // are round tubes and props are solid and matte. The viewer's text labels and its readout list are left
 // to the page, which shows only the peak marker and the probe.
 import {
-  BackSide, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, CylinderGeometry, DoubleSide,
+  BackSide, Box3, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, CylinderGeometry, DoubleSide,
   DataTexture, Group, InstancedBufferAttribute, LinearFilter, InstancedMesh, LineBasicMaterial, LineSegments, Matrix4, Mesh,
   PlaneGeometry, Quaternion, Raycaster, Scene, ShaderMaterial, SphereGeometry, TorusGeometry, Vector3,
 } from 'three';
 import { LIT, arrow, edgeLines } from './play-draw.js';
+import { contactShadow } from './contact-shadow.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
 
 const VERT = /* glsl */ `
 attribute vec3 tint;
 attribute float cutv;
+#ifdef TUBE
+// a line drawn as a tube grows or thins about its own axis, so it keeps its width on screen in a close view
+attribute vec3 axis;
+uniform float uTube;
+#endif
 #ifdef FIELD
 attribute vec2 fval;
 varying vec2 vF;
@@ -25,6 +31,9 @@ varying float vR;
 void main() {
   vec3 c = tint;
   vec4 p = vec4(position, 1.0);
+#ifdef TUBE
+  p.xyz = axis + (position - axis) * uTube;
+#endif
   vec3 n = normal;
 #ifdef USE_INSTANCING
   p = instanceMatrix * p;
@@ -169,7 +178,11 @@ export function sceneParts({ arrays, run }) {
     const d = arrays.objs[oi];
     if (!d) return;
     let rgb = bytes(o.color || '#9aa0a6');
-    if (o.prop && o.kind !== 'ground') rgb = rgb.map((c) => Math.round(c * PROP));
+    if (o.prop && o.kind !== 'ground') {
+      // a prop is darker and a little grayer, so lit in linear light it stays behind the part the run is about
+      const y = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+      rgb = rgb.map((c) => Math.round((c + (y - c) * 0.3) * PROP));
+    }
     const it = { o, d, oi, mag: magnifyOf(h, oi), f: o.field ? fields[o.field.f] : null, base: (o.opacity ?? 1) < 1 ? behind(rgb, o.opacity) : rgb };
     if (o.kind === 'mesh') {
       const geo = new BufferGeometry(), nv = d.node.length;
@@ -213,7 +226,11 @@ export function sceneParts({ arrays, run }) {
         if (o.at) cut[v] = Math.max(cut[v], o.at[d.run[v]]);
       }
       geo.setAttribute('cutv', new BufferAttribute(cut, 1));
-      it.mesh = new Mesh(geo, material({ ...o, opacity: 1 }, { prop: !!o.prop }));
+      geo.setAttribute('axis', new BufferAttribute(d.axis, 3));
+      const mat = material({ ...o, opacity: 1 }, { prop: !!o.prop });
+      mat.defines.TUBE = '';
+      mat.uniforms.uTube = { value: 1 };
+      it.mesh = new Mesh(geo, mat);
       it.cuts = !!(d.td || o.at);
     } else if (o.kind === 'points' || o.kind === 'atoms') {
       const atoms = o.kind === 'atoms', sh = o.pos.shape;
@@ -354,16 +371,17 @@ export function sceneParts({ arrays, run }) {
     }
   }
 
-  function arrowsFrame(it, a, b, k) {
-    const { o, d } = it, n = it.n, mV = d.V.length > n * 3, mO = d.O.length > n * 3, s = o.scale ? series(o.scale, a, b, k) : 1;
+  // arrows are sized for the whole scene, so a close view shrinks them about their tails as it thins the lines
+  function arrowsFrame(it, a, b, k, tube = 1) {
+    const { o, d } = it, n = it.n, mV = d.V.length > n * 3, mO = d.O.length > n * 3, s = (o.scale ? series(o.scale, a, b, k) : 1) * tube;
     const dir = new Vector3();
     for (let i = 0; i < n; i++) {
       const og = [0, 1, 2].map((j) => (mO ? at2(d.O, n * 3, a, b, k, i * 3 + j) : d.O[i * 3 + j]));
       const v = [0, 1, 2].map((j) => (mV ? at2(d.V, n * 3, a, b, k, i * 3 + j) : d.V[i * 3 + j]) * s);
       const len = Math.hypot(...v), g = it.arrows[i];
-      g.visible = len > R * 1e-4;
+      g.visible = len > R * 1e-4 * tube;
       if (!g.visible) continue;
-      const r = o.radius || Math.max(len * 0.035, R * 0.006);
+      const r = (o.radius || Math.max(len * 0.035 / tube, R * 0.006)) * tube;
       const head = Math.min(len * 0.45, r * 7), body = Math.max(len - head, len * 0.01), hs = head / 8;
       dir.set(v[0] / len, v[1] / len, v[2] / len);
       g.quaternion.setFromUnitVectors(Y, dir);
@@ -379,10 +397,12 @@ export function sceneParts({ arrays, run }) {
 
   let key = '';
   function set(f) {
-    const { a, b, k, t, bend = true, mag = true } = f;
-    const next = `${a},${b},${k.toFixed(5)},${t},${bend},${mag}`;
+    const { a, b, k, t, bend = true, mag = true, tube = 1 } = f;
+    for (const it of items) if (it.o.kind === 'lines') it.mesh.material.uniforms.uTube.value = tube;
+    const next = `${a},${b},${k.toFixed(5)},${t},${bend},${mag},${tube}`;
     if (next === key) return;
     key = next;
+    shadowDirty = true;
     for (const it of items) {
       const o = it.o;
       it.mesh.visible = shownAt(o.when, t);
@@ -408,7 +428,7 @@ export function sceneParts({ arrays, run }) {
       } else if (o.kind === 'lines') {
         if (it.cuts) uni.uCut.value = t;
       } else if (o.kind === 'points' || o.kind === 'atoms') pointsFrame(it, a, b, k);
-      else if (o.kind === 'arrows') arrowsFrame(it, a, b, k);
+      else if (o.kind === 'arrows') arrowsFrame(it, a, b, k, tube);
     }
   }
 
@@ -440,8 +460,51 @@ export function sceneParts({ arrays, run }) {
     return { v, name: f.name, unit: f.unit || '', digits: f.digits ?? 3, limit: f.limit ?? null, limitLabel: f.limit_label || '', point: hit.point.toArray() };
   }
 
+  // ---- a contact shadow on the floor or bench the subject stands on (contact-shadow.js) ----
+  // worked out at the first frame drawn, once every prop has its pose: the floor is the ground, or the top of
+  // the highest prop just under the subject's lowest point and under its footprint. A view that follows a small
+  // subject over a long path gets none, since its floor is far away.
+  let shadow = null, shadowDirty = true, shadowTried = false;
+  function findShadow() {
+    shadowTried = true;
+    if (run.follow) return;
+    const sb = run.subject || run.bounds, bottom = sb.lo[2], tol = 0.02 * R;
+    const fx0 = sb.lo[0], fx1 = sb.hi[0], fy0 = sb.lo[1], fy1 = sb.hi[1];
+    scene.updateMatrixWorld(true);
+    let floor = -Infinity;
+    const box = new Box3();
+    for (const it of items) {
+      if (it.o.kind === 'ground') { if (it.o.z <= bottom + tol) floor = Math.max(floor, it.o.z); continue; }
+      if (!it.o.prop || !(it.o.kind === 'mesh' || it.o.kind === 'body') || !it.mesh.visible) continue;
+      box.setFromObject(it.mesh);
+      const top = box.max.z;
+      const under = box.min.x < fx1 && box.max.x > fx0 && box.min.y < fy1 && box.max.y > fy0;
+      if (under && top <= bottom + tol && top >= bottom - 0.25 * (sb.hi[2] - sb.lo[2] + R * 0.1)) floor = Math.max(floor, top);
+    }
+    if (!Number.isFinite(floor)) return;
+    const casters = new Set();
+    for (const it of items) {
+      if (it.o.prop || !['mesh', 'body', 'points', 'atoms'].includes(it.o.kind)) continue;
+      casters.add(it.mesh);
+      if (it.bonds) casters.add(it.bonds);
+    }
+    if (!casters.size) return;
+    const size = Math.max(fx1 - fx0, fy1 - fy0) * 1.5 + R * 0.12;
+    const reach = Math.max(sb.hi[2] - floor, R * 0.2) * 0.7;
+    shadow = contactShadow({ casters, center: [(fx0 + fx1) / 2, (fy0 + fy1) / 2], size, floor: floor + R * 4e-4, reach });
+    scene.add(shadow.plane);
+  }
+  /** Redraw the contact shadow when the scene has moved since it was last drawn. */
+  function shade(renderer) {
+    if (!shadowTried) findShadow();
+    if (!shadow || !shadowDirty) return;
+    shadowDirty = false;
+    shadow.render(renderer, scene);
+  }
+
   function dispose() {
+    shadow?.dispose();
     scene.traverse((x) => { x.geometry?.dispose?.(); x.material?.dispose?.(); });
   }
-  return { scene, set, probe, dispose };
+  return { scene, set, probe, shade, dispose };
 }

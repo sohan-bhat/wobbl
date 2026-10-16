@@ -5,7 +5,7 @@
 // changes uniforms, except a heat run's frames, which are copied in as the clock passes them.
 import {
   BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
-  LineSegments, PerspectiveCamera, Scene, ShaderMaterial, SphereGeometry, Vector3, WebGLRenderer,
+  LineSegments, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial, SphereGeometry, Vector3, WebGLRenderer,
 } from 'three';
 import { sceneParts } from './play-scene.js';
 
@@ -228,10 +228,33 @@ export function createStage({ canvas, w, h, px, kind }) {
   renderer.setPixelRatio(px);
   renderer.setSize(w, h, false);
   renderer.setScissorTest(true);
+  renderer.autoClear = false;
   const camera = new PerspectiveCamera(30, 1, 1, 10000);
   camera.up.set(0, 0, 1);
   let cssW = w, cssH = h;
   const parts = [];
+  // behind each view a soft pool of light, as a studio backdrop or model-viewer's floor glow gives, so dark
+  // parts keep their outline and the view has depth, fading to the page's own black at the edges
+  const backdrop = new Scene();
+  const glow = new Mesh(new PlaneGeometry(2, 2), new ShaderMaterial({
+    depthTest: false, depthWrite: false,
+    uniforms: { uAspect: { value: 1 } },
+    vertexShader: 'varying vec2 vP; void main() { vP = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: /* glsl */ `
+      uniform float uAspect;
+      varying vec2 vP;
+      void main() {
+        vec2 q = vec2(vP.x * max(uAspect, 1.0), vP.y * max(1.0 / uAspect, 1.0));
+        float r = length(q * vec2(0.82, 1.0) - vec2(0.0, 0.1));
+        float k = 1.0 - smoothstep(0.05, 1.25, r);
+        vec3 c = mix(vec3(0.055, 0.063, 0.067), vec3(0.106, 0.118, 0.133), k * k);
+        // a little noise against banding in so dark a gradient
+        float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+        gl_FragColor = vec4(c + (n - 0.5) / 255.0, 1.0);
+      }`,
+  }));
+  glow.frustumCulled = false;
+  backdrop.add(glow);
 
   function add({ run, arrays, top, row = 0 }) {
     if (kind === 'scene') {
@@ -302,6 +325,18 @@ export function createStage({ canvas, w, h, px, kind }) {
     part.scene.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
   }
 
+  /** Put the camera where a frame says: { position, target, fov, aspect, near, far }. */
+  function look(c) {
+    camera.position.fromArray(c.position);
+    camera.lookAt(c.target[0], c.target[1], c.target[2]);
+    camera.fov = c.fov;
+    camera.aspect = c.aspect;
+    // a scene can be metres or kilometres across, so the clipping planes come with the camera
+    if (c.near) { camera.near = c.near; camera.far = c.far; }
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
+  }
+
   const Y = new Vector3(0, 1, 0), dir = new Vector3(), at = new Vector3();
   /** Point a part's arrow for the load fraction k: a pull starts at its point, a push ends on the face. */
   function aim(part, k, radius, bend) {
@@ -353,15 +388,7 @@ export function createStage({ canvas, w, h, px, kind }) {
      * f.radius: the part's radius in mm, for the arrow.
      */
     frame(f) {
-      const c = f.camera;
-      camera.position.fromArray(c.position);
-      camera.lookAt(c.target[0], c.target[1], c.target[2]);
-      camera.fov = c.fov;
-      camera.aspect = c.aspect;
-      // a scene can be metres or kilometres across, so the clipping planes come with the camera
-      if (c.near) { camera.near = c.near; camera.far = c.far; }
-      camera.updateProjectionMatrix();
-      camera.updateMatrixWorld();
+      look(f.camera);
       renderer.setScissor(0, 0, cssW, cssH);
       renderer.setViewport(0, 0, cssW, cssH);
       renderer.clear();
@@ -370,16 +397,42 @@ export function createStage({ canvas, w, h, px, kind }) {
         part.uniforms.uK.value = f.k;
         // the bending toggle: drawn larger than it is, or at its true size
         if (part.uniforms.uExag) part.uniforms.uExag.value = f.bend === false ? 1 : part.run.exag;
-        if (part.sp) part.sp.set(f.scenes ? f.scenes[part.row] : f.scene);
+        if (part.sp) {
+          part.sp.set(f.scenes ? f.scenes[part.row] : f.scene);
+          part.sp.shade(renderer);
+        }
         if (part.load) aim(part, f.k, f.radius, f.bend);
         if (f.heat) {
           frames(part, f.heat.i0, f.heat.i1);
           part.uniforms.uMix.value = f.heat.mix;
         }
+        // a view that follows its subject has a camera of its own for each pane
+        if (f.cameras) look(f.cameras[part.row]);
         // three.js counts the viewport from the bottom left
         renderer.setViewport(x, cssH - y - vh, vw, vh);
         renderer.setScissor(x, cssH - y - vh, vw, vh);
+        glow.material.uniforms.uAspect.value = vw / vh;
+        renderer.render(backdrop, camera);
+        renderer.clearDepth();
         renderer.render(part.scene, camera);
+        const ins = f.insets && f.insets[part.row];
+        if (ins && part.sp) {
+          // the whole scene in a corner of the view, on a solid ground with a hairline round it
+          const [ix, iy, iw, ih] = ins.rect, bx = x + ix, by = cssH - (y + iy) - ih;
+          renderer.setScissor(bx - 1, by - 1, iw + 2, ih + 2);
+          renderer.setClearColor(0x2a2d32, 1);
+          renderer.clear();
+          renderer.setScissor(bx, by, iw, ih);
+          renderer.setClearColor(0x141619, 1);
+          renderer.clear();
+          renderer.setClearColor(0x000000, 0);
+          part.sp.set(ins.scene);
+          look(ins.camera);
+          renderer.setViewport(bx, by, iw, ih);
+          renderer.clearDepth();
+          renderer.render(part.scene, camera);
+          look(f.cameras ? f.cameras[part.row] : f.camera);
+        }
       });
     },
     size(nw, nh, npx) {
