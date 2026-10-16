@@ -193,7 +193,7 @@ def test_arm_on_a_desk_with_motors_and_payload(tmp_path):
     assert {"desk", "shoulder motor", "elbow motor", "pick spot", "placed spot"} <= set(names)
     motor = next(o for o in h["objects"] if o.get("name") == "shoulder motor")
     load_ = motor["field"]["values"]
-    assert load_[0] < 1 < load_[-1]                            # it turns red once the joint asks for more
+    assert load_[0] < 100 < load_[-1]                          # it turns red once the joint asks for more
     assert any("250 g payload" in lb["text"] for lb in h["labels"])
     ro = {r["name"]: r for r in h["readouts"]}
     assert {"shoulder torque", "shoulder speed", "shoulder current"} <= set(ro)
@@ -225,3 +225,35 @@ def test_wiper_gets_its_windshield_and_blade(tmp_path):
     assert {"windshield", "wiper arm", "wiper blade", "swept edge"} <= names
     blade = next(o for o in h["objects"] if o.get("name") == "wiper blade")
     assert blade["pos"]["shape"][0] == h["timeline"]["frames"]
+
+
+def test_the_input_to_sweep_comes_from_the_mechanism_and_its_question():
+    from wobbl.mechanism.sweep import choose
+    arm = choose("arm", {"payload": "500 g"}, "Can these hobby servos lift a 500 g payload?")
+    assert (arm.key, arm.unit, arm.design) == ("payload", "g", 500.0)
+    assert arm.values[0] == 0 and arm.values[-1] == 800 and 10 <= len(arm.values) <= 25
+    assert choose("arm", {}, "how fast can it make the move?").key == "move_time"
+    wiper = choose("fourbar", {"stall_torque": 25, "no_load_speed": "45rpm", "load": 6},
+                   "can a 45 rpm wiper motor drive it over dry glass?")
+    assert wiper.key == "load" and wiper.design == 6.0 and wiper.values[-1] >= 24
+    assert [m[1] for m in wiper.marks] == ["wet glass", "dry glass"]
+    assert choose("pendulum", {}, "what is its period?") is None
+
+
+def test_a_wiper_linkage_is_a_model_over_its_blade_drag(tmp_path):
+    from wobbl.mechanism.study import run_mechanism
+    run_mechanism("fourbar", {"ground": 300, "crank": 80, "coupler": 300, "rocker": 110, "link_mass": "80,250,300",
+                              "stall_torque": 25, "no_load_speed": "45rpm", "load": 6, "turns": 1, "timestep": "1 ms"},
+                  tmp_path, "can a 45 rpm wiper motor drive this wiper linkage over dry glass?")
+    assert (tmp_path / "sweep.json").exists()
+    h, _ = load(tmp_path / "scene.wobbl")
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["design"] == 6.0 and tl["unit"] == "N m" and tl["frames"] >= 10
+    assert h["readouts"][0]["name"] == "crank torque" and "limits" in h["readouts"][0]
+    tq = h["readouts"][0]["values"]
+    assert tq[0] < tq[-1]                                     # more drag, more torque at the crank
+    assert all(f.get("limit") is not None and f.get("limit_label") for f in h["fields"])
+    assert {"dry glass", "wet glass"} <= {e["name"] for e in h["events"]}
+    assert "follow" not in h["camera"] and h["camera"]["presets"]
+    names = set(_names(h))
+    assert {"windshield", "wiper blade", "swept edge", "crank motor"} <= names

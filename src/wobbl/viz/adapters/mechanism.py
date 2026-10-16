@@ -2,8 +2,12 @@
 every driven one, colored by the torque it is asked for against what it can give at that speed, and red when it is
 asked for more. Readouts tick the torque, speed and current of the hardest worked motors.
 
-The poses are the run's own, recorded at evenly spaced steps, and the viewer blends between them and says so. Joint
-positions come from the run's model.xml and those poses (mech_joints.py). Around the mechanism stand the things
+A ready made mechanism also writes sweep.json, the mechanism solved again over the one input its question turns on,
+such as an arm's payload or the drag a wiper's blade works against. Its scene is a model to work with. Each value
+of that input shows the mechanism at its hardest instant, where a motor is asked the most, with every motor colored
+by its share of what it can give there, and the user moves a slider over the input. Without a sweep the scene
+plays the run's own poses, recorded at evenly spaced steps. Joint positions come from the run's model.xml and those
+poses (mech_joints.py). Around the mechanism stand the things
 the question names. A wiper gets its windshield, with an arm and blade on the output link sweeping the glass, and
 an arm on a desk gets the desk, with its pick and place spots and its payload named.
 """
@@ -19,11 +23,15 @@ from .common import plain, read, verdict, words
 from .mech_joints import joints as joint_poses, masses, rotate
 
 FAIL_WORDS = ("limit", "stall", "slip", "tip", "bind", "collide", "hits", "lift off", "separat", "touches")
-LOAD = "motor load"
+LOAD = "torque against limit"
 GLASS = "#9fc6e0"
+TRACK_DEG = 2.0       # a run further than this behind its move did not make it, as the arm analysis judges
 
 
 def build(out: Path, pb: dict | None = None) -> Path | None:
+    sw = read(out, "sweep.json")
+    if sw and sw.get("manifest", {}).get("kind") == "mechanism":
+        return build_sweep(out, sw)
     pb = pb or read(out, "playback.json")
     if not pb or pb.get("manifest", {}).get("kind") != "mechanism":
         return None
@@ -35,12 +43,66 @@ def build(out: Path, pb: dict | None = None) -> Path | None:
               source=m.get("source", ""))
     s.timeline(t, unit="s", label="time", seconds=float(m.get("suggested_seconds") or max(t[-1], 3)),
                between="interpolated")
-    n = len(t)
+    reach, centre, drawn, plane = draw_bodies(s, pb)
+    w = words(o)
+    J = joint_poses(out, pb)
+    pins(s, pb, J, reach)
+    motors = drive_motors(s, pb, J, reach, drawn)
+    setting(s, out, pb, J, w, plane, reach, drawn)
+    readouts(s, pb, motors)
+    for e in pb.get("events", []):
+        bad = any(x in e["name"].lower() for x in FAIL_WORDS)
+        s.event(float(e["t_s"]), e["name"], e.get("detail", ""), kind="fail" if bad else "info")
+    verdict(s, {**o, "verdict": o.get("verdict") or m.get("verdict"),
+                "headline": o.get("headline") or m.get("headline")})
+    if not s.cam:
+        s.camera(target=centre, direction=(0.55, -1.0, 0.6), distance=reach * 2.6 + 0.2)
+    return s.save(out)
+
+
+def build_sweep(out: Path, sw: dict) -> Path:
+    """The mechanism over the input its question turns on: every value is its own run, shown at its hardest
+    instant, and nothing plays on its own."""
+    o = read(out, "outcome.json") or {}
+    pb = read(out, "playback.json") or {}
+    inp = sw["manifest"]["input"]
+    title = (pb.get("manifest", {}).get("title") or "Mechanism").capitalize()
+    s = Scene(f"{title} over its {inp['label']}", domain="mechanism", question=o.get("question", ""), length="m",
+              source=sw["manifest"].get("source", ""))
+    v = np.asarray(sw["t"], float)
+    s.timeline(v, unit=inp["unit"], label=inp["label"], between="step", kind="input", design=inp["design"],
+               note=inp.get("note", ""))
+    reach, centre, drawn, plane = draw_bodies(s, sw)
+    w = words(o)
+    J = joint_poses(out, sw)
+    pins(s, sw, J, reach)
+    motors = drive_motors(s, sw, J, reach, drawn)
+    setting(s, out, sw, J, w, plane, reach, drawn)
+    paths(s, sw, v, reach)
+    sweep_readouts(s, sw, motors)
+    for e in sw.get("events", []):
+        s.event(float(e["t_s"]), e["name"], e.get("detail", ""), kind=e.get("kind", "info"))
+    s.note("Each value of the slider is its own run, shown at the instant its motors are asked the most.")
+    verdict(s, o)
+    c = s.cam or {}
+    target = c.get("target", centre.tolist())
+    dist = c.get("dist", reach * 2.6 + 0.2)
+    s.camera(target=target, direction=c.get("dir", (0.55, -1.0, 0.6)), distance=dist,
+             presets=[{"name": "Front", "target": target, "dir": (0.0, -1.0, 0.25), "dist": dist},
+                      {"name": "Top", "target": target, "dir": (0.0, -0.05, 1.0), "dist": dist},
+                      {"name": "Side", "target": target, "dir": (1.0, 0.0, 0.25), "dist": dist},
+                      {"name": "Mechanism", "target": centre.tolist(), "dir": (0.55, -1.0, 0.6),
+                       "dist": reach * 2.6 + 0.2}])
+    return s.save(out)
+
+
+def draw_bodies(s, pb):
+    """Every geom the run recorded as a primitive with its pose at each frame. Returns the mechanism's reach and
+    centre, the bodies drawn by name and the floor plane, if any."""
     moving = [np.asarray(b["pos"], float) for b in pb["bodies"] if not b.get("static")]
     allp = np.concatenate([p.reshape(-1, 3) for p in moving] or [np.zeros((1, 3))])
     reach = float(np.ptp(allp, 0).max()) or 0.5
     centre = allp.mean(0)
-    w = words(o)
     thin = reach * 0.018
     drawn = {}
     plane = None
@@ -59,19 +121,7 @@ def build(out: Path, pb: dict | None = None) -> Path | None:
             s.note("Thin links are drawn a little thicker than the model's so they show.")
         drawn[b["name"]] = s.body(shape, size, pos=b["pos"], quat=b["quat"], color=b.get("color", "#9aa0a6"),
                                   name=b["name"])
-    J = joint_poses(out, pb)
-    pins(s, pb, J, reach)
-    motors = drive_motors(s, pb, J, reach)
-    setting(s, out, pb, J, w, plane, reach, drawn)
-    readouts(s, pb, motors)
-    for e in pb.get("events", []):
-        bad = any(x in e["name"].lower() for x in FAIL_WORDS)
-        s.event(float(e["t_s"]), e["name"], e.get("detail", ""), kind="fail" if bad else "info")
-    verdict(s, {**o, "verdict": o.get("verdict") or m.get("verdict"),
-                "headline": o.get("headline") or m.get("headline")})
-    if not s.cam:
-        s.camera(target=centre, direction=(0.55, -1.0, 0.6), distance=reach * 2.6 + 0.2)
-    return s.save(out)
+    return reach, centre, drawn, plane
 
 
 def pins(s, pb, J, reach):
@@ -85,15 +135,16 @@ def pins(s, pb, J, reach):
                name=f"{name} pin")
 
 
-def drive_motors(s, pb, J, reach) -> list[dict]:
-    """A motor at every driven joint, behind it on its axis, colored by its torque against its limit."""
+def drive_motors(s, pb, J, reach, drawn=None) -> list[dict]:
+    """A motor at every driven joint, behind it on its axis, colored by its torque against its limit. The link the
+    joint moves takes the same color, so the joint that runs short shows from across the room."""
     out = []
     for name, j in pb.get("joints", {}).items():
         if "needed" not in j:
             continue
         need = np.abs(np.asarray(j["needed"]["values"], float))
         lim = np.abs(np.asarray(j.get("limit", {}).get("values", need), float))
-        share = need / np.maximum(lim, 1e-12)
+        share = np.asarray(j["share"], float) if "share" in j else need / np.maximum(lim, 1e-12)
         d = {"name": name, "need": need, "lim": lim, "share": share, "unit": j["needed"].get("unit", "N m"),
              "joint": j, "body": None}
         g = J.get(name)
@@ -105,10 +156,15 @@ def drive_motors(s, pb, J, reach) -> list[dict]:
             r, h = reach * 0.04, reach * 0.05
             pos = g["anchor"] + side * (h + reach * 0.012)
             body = s.body("cylinder", [r, h], pos=pos, quat=_along(side), color="#2b2e33", name=f"{name} motor")
-            body.color_by(LOAD, share, colormap="heat", range=(0, 1), unit="of its torque", digits=2)
+            body.color_by(LOAD, share * 100, colormap="heat", range=(0, 150), unit="%", digits=3, limit=100,
+                          limit_label="motor limit")
             s.body("cylinder", [reach * 0.012, reach * 0.014], pos=g["anchor"], quat=_along(ax), color="#c3c7cd",
                    name=f"{name} shaft")
             d["body"] = body
+            link = (drawn or {}).get(g.get("body"))
+            if link is not None and link.fld is None:
+                link.color_by(LOAD, share * 100, colormap="heat", range=(0, 150), unit="%", digits=3, limit=100,
+                              limit_label="motor limit")
             s.label(f"{name} {{{name} torque}}", [0, 0, reach * 0.09], follow=body, kind="note")
         out.append(d)
     out.sort(key=lambda d: -float(d["share"].max()))
@@ -146,6 +202,73 @@ def readouts(s, pb, motors):
         if name.endswith(("speed", "current", "electrical power")) or len(s.readouts) >= 9:
             continue
         s.readout(name, ser["values"], unit=ser.get("unit", ""), digits=3)
+
+
+def windows(v) -> list[tuple]:
+    """The stretch of the input each saved value stands for, halfway to its neighbours, open at either end."""
+    v = np.asarray(v, float)
+    mid = (v[1:] + v[:-1]) / 2
+    return [(None if i == 0 else float(mid[i - 1]), None if i == len(v) - 1 else float(mid[i])) for i in range(len(v))]
+
+
+def paths(s, sw, v, reach):
+    """Where the payload goes through the move with the real motors at each value, green when the mechanism keeps
+    to the move and red when it falls behind, over the path the move asks for in yellow."""
+    P = sw.get("paths") or {}
+    keys = [k for k in P if not k.endswith(" asked")]
+    keys = [k for k in keys if "payload" in k] or keys[:2]
+    behind = (sw.get("series", {}).get("falls behind") or {}).get("values")
+    design = float(sw["manifest"]["input"].get("design", v[0]))
+    win = windows(v)
+    for k in keys:
+        asked = P.get(f"{k} asked")
+        if asked:
+            a = np.asarray(asked[int(np.argmin(np.abs(v - design)))], float)
+            s.lines([a], color="#ffd400", width=1.5, name=f"{k} path asked")
+            top = a[int(np.argmax(a[:, 2]))]
+            s.label("the move as asked", top + [0, 0, reach * 0.06], kind="note")
+        for i, p in enumerate(P[k]):
+            off = behind is not None and behind[i] > TRACK_DEG
+            s.lines([np.asarray(p, float)], color="#ff6b5b" if off else "#3dcf7a", width=2.5,
+                    name=f"{k} path").show(*win[i])
+
+
+def sweep_readouts(s, sw, motors):
+    """The hardest worked motor's torque first, against what it can give at that instant, then the others, then
+    what the run with the real motors shows."""
+    n = len(sw["t"])
+    series = sw.get("series", {})
+    if motors:
+        share = np.array([d["share"] for d in motors])
+        k = share.argmax(0)
+        hardest = {motors[i]["name"] for i in k}
+        if len(hardest) == 1:
+            motors.sort(key=lambda d: d["name"] not in hardest)
+        else:
+            rows = np.arange(n)
+            need = np.array([d["need"] for d in motors])[k, rows]
+            lim = np.array([d["lim"] for d in motors])[k, rows]
+            s.readout("hardest motor torque", need, unit="N m", digits=3, limit=lim)
+    for d in motors[:4]:
+        name, j = d["name"], d["joint"]
+        stall = j.get("mode") == "voltage"
+        # a motor run open loop gives what it is asked until it stalls, so it reads red only at its stall
+        s.readout(f"{name} torque", d["need"], unit=d["unit"], digits=3, limit=d["lim"] * (0.999 if stall else 1))
+        sp = series.get(f"{name} speed")
+        if sp:
+            s.readout(f"{name} speed", sp["values"], unit="rpm", digits=3)
+    for d in motors[:1] + [x for x in motors[1:4] if x["joint"].get("mode") == "voltage"]:
+        rms = d["joint"].get("rms")
+        if rms:
+            s.readout(f"{d['name']} RMS torque", rms["values"], unit="N m", digits=3, limit=d["joint"]["rated"])
+    if "falls behind" in series:
+        s.readout("falls behind the move", series["falls behind"]["values"], unit="deg", digits=3, limit=TRACK_DEG)
+    hit = series.get("contact force")
+    if hit and max(hit["values"]) > 0.5:
+        s.readout("parts touching", hit["values"], unit="N", digits=3, limit=0.5)
+    tilt = series.get("base tilt")
+    if tilt and max(tilt["values"]) > 0.5:
+        s.readout("base tilt", tilt["values"], unit="deg", digits=3, limit=5.0)
 
 
 def setting(s, out, pb, J, w, plane, reach, drawn):
@@ -193,8 +316,17 @@ def windshield(s, pb, name, j, J, reach):
            quat=quats, color="#111214", name="wiper blade", prop=True)
     t = np.asarray(pb["t"], float)
     tip, root = base + d * (arm * 0.98 + blade / 2), base + d * (arm * 0.98 - blade / 2)
-    s.lines([tip + n * 0.002, root + n * 0.002], color="#e8f4ff", width=1.5, name="swept edge",
-            drawn=[t, t])
+    swing = (pb.get("swing") or {}).get(body["name"])
+    if swing:       # a sweep: the arc the blade's ends cover in each value's own run
+        for (lo, hi), qs in zip(windows(t), swing):
+            e = -rotate(np.asarray(qs, float), [0, 0, 1])
+            e = e - np.outer(e @ n, n)
+            e /= np.maximum(np.linalg.norm(e, axis=1, keepdims=True), 1e-12)
+            s.lines([base + e * (arm * 0.98 + blade / 2) + n * 0.002, base + e * (arm * 0.98 - blade / 2) + n * 0.002],
+                    color="#e8f4ff", width=1.5, name="swept edge").show(lo, hi)
+    else:
+        s.lines([tip + n * 0.002, root + n * 0.002], color="#e8f4ff", width=1.5, name="swept edge",
+                drawn=[t, t])
     span = np.concatenate([tip, root, base[None]])
     lo, hi = span.min(0), span.max(0)
     c = (lo + hi) / 2
@@ -221,18 +353,25 @@ def desk(s, out, pb, z, reach, drawn):
     if pay is not None:
         pp = np.asarray(pay["pos"], float)
         kg = mass.get(pay["name"])
-        what = f"{kg * 1000:.0f} g payload" if kg else "payload"
+        swept = pb.get("manifest", {}).get("input", {}).get("key") == "payload"
+        what = "payload" if swept or not kg else f"{kg * 1000:.0f} g payload"
         r = float(pay["size"][0])
         if pay["name"] in drawn:
             s.label(what, [0, 0, r * 2.2], follow=drawn[pay["name"]], kind="note")
-        for e in pb.get("events", []):
-            nm = e["name"].lower()
-            if nm in ("pick", "placed", "place"):
-                k = int(np.argmin(np.abs(t - float(e["t_s"]))))
-                at = pp[k] if pp.ndim == 2 else pp
-                s.body("cylinder", [r * 1.6, reach * 0.002], pos=[at[0], at[1], z + reach * 0.002],
-                       color="#ffd400" if nm == "pick" else "#3dcf7a", name=f"{nm} spot", prop=True)
-                s.label("pick" if nm == "pick" else "place", [at[0], at[1], z + r * 0.4], kind="note")
+        asked = (pb.get("paths") or {}).get(f"{pay['name']} asked")
+        if asked:       # a sweep: the move as asked starts at the pick and ends at the place
+            spots = [("pick", np.asarray(asked[0][0])), ("placed", np.asarray(asked[0][-1]))]
+        else:
+            spots = []
+            for e in pb.get("events", []):
+                nm = e["name"].lower()
+                if nm in ("pick", "placed", "place"):
+                    k = int(np.argmin(np.abs(t - float(e["t_s"]))))
+                    spots.append((nm, pp[k] if pp.ndim == 2 else pp))
+        for nm, at in spots:
+            s.body("cylinder", [r * 1.6, reach * 0.002], pos=[at[0], at[1], z + reach * 0.002],
+                   color="#ffd400" if nm == "pick" else "#3dcf7a", name=f"{nm} spot", prop=True)
+            s.label("pick" if nm == "pick" else "place", [at[0], at[1], z + r * 0.4], kind="note")
     s.camera(target=[c[0], c[1], z + reach * 0.35], direction=(0.6, -1.0, 0.65), distance=reach * 3.2 + 0.15)
 
 
