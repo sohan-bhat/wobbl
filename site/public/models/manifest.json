@@ -1,6 +1,101 @@
 {
 "version": 1,
 "examples": {
+  "baking-soda-vinegar": {
+    "replace": [
+      {"object": "beaker", "file": "baking-soda-vinegar/beaker.glb"}
+    ]
+  },
+  "bolted-flange": {
+    "replace": [
+      {"object": "plate", "file": "bolted-flange/plate.glb"},
+      {"object": "M8 8.8", "file": "bolted-flange/m8-88.glb"},
+      {"object": "M8 8.8 head", "file": "bolted-flange/m8-88-head.glb"}
+    ]
+  },
+  "bracket-crack": {
+    "replace": [
+      {"object": "bolt", "file": "bracket-crack/bolt.glb"},
+      {"object": "bolt head", "file": "bracket-crack/bolt-head.glb"},
+      {"object": "mounting plate", "file": "bracket-crack/mounting-plate.glb"}
+    ]
+  },
+  "cast-motor-mount": {
+    "add": [
+      {"file": "cast-motor-mount/plate.glb"},
+      {"file": "cast-motor-mount/motor.glb"},
+      {"file": "cast-motor-mount/motor-flange.glb"},
+      {"file": "cast-motor-mount/motor-shaft.glb"},
+      {"file": "cast-motor-mount/pulley.glb"}
+    ]
+  },
+  "cast-mount-credibility": {
+    "add": [
+      {"file": "cast-mount-credibility/plate.glb"},
+      {"file": "cast-mount-credibility/motor.glb"},
+      {"file": "cast-mount-credibility/motor-flange.glb"},
+      {"file": "cast-mount-credibility/motor-shaft.glb"},
+      {"file": "cast-mount-credibility/pulley.glb"}
+    ]
+  },
+  "circuits/buck": {
+    "replace": [
+      {"object": "bench", "file": "circuits-buck/bench.glb"},
+      {"object": "breadboard", "file": "circuits-buck/breadboard.glb"}
+    ]
+  },
+  "circuits/kicad-board": {
+    "replace": [
+      {"object": "bench", "file": "circuits-kicad-board/bench.glb"},
+      {"object": "breadboard", "file": "circuits-kicad-board/breadboard.glb"}
+    ]
+  },
+  "circuits/led": {
+    "replace": [
+      {"object": "bench", "file": "circuits-led/bench.glb"},
+      {"object": "breadboard", "file": "circuits-led/breadboard.glb"}
+    ]
+  },
+  "circuits/mosfet": {
+    "replace": [
+      {"object": "bench", "file": "circuits-mosfet/bench.glb"},
+      {"object": "breadboard", "file": "circuits-mosfet/breadboard.glb"}
+    ]
+  },
+  "circuits/opamp-cable": {
+    "replace": [
+      {"object": "bench", "file": "circuits-opamp-cable/bench.glb"},
+      {"object": "breadboard", "file": "circuits-opamp-cable/breadboard.glb"}
+    ]
+  },
+  "desktop-arm": {
+    "replace": [
+      {"object": "desk", "file": "desktop-arm/desk.glb"}
+    ]
+  },
+  "drone-arm": {
+    "add": [
+      {"file": "drone-arm/bolt.glb"},
+      {"file": "drone-arm/bolt-head.glb"},
+      {"file": "drone-arm/mounting-plate.glb"}
+    ]
+  },
+  "falling-rock": {
+    "replace": [
+      {"object": "rock", "file": "falling-rock/rock.glb"}
+    ]
+  },
+  "handheld-drop": {
+    "add": [
+      {"file": "handheld-drop/floor.glb"}
+    ],
+    "hide": ["ground"]
+  },
+  "heat-sink": {
+    "add": [
+      {"file": "heat-sink/heat-source.glb"}
+    ]
+  },
   "knsb-motor": {
     "replace": [
       {"object": "nozzle", "file": "knsb-motor/nozzle.glb"},
@@ -14,6 +109,28 @@
     ],
     "hide": ["ground"]
   },
+  "motor-mount": {
+    "add": [
+      {"file": "motor-mount/bolt.glb"},
+      {"file": "motor-mount/bolt-head.glb"},
+      {"file": "motor-mount/mounting-plate.glb"},
+      {"file": "motor-mount/motor.glb"},
+      {"file": "motor-mount/motor-flange.glb"},
+      {"file": "motor-mount/motor-shaft.glb"},
+      {"file": "motor-mount/pulley.glb"}
+    ]
+  },
+  "printed-lid": {
+    "replace": [
+      {"object": "print bed", "file": "printed-lid/print-bed.glb"}
+    ]
+  },
+  "propane-flame": {
+    "replace": [
+      {"object": "burner", "file": "propane-flame/burner.glb"},
+      {"object": "air inlet", "file": "propane-flame/air-inlet.glb"}
+    ]
+  },
   "rocket-launch": {
     "replace": [
       {"object": "rocket", "file": "rocket-launch/airframe.glb"},
@@ -22,6 +139,27 @@
       {"object": "fins", "file": "rocket-launch/fins.glb"},
       {"object": "launch pad", "file": "rocket-launch/launch-pad.glb"},
       {"object": "launch rail", "file": "rocket-launch/rail.glb"}
+    ]
+  },
+  "shelf-bracket": {
+    "add": [
+      {"file": "shelf-bracket/bolt.glb"},
+      {"file": "shelf-bracket/bolt-head.glb"},
+      {"file": "shelf-bracket/wall.glb"},
+      {"file": "shelf-bracket/shelf.glb"},
+      {"file": "shelf-bracket/load-on-the-shelf.glb"}
+    ]
+  },
+  "steel-hook": {
+    "replace": [
+      {"object": "bolt", "file": "steel-hook/bolt.glb"},
+      {"object": "bolt head", "file": "steel-hook/bolt-head.glb"},
+      {"object": "weight", "file": "steel-hook/weight.glb"}
+    ]
+  },
+  "strut-buckling": {
+    "replace": [
+      {"object": "end plate", "file": "strut-buckling/end-plate.glb"}
     ]
   },
   "wiper-linkage": {
