@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.3 (2026-10-16)
+
+**Ask in your own words**
+- Everyday phrases route to the right analysis. "rocket thrust test" and "static fire" run a motor
+  static fire, and "how high", "drop test", "bend test", "heat soak" and "will it fry" each find
+  their analysis. Longer phrases count for more than single words.
+- With no spec, Wobbl runs on a typical motor, rocket, bracket, heat sink, case, radio band or prop
+  speed, says what it assumed and the flag that changes it. A heat question with no wattage asks
+  that one question.
+- "Without a resistor" is taken at its word.
+
+**Export a run**
+- `--export gif|mp4|png|report` and `--out` save a clip, a still or the report. Words like
+  "give me a gif in downloads" or "a png on my desktop" do the same. GIFs stay under 15 MB. MP4
+  needs ffmpeg on PATH and falls back to a GIF with a note when it is missing. Files are never
+  overwritten.
+
+**A brighter terminal**
+- Results, badges and the live status use Wobbl's own yellow, green, amber and red.
+- `wobbl setup` shows progress while it measures disk use, finds solver footprints and registers
+  agents, so nothing sits still without a status.
+
+**Installs**
+- The npm launcher asks uv and pipx for a fresh PyPI answer, so an install minutes after a release
+  gets that release.
+
 ## 0.1.2 (2026-10-16)
 
 **npm installs that work**

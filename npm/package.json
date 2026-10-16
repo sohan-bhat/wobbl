@@ -1,6 +1,6 @@
 {
   "name": "wobbl",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Simulate anything before you build it. Installs the Wobbl CLI and MCP server with npm or npx.",
   "keywords": [
     "simulation",

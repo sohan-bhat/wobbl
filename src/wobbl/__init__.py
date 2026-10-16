@@ -11,6 +11,6 @@ The package is layered the same way the work flows:
         ->  verification (can we trust it)  ->  report (what you see)
 """
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 __all__ = ["__version__"]
