@@ -498,7 +498,9 @@ def validate(only, out, markdown):
 def mcp():
     """Run the MCP server on stdio (agents start this; 'wobbl setup' registers it)."""
     from ..mcp.server import main as serve
+    from ..setup import progress
 
+    progress.FACTORY = None     # stdout carries the protocol, so first use installs report in plain lines
     serve()
 
 
