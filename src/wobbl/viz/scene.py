@@ -88,8 +88,10 @@ class Scene:
         return self
 
     def field(self, name: str, unit: str = "", *, colormap: str = "turbo", range=None, limit=None,
-              limit_label: str = "", digits: int = 3, data=None) -> int:
-        """Declare a color field (or find one already declared by name) and return its index."""
+              limit_label: str = "", digits: int = 3, data=None, target=None) -> int:
+        """Declare a color field (or find one already declared by name) and return its index. Over limit the part
+        shows white and the viewer's verdict reads fails; over target (0.8 of limit when not given) it reads
+        marginal, as a target safety factor would make it."""
         for i, f in enumerate(self.fields):
             if f["name"] == name:
                 if data is not None:
@@ -102,6 +104,8 @@ class Scene:
             f["limit"] = _f(limit)
             if limit_label:
                 f["limit_label"] = limit_label
+            if target is not None:
+                f["target"] = _f(target)
         self.fields.append(f)
         self._fdata.append([] if data is None else [np.ravel(np.asarray(data, float))])
         return len(self.fields) - 1

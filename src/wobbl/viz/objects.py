@@ -120,12 +120,13 @@ class Mesh(_Obj):
         self.glow = None
 
     def color_by(self, field: str, values, *, scale=None, unit: str = "", colormap: str = "turbo", range=None,
-                 limit=None, limit_label: str = "", digits: int = 3) -> "Mesh":
+                 limit=None, limit_label: str = "", digits: int = 3, target=None) -> "Mesh":
         """Color by a field. values is one value per vertex, either for every frame (shape frames x vertices), or
         once with scale giving each frame's multiple of it, which is exact for a linear model."""
         v = np.asarray(values, float)
         f = self.s.field(field, unit, colormap=colormap, range=range, limit=limit, limit_label=limit_label,
-                         digits=digits, data=v if scale is None else np.outer(np.asarray(scale, float), v))
+                         digits=digits, data=v if scale is None else np.outer(np.asarray(scale, float), v),
+                         target=target)
         self.fld = (f, v, None if scale is None else np.asarray(scale, float))
         return self
 
@@ -218,11 +219,11 @@ class Body(_Obj):
         return self
 
     def color_by(self, field: str, values, *, unit: str = "", colormap: str = "inferno", range=None, limit=None,
-                 limit_label: str = "", digits: int = 3) -> "Body":
+                 limit_label: str = "", digits: int = 3, target=None) -> "Body":
         """Color the whole body by one value per frame, as a lumped cell temperature."""
         v = np.asarray(values, float)
         f = self.s.field(field, unit, colormap=colormap, range=range, limit=limit, limit_label=limit_label,
-                         digits=digits, data=v)
+                         digits=digits, data=v, target=target)
         self.fld = (f, v)
         return self
 
