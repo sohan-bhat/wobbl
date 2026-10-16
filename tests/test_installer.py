@@ -46,7 +46,7 @@ def test_registry_maps_domains_to_recipes():
 def test_a_new_recipe_installs_on_first_use_not_in_setup(home, monkeypatch):
     calls = []
 
-    def fake_mm(mm, args, log, logfile):   # stands in for micromamba: records the call, writes conda-meta
+    def fake_mm(mm, args, what, prefix, pkgs=None):   # stands in for micromamba: records the call, writes conda-meta
         calls.append(args)
         env = home / "env"
         (env / "conda-meta").mkdir(parents=True, exist_ok=True)
@@ -55,7 +55,7 @@ def test_a_new_recipe_installs_on_first_use_not_in_setup(home, monkeypatch):
         (env / "bin" / "ElmerSolver").write_text("x")
         (env / "conda-meta" / "elmer-9.0-h_0.json").write_text("{}")
 
-    monkeypatch.setattr(installer, "_mm", fake_mm)
+    monkeypatch.setattr(installer, "run_micromamba", fake_mm)
     monkeypatch.setattr(installer, "ensure_micromamba", lambda log, force=False: home / "bin" / "micromamba")
     monkeypatch.setattr(installer, "RECIPES", dict(installer.RECIPES))
     installer.register(installer.Recipe("elmer", ("multiphysics",), ("elmer>=9",), keep=("ElmerSolver*",),

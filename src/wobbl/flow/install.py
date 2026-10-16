@@ -214,20 +214,16 @@ def _from_app(zpath: Path, stage: Path, log: Log) -> float:
 
 # --- Linux: conda-forge into its own environment, pruned in place ----------------------------------------------
 def _from_conda(stage: Path, log: Log) -> float:
-    from ..setup.installer import ensure_micromamba
+    from ..setup.installer import ensure_micromamba, run_micromamba
 
     mm = ensure_micromamba(log)
     root, pkgs = stage / "root", stage / "pkgs"
-    env = dict(os.environ, MAMBA_ROOT_PREFIX=str(wobbl_home() / "mamba"), CONDA_PKGS_DIRS=str(pkgs))
     log(f"installing {CONDA_SPEC} from conda-forge (about 250 MB to download)")
-    logfile = wobbl_home() / "setup.log"
-    with open(logfile, "a") as lf:
-        cmd = [str(mm), "create", "-y", "-c", "conda-forge", "--override-channels", "-p", str(root), CONDA_SPEC]
-        lf.write(f"\n$ {' '.join(cmd)}\n")
-        lf.flush()
-        r = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT, env=env)
-    if r.returncode != 0:
-        raise FlowSetupError(f"micromamba could not install OpenFOAM (exit {r.returncode}); see {logfile}")
+    try:
+        run_micromamba(mm, ["create", "-y", "-c", "conda-forge", "--override-channels", "-p", str(root), CONDA_SPEC],
+                       "OpenFOAM", root, pkgs=pkgs)
+    except SetupError as e:
+        raise FlowSetupError(f"micromamba could not install OpenFOAM. {e}") from None
     shutil.rmtree(pkgs, ignore_errors=True)
     full = dir_size(root) / 1e6
     keep = closure([root / "bin" / a for a in APPS], [root / "lib", root / "lib" / "dummy"])

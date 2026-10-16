@@ -11,9 +11,17 @@ from .. import __version__
 from . import ui
 
 # what setup suggests last: check the install, then the no file question the first run guide starts with
-NEXT_STEP = ("Next, run [bold]wobbl doctor[/bold] to check every piece, then ask a first question that needs no "
-             "files with [bold]wobbl simulate \"will a blue LED on 5V with a 47 ohm resistor fry?\"[/bold], or "
-             "point it at a part of your own with [bold]wobbl simulate part.step \"will it hold 200 N?\"[/bold]")
+NEXT_STEPS = (("wobbl doctor", "checks every piece"),
+              ('wobbl simulate "will a blue LED on 5V with a 47 ohm resistor fry?"', "a first question, no files"),
+              ('wobbl simulate part.step "will it hold 200 N?"', "a part of your own"))
+
+
+def next_steps() -> None:
+    ui.section("next")
+    for cmd, why in NEXT_STEPS:
+        ui.line(f"  {cmd}")
+        ui.say(why, style="dim", indent=4)
+    ui.console.print()
 
 
 @click.command()
@@ -33,44 +41,50 @@ def setup(agents, no_agents, no_solvers, only, project, force, dry_run):
     from ..setup import installer
     from ..solvers.locate import wobbl_home
 
-    log = lambda m: ui.console.print(f"  {m}")  # noqa: E731
+    log = lambda m: ui.say(m)  # noqa: E731
     if not no_solvers:
         ui.section("solvers")
         p = installer.plan()
-        ui.console.print(f"  platform {p['platform']}, installing into {wobbl_home()}")
+        ui.files([("platform", p["platform"]), ("installing into", wobbl_home())])
         for k, why in p["unavailable"].items():
-            ui.console.print(f"  [yellow]{k}: {why}[/yellow]")
+            ui.say(f"{k}: {why}", style="yellow")
         if dry_run:
-            ui.console.print(f"  would install {', '.join(p['env'] + p['env_x86'])}")
+            ui.say(f"would install {', '.join(p['env'] + p['env_x86'])}")
         else:
             try:
                 st = installer.install(log, force=force, only=only.split(",") if only else None)
             except installer.SetupError as e:
-                ui.fail(str(e), "Rerun 'wobbl setup'; details are in ~/.wobbl/setup.log")
+                if getattr(e, "tail", ""):
+                    ui.section("the end of the install log")
+                    for ln in e.tail.splitlines():
+                        ui.line(f"  {ln}", style="dim")
+                ui.fail(str(e), "Run wobbl setup again once the problem above is fixed. Every install log is in "
+                                f"{wobbl_home() / 'logs'}")
+            ui.console.print()
+            asked = st.get("chosen")
             for k, why in st.get("unavailable", {}).items():
-                ui.console.print(f"  [yellow]{k} unavailable: {why}[/yellow]")
+                if asked is None or k in asked:
+                    ui.say(f"{k} unavailable: {why}", style="yellow")
             size = st.get("size", {})
             envs = sum(v for k, v in size.items() if k.startswith("env"))
-            ui.console.print(f"  solvers take {envs / 1e6:.0f} MB, and all of {wobbl_home()} takes "
-                             f"{size.get('total', 0) / 1e6:.0f} MB")
+            took = f" Setup took {st['seconds']:.0f} s." if st.get("seconds") else ""
+            ui.say(f"Solvers take {envs / 1e6:.0f} MB, and all of Wobbl's home folder takes "
+                   f"{size.get('total', 0) / 1e6:.0f} MB.{took}")
             if st.get("cache_freed"):
-                ui.console.print(f"  [dim]cleared {st['cache_freed'] / 1e6:.0f} MB of downloads left over from "
-                                 "the install[/dim]")
-        from ..motion.tools import footprint
-        ui.console.print(f"  {footprint()['line']}")
-        from ..life.tools import footprint as life_footprint
-        ui.console.print(f"  {life_footprint()['line']}")
+                ui.say(f"Cleared {st['cache_freed'] / 1e6:.0f} MB of downloads left over from the install.",
+                       style="dim")
         from ..chem.tools import footprint as chem_footprint
-        ui.console.print(f"  {chem_footprint()['line']}")
+        from ..life.tools import footprint as life_footprint
         from ..mechanism.install import footprint as mechanism_footprint
-        ui.console.print(f"  {mechanism_footprint()['line']}")
+        from ..motion.tools import footprint
+        ui.bullets([f()["line"] for f in (footprint, life_footprint, chem_footprint, mechanism_footprint)])
     if not no_agents and agents != "none":
         ui.section("agents")
         found = ag.detect()
         if agents == "detected":
             chosen = [a for a, ok in found.items() if ok]
             if not chosen:
-                ui.console.print("  no coding agents found; run 'wobbl setup --agents all' to register anyway")
+                ui.say("No coding agents found. Run wobbl setup --agents all to register them anyway.")
         elif agents == "all":
             chosen = list(ag.AGENTS)
         else:
@@ -82,9 +96,9 @@ def setup(agents, no_agents, no_solvers, only, project, force, dry_run):
             r = ag.register(chosen, log, dry_run)
             if project:
                 r.project_rules(Path.cwd())
-            ui.console.print("  [dim]backups of changed files are in ~/.wobbl/backups; undo with "
-                             "'wobbl uninstall'[/dim]")
-    ui.console.print(f"\n  {NEXT_STEP}\n")
+            ui.say("Backups of changed files are in ~/.wobbl/backups, and wobbl uninstall undoes it all.",
+                   style="dim")
+    next_steps()
 
 
 @click.command()

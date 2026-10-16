@@ -1,5 +1,4 @@
 import json
-import re
 import shlex
 
 import click
@@ -69,10 +68,12 @@ def test_setup_ends_with_real_next_steps(homes):
     assert r.exit_code == 0, r.output
     text = " ".join(r.output.split())
     assert "wobbl examples" not in text
-    assert text.startswith("Next, run wobbl doctor to check every piece")
-    suggested = re.findall(r'wobbl (?:"[^"]+"|\S+(?: "[^"]+")?)', text)
+    assert text.startswith("NEXT wobbl doctor checks every piece")
+    from wobbl.cli.admin import NEXT_STEPS
+    suggested = [cmd for cmd, _ in NEXT_STEPS]
     assert len(suggested) == 3, suggested
     for cmd in suggested:
+        assert cmd in r.output                          # each on one line, never wrapped
         args = shlex.split(cmd)[1:]
         root = click.Context(cli, info_name="wobbl")
         name, sub, rest = cli.resolve_command(root, args)

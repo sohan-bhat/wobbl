@@ -387,8 +387,94 @@ def checklist(items, run, workers: int = 4, show: bool = True, pad: int = 0) -> 
     return [done[i] for i in range(len(items))]
 
 
+class InstallProgress:
+    """The live display of an install on stderr: a line per stage with a spinner, then ok or failed, a bar with
+    bytes or a package count and the percent when the size is known, and the time each stage took."""
+
+    def __init__(self, log=None):
+        from rich.progress import (BarColumn, DownloadColumn, Progress, ProgressColumn, TaskProgressColumn,
+                                   TimeElapsedColumn)
+
+        class State(ProgressColumn):
+            def __init__(self):
+                super().__init__()
+                self.spin = Spinner("dots", style="yellow")
+
+            def render(self, task):
+                ok = task.fields.get("ok")
+                if ok is None:
+                    return self.spin.render(task.get_time())
+                return Text("ok", style="bold green") if ok else Text("failed", style="bold red")
+
+        class Bar(BarColumn):
+            def render(self, task):
+                return super().render(task) if task.total else Text("")
+
+        class Amount(DownloadColumn):
+            def render(self, task):
+                if not task.total:
+                    return Text(task.fields.get("detail", ""), style="dim")
+                if task.fields.get("unit") == "bytes":
+                    return super().render(task)
+                return Text(f"{task.completed:.0f}/{task.total:.0f} {task.fields.get('unit', '')}", style="dim")
+
+        class Percent(TaskProgressColumn):
+            def render(self, task):
+                return super().render(task) if task.total else Text("")
+
+        self.progress = Progress(State(), "{task.description}", Bar(bar_width=24), Percent(), Amount(),
+                                 TimeElapsedColumn(), console=err, refresh_per_second=8,
+                                 expand=False)
+        self.t0 = time.time()
+        self._pause = None
+
+    def open(self):
+        self._pause = _paused()
+        self._pause.__enter__()
+        self.progress.start()
+
+    def close(self):
+        self.progress.stop()
+        if self._pause is not None:
+            self._pause.__exit__(None, None, None)
+
+    def stage(self, title, total=None, unit=""):
+        from ..setup.progress import Stage
+        st = Stage(self, title, total, unit)
+        st.handle = self.progress.add_task(title, total=total, ok=None, unit=unit, detail="")
+        return st
+
+    def note(self, text):
+        self.progress.console.print(Text(f"  {text}", style="dim"))
+
+    def _update(self, st):
+        self.progress.update(st.handle, completed=st.completed, total=st.total, detail=st.detail)
+
+    def _finish(self, st):
+        self.progress.update(st.handle, completed=st.completed if not st.total else (st.total if st.finished
+                                                                                        else st.completed),
+                             total=st.total, ok=bool(st.finished), detail=st.detail)
+        self.progress.stop_task(st.handle)
+
+
+def install_reporter(log=None):
+    """What an install reports through: the live display on a terminal, plain lines elsewhere."""
+    from ..setup.progress import Reporter
+    if plain(err):
+        return Reporter(log or (lambda m: err.print(f"wobbl: {m}", markup=False, highlight=False)))
+    return InstallProgress(log)
+
+
 def fail(msg: str, hint: str = "") -> None:
     err.print(Text("error ", style="bold red") + Text(str(msg)))
     if hint:
         err.print(Text(hint, style="dim"))
     sys.exit(2)
+
+
+def _use_install_progress() -> None:
+    from ..setup import progress as setup_progress
+    setup_progress.FACTORY = install_reporter
+
+
+_use_install_progress()

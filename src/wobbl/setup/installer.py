@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..solvers.locate import bin_dirs, env_prefix, platform_tag, wobbl_home
+from . import progress
 
 MICROMAMBA_VERSION = os.environ.get("WOBBL_MICROMAMBA_VERSION", "2.9.0-0")
 MM_URL = "https://github.com/mamba-org/micromamba-releases/releases/download/{v}/micromamba-{p}"
@@ -53,7 +54,9 @@ PRUNE = ("include", "share/doc", "share/man", "share/info", "share/locale", "sha
 
 
 class SetupError(RuntimeError):
-    pass
+    def __init__(self, msg: str = "", tail: str = ""):
+        super().__init__(msg)
+        self.tail = tail     # the end of the raw log, shown when an install fails
 
 
 @dataclass
@@ -127,21 +130,44 @@ def _ssl_context():
         return ssl.create_default_context()
 
 
-def download(url: str, dest: Path, log: Log = print) -> Path:
+SHOWN_BYTES = 1_000_000     # a download this big or bigger gets its own progress line
+
+
+def download(url: str, dest: Path, log: Log = print, label: str | None = None) -> Path:
+    """Fetch url into dest. A big download shows its bytes and percent on the current install's progress."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
+    name = label or dest.name
+    stage = None
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "wobbl-setup"})
         with urllib.request.urlopen(req, context=_ssl_context(), timeout=120) as r, open(tmp, "wb") as f:
-            shutil.copyfileobj(r, f)
+            total = int(r.headers.get("Content-Length") or 0)
+            if total >= SHOWN_BYTES:
+                stage = progress.current().stage(f"download {name}", total=total, unit="bytes")
+            while True:
+                chunk = r.read(1 << 16)
+                if not chunk:
+                    break
+                f.write(chunk)
+                if stage is not None:
+                    stage.update(advance=len(chunk))
     except Exception as e:  # noqa: BLE001  fall back to curl, which uses the system trust store
+        if stage is not None:
+            stage.update(completed=0, detail="retrying with curl")
         curl = shutil.which("curl")
         if not curl:
+            if stage is not None:
+                stage.fail()
             raise SetupError(f"could not download {url}: {e}") from e
         r = subprocess.run([curl, "-fsSL", "-o", str(tmp), url], capture_output=True, text=True)
         if r.returncode != 0:
+            if stage is not None:
+                stage.fail()
             raise SetupError(f"could not download {url}: {e}; curl said {r.stderr.strip()}") from e
     tmp.replace(dest)
+    if stage is not None:
+        stage.done("")
     return dest
 
 
@@ -157,8 +183,7 @@ def ensure_micromamba(log: Log = print, force: bool = False) -> Path:
     plat = platform_tag()
     name = plat + (".exe" if plat.startswith("win") else "")
     url = MM_URL.format(v=MICROMAMBA_VERSION, p=name)
-    log(f"downloading micromamba {MICROMAMBA_VERSION} for {plat}")
-    download(url, mm, log)
+    download(url, mm, log, label=f"micromamba {MICROMAMBA_VERSION}")
     try:
         sha_file = Path(tempfile.mkdtemp()) / "mm.sha256"
         download(MM_URL.format(v=MICROMAMBA_VERSION, p=plat) + ".sha256", sha_file, log)
@@ -175,25 +200,151 @@ def ensure_micromamba(log: Log = print, force: bool = False) -> Path:
     return mm
 
 
-def _mm(mm: Path, args: list[str], log: Log, logfile: Path) -> None:
-    env = dict(os.environ)
-    env["MAMBA_ROOT_PREFIX"] = str(wobbl_home() / "mamba")
-    env["CONDA_PKGS_DIRS"] = str(wobbl_home() / "mamba" / "pkgs")
-    cmd = [str(mm), *args]
+def log_path(what: str) -> Path:
+    """A new file under ~/.wobbl/logs for the raw output of one install step."""
+    d = wobbl_home() / "logs"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / f"{what}-{time.strftime('%Y%m%d-%H%M%S')}.log"
+
+
+def log_tail(path: Path, lines: int = 12) -> str:
+    try:
+        return "\n".join(path.read_text(errors="replace").strip().splitlines()[-lines:])
+    except OSError:
+        return ""
+
+
+def _archive(item: dict, pkgs: Path) -> list[Path]:
+    """Where micromamba puts a package's archive while and after it downloads."""
+    from urllib.parse import urlparse
+    u = urlparse(item.get("url", ""))
+    fn = item.get("fn") or Path(u.path).name
+    return [pkgs / u.scheme / u.netloc / u.path.lstrip("/"), pkgs / fn] if u.scheme else [pkgs / fn]
+
+
+def _downloaded(fetch: list[dict], pkgs: Path) -> int:
+    """Bytes of the planned packages on disk so far, partial downloads included."""
+    listing: dict[Path, list[str]] = {}
+    got = 0
+    for item in fetch:
+        size = int(item.get("size") or 0)
+        best = 0
+        for path in _archive(item, pkgs):
+            if path.parent not in listing:
+                try:
+                    listing[path.parent] = os.listdir(path.parent)
+                except OSError:
+                    listing[path.parent] = []
+            for n in listing[path.parent]:
+                if n.startswith(path.name):
+                    q = path.parent / n
+                    try:
+                        best = max(best, size if q.is_dir() else q.stat().st_size)
+                    except OSError:
+                        pass
+        got += min(best, size) if size else 0
+    return got
+
+
+def _linked(env: Path, since: float) -> int:
+    meta = env / "conda-meta"
+    try:
+        return sum(1 for f in meta.glob("*.json") if f.stat().st_mtime >= since)
+    except OSError:
+        return 0
+
+
+def _plan_transaction(mm: Path, args: list[str], env: dict, logfile: Path) -> tuple[list[dict], list[dict]] | None:
+    """The packages a micromamba command would download and link, from a dry run, or None when it cannot say."""
     with open(logfile, "a") as lf:
-        lf.write(f"\n$ {' '.join(cmd)}\n")
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
-        last = time.time()
-        for line in p.stdout:
-            lf.write(line)
-            s = line.strip()
-            if s and (s.startswith(("+", "Transaction", "Linking", "Downloading")) or "Done" in s) and \
-                    time.time() - last > 0.5:
-                log("  " + s[:100])
-                last = time.time()
-        p.wait()
+        lf.write(f"\n$ {mm} {' '.join(args)} --dry-run --json\n")
+        lf.flush()
+        try:
+            r = subprocess.run([str(mm), *args, "--dry-run", "--json"], stdout=subprocess.PIPE, stderr=lf, text=True,
+                               env=env, stdin=subprocess.DEVNULL, timeout=900)
+        except (subprocess.TimeoutExpired, OSError) as e:
+            lf.write(f"dry run gave up: {e}\n")
+            return None
+    try:
+        d = json.loads(r.stdout)
+    except ValueError:
+        d = None
+    if r.returncode != 0:
+        with open(logfile, "a") as lf:
+            if d is None:
+                lf.write(r.stdout)
+            else:
+                lf.write(json.dumps(d, indent=1) + "\n")
+                for h in d.get("log_history") or []:
+                    if isinstance(h, dict) and h.get("message"):
+                        lf.write(f"{h.get('level', 'error')}: {h['message']}\n")
+                for prob in d.get("solver_problems") or []:
+                    lf.write(f"problem: {prob}\n")
+        raise SetupError(f"micromamba could not work out the packages (exit {r.returncode}). Its log is {logfile}",
+                         log_tail(logfile))
+    acts = (d or {}).get("actions", {})
+    return (list(acts.get("FETCH", [])), list(acts.get("LINK", []))) if d is not None else None
+
+
+def run_micromamba(mm: Path, args: list[str], what: str, prefix: Path, pkgs: Path | None = None) -> Path:
+    """Run a micromamba create or install with a progress line for each of its stages: working out the packages,
+    downloading them with bytes and percent, and installing them by count. Its raw output goes to a file under
+    ~/.wobbl/logs, which a failure names and quotes the end of."""
+    pkgs = pkgs or wobbl_home() / "mamba" / "pkgs"
+    env = dict(os.environ, MAMBA_ROOT_PREFIX=str(wobbl_home() / "mamba"), CONDA_PKGS_DIRS=str(pkgs))
+    logfile = log_path(f"micromamba-{re.sub(r'[^a-z0-9]+', '-', what.lower()).strip('-')}")
+    rep = progress.current()
+    with rep.stage(f"resolve {what}") as st:
+        st.detail = "could not work out the packages"
+        planned = _plan_transaction(mm, args, env, logfile)
+        st.detail = ""
+        if planned is not None:
+            fetch, link = planned
+            size = sum(int(x.get("size") or 0) for x in fetch)
+            st.detail = f"{len(link)} packages" + (f", {progress.nbytes(size)} to download" if fetch else "")
+    fetch, link = planned if planned is not None else ([], [])
+    total = sum(int(x.get("size") or 0) for x in fetch)
+    dl = rep.stage(f"download {what}", total=total, unit="bytes") if total else None
+    inst = None
+    t0 = time.time()
+    with open(logfile, "a") as lf:
+        lf.write(f"\n$ {mm} {' '.join(args)}\n")
+        lf.flush()
+        p = subprocess.Popen([str(mm), *args], stdout=lf, stderr=subprocess.STDOUT, env=env, stdin=subprocess.DEVNULL)
+        try:
+            while True:
+                code = p.poll()
+                if dl is not None and dl.finished is None:
+                    dl.update(completed=_downloaded(fetch, pkgs))
+                n = _linked(prefix, t0 - 1)
+                if inst is None and (n or code is not None or (dl is not None and dl.completed >= total)
+                                     or dl is None):
+                    if dl is not None and code in (None, 0):
+                        dl.done()
+                    inst = rep.stage(f"install {what}", total=len(link) or None, unit="packages")
+                if inst is not None and link:
+                    inst.update(completed=min(n, len(link)))
+                if code is not None:
+                    break
+                time.sleep(0.2)
+        except BaseException:
+            p.kill()
+            p.wait()
+            for s in (dl, inst):
+                if s is not None:
+                    s.fail("stopped")
+            raise
     if p.returncode != 0:
-        raise SetupError(f"micromamba failed (exit {p.returncode}); see {logfile}")
+        for s in (dl, inst):
+            if s is not None:
+                s.fail()
+        raise SetupError(f"micromamba could not install {what} (exit {p.returncode}). Its log is {logfile}",
+                         log_tail(logfile))
+    if dl is not None:
+        dl.done()
+    if inst is not None:
+        inst.done(f"{len(link)} packages" if link else "")
+    return logfile
 
 
 def _chosen(names: list[str] | None) -> list[Recipe]:
@@ -229,40 +380,54 @@ def plan(plat: str | None = None, names: list[str] | None = None) -> dict:
 
 
 def install(log: Log = print, force: bool = False, only: list[str] | None = None) -> dict:
+    """Install the core solvers, or those named, with a progress line for every step."""
+    with progress.reporting(log) as rep:
+        return _install(rep, force, only)
+
+
+def _install(rep: progress.Reporter, force: bool, only: list[str] | None) -> dict:
     home = wobbl_home()
     home.mkdir(parents=True, exist_ok=True)
-    logfile = home / "setup.log"
+    note = rep.note
     p = plan(names=only)
     unavailable = dict(p["unavailable"])
     if p["groups"]:
-        mm = ensure_micromamba(log, force)
+        mm = ensure_micromamba(note, force)
         base = ["-y", "-r", str(home / "mamba"), "-c", "conda-forge", "--override-channels"]
     for g in p["groups"]:
         env = env_prefix(g["env"])
         verb = "install" if (env / "conda-meta").exists() and not force else "create"
         names = ", ".join(g["recipes"])
         if g["platform"]:
-            log(f"installing {names} (Intel build, runs under Rosetta 2)")
             try:
-                _mm(mm, [verb, *base, "--platform", g["platform"], "-p", str(env), *g["specs"]], log, logfile)
+                run_micromamba(mm, [verb, *base, "--platform", g["platform"], "-p", str(env), *g["specs"]],
+                               f"{names} (Intel build for Rosetta 2)", env)
             except SetupError as e:
                 unavailable.update({n: f"Intel {n} could not be installed: {e}" for n in g["recipes"]})
         else:
-            log(f"installing {names} into {env}")
-            _mm(mm, [verb, *base, "-p", str(env), *g["specs"]], log, logfile)
+            run_micromamba(mm, [verb, *base, "-p", str(env), *g["specs"]], names, env)
     for name in p["custom"]:
-        log(f"installing {name}")
-        try:
-            RECIPES[name].installer(log, force)
-        except SetupError as e:
-            unavailable[name] = str(e)
-    status = verify(log)
+        with rep.stage(f"install {name}") as st:
+            try:
+                RECIPES[name].installer(note, force)
+            except SetupError as e:
+                unavailable[name] = str(e)
+                st.fail(str(e)[:100])
+    chosen = [r.name for r in _chosen(only)]
+    rep.checks = chosen
+    status = verify(note)
     if p["groups"]:
-        status = prune(status, log)
-        status["cache_freed"] = clean_cache(log)
+        with rep.stage("prune files no solver needs") as st:
+            status = prune(status, note)
+        with rep.stage("clear the download cache") as st:
+            status["cache_freed"] = clean_cache(note)
+            if status["cache_freed"]:
+                st.detail = f"{progress.nbytes(status['cache_freed'])} freed"
+    status["chosen"] = chosen
     status["platform"] = p["platform"]
     status["unavailable"] = {**status.get("unavailable", {}), **unavailable}
     status["size"] = sizes()
+    status["seconds"] = round(time.time() - rep.t0, 1)
     (home / "config.json").write_text(json.dumps(status, indent=1))
     return status
 
@@ -270,17 +435,18 @@ def install(log: Log = print, force: bool = False, only: list[str] | None = None
 def install_on_demand(domains: tuple[str, ...] | list[str], log: Log | None = None) -> bool:
     """Install the solvers of a domain the first time it is used. True when something was installed.
 
-    WOBBL_AUTO_INSTALL=0 turns this off. Progress goes to stderr, since an MCP server's stdout carries the
-    protocol.
+    WOBBL_AUTO_INSTALL=0 turns this off. Plain progress goes to stderr, since an MCP server's stdout carries
+    the protocol, and the command line draws it as a live display instead.
     """
     if os.environ.get("WOBBL_AUTO_INSTALL", "1").strip().lower() in ("0", "no", "false", "off"):
         return False
     todo = list({r.name: r for d in domains for r in recipes_for(d) if target(r) and not installed(r)})
     if not todo:
         return False
-    log = log or (lambda m: print(f"wobbl: {m}", file=sys.stderr, flush=True))
-    log(f"first {domains[0]} study on this machine, installing {', '.join(todo)} into {wobbl_home()}")
-    install(log, only=todo)
+    with progress.reporting(log) as rep:
+        rep.note(f"first {domains[0]} study on this machine, so Wobbl installs {', '.join(todo)} into "
+                 f"{wobbl_home()} once")
+        install(rep.note, only=todo)
     return True
 
 
@@ -334,7 +500,15 @@ def prune(before: dict, log: Log = print) -> dict:
             moved.append((path, dest))
     if not moved:
         return before
-    after = verify(lambda m: None)
+    rep = progress.current() if progress._current else None
+    keep = getattr(rep, "checks", None)
+    if rep is not None:
+        rep.checks = []          # the second round of checks is silent
+    try:
+        after = verify(lambda m: None)
+    finally:
+        if rep is not None:
+            rep.checks = keep
     broke = [n for n, s in before["solvers"].items()
              if s.get("works") and not after["solvers"].get(n, {}).get("works")]
     if broke:
@@ -407,7 +581,7 @@ def check_calculix(log: Log) -> dict | str:
     ccx = base.get("calculix")
     path = ccx.locate()
     if path is None:
-        return "CalculiX was not found after install; see ~/.wobbl/setup.log"
+        return "CalculiX was not found after install; the install log is in ~/.wobbl/logs"
     ok, msg = False, ""
     with tempfile.TemporaryDirectory() as tmp:
         Path(tmp, "t.inp").write_text(TEST_INP)
@@ -445,16 +619,26 @@ def check_ngspice(log: Log) -> dict | str:
 
 
 def verify(log: Log = print) -> dict:
-    """Run each solver on a tiny problem and report what works."""
+    """Run each solver on a tiny problem and report what works. During an install each check the install asked
+    for (the reporter's checks, or all when it names none) gets its own progress line."""
     out = {"solvers": {}, "unavailable": {}}
+    rep = progress.current() if progress._current else None
+    show = getattr(rep, "checks", None)
     for r in RECIPES.values():
         if r.check is None or not (r.core or installed(r)):
             continue
-        got = r.check(log)
+        shown = rep is not None and (show is None or r.name in show)
+        st = rep.stage(f"check {r.name}") if shown else None
+        quiet = rep is not None and st is None
+        got = r.check((lambda m: None) if quiet else log if st is None else
+                      (lambda m, st=st: setattr(st, "detail", m)))
         if isinstance(got, str):
             out["unavailable"].setdefault(r.name, got)
         else:
             out["solvers"][r.name] = got
+        if st is not None:
+            ok = not isinstance(got, str) and got.get("works")
+            st.done() if ok else st.fail(got if isinstance(got, str) else (got.get("error") or "")[:100])
     return out
 
 
