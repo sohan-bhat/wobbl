@@ -12,10 +12,9 @@ from pathlib import Path
 import numpy as np
 
 from .. import props as P
-from ..scene import FILE, Scene, array, load
+from ..scene import Scene
 from .common import plain, read, verdict
 
-G = 9810.0
 
 
 def arr(d: dict) -> np.ndarray:
@@ -38,127 +37,93 @@ def build(out: Path, pb: dict) -> Path | None:
 
 
 def vibration(out, pb, o):
+    """The steady response as the excitation speeds up through its range, from the stored modes (see
+    wobbl.life.scene.speed_sweep)."""
+    from ...life.scene import speed_sweep
+
     X, T = mesh_of(pb)
-    amp = float(pb.get("amplitude_mm", 0.06 * np.linalg.norm(np.ptp(X, 0))))
     modes = pb.get("modes", [])
     if not modes:
         return None
-    K = 24                                    # frames a cycle, two cycles a mode
-    n = 2 * K * len(modes)
-    t = np.arange(n, dtype=float)
-    s = Scene("Mode shapes", domain="vibration", question=o.get("question", ""), source=pb.get("about", ""))
-    s.timeline(t / K, unit="cycles", label="playback", seconds=3.0 * len(modes), between="interpolated")
-    freq = np.zeros(n)
-    for i, m in enumerate(modes):
-        phi = arr(m["shape"])
-        win = (t >= i * 2 * K) & (t < (i + 1) * 2 * K)
-        sc = np.where(win, np.sin(2 * np.pi * (t - i * 2 * K) / K), 0.0)
-        mesh = s.mesh(X, T, name=f"mode {m['mode']}", max_vertices=6000)
-        mesh.color_by("relative motion", np.linalg.norm(phi, axis=1), scale=np.abs(sc), colormap="viridis",
-                      range=(0, 1))
-        mesh.deform(phi * amp, scale=sc)
-        mesh.show(i * 2, (i + 1) * 2 - 1 / K)
-        freq[win] = m["frequency_Hz"]
-        bad = m.get("status") in ("resonant", "inside")
-        s.event(i * 2, f"mode {m['mode']} at {m['frequency_Hz']:.4g} Hz", m.get("status", ""),
-                kind="fail" if bad else "info")
-        s.label(f"mode {m['mode']}, {m['frequency_Hz']:.4g} Hz, {m.get('status', '')}".rstrip(", "),
-                X[int(np.argmax(np.linalg.norm(phi, axis=1)))] + [0, 0, amp], t0=i * 2, t1=(i + 1) * 2 - 1 / K,
-                kind="fail" if bad else "note")
-    s.notes = [n_ for n_ in s.notes if not n_.startswith("Deformation")]
-    s.note(f"Each mode swings to {amp:.3g} mm and is slowed down so the eye can follow. The real motion is far "
-           "smaller and faster.")
-    s.readout("frequency", freq, unit="Hz", digits=4)
+    v = o.get("values", {})
+    bands = [(float(b["lo_Hz"]), float(b["hi_Hz"]), b.get("label", "excitation")) for b in pb.get("excitations", [])]
+    s = Scene(o.get("question") or "Vibration", domain="vibration", question=o.get("question", ""),
+              source="The run's mode shapes, each driven at the excitation's frequency with its damping.")
+    speed_sweep(s, X, T, [arr(m["shape"]) for m in modes], [m["frequency_Hz"] for m in modes],
+                [m["mode"] for m in modes], bands, zeta=float(v.get("damping") or 0.03),
+                margin=float(v.get("margin") or 0.2),
+                quiet=[m["mode"] for m in modes if m.get("status") == "barely excited"])
     verdict(s, o)
     return s.save(out)
 
 
 def buckling(out, pb, o):
+    """The part under each load up to 95% of its buckling load, from the stored shape (see
+    wobbl.life.scene.load_sweep). Without a stored stress the part is colored by its bow."""
+    from ...life.scene import load_sweep
+
     X, T = mesh_of(pb)
-    phi = arr(pb["shape"])
     fr = pb["frames"]
-    lam = np.asarray(fr["load_factor"], float)
-    bow = np.asarray(fr["bow_mm"], float)
-    L = float(pb.get("length_mm") or np.ptp(X, 0).max())
-    ex = float(f"{max(0.06 * L / max(bow.max(), 1e-9), 1.0):.2g}")
-    s = Scene("Buckling as the load grows", domain="buckling", question=o.get("question", ""),
-              source=pb.get("about", ""))
-    s.timeline(lam, unit="x load", label="load factor", seconds=7, between="interpolated")
-    m = s.mesh(X, T, name="part", max_vertices=8000)
-    m.color_by("bow", np.linalg.norm(phi, axis=1), scale=bow, unit="mm", colormap="viridis")
-    m.deform(phi, scale=bow, exaggerate=ex)
-    s.readout("load factor", lam, unit="x", digits=3)
-    s.readout("bow", bow, unit="mm", digits=3)
-    df = pb.get("design_factor")
-    if df and df <= lam[-1]:
-        s.event(df, "design factor", "with the knockdown for imperfections", kind="info")
-    s.event(lam[-1], "nearing the buckling load", f"buckles at {pb.get('buckling_factor', 0):.3g} times the load",
-            kind="fail")
-    lo, hi = X.min(0), X.max(0)
-    ax = int(np.argmax(hi - lo))
-    for end in (lo[ax], hi[ax]):
-        c = (lo + hi) / 2
-        c[ax] = end
-        n = np.zeros(3)
-        n[ax] = 1 if end == lo[ax] else -1
-        P.slab(s, c, n, L * 0.12, L * 0.12, L * 0.03, color=P.STEEL, name="end plate")
+    lam = float(pb.get("buckling_factor") or 0)
+    if lam <= 0:
+        return None
+    v = o.get("values", {})
+    e0 = float(fr["bow_mm"][0])
+    yf = pb.get("yield_factor")
+    s = Scene(o.get("question") or "Buckling", domain="buckling", question=o.get("question", ""),
+              source="The first buckling shape from the run, grown from a starting crookedness with the load.")
+    load_sweep(s, X, T, arr(pb["shape"]), lam, float(pb.get("design_factor") or lam),
+               float(v.get("applied_load_N") or 1000.0), e0,
+               measure=arr(pb["stress_MPa"]) if "stress_MPa" in pb else None,
+               yield_factor=float(yf) if yf else float("inf"),
+               target=float(v["target_sf"]) if v.get("target_sf") else None)
     verdict(s, o)
     return s.save(out)
 
 
 def drop(out, pb, o):
+    """The part on the floor at its peak stress, scaled to each drop height by the landing speed (see
+    wobbl.drop.scene). The contact patch is the part's stress above the governing peak, which the run leaves out."""
+    from ...drop.scene import height_sweep
+
     X, T = mesh_of(pb)
     f = pb["fall"]
     d = np.asarray(f["down"], float)
     u, v, w = P.basis(-d)
     R = np.vstack([u, v, w])                  # turns the run's down onto -z
     Xr = X @ R.T
-    floor = float(f["floor_level_mm"])
+    base = Xr - [*Xr[:, :2].mean(0), Xr[:, 2].min()]
     H = float(f["height_mm"])
     fr = pb["frames"]
-    t_hit = np.asarray(fr["time_s"], float)
-    trans = arr(fr["translation"]) @ R.T
-    coeff, shapes = arr(fr["coeff"]), arr(pb["shapes"])
-    el = np.einsum("fk,kvc->fvc", coeff, shapes) @ R.T
-    stress = arr(fr["stress"])
-    t_fall = np.sqrt(2 * H / G)
-    k = 30
-    tf = np.linspace(-t_fall, 0, k, endpoint=False)
-    zf = 0.5 * G * tf ** 2                    # height above first touch
-    lowest = float((Xr[:, 2]).min())
-    base = Xr - [0, 0, lowest]                # first touch at z = 0
-    n = len(base)
-    U = np.concatenate([np.repeat((np.c_[np.zeros(k), np.zeros(k), zf])[:, None, :], n, 1),
-                        trans[:, None, :] + el], 0)
-    ex = 1.0
-    emax = float(np.abs(el).max())
-    span = float(np.ptp(base, 0).max())
-    if emax > 0:
-        ex = float(f"{max(0.04 * span / emax, 1.0):.2g}")
-        U[k:] = trans[:, None, :] + el * ex
-    S = np.concatenate([np.zeros((k, n)), stress], 0)
-    t = np.concatenate([tf, t_hit])
-    s = Scene(f"Drop from {H / 1000:.3g} m onto {f.get('floor_name', 'the floor')}", domain="drop",
-              question=o.get("question", ""), source="Free fall from the height, then the run's own frames from "
-                                                     "first touch.")
-    s.timeline(t * 1000, unit="ms", label="time", seconds=6, between="interpolated")
-    m = s.mesh(base, T, name="part", max_vertices=8000)
     gov = pb.get("governing", {})
-    m.color_by("stress", S, unit="MPa", range=(0, max(float(stress.max()), 1e-9)))
-    m.deform(U, exaggerate=1.0)
-    if ex > 1:
-        s.note(f"The part's own bending is drawn {ex:.3g} times larger so it shows, while its fall and rebound "
-               "are true to scale.")
-    s.ground(0.0, size=span * 8, grid=float(10 ** np.floor(np.log10(span / 2))), color="#2a2c30")
-    s.readout("height", np.r_[zf, np.zeros(len(t_hit))], unit="mm", digits=3)
-    s.readout("peak stress", S.max(1), unit="MPa", digits=3)
-    s.event(0.0, "impact", f"at {f['impact_speed_mm_s'] / 1000:.3g} m/s", kind="fail" if o.get("verdict") == "fails"
-            else "info")
-    if gov:
-        at = (np.asarray(gov["at_mm"], float) @ R.T) - [0, 0, lowest]
-        s.label("peak {peak stress}", at, t0=float(gov.get("time_s", 0)) * 1000, kind="peak")
+    t_hit = np.asarray(fr["time_s"], float)
+    stress = arr(fr["stress"])
+    k = int(np.argmin(np.abs(t_hit - float(gov.get("time_s", t_hit[int(np.argmax(stress.max(1)))])))))
+    el = np.einsum("k,kvc->vc", arr(fr["coeff"])[k], arr(pb["shapes"])) @ R.T
+    S = stress[k]
+    peak = float(gov.get("stress_MPa") or S.max())
+    zone = S > peak * 1.02
+    v_ = o.get("values", {})
+    allow = float(v_.get("allowable_MPa") or 0) or peak
+    target = next((float(m[1]) for m in o.get("metrics", []) if m[0] == "target"
+                   and str(m[1]).replace(".", "", 1).isdigit()), None)
+    at = None
+    if gov.get("at_mm"):
+        at_r = np.asarray(gov["at_mm"], float) @ R.T - [*Xr[:, :2].mean(0), Xr[:, 2].min()]
+        at = int(np.argmin(np.linalg.norm(base - at_r, axis=1)))
+    hist = pb.get("history", {})
+    s = Scene(f"Drop onto {f.get('floor_name', 'the floor').lower()}", domain="drop", question=o.get("question", ""),
+              source="The run's impact at the instant of peak stress, scaled to each drop height by the landing "
+                     "speed.")
+    watch = pb.get("watch_mm")
+    height_sweep(s, base, T, S, el, H, allow, target=target, g_peak=max(hist.get("g_watch", [0]) or [0]),
+                 force_peak=max(hist.get("force_N", [0]) or [0]), node=at,
+                 watch_at=None if watch is None else np.asarray(watch, float) @ R.T - [*Xr[:, :2].mean(0),
+                                                                                      Xr[:, 2].min()],
+                 floor_key=f.get("floor", ""), landing=f.get("landing", ""), zone=zone)
     verdict(s, o)
-    s.camera(target=[0, 0, span * 0.6], direction=(0.6, -1, 0.35), distance=span * 3.2)
+    span = float(np.ptp(base, 0).max())
+    s.camera(target=[0, 0, 0.5 * float(base[:, 2].max())], direction=(1.0, -1.4, 0.6), distance=span * 3.4)
     return s.save(out)
 
 
@@ -193,39 +158,43 @@ def framed(out, pb, o):
     return s.save(out)
 
 
+def _source(out: Path, source: str) -> Path | None:
+    """The strength run a fatigue study read, wherever its path was written from."""
+    p = Path(source)
+    for c in [p, Path(out) / p, *[q / p for q in Path(out).resolve().parents]]:
+        if c.is_dir():
+            return c.resolve()
+    return None
+
+
 def fatigue(out, pb, o):
-    """Damage over the duty cycle, drawn on the strength run it came from when that run has a scene."""
+    """The damage over the required duty as the duty's loads are scaled, on the strength run it came from (see
+    wobbl.life.scene.duty_sweep). A run from before the stored sweep reads its S-N slope instead, which leaves
+    out the knee and the mean stress correction's own curve."""
+    from ...life.scene import duty_sweep, source_surface
+
     st = read(out, "study.json") or {}
-    src = (Path(out) / st.get("source", "")).resolve() if st.get("source") else None
-    if src is None or not (src / FILE).exists():
+    src = _source(out, st.get("source", "")) if st.get("source") else None
+    v = o.get("values", {})
+    where = pb.get("where_mm") or v.get("xyz")
+    got = source_surface(src, where) if src else None
+    if got is None:
         return None
-    h, blob = load(src / FILE)
-    part = next((ob for ob in h["objects"] if ob["kind"] == "mesh" and ob.get("name") == "part"), None)
-    if part is None:
-        return None
-    X, T = array(h, blob, part["pos"]), array(h, blob, part["tri"])
-    fr = pb["frames"]
-    cyc, dmg = np.asarray(fr["cycles"], float), np.asarray(fr["damage"], float)
-    s = Scene("Fatigue damage over the duty cycle", domain="fatigue", question=o.get("question", ""),
-              source=pb.get("about", ""))
-    s.timeline(cyc, unit="cycles", label="cycles", seconds=8, between="interpolated")
-    m = s.mesh(X, T, name="part", max_vertices=len(X) + 1)
-    if part.get("field"):
-        f = h["fields"][part["field"]["f"]]
-        m.color_by(f"{f['name']} at full load", array(h, blob, part["field"]["values"]), unit=f.get("unit", ""),
-                   range=f.get("range"), limit=f.get("limit"), limit_label=f.get("limit_label", ""))
-    s.readout("damage", dmg, digits=3, limit=1.0)
-    s.readout("cycles", cyc, digits=3)
-    where = pb.get("where_mm")
-    if where:
-        s.label("damage {damage}", where, kind="peak")
-    hit = np.nonzero(dmg >= 1)[0]
-    if len(hit):
-        s.event(float(cyc[hit[0]]), "a crack starts", "damage reaches one", kind="fail")
-    s.note("The color is the stress of the strength run this fatigue study reads, and the damage at its critical "
-           "spot builds up by Miner's rule.")
+    X, T, ratio, cam = got
+    sw = pb.get("sweep")
+    sf = float(v.get("sf") or pb.get("safety_factor") or float("inf"))
+    if not sw:
+        b = float((v.get("curve") or {}).get("b") or -0.1)
+        d0 = float(v.get("damage") or np.asarray(pb["frames"]["damage"], float)[-1])
+        g = np.linspace(0.0, 2.0 * max(1.5, 1.3 * sf) if np.isfinite(sf) else 3.0, 81)[1:]
+        sw = {"stress_scale": g.tolist(), "damage": (d0 * g ** (-1.0 / b)).tolist(),
+              "required": v.get("required", pb.get("required", 1.0)), "unit": "repeats"}
+    s = Scene(o.get("question") or "Fatigue damage", domain="fatigue", question=o.get("question", ""),
+              source="The strength run's stress scaled with the duty's loads, and the damage at the judged peak "
+                     "by Miner's rule.")
+    duty_sweep(s, X, T, ratio, sw, sf=sf, target=float(v["target_sf"]) if v.get("target_sf") else sw.get("target"),
+               required=float(sw.get("required") or 1.0), unit=sw.get("unit", "repeats"), where=where)
     verdict(s, o, plain(o.get("headline", "")))
-    if h.get("camera"):
-        c = h["camera"]
-        s.camera(target=c.get("target"), direction=c.get("dir"), distance=c.get("dist"), fov=c.get("fov", 30))
+    if cam:
+        s.camera(target=cam.get("target"), direction=cam.get("dir"), distance=cam.get("dist"), fov=cam.get("fov", 30))
     return s.save(out)

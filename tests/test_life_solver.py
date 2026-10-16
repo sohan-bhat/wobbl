@@ -44,6 +44,7 @@ def _playback_ok(out, kind):
     assert scene.exists() and scene.stat().st_size < BUDGET
     head = load(scene)[0]
     assert head["domain"] == kind and head["timeline"]["frames"] > 10 and head["objects"]
+    assert head["timeline"]["kind"] == "input" and head["fields"][0].get("limit") is not None
     assert "scene.wobbl" in json.loads((out / "outcome.json").read_text())["values"].get("scene", "")
 
 

@@ -109,9 +109,117 @@ def test_crack_load_label_and_view(tmp_path):
     fracture.build(tmp_path, pb, run=run, outcome={"question": ""})
     h, _ = load(tmp_path / "scene.wobbl")
     names = {r["name"]: r for r in h["readouts"]}
-    assert names["load"]["unit"] == "N" and names["load"]["values"][0] == 250.0
-    assert "front outline" in {o.get("name") for o in h["objects"]}
+    tl = h["timeline"]
+    assert names["load"]["unit"] == "N" and tl["kind"] == "input" and tl["design"] == 250.0
+    assert names["load"]["values"][tl["t"].index(250.0)] == 250.0
+    assert "fronts" in {o.get("name") for o in h["objects"]}
     assert len(h["camera"]["target"]) == 3 and h["camera"]["dist"] > 0
+
+
+def test_crack_load_sweep_judges_the_target_life(tmp_path):
+    """With the run's lives at each load, the crack's K limit sits where one part in ten fails before the target
+    and its target where one in a hundred does, so the color's verdict is the question's."""
+    from wobbl.fracture.playback import write
+    V, F = grid_mesh()
+    steps = [{"step": i, "size_mm": 1 + i, "cycles": 1000.0 * i, "k_lead": 5 + i,
+              "fronts": [{"xyz": np.c_[np.linspace(0, 1 + i, 5), np.zeros(5), np.full(5, 1.0)].tolist(),
+                          "k": np.c_[np.full(5, 5.0 + i), np.zeros((5, 2))].tolist()}]} for i in range(4)]
+    f = np.linspace(0.5, 1.5, 11)
+    sweep = {"factor": f.tolist(), "nominal": (2e5 * f ** -4).tolist(), "B1": (8e4 * f ** -4).tolist(),
+             "B10": (1.5e5 * f ** -4).tolist(), "pof": np.clip(0.01 * f ** 8, 0, 1).tolist(), "load_N": 4000.0,
+             "kc": 29.0, "target": 1e5, "max_pof": 0.01}
+    write(tmp_path / "playback.json", part={"vertices": V.tolist(), "triangles": F.tolist(), "edge_vertices": [],
+                                            "edges": []},
+          origin=[0, 0, 1], normal=[0, 1, 0], steps=steps, starts=[[[0, 0, 1], [0.5, 0, 1]]],
+          growth=([1, 2], [0, 1000]), lives=np.array([1e4, 2e4]), percentiles={"B10": 1e4}, target=1e5, pof=0.5,
+          inspection={}, verdict="fails", headline="It cracks.", material="7075", spectrum="", end="edge",
+          sweep=sweep)
+    outcome(tmp_path, "fracture", "fails")
+    assert build_scene(tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    tl, fld = h["timeline"], h["fields"][0]
+    assert tl["kind"] == "input" and tl["unit"] == "N" and tl["design"] == 4000.0
+    assert h["readouts"][0]["name"] == "B1 life"
+    # B10 = 1e5 at f = 1.5 ** 0.25 and B1 at 0.8 ** 0.25, against the largest K of 8
+    assert fld["limit"] == pytest.approx(8 * 1.5 ** 0.25, rel=0.02)
+    assert fld["target"] == pytest.approx(8 * 0.8 ** 0.25, rel=0.02)
+    assert not any("reveal" in o for o in h["objects"])
+
+
+def _life_pb(kind, X, F, **extra):
+    from wobbl.life.playback import mesh_block
+    return {"format": "wobbl-playback", "version": 1, "kind": kind, "mesh": mesh_block(X, F), **extra}
+
+
+def test_vibration_sweeps_the_rotor_speed(tmp_path):
+    from wobbl.life.playback import quantize
+    V, F = grid_mesh()
+    phi = np.c_[np.zeros((len(V), 2)), V[:, 0] / 10]
+    modes = [{"mode": 1, "frequency_Hz": 100.0, "status": "resonant", "mass_share_xyz": [0, 0, 0.8],
+              "shape": quantize(phi, "int8")}]
+    pb = _life_pb("vibration", V, F, modes=modes, amplitude_mm=1.0,
+                  excitations=[{"label": "once per turn", "lo_Hz": 50.0, "hi_Hz": 150.0}])
+    (tmp_path / "playback.json").write_text(json.dumps(pb))
+    (tmp_path / "outcome.json").write_text(json.dumps({"domain": "vibration", "verdict": "fails", "headline": "Rings.",
+                                                       "question": "q", "values": {"damping": 0.05, "margin": 0.2}}))
+    assert build_scene(tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    tl, ro = h["timeline"], h["readouts"]
+    assert tl["kind"] == "input" and tl["unit"] == "rpm" and tl["t"][0] == 3000 and tl["t"][-1] == 9000
+    assert tl["design"] == pytest.approx(6000, abs=100)          # the worst speed, at resonance
+    assert ro[0]["name"] == "amplification" and max(ro[0]["values"]) == pytest.approx(10.0, rel=0.02)
+    assert h["fields"][0]["limit"] and h["fields"][0]["target"] < h["fields"][0]["limit"]
+    assert any(e["kind"] == "fail" for e in h["events"])
+
+
+def test_buckling_sweeps_the_load_to_the_buckling_load(tmp_path):
+    from wobbl.life.playback import quantize
+    V, F = grid_mesh()
+    phi = np.c_[np.zeros(len(V)), np.sin(np.pi * V[:, 0] / 10), np.zeros(len(V))]
+    pb = _life_pb("buckling", V, F, shape=quantize(phi, "int8"), buckling_factor=4.0, design_factor=3.0,
+                  yield_factor=6.0, length_mm=10.0, stress_MPa=quantize(np.full(len(V), 20.0), "int16"),
+                  frames={"load_factor": [0, 1], "bow_mm": [0.1, 0.133]})
+    (tmp_path / "playback.json").write_text(json.dumps(pb))
+    (tmp_path / "outcome.json").write_text(json.dumps({"domain": "buckling", "verdict": "holds", "headline": "OK.",
+                                                       "question": "q", "values": {"applied_load_N": 1000.0,
+                                                                                   "target_sf": 2.0}}))
+    assert build_scene(tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    tl, fld = h["timeline"], h["fields"][0]
+    assert tl["kind"] == "input" and tl["design"] == 1.0 and tl["t"][-1] == pytest.approx(3.8)
+    assert fld["name"] == "stress" and fld["limit"] == pytest.approx(60.0, rel=0.01)
+    assert fld["target"] == pytest.approx(30.0, rel=0.01)
+    assert h["readouts"][0]["name"] == "factor against buckling"
+
+
+def test_drop_sweeps_the_height_and_leaves_the_contact_patch_out(tmp_path):
+    from wobbl.life.playback import encode, quantize
+    V, F = grid_mesh()
+    V = V[:, [0, 2, 1]]                                     # a wall standing on its edge, landing along -z
+    S = np.full(len(V), 30.0)
+    S[V[:, 2] == 0] = 400.0                                 # the crush where it touches
+    S[len(V) // 2 + 3] = 40.0
+    pb = _life_pb("drop", V, F,
+                  fall={"height_mm": 1000.0, "impact_speed_mm_s": 4429.0, "down": [0, 0, -1], "floor": "concrete",
+                        "floor_name": "Concrete", "landing": "-z face down", "floor_level_mm": 0.0},
+                  frames={"time_s": [0.0, 1e-4], "translation": quantize(np.zeros((2, 3))),
+                          "coeff": quantize(np.array([[0.0], [1.0]])),
+                          "stress": encode(np.round(np.vstack([0 * S, S]) / 400 * 255).astype("uint8"), "uint8",
+                                           scale=400 / 255.0, offset=0.0)},
+                  shapes=quantize(np.full((1, len(V), 3), 0.01)), history={"g_watch": [0, 900], "force_N": [0, 50]},
+                  governing={"stress_MPa": 40.0, "at_mm": V[len(V) // 2 + 3].tolist(), "time_s": 1e-4})
+    (tmp_path / "playback.json").write_text(json.dumps(pb))
+    (tmp_path / "outcome.json").write_text(json.dumps({"domain": "drop", "verdict": "marginal", "headline": "M.",
+                                                       "question": "q", "metrics": [["target", "2"]],
+                                                       "values": {"allowable_MPa": 62.0}}))
+    assert build_scene(tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    tl, ro = h["timeline"], {r["name"]: r for r in h["readouts"]}
+    assert tl["kind"] == "input" and tl["unit"] == "m" and tl["design"] == 1.0
+    assert h["readouts"][0]["name"] == "peak stress" and h["fields"][0]["target"] == 31.0
+    at = tl["t"].index(1.0)
+    assert ro["peak stress"]["values"][at] == pytest.approx(40.0, rel=0.02)
+    assert ro["peak stress"]["values"][-1] == pytest.approx(40.0 * np.sqrt(2), rel=0.02)
 
 
 def test_examples_with_playback(tmp_path):
@@ -417,3 +525,30 @@ def test_reaction_runs_in_its_vessel(tmp_path, wet):
     else:
         assert {"crucible", "charge", "reaction front", "sparks"} <= names
     assert h["timeline"]["unit"] == "%" and h["timeline"]["frames"] > 30
+
+
+def test_fatigue_sweeps_the_duty_load_on_its_strength_scene(tmp_path):
+    from wobbl.viz.scene import Scene
+    V, F = grid_mesh()
+    src = tmp_path / "strength"
+    s = Scene("part", domain="strength")
+    s.timeline(np.linspace(0, 1, 3), unit="N", label="load", between="exact")
+    s.mesh(V, F, name="part").color_by("von Mises", V[:, 0] * 10, scale=np.linspace(0, 1, 3), unit="MPa", limit=200)
+    s.save(src)
+    run = tmp_path / "fatigue"
+    run.mkdir()
+    (run / "study.json").write_text(json.dumps({"source": "../strength"}))
+    g = np.linspace(0.05, 3.0, 60)
+    pb = {"format": "wobbl-playback", "kind": "fatigue", "where_mm": [10, 0, 0],
+          "frames": {"cycles": [0, 1], "damage": [0, 0.5]},
+          "sweep": {"stress_scale": g.tolist(), "damage": (0.5 * g ** 8).tolist(), "required": 10,
+                    "unit": "repeats"}}
+    (run / "playback.json").write_text(json.dumps(pb))
+    (run / "outcome.json").write_text(json.dumps({"domain": "fatigue", "verdict": "marginal", "headline": "M.",
+                                                  "question": "q", "values": {"sf": 0.5 ** -0.125,
+                                                                              "target_sf": 2.0}}))
+    assert build_scene(run)
+    h, _ = load(run / "scene.wobbl")
+    tl, fld, ro = h["timeline"], h["fields"][0], h["readouts"]
+    assert tl["kind"] == "input" and tl["design"] == 100.0 and fld["limit"] == 1.0 and fld["target"] == 0.5
+    assert ro[0]["name"] == "damage" and ro[0]["values"][tl["t"].index(100.0)] == pytest.approx(0.5, rel=0.02)
