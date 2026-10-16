@@ -13,20 +13,26 @@ tolerance practice assumes at a hole.
 
 | Result | Value |
 |---|---|
-| Typical bracket | fails after about 83,400 cycles |
-| One in ten | fails by 53,200 cycles |
-| One in a hundred (B1) | fails by 36,600 cycles |
-| Share failing before 100,000 cycles | 71.5%, against 1% allowed |
-| Inspection | every 41,700 cycles |
+| Typical bracket | fails after about 86,200 cycles |
+| One in ten | fails by 55,100 cycles |
+| One in a hundred (B1) | fails by 38,000 cycles |
+| Share failing before 100,000 cycles | 68%, against 1% allowed |
+| Inspection | every 43,100 cycles |
 | Hand calculation | a weight function over the uncracked stress gives 7.77 MPa sqrt(m) for the starting crack, the finite element K is 7.17 |
 
-![The crack path through the lug, colored by the cycle count when each front passed](output/images/path.png)
+![The crack path through the lug, colored by the cycle count when each front passed](output/crack/images/path.png)
 
-The crack starts where the bore is most stressed, at (91.7, -3.6, 2.5), grows straight out through the lug
-over ten solved steps and cuts the wall at about 9 mm, where K climbs from 7.2 to 15 MPa sqrt(m). A
-Monte Carlo over 20,000 brackets with scattered starting flaws, growth constants, loads and toughness
-gives the spread above. Wobbl suggests cutting the stress at the bore by 21%, through a larger lug or a
-smaller load, a steel lug, or inspecting every 41,700 cycles.
+The run checks the bracket's strength first (`output/stress`, a safety factor of 1.57 against yield) and then
+grows the crack (`output/crack`). The crack starts where the bore is most stressed, at (91.7, -3.6, 2.5), grows
+straight out through the lug over ten solved steps and cuts the wall at about 9 mm, where K climbs from 7.2 to 15
+MPa sqrt(m). A Monte Carlo over 20,000 brackets with scattered starting flaws, growth constants, loads and
+toughness gives the spread above. Wobbl suggests cutting the stress at the bore by 20%, through a larger radius,
+a thicker section or a smaller load, a steel lug, or inspecting every 43,100 cycles.
 
-`output/playback.json` holds the part's surface, every solved front with its K and the cycle count when
-it passed, the growth curve and the spread of lives, for a viewer to play the crack back.
+Open `output/simulation.html` for both steps in 3D. The crack view is the crack at the end of its path with a
+slider over the load from 1.2 to 8 kN, opening at the 4 kN asked about. K scales exactly with the load, and the
+life of one part in a hundred and the share failing before the target are the run's own at each load. The badge
+turns MARGINAL at about 3.2 kN, where one part in a hundred no longer lasts 100,000 cycles, and FAILS at about
+3.5 kN, where one in ten does not.
+`output/crack/playback.json` holds the part's surface, every solved front with its K and the cycle count when it
+passed, the growth curve, the spread of lives and the lives at each load.

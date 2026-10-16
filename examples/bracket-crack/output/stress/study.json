@@ -1,0 +1,41 @@
+{
+ "part": "../../bracket.py",
+ "material": "7075-t6",
+ "loads": [
+  {
+   "kind": "bolt",
+   "faces": "hole d=8",
+   "magnitude": 4000.0,
+   "direction": [
+    0.8660190526287391,
+    0.5000110003630134,
+    0.0
+   ],
+   "point": null,
+   "coupling": "distributed",
+   "text": "4 kN 0.866,0.5,0 bearing @ hole d=8",
+   "imperial": false
+  }
+ ],
+ "fixtures": [
+  {
+   "kind": "bolt",
+   "faces": "holes d=6.6",
+   "text": "bolt holes d=6.6",
+   "dofs": "xyz",
+   "stiffness": 0.0
+  }
+ ],
+ "target_sf": null,
+ "quality": "normal",
+ "budget": 3600.0,
+ "max_levels": 4,
+ "question": "Where does a crack at the pin hole go, and do 99% of brackets last 100,000 cycles?",
+ "imperial": false,
+ "scale": 1.0,
+ "body": null,
+ "mesh_size": null,
+ "print_direction": null,
+ "assumptions": [],
+ "params": {}
+}

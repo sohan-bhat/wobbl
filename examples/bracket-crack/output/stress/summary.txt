@@ -1,0 +1,26 @@
+HOLDS. Peak 320 MPa on the 6 mm inside fillet (face 3) at (34.5, -14.2, 3.02), safety factor 1.57 against yield (target 1.5).
+
+Confidence: high. passed mesh convergence, force balance, hand calculation, singularities, bolt bearing, units and sanity
+Max deflection 0.415 mm at (104, -1.33e-14, 5).
+Material Aluminum 7075-T6, limit 503 MPa; mass 47.6 g.
+Loads: 4 kN 0.866,0.5,0 bearing @ hole d=8. Fixtures: bolt holes d=6.6.
+
+Checks:
+  [pass] mesh convergence: von Mises stress settled: 304 -> 323 -> 320 MPa over 3 meshes, last change 0.9%
+  [pass] force balance: reactions balance the loads to 2.6e-05% (forces) and 3.3e-06% (moments)
+  [pass] hand calculation: beam theory through the critical section gives 190 MPa nominal; FEA peak is 1.69x that, a stress concentration of about 1.7 from the local shape
+  [pass] singularities: no sharp corner or support artifact is above the reported stress
+  [pass] bolt bearing: worst hole of fix1 (d 6.6 mm) carries 5226 N sideways and 79.9 N along its axis; bearing stress 158 MPa, safety factor 4.77 on bearing
+  [pass] units and sanity: part 116 mm across, peak strain 0.0045, max deflection 0.415 mm (0.36% of size): all plausible
+
+Assumptions:
+  - Linear elastic material and small deflections (no yielding redistribution, no buckling).
+  - Aluminum 7075-T6: E 71700 MPa, Poisson 0.33, von Mises vs yield 503 MPa (ASM Aerospace Specification Metals, Aluminum 7075-T6).
+  - Loads are static and applied all at once; no impact, vibration or fatigue.
+  - Wrought metal treated as isotropic; rolled, drawn or extruded stock is close to it at yield.
+  - Bolted holes are rigidly held over the hole and a washer sized ring (twice the hole radius).
+  - Bolt loads press on the loaded half of each hole with a cosine distribution.
+  - Contact between separate parts, friction and preload are not modeled.
+
+Images: stress: images/stress.png, zoom: images/zoom.png, safety: images/safety.png, deformed: images/deformed.png, convergence: images/convergence.png
+Report: report.html

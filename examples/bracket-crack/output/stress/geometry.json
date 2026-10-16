@@ -1,0 +1,24 @@
+{
+ "source": "work/geometry/bracket-9d5cd056.step",
+ "path": "work/geometry/prepared.brep",
+ "kind": "cad",
+ "bbox": [
+  [
+   -1e-07,
+   -25.0000001,
+   -1e-07
+  ],
+  [
+   104.0000001,
+   25.0000001,
+   5.0000001
+  ]
+ ],
+ "volume": 16923.190209172528,
+ "n_bodies": 1,
+ "n_surfaces": 15,
+ "notes": [
+  "Built from bracket.py with thickness=5, arm_width=28, lug_radius=14, pin_hole=8, fillet=6."
+ ],
+ "stl_angle": 30.0
+}

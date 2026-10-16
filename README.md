@@ -467,7 +467,7 @@ particular part will fail.
 
 | Run | Answer | Checked against |
 |---|---|---|
-| [Bracket crack](examples/bracket-crack) | a crack at the pin hole cuts the lug after about 83,400 cycles, one bracket in a hundred by 36,600, so 71.5% fail before 100,000 | K on two front meshes 0.1% apart, a weight function within 8%, the force balance and the Monte Carlo's sampling band |
+| [Bracket crack](examples/bracket-crack) | a crack at the pin hole cuts the lug after about 86,200 cycles, one bracket in a hundred by 38,000, so 68% fail before 100,000 | K on two front meshes 0.1% apart, a weight function within 8%, the force balance and the Monte Carlo's sampling band |
 
 Each run writes `playback.json` with the part, every front and the spread of lives, which a
 viewer plays back. Crack growth is linear elastic fracture mechanics, so crack tip plasticity,

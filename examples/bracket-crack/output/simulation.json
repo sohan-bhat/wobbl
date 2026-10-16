@@ -1,0 +1,67 @@
+{
+ "thing": "bracket.py",
+ "question": "Where does a crack at the pin hole go, and do 99% of brackets last 100,000 cycles?",
+ "plan": {
+  "thing": "bracket.py",
+  "question": "Where does a crack at the pin hole go, and do 99% of brackets last 100,000 cycles?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "stress",
+   "crack"
+  ],
+  "reasons": [
+   {
+    "decided": "bracket.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics crack, as asked, with stress first because the others read its result",
+    "override": "--physics stress,crack"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "fail",
+ "situation": {
+  "supports": [
+   "bolt holes d=6.6"
+  ],
+  "loads": [
+   "4 kN 0.866,0.5,0 bearing @ hole d=8"
+  ],
+  "material": "7075-t6",
+  "crack": {
+   "start": "through 1.27 mm at hole d=8",
+   "spectrum": "R = 0.1"
+  }
+ },
+ "steps": [
+  {
+   "analysis": "stress",
+   "domain": "part",
+   "verdict": "holds",
+   "headline": "Peak 320 MPa on the 6 mm inside fillet (face 3) at (34.5, -14.2, 3.02), safety factor 1.57 against yield (target 1.5).",
+   "confidence": "high",
+   "result_dir": "stress",
+   "report": "stress/report.html",
+   "assumptions": []
+  },
+  {
+   "analysis": "crack",
+   "domain": "part",
+   "verdict": "fails",
+   "headline": "A 1.27 mm through crack at the edge of the 8 mm hole at (91.7, -3.6, 2.5) fails after about 86,219 cycles in a typical part. One part in ten fails by 55,144 cycles and one in a hundred by 37,968. 68% of parts fail before the 100000 cycle target (allowed 1%).",
+   "confidence": "medium",
+   "result_dir": "crack",
+   "report": "crack/report.html",
+   "assumptions": []
+  }
+ ]
+}
