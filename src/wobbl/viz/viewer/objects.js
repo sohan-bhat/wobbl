@@ -1,6 +1,6 @@
-// The scene's objects: each one decoded into what the GPU draws, brought to any playback position and drawn.
+// The scene's objects: each one decoded into what the GPU draws, brought to any slider position and drawn.
 // G holds the GL context and programs, the color fields and the scene's size; without WebGL, G.gl is null and
-// the objects still follow playback so readouts and labels work.
+// the objects still follow the slider so readouts and labels work.
 
 const colorOf = (f, v, out, o) => {
   const c = Number.isNaN(v) ? NONE : f.limit !== undefined && v > f.limit ? OVER : null;
@@ -134,7 +134,7 @@ function frame(G, ob, a, b, k, t) {
     const q = ob.pq.length > 4 ? nrm4([0, 1, 2, 3].map((i) => at2(ob.pq, 4, a, b, k, i))) : ob.pq;
     ob.M = pose(q, pp); ob.at = pp;
   }
-  if (o.kind === 'mesh') meshFrame(gl, ob, a, b, k);
+  if (o.kind === 'mesh') meshFrame(gl, ob, a, b, k, G.unbent);
   else if (o.kind === 'body') {
     if (ob.f) colorOf(ob.f, series(o.field.values, a, b, k), ob.color = [0, 0, 0], 0);
     if (gl) { for (let i = 0; i < ob.cbuf.length; i += 4) ob.cbuf.set([...ob.color, 255], i); ob.d.set('c', ob.cbuf); }
@@ -143,10 +143,10 @@ function frame(G, ob, a, b, k, t) {
   else if (o.kind === 'arrows') arrowsFrame(G, ob, a, b, k);
 }
 
-function meshFrame(gl, ob, a, b, k) {
+function meshFrame(gl, ob, a, b, k, unbent) {
   const o = ob.o, n = ob.n, P = ob.P, cur = ob.cur;
   if (ob.du) {
-    const ex = o.deform.exaggerate || 1, sc = o.deform.scale;
+    const ex = unbent ? 1 : o.deform.exaggerate || 1, sc = o.deform.scale;
     if (sc) { const s = series(sc, a, b, k) * ex; for (let i = 0; i < n * 3; i++) cur[i] = P[i] + ob.du[i] * s; }
     else for (let i = 0; i < n * 3; i++) cur[i] = P[i] + at2(ob.du, n * 3, a, b, k, i) * ex;
   }
@@ -217,7 +217,7 @@ function linesFrame(ob, t, a, b, k) {
   ob.tn = t;
 }
 
-// Glows move along lines that carry flow, by each line's speed for dt seconds of playback.
+// Glows along lines that carry flow, moved on by each line's speed for dt seconds (the viewer holds them still).
 function flowStep(G, dt) {
   for (const ob of G.objs) {
     if (!ob.speeds || !ob.l || !ob.vis) continue;
