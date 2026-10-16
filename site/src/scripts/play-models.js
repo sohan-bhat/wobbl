@@ -8,7 +8,10 @@
 //   replace: [{ object, index?, file, tint?: [material names], scale?, matrix? }],
 //   add: [{ file, parent?, scale?, matrix? }],     world frame, or the named object's frame
 //   hide: [object names] } } }
-import { CustomBlending, FrontSide, Group, ImageBitmapLoader, OneFactor, OneMinusSrcAlphaFactor, SRGBColorSpace } from 'three';
+import {
+  AlwaysStencilFunc, CustomBlending, EqualStencilFunc, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
+  OneFactor, OneMinusSrcAlphaFactor, ReplaceStencilOp, SRGBColorSpace,
+} from 'three';
 import { studioShader } from './play-look.js';
 
 const manifests = new Map(), files = new Map();
@@ -85,6 +88,8 @@ function prepare(m) {
     const alpha = Math.min(0.3, Math.max(0.08, 1 - m.transmission + 0.08));
     out.transmission = 0;
     Object.assign(out, { transparent: true, depthWrite: false, side: FrontSide, blending: CustomBlending, blendSrc: OneFactor, blendDst: OneMinusSrcAlphaFactor });
+    // clear, so it is left out over the part the run is about rather than washing its colors with reflections
+    Object.assign(out, { stencilWrite: true, stencilRef: 1, stencilFunc: NotEqualStencilFunc, stencilWriteMask: 0, stencilZPass: KeepStencilOp });
     out.onBeforeCompile = (sh) => {
       studioShader(sh);
       sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
@@ -95,9 +100,33 @@ function prepare(m) {
     out.customProgramCacheKey = () => `wobbl-model-glass-${alpha.toFixed(3)}`;
   } else {
     out.onBeforeCompile = studioShader;
+    // drawn whole only where the part the run is about is not behind it (see subject below)
+    Object.assign(out, { stencilWrite: true, stencilRef: 1, stencilFunc: NotEqualStencilFunc, stencilWriteMask: 0, stencilZPass: KeepStencilOp });
   }
   ready.set(m, out);
   return out;
+}
+
+// ---- the part stays in sight ----
+// A model in front of the part a run is about (a motor on its mount, a heater on a heat sink, a box on a shelf
+// bracket) is drawn faint where it covers the part, so the stress or the temperature still reads through it, as
+// an X-ray view in an engineering program does. The part marks the pixels it covers in the stencil buffer;
+// every model is drawn whole outside them and as a faint copy over them.
+
+/** Make a material mark the pixels its part covers: the part's surface, drawn before any model. */
+export function subject(m) {
+  Object.assign(m, { stencilWrite: true, stencilRef: 1, stencilFunc: AlwaysStencilFunc, stencilZPass: ReplaceStencilOp });
+  return m;
+}
+
+const ghosts = new WeakMap();
+function ghostOf(p) {
+  if (ghosts.has(p)) return ghosts.get(p);
+  const g = p.clone();
+  g.onBeforeCompile = studioShader;
+  Object.assign(g, { transparent: true, opacity: 0.2, depthWrite: false, stencilFunc: EqualStencilFunc });
+  ghosts.set(p, g);
+  return g;
 }
 
 /**
@@ -114,8 +143,16 @@ export function instance(gltf, entry) {
     group.matrixAutoUpdate = false;
     group.matrix.fromArray(entry.matrix);
   }
-  const tinted = [], meshes = [];
+  const tinted = [], meshes = [], extra = [];
   const names = new Set(entry.tint || []);
+  // a tinted material's faint copy is its own, so it takes the same color
+  const tintedGhost = (m) => {
+    if (!tinted.includes(m)) return ghostOf(m);
+    const g = ghostOf(m).clone();
+    g.onBeforeCompile = studioShader;
+    tinted.push(g);
+    return g;
+  };
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.castShadow = true;
@@ -133,7 +170,17 @@ export function instance(gltf, entry) {
       return p;
     };
     o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+    o.renderOrder = 1;
+    // the faint copy over the part, sharing the mesh's geometry and its place
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (mats.every((m) => m.transparent)) return;
+    const ghost = o.clone();
+    ghost.material = Array.isArray(o.material) ? mats.map((m) => (m.transparent ? m : tintedGhost(m))) : tintedGhost(o.material);
+    Object.assign(ghost, { castShadow: false, receiveShadow: false, renderOrder: 2 });
+    ghost.children.length = 0;
+    extra.push([o, ghost]);
   });
+  for (const [o, ghost] of extra) o.parent.add(ghost);
   let last = '';
   return {
     group, meshes,

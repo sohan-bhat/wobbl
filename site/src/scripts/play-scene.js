@@ -11,7 +11,7 @@ import {
 } from 'three';
 import { LIT, arrow, edgeLines } from './play-draw.js';
 import { FINISHES, SRGB, finishOf, studioShader } from './play-look.js';
-import { instance } from './play-models.js';
+import { instance, subject } from './play-models.js';
 import { contactShadow } from './contact-shadow.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
 
@@ -210,7 +210,8 @@ function material(o, { prop = false, shell = false, field = null, tube = false, 
   m.customProgramCacheKey = () => `wobbl-scene-${+opts.field}${+tube}${+glass}${+unlit}${+opts.lift}`;
   // the uniforms the stage brings to each frame, as on the shader materials before
   m.uniforms = uniforms;
-  return m;
+  // a part the run is about, colored by its field, shows through the models in front of it (play-models.js)
+  return field && !prop && !glass ? subject(m) : m;
 }
 
 /** What an object is made of, from its name and what it is: a pin is bare steel, a motor's can black paint. */
@@ -523,7 +524,7 @@ export function sceneParts({ arrays, run }) {
     shadowDirty = true;
     for (const it of items) {
       const o = it.o;
-      it.mesh.visible = shownAt(o.when, t);
+      it.mesh.visible = !it.hidden && shownAt(o.when, t);
       if (it.bonds) it.bonds.visible = it.mesh.visible;
       if (!it.mesh.visible) continue;
       const uni = it.mesh.material?.uniforms;
@@ -652,7 +653,14 @@ export function sceneParts({ arrays, run }) {
         if (shadowCasters.has(it.mesh)) for (const x of m.meshes) shadowCasters.add(x);
       }
     }
-    for (const name of spec.hide || []) for (const it of pick(name)) hideShape(it);
+    for (const name of spec.hide || []) {
+      for (const it of items) {
+        if (it.o.name !== name) continue;
+        // a ground the models replace (a concrete pad) goes with its grid; anything else keeps its shape for the probe
+        if (it.o.kind === 'ground') { it.mesh.visible = false; it.hidden = true; }
+        else if (it.o.kind === 'mesh' || it.o.kind === 'body') hideShape(it);
+      }
+    }
     for (const e of spec.add || []) {
       const g = models.get(e.file);
       if (!g) continue;

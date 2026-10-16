@@ -9,7 +9,7 @@ import {
   SRGBColorSpace, Vector3, WebGLRenderer,
 } from 'three';
 import { sceneParts } from './play-scene.js';
-import { instance } from './play-models.js';
+import { instance, subject } from './play-models.js';
 import {
   FINISHES, LOOK, SRGB, aimKey, decodeStudioBytes, depthMaterial, finishOf, finishShader, keyLight, loadStudio, studioEnvironment,
   studioShader, turnStudio,
@@ -312,7 +312,8 @@ function partMaterial(kind, uniforms, finish, mm = 1) {
   };
   m.customProgramCacheKey = () => `wobbl-part-${kind}-${finish}`;
   m.extensions = { derivatives: true };
-  return m;
+  // the part shows through any model drawn in front of it (play-models.js)
+  return subject(m);
 }
 
 /** The outlines of a strength or heat part: the same field, lit the old simple way and darkened. */
@@ -372,7 +373,7 @@ export function arrow(color = YELLOW) {
  * part into its view rectangle ([x, y, w, h] in CSS pixels from the top left).
  */
 export function createStage({ canvas, w, h, px, kind }) {
-  const renderer = new WebGLRenderer({ canvas, antialias: px < 2, alpha: true, powerPreference: 'default' });
+  const renderer = new WebGLRenderer({ canvas, antialias: px < 2, alpha: true, stencil: true, powerPreference: 'default' });
   renderer.setClearColor(0x000000, 0);
   // linear light out to sRGB; the tone mapping is PBR Neutral inside each lit material (play-look.js)
   renderer.outputColorSpace = SRGBColorSpace;
