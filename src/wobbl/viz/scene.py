@@ -61,6 +61,7 @@ class Scene:
         self.notes: list[str] = []
         self.cam: dict = {}
         self.result: dict | None = None
+        self.mag: dict | None = None
 
     # time
     def timeline(self, t, *, unit: str = "s", label: str = "time", seconds: float = 8.0,
@@ -218,6 +219,19 @@ class Scene:
         self.result = {"word": word, "line": line, "tone": tone}
         return self
 
+    def magnify(self, objects, factor: float, *, label: str = "", anchor=None) -> "Scene":
+        """Draw small objects factor times larger so they show at the scene's scale, as a rocket on a flight kilometres
+        long. Each object grows about its own pose, or about anchor when given, which keeps a group such as a pad
+        and its rail together. A view says so and lets the reader see them at their true size. The first call
+        names the toggle and its factor; later groups may grow by less, as a pad beside a rocket."""
+        if not self.mag:
+            self.mag = {"factor": _f(factor), "label": label or "Drawn", "groups": []}
+        self.mag["groups"].append({"objects": [self.objects.index(o) for o in objects], "factor": _f(factor),
+                                   "anchor": None if anchor is None else _fl(anchor)})
+        names = label or ", ".join(o.name for o in objects if o.name)[:40] or "small parts"
+        self.note(f"{names[0].upper() + names[1:]} drawn {factor:g} times larger so {'it shows' if len(objects) == 1 or label else 'they show'}")
+        return self
+
     def camera(self, *, target=None, direction=None, distance=None, fov: float = 30.0, follow: _Obj | None = None,
                presets: list[dict] | None = None) -> "Scene":
         """Where the view starts: looking at target from direction (pointing from the target to the eye) at
@@ -261,6 +275,8 @@ class Scene:
              "labels": self.labels, "notes": self.notes, "buffers": enc.bufs}
         if self.result:
             h["verdict"] = self.result
+        if self.mag:
+            h["magnify"] = self.mag
         if any(o.prop for o in self.objects):
             h["props_note"] = "Props in gray stripes show the setup and are not part of the analysis"
         return h, enc.blob()

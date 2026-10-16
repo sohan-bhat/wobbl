@@ -82,6 +82,13 @@ class _Obj:
     def __init__(self, scene: "Scene", name: str, prop: bool):
         self.s, self.name, self.prop = scene, name, prop
         self.when: tuple | None = None
+        self.guide = False
+
+    def as_guide(self) -> "_Obj":
+        """Mark the object as a guide drawn only to carry text labels, such as a height scale's pole and ticks. A
+        view that shows no labels leaves guides out."""
+        self.guide = True
+        return self
 
     def show(self, t0=None, t1=None) -> "_Obj":
         """Show the object only between two times on the timeline (either end may be open)."""
@@ -94,6 +101,8 @@ class _Obj:
             d["name"] = self.name
         if self.prop:
             d["prop"] = True
+        if self.guide:
+            d["guide"] = True
         if self.when:
             d["when"] = [None if v is None else _f(v) for v in self.when]
         return d
