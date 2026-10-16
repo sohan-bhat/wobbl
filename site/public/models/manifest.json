@@ -1,0 +1,20 @@
+{
+"version": 1,
+"examples": {
+  "wiper-linkage": {
+    "replace": [
+      {"object": "crank", "file": "wiper-linkage/crank.glb", "tint": ["paint"], "anchors": {"hub": [0, 0, 0.04], "pin": [0, 0, -0.04]}},
+      {"object": "coupler pin", "file": "wiper-linkage/ball-stud.glb"},
+      {"object": "coupler", "file": "wiper-linkage/coupler.glb", "anchors": {"crank_end": [0, 0, 0.15], "rocker_end": [0, 0, -0.15]}},
+      {"object": "rocker", "file": "wiper-linkage/rocker.glb", "anchors": {"pivot": [0, 0, 0.055], "coupler_end": [0, 0, -0.055]}},
+      {"object": "rocker pin", "file": "wiper-linkage/spindle-boss.glb"},
+      {"object": "crank shaft", "file": "wiper-linkage/output-shaft.glb"},
+      {"object": "crank motor", "file": "wiper-linkage/motor.glb", "tint": ["paint"]},
+      {"object": "wiper spindle", "file": "wiper-linkage/pivot-tower.glb"},
+      {"object": "wiper arm", "file": "wiper-linkage/arm.glb"},
+      {"object": "wiper blade", "file": "wiper-linkage/blade.glb"},
+      {"object": "windshield", "file": "wiper-linkage/glass.glb"}
+    ]
+  }
+}
+}
