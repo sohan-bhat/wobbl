@@ -31,9 +31,11 @@ def build(out: Path, pb: dict) -> Path | None:
 
 
 def flame(out, pb, o):
-    """A burner with its flame through the sweep of equivalence ratio. The burned gas is colored by the run's
-    equilibrium temperature at each mixture and the unburned cone by the reactants'. Above the flame its products
+    """A burner to drive by hand: the slider sets the equivalence ratio, and each value is its own equilibrium
+    solve. The burned gas is colored by its temperature at that mixture against the limit (the one asked for, or
+    where thermal NO starts to form fast) and the unburned cone by the reactants'. Above the flame its products
     hang as molecules in their solved shares, CO and NO among them."""
+    from ...chem.sweep import flame_limit
     fr = pb["frames"]
     fl = pb.get("flame") or {}
     phi = np.array([f["phi"] for f in fr], float)
@@ -44,7 +46,9 @@ def flame(out, pb, o):
               question=o.get("question", ""), length="mm",
               source="Each frame is its own equilibrium solve at that equivalence ratio. The flame's shape is drawn "
                      "for the eye, its colors and the molecules' shares are the run's.")
-    s.timeline(phi, unit="", label="equivalence ratio", seconds=12, between="interpolated")
+    s.timeline(phi, unit="", label="equivalence ratio", between="step", kind="input",
+               design=float(fl.get("phi") or 1.0), note="Below 1 the mixture is lean, above 1 rich in fuel.")
+    lim, lim_label = flame_limit(fl.get("limit_K"))
     # the burner
     s.mesh(*lathe([(0, 0), (16, 0), (16, 6), (6, 8), (6, 90), (4.5, 90), (4.5, 10), (0, 10)], 32), name="burner",
            color=P.STEEL, smooth=False)
@@ -57,7 +61,7 @@ def flame(out, pb, o):
     for X, T, name, temp, op in ((Xo, To, "flame", TK, 0.55), (Xi, Ti, "unburned cone", np.full(n, T0), 0.75)):
         m = s.mesh(X, T, name=name, color="#ff9a3c", opacity=op)
         m.color_by("gas temperature", np.outer(temp, np.ones(len(X))), unit="K", colormap="inferno",
-                   range=(T0, max(TK.max(), T0 + 1)))
+                   range=(T0, max(TK.max(), lim, T0 + 1)), limit=lim, limit_label=lim_label, digits=4)
         m.deform(np.c_[np.zeros(len(X)), np.zeros(len(X)), X[:, 2] - 90], scale=tall - 1)
         m.glow = np.clip((temp - 1000) / 1500, 0, 1)
     s.notes = [x for x in s.notes if not x.startswith("Deformation")]
@@ -90,17 +94,17 @@ def flame(out, pb, o):
     if els:
         s.atoms(els, np.stack(pos, axis=1), radius=0.35 * scale, name="burned gas")
         s.label("CO and NO molecules drawn to their own peak", [30, 0, 150], kind="note")
-    s.readout("flame temperature", TK, unit="K", digits=4)
+    s.readout("flame temperature", TK, unit="K", digits=4, limit=lim)
     for k in trace:
         s.readout(f"{k}", [f["x"].get(k, 0) * 1e6 for f in fr], unit="ppm", digits=3)
     for k in [x for x in ("CO2", "H2O", "O2") if x in main]:
         s.readout(k, [f["x"].get(k, 0) * 100 for f in fr], unit="%", digits=3)
-    here = pb["manifest"].get("operating_frame")
-    if here is not None:
-        s.event(float(phi[here]), "your mixture", f"{TK[here]:.4g} K")
     s.ground(0, size=300, grid=20)
     verdict(s, o)
-    s.camera(target=[0, 0, 150], direction=(0.5, -1, 0.25), distance=330)
+    s.camera(target=[0, 0, 150], direction=(0.5, -1, 0.25), distance=330,
+             presets=[{"name": "Burner", "target": [0, 0, 110], "dir": (0.5, -1, 0.25), "dist": 330},
+                      {"name": "Flame", "target": [0, 0, 120], "dir": (0.3, -1, 0.1), "dist": 170},
+                      {"name": "Burned gas", "target": [0, 0, 185], "dir": (0.2, -1, 0.3), "dist": 140}])
     return s.save(out)
 
 
