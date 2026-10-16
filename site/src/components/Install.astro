@@ -1,0 +1,90 @@
+---
+// The install box on the landing page. One tab per installer, each with its install command
+// and then wobbl setup. The tabs follow the ARIA tabs pattern (scripts/app.ts handles every
+// tablist), and the script below remembers the chosen installer in localStorage. Nothing
+// goes into the address.
+interface Way { id: string; name: string; lines: string[] }
+const ways: Way[] = [
+  { id: 'npm', name: 'npm', lines: ['npm i -g wobbl', 'wobbl setup'] },
+  { id: 'pipx', name: 'pipx', lines: ['pipx install wobbl', 'wobbl setup'] },
+  { id: 'uv', name: 'uv', lines: ['uv tool install wobbl', 'wobbl setup'] },
+  // npx installs wobbl on its first run, so one line does both steps
+  { id: 'npx', name: 'npx', lines: ['npx wobbl setup'] },
+];
+---
+<div class="get">
+  <div class="get-tabs" role="tablist" aria-label="Install with" data-remember="wobbl.installer">
+    {ways.map((w, i) => (
+      <button type="button" role="tab" id={`get-${w.id}`} aria-controls={`get-${w.id}-panel`}
+              aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1} data-key={w.id}>{w.name}</button>
+    ))}
+  </div>
+  {ways.map((w, i) => (
+    <div class="get-panel" role="tabpanel" id={`get-${w.id}-panel`} aria-labelledby={`get-${w.id}`} hidden={i !== 0} data-copy-block>
+      <pre class="get-cmd">{w.lines.map((l) => <span class="get-ln"><span class="get-p" aria-hidden="true">$ </span>{l}</span>)}</pre>
+      <button class="copy get-copy" type="button" data-copy={w.lines.join('\n')} aria-label={`Copy the ${w.name} install commands`}>Copy</button>
+    </div>
+  ))}
+</div>
+
+<script>
+  // Bring back the installer picked on an earlier visit, and keep each new pick. Storage can be
+  // blocked, so every read and write is wrapped and the box works the same without it.
+  const KEY = 'wobbl.installer';
+  for (const list of document.querySelectorAll<HTMLElement>('.get-tabs')) {
+    const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const show = (tab: HTMLButtonElement) => {
+      for (const t of tabs) {
+        const on = t === tab;
+        t.setAttribute('aria-selected', String(on));
+        t.tabIndex = on ? 0 : -1;
+        const panel = document.getElementById(t.getAttribute('aria-controls') ?? '');
+        if (panel) panel.hidden = !on;
+      }
+    };
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(KEY); } catch { /* storage blocked */ }
+    const tab = tabs.find((t) => t.dataset.key === saved);
+    if (tab) show(tab);
+    const keep = () => {
+      const on = tabs.find((t) => t.getAttribute('aria-selected') === 'true');
+      if (!on?.dataset.key) return;
+      try { localStorage.setItem(KEY, on.dataset.key); } catch { /* storage blocked */ }
+    };
+    list.addEventListener('click', () => setTimeout(keep));
+    list.addEventListener('keydown', () => setTimeout(keep));
+  }
+</script>
+
+<style>
+  /* Installer tabs on top, the active one filled yellow. Then the commands with a yellow
+     prompt and a large Copy button, in a box that sits on the same dark yellow lip as the
+     primary button, offset down and to the right. Sharp corners, like every control here. */
+  .get { margin-top: 28px; max-width: 34rem; }
+  .get-tabs { display: flex; gap: 6px; }
+  .get-tabs [role="tab"] {
+    min-height: 38px; min-width: 66px; padding: 0 16px; cursor: pointer;
+    background: transparent; border: 1px solid var(--line-2); border-bottom: 0; color: var(--fg-2);
+    font: 600 13px/1 var(--mono); letter-spacing: 0.04em;
+    transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+  }
+  .get-tabs [role="tab"]:hover { color: var(--fg); border-color: var(--fg-2); }
+  .get-tabs [role="tab"][aria-selected="true"] { background: var(--yellow); border-color: var(--yellow); color: var(--ink); }
+  .get-panel {
+    display: flex; align-items: center; gap: 16px; min-height: 108px; padding: 16px 16px 16px 20px;
+    background: var(--bg-2); border: 1px solid var(--line-2);
+    box-shadow: 6px 6px 0 #7a6600;
+  }
+  .get-panel[hidden] { display: none; }
+  .get-cmd { flex: 1; min-width: 0; margin: 0; overflow-x: auto; font: 500 15px/1.8 var(--mono); color: var(--fg); }
+  .get-ln { display: block; white-space: pre; }
+  .get-p { color: var(--yellow); user-select: none; }
+  .get-copy.copy { --lip: 4px; flex: none; min-height: 48px; padding: 0 22px; font-size: 13px; }
+  @media (max-width: 419px) {
+    .get-tabs { gap: 4px; }
+    .get-tabs [role="tab"] { flex: 1; min-width: 0; padding: 0 8px; }
+    .get-panel { gap: 12px; padding: 14px 12px 14px 14px; box-shadow: 4px 4px 0 #7a6600; }
+    .get-cmd { font-size: 13.5px; }
+    .get-copy.copy { padding: 0 14px; }
+  }
+</style>

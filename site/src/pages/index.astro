@@ -3,7 +3,7 @@
 // a rocket, one run per domain, the bake off in two counts and links into the docs.
 import Base from '../layouts/Base.astro';
 import Answer from '../components/Answer.astro';
-import Term from '../components/Term.astro';
+import Install from '../components/Install.astro';
 import HeroPart from '../components/HeroPart.astro';
 import FlightPair from '../components/FlightPair.astro';
 import { url } from '../lib/site';
@@ -19,9 +19,7 @@ import { poster, posterSet } from '../lib/poster';
       <div class="hero-grid">
         <div class="hero-copy">
           <p class="lede">Ask your agent if a part will crack. Wobbl runs a real solver, then checks the answer before you see it.</p>
-          <div class="install">
-            <Term code={'pipx install wobbl\nwobbl setup'} label="Install" />
-          </div>
+          <Install />
           <p class="hero-cta"><a class="btn" href={url('get-started/')}>Get started</a></p>
         </div>
         <HeroPart />
