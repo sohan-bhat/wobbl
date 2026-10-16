@@ -7,6 +7,7 @@ import os
 import bpy
 import numpy as np
 
+import sources
 from shapes import select
 
 TEX = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.cache', 'tex')
@@ -61,7 +62,26 @@ NORMALS = {
 }
 
 
+def _tread(n=256):
+    """Diamond tread plate: raised lozenges in two crossing directions on a grid, four to a tile."""
+    y, x = np.mgrid[0:n, 0:n] / n
+    h = np.zeros((n, n))
+    for cx in range(4):
+        for cy in range(4):
+            px, py = (cx + 0.5) / 4, (cy + 0.5) / 4
+            ang = math.radians(45 if (cx + cy) % 2 else -45)
+            dx = (x - px + 0.5) % 1 - 0.5
+            dy = (y - py + 0.5) % 1 - 0.5
+            u = dx * math.cos(ang) + dy * math.sin(ang)
+            v = -dx * math.sin(ang) + dy * math.cos(ang)
+            d = (u / 0.085) ** 2 + (v / 0.018) ** 2
+            h = np.maximum(h, np.clip(1 - d, 0, 1) ** 0.5)
+    return h + 0.05 * _noise(n, 30, 100, 31)
+
+
 def tex_normal(name):
+    if name == 'tread_n.png' and not os.path.exists(os.path.join(TEX, name)):
+        _save(name, _normal_from(_tread(), 6.0))
     if not os.path.exists(os.path.join(TEX, name)):
         n, lo, hi, ax, ay, st, seed = NORMALS[name]
         h = _noise(n, lo, hi, seed, ax, ay)
@@ -78,7 +98,7 @@ def tex_rough(lo, hi, metal, seed=21):
         n = 256
         big = _noise(n, 1.5, 5, seed)
         fine = _noise(n, 30, 110, seed + 1)
-        x = np.clip(0.5 + 0.22 * big + 0.12 * fine, 0, 1)
+        x = np.clip(0.5 + 0.12 * big + 0.16 * fine, 0, 1)
         r = lo + (hi - lo) * x
         rgb = np.stack([np.ones_like(r), r, np.full_like(r, metal)], -1)
         _save(name, rgb)
@@ -97,9 +117,15 @@ def image(name, path=None, size=None, color=False):
 
 
 def material(name, color=(0.5, 0.5, 0.5), metal=0.0, rough=0.5, normal=None, normal_strength=1.0, rough_var=None,
-             uv_scale=1.0, coat=0.0, coat_rough=0.05, transmission=0.0, ior=1.5, alpha=1.0, base_map=None, emissive=None):
+             uv_scale=1.0, coat=0.0, coat_rough=0.05, transmission=0.0, ior=1.5, alpha=1.0, base_map=None, emissive=None,
+             pbr=None, tone=1.0):
     """A glTF metallic roughness material. normal names a tileable detail map and rough_var a roughness range,
     both made in looks.py and laid on uv0; uv_scale is how many tiles a model unit holds after the cube projection."""
+    rough_tex = None
+    if pbr:
+        # a CC0 scanned material from ambientCG (sources.py): its color, normal and roughness
+        c, normal, rough_tex = sources.ambientcg(pbr, metal=metal, tone=tone)
+        base_map = os.path.join(TEX, c)
     m = bpy.data.materials.new(name)
     m['base'] = name
     m.use_nodes = True
@@ -139,9 +165,9 @@ def material(name, color=(0.5, 0.5, 0.5), metal=0.0, rough=0.5, normal=None, nor
         nm.inputs['Strength'].default_value = normal_strength
         nt.links.new(t.outputs['Color'], nm.inputs['Color'])
         nt.links.new(nm.outputs['Normal'], b.inputs['Normal'])
-    if rough_var:
+    if rough_var or rough_tex:
         # the glTF exporter reads roughness from the green channel of a metallic roughness texture, metal from blue
-        rough_map = tex_rough(rough_var[0], rough_var[1], metal)
+        rough_map = rough_tex or tex_rough(rough_var[0], rough_var[1], metal)
         t = nt.nodes.new('ShaderNodeTexImage')
         t.image = image(rough_map, os.path.join(TEX, rough_map))
         nt.links.new(uvnode().outputs['UV'], t.inputs['Vector'])
@@ -258,6 +284,21 @@ def mats(unit=1.0):
         'aluminum_machined': lambda: material('aluminum_machined', (0.8, 0.81, 0.82), 1.0, 0.22, 'brushed_n.png', 0.35, (0.16, 0.3), 30 * d),
         'plastic_black': lambda: material('plastic_black', (0.03, 0.03, 0.032), 0.0, 0.45, None, 0.6, (0.38, 0.55), 60 * d),
         'rubber': lambda: material('rubber', (0.018, 0.018, 0.018), 0.0, 0.72, None, 0.7, (0.62, 0.85), 80 * d),
+        'paint_white': lambda: material('paint_white', (0.82, 0.82, 0.8), 0.0, 0.22, 'peel_n.png', 0.08, (0.16, 0.3), 30 * d, coat=1.0, coat_rough=0.04),
+        'paint_red': lambda: material('paint_red', (0.62, 0.07, 0.04), 0.0, 0.22, 'peel_n.png', 0.08, (0.16, 0.3), 30 * d, coat=1.0, coat_rough=0.04),
+        'paint_gloss_black': lambda: material('paint_gloss_black', (0.018, 0.018, 0.02), 0.0, 0.25, 'peel_n.png', 0.1, (0.18, 0.32), 30 * d, coat=1.0, coat_rough=0.05),
+        'decal': lambda: material('decal', (0.015, 0.015, 0.016), 0.0, 0.32),
+        'graphite': lambda: material('graphite', (0.05, 0.05, 0.055), 0.0, 0.62, 'cast_n.png', 0.4, (0.55, 0.72), 60 * d),
+        'aluminum_anodized': lambda: material('aluminum_anodized', (0.05, 0.05, 0.055), 1.0, 0.35, None, 0.4, (0.3, 0.42), 30 * d),
+        'nylon': lambda: material('nylon', (0.72, 0.71, 0.66), 0.0, 0.45, None, 0.4, (0.4, 0.55), 60 * d),
+        'tread_steel': lambda: material('tread_steel', (0.5, 0.5, 0.5), 1.0, 0.45, 'tread_n.png', 1.0, (0.38, 0.6), 6 * d),
+        'steel_mill': lambda: material('steel_mill', (0.2, 0.205, 0.215), 1.0, 0.55, 'fine_n.png', 0.4, (0.48, 0.62), 40 * d),
+        'steel_stainless': lambda: material('steel_stainless', (0.66, 0.66, 0.67), 1.0, 0.26, 'brushed_n.png', 0.3, (0.2, 0.32), 30 * d),
+        'steel_black_oxide': lambda: material('steel_black_oxide', (0.07, 0.07, 0.075), 1.0, 0.4, None, 0.4, (0.32, 0.48), 60 * d),
+        'steel_chrome': lambda: material('steel_chrome', (0.85, 0.85, 0.86), 1.0, 0.08),
+        'concrete': lambda: material('concrete', (1, 1, 1), 0.0, 0.85, None, 0.8, None, 1.6 * d, pbr='Concrete034', tone=0.55),
+        'wood': lambda: material('wood', (1, 1, 1), 0.0, 0.6, None, 0.6, None, 2.0 * d, pbr='Wood049', tone=0.8),
+        'rock': lambda: material('rock', (1, 1, 1), 0.0, 0.8, None, 1.0, None, 1.0 * d, pbr='Rock030', tone=0.85),
         'glass': lambda: material('glass', (0.86, 0.93, 0.9), 0.0, 0.02, transmission=1.0, ior=1.52),
         'frit': lambda: material('frit', (0.012, 0.012, 0.012), 0.0, 0.32),
     }

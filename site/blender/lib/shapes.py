@@ -281,3 +281,67 @@ def frame_matrix(origin, x, y=None, z=None):
     for k in range(3):
         M[k][0], M[k][1], M[k][2], M[k][3] = x[k], y[k], z[k], origin[k]
     return M
+
+
+def sweep(name, z0, z1, profile, steps=24, cap=True):
+    """A closed outline profile(s) -> [(x, y), ...] (same count, counter clockwise) at each z from z0 to z1,
+    s from 0 to 1, bridged into one surface: tapered fillets, fins with a varying section."""
+    bm = bmesh.new()
+    rings = []
+    for i in range(steps + 1):
+        s = i / steps
+        rings.append([bm.verts.new((x, y, z0 + (z1 - z0) * s)) for x, y in profile(s)])
+    n = len(rings[0])
+    for r0, r1 in zip(rings, rings[1:]):
+        for j in range(n):
+            bm.faces.new((r0[j], r0[(j + 1) % n], r1[(j + 1) % n], r1[j]))
+    if cap:
+        bm.faces.new(list(reversed(rings[0])))
+        bm.faces.new(rings[-1])
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-9)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return _obj(name, bm)
+
+
+def wrap(ob, radius, axis_z=True):
+    """Bend a flat decal lying in the xy plane (x along the body, y round it, z out of it) onto a cylinder of
+    this radius about z: x becomes height, y becomes arc length."""
+    bake_transform(ob)
+    for v in ob.data.vertices:
+        x, y, z = v.co
+        th = y / radius
+        r = radius + z
+        v.co = (r * math.cos(th), r * math.sin(th), x)
+    ob.data.update()
+    return ob
+
+
+def text(name, body, size, depth=0.0, font=None):
+    """A line of text as a mesh, lying in the xy plane with its baseline along x."""
+    cu = bpy.data.curves.new(name, 'FONT')
+    cu.body = body
+    cu.size = size
+    cu.extrude = depth
+    cu.align_x = 'CENTER'
+    cu.align_y = 'CENTER'
+    if font:
+        cu.font = bpy.data.fonts.load(font, check_existing=True)
+    ob = bpy.data.objects.new(name, cu)
+    bpy.context.scene.collection.objects.link(ob)
+    return to_mesh(ob)
+
+
+def band(name, radius, z0, z1, a0=0.0, a1=2 * math.pi, n=None, rows=2):
+    """A painted band or patch on a cylinder: the surface between z0 and z1 and angles a0 to a1, lifted a hair."""
+    if n is None:
+        n = max(8, int(64 * (a1 - a0) / (2 * math.pi)))
+    full = abs(a1 - a0 - 2 * math.pi) < 1e-9
+    bm = bmesh.new()
+    cols = n if full else n + 1
+    grid = [[bm.verts.new((radius * math.cos(a0 + (a1 - a0) * j / n), radius * math.sin(a0 + (a1 - a0) * j / n),
+                           z0 + (z1 - z0) * i / (rows - 1))) for j in range(cols)] for i in range(rows)]
+    for i in range(rows - 1):
+        for j in range(n):
+            j1 = (j + 1) % cols
+            bm.faces.new((grid[i][j], grid[i][j1], grid[i + 1][j1], grid[i + 1][j]))
+    return _obj(name, bm)
