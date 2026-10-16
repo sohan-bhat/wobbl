@@ -1,6 +1,6 @@
 {
  "domain": "circuit",
- "part": "opamp-cable.cir",
+ "part": "../opamp-cable.cir",
  "question": "Is this buffer stable driving the cable?",
  "verdict": "fails",
  "headline": "U1 (LM358) does not work as wired: 2 degrees of phase margin at 47133 Hz: it oscillates or rings hard.",
@@ -208,17 +208,10 @@
     "phase_margin_deg": 1.946606,
     "gain_margin_dB": 5.062269
    }
-  },
-  {
-   "name": "supply range",
-   "status": "info",
-   "summary": "solved at both ends of the supply (V1 4.75 to 5.25 V); the hardest parts there: CCABLE at 16%, C1 at 16%, RADC at 4%",
-   "detail": {
-    "range": "V1 4.75 to 5.25 V"
-   }
   }
  ],
  "assumptions": [
+  "Wobbl guessed: air temperature around the board not given, so Wobbl assumed 25 C.",
   "V1: USB port: 5 V (4.75 to 5.25 V), 0.15 ohm inside, 0.5 A most.",
   "U1: LM358 datasheet: 0.7 MHz, 0.3 V/us, swing to 1.5 V of V+ and 0.02 V of V-, 40 mA short circuit, 3 to 32 V supply.",
   "Ambient 25 C; temperatures are ambient plus average power times each part's thermal resistance."
@@ -232,12 +225,12 @@
     "items": [
      {
       "what": "current drawn",
-      "value": 0.000639,
+      "value": 0.000625,
       "limit": 0.5,
       "unit": "A",
-      "use": 0.001278,
+      "use": 0.00125,
       "status": "ok",
-      "note": "with V1 at 5.25 V"
+      "note": ""
      }
     ],
     "v": 5.0,
@@ -247,7 +240,7 @@
     "generic": false,
     "source": "USB port: 5 V (4.75 to 5.25 V), 0.15 ohm inside, 0.5 A most",
     "status": "ok",
-    "use": 0.001278
+    "use": 0.00125
    },
    "R1": {
     "ref": "R1",
@@ -256,21 +249,21 @@
     "items": [
      {
       "what": "power",
-      "value": 0.000689,
+      "value": 0.000625,
       "limit": 0.1,
       "unit": "W",
-      "use": 0.006891,
+      "use": 0.00625,
       "status": "ok",
-      "note": "surface near 25.6 C; with V1 at 5.25 V"
+      "note": "surface near 25.5 C"
      },
      {
       "what": "voltage",
-      "value": 2.625004,
+      "value": 2.500004,
       "limit": 75,
       "unit": "V",
-      "use": 0.035,
+      "use": 0.033333,
       "status": "ok",
-      "note": "with V1 at 5.25 V"
+      "note": ""
      }
     ],
     "v": 2.500004,
@@ -280,7 +273,7 @@
     "generic": false,
     "source": "rating of a 0603 resistor",
     "status": "ok",
-    "use": 0.035
+    "use": 0.033333
    },
    "R2": {
     "ref": "R2",
@@ -289,21 +282,21 @@
     "items": [
      {
       "what": "power",
-      "value": 0.000689,
+      "value": 0.000625,
       "limit": 0.1,
       "unit": "W",
-      "use": 0.006891,
+      "use": 0.00625,
       "status": "ok",
-      "note": "surface near 25.6 C; with V1 at 5.25 V"
+      "note": "surface near 25.5 C"
      },
      {
       "what": "voltage",
-      "value": 2.624996,
+      "value": 2.499996,
       "limit": 75,
       "unit": "V",
-      "use": 0.035,
+      "use": 0.033333,
       "status": "ok",
-      "note": "with V1 at 5.25 V"
+      "note": ""
      }
     ],
     "v": 2.499996,
@@ -313,7 +306,7 @@
     "generic": false,
     "source": "rating of a 0603 resistor",
     "status": "ok",
-    "use": 0.035
+    "use": 0.033333
    },
    "C1": {
     "ref": "C1",
@@ -322,12 +315,12 @@
     "items": [
      {
       "what": "voltage",
-      "value": 2.624996,
+      "value": 2.499996,
       "limit": 16.0,
       "unit": "V",
-      "use": 0.164062,
+      "use": 0.15625,
       "status": "ok",
-      "note": "with V1 at 5.25 V"
+      "note": ""
      }
     ],
     "v": 2.499996,
@@ -337,7 +330,7 @@
     "generic": false,
     "source": "16 V rating as marked, X7R",
     "status": "ok",
-    "use": 0.164062
+    "use": 0.15625
    },
    "U1": {
     "ref": "U1",
@@ -346,30 +339,30 @@
     "items": [
      {
       "what": "supply voltage",
-      "value": 5.25,
+      "value": 5.0,
       "limit": 32,
       "unit": "V",
-      "use": 0.164062,
+      "use": 0.15625,
       "status": "ok",
-      "note": "with V1 at 5.25 V"
+      "note": ""
      },
      {
       "what": "output current",
-      "value": 2.6e-05,
+      "value": 2.5e-05,
       "limit": 0.04,
       "unit": "A",
-      "use": 0.000657,
+      "use": 0.000626,
       "status": "ok",
-      "note": "with V1 at 5.25 V"
+      "note": ""
      },
      {
       "what": "temperature",
-      "value": 25.238302,
+      "value": 25.226563,
       "limit": 150,
       "unit": "C",
-      "use": 0.001906,
+      "use": 0.001813,
       "status": "ok",
-      "note": "0.00191 W at 125 C/W from 25 C; with V1 at 5.25 V"
+      "note": "0.00181 W at 125 C/W from 25 C"
      },
      {
       "what": "phase margin",
@@ -388,7 +381,7 @@
     "generic": false,
     "source": "LM358 datasheet: 0.7 MHz, 0.3 V/us, swing to 1.5 V of V+ and 0.02 V of V-, 40 mA short circuit, 3 to 32 V supply",
     "status": "fails",
-    "use": 0.001906
+    "use": 0.001813
    },
    "CCABLE": {
     "ref": "CCABLE",
@@ -397,12 +390,12 @@
     "items": [
      {
       "what": "voltage",
-      "value": 2.626969,
+      "value": 2.501971,
       "limit": 16.0,
       "unit": "V",
-      "use": 0.164186,
+      "use": 0.156373,
       "status": "ok",
-      "note": "with V1 at 5.25 V"
+      "note": ""
      }
     ],
     "v": 2.501971,
@@ -412,7 +405,7 @@
     "generic": false,
     "source": "16 V rating as marked, X7R",
     "status": "ok",
-    "use": 0.164186
+    "use": 0.156373
    },
    "RADC": {
     "ref": "RADC",
@@ -421,21 +414,21 @@
     "items": [
      {
       "what": "power",
-      "value": 6.9e-05,
+      "value": 6.3e-05,
       "limit": 0.1,
       "unit": "W",
-      "use": 0.00069,
+      "use": 0.000626,
       "status": "ok",
-      "note": "surface near 25.1 C; with V1 at 5.25 V"
+      "note": "surface near 25.1 C"
      },
      {
       "what": "voltage",
-      "value": 2.626969,
+      "value": 2.501971,
       "limit": 75,
       "unit": "V",
-      "use": 0.035026,
+      "use": 0.03336,
       "status": "ok",
-      "note": "with V1 at 5.25 V"
+      "note": ""
      }
     ],
     "v": 2.501971,
@@ -445,7 +438,7 @@
     "generic": false,
     "source": "rating of a 0603 resistor",
     "status": "ok",
-    "use": 0.035026
+    "use": 0.03336
    }
   },
   "nodes": {
@@ -454,18 +447,18 @@
    "out": 2.501971
   },
   "probes": {},
-  "V1_current_drawn": 0.000639,
-  "R1_power": 0.000689,
-  "R1_voltage": 2.625004,
-  "R2_power": 0.000689,
-  "R2_voltage": 2.624996,
-  "C1_voltage": 2.624996,
-  "U1_supply_voltage": 5.25,
-  "U1_output_current": 2.6e-05,
-  "U1_temperature": 25.238302,
-  "CCABLE_voltage": 2.626969,
-  "RADC_power": 6.9e-05,
-  "RADC_voltage": 2.626969,
+  "V1_current_drawn": 0.000625,
+  "R1_power": 0.000625,
+  "R1_voltage": 2.500004,
+  "R2_power": 0.000625,
+  "R2_voltage": 2.499996,
+  "C1_voltage": 2.499996,
+  "U1_supply_voltage": 5.0,
+  "U1_output_current": 2.5e-05,
+  "U1_temperature": 25.226563,
+  "CCABLE_voltage": 2.501971,
+  "RADC_power": 6.3e-05,
+  "RADC_voltage": 2.501971,
   "ac": {
    "stability": {
     "U1": {
@@ -602,9 +595,6 @@
     }
    }
   },
-  "tolerance": {
-   "supply_range": "V1 4.75 to 5.25 V"
-  },
   "analysis": "op",
   "netlist_source": "netlist",
   "_figures": [
@@ -639,7 +629,80 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 1.609824,
+ "t_total": 0.921685,
  "solver": "ngspice 41",
- "criteria": []
+ "criteria": [
+  {
+   "name": "V1 current drawn",
+   "value": "V1_current_drawn",
+   "limit": 0.5,
+   "sense": "max"
+  },
+  {
+   "name": "R1 power",
+   "value": "R1_power",
+   "limit": 0.1,
+   "sense": "max"
+  },
+  {
+   "name": "R1 voltage",
+   "value": "R1_voltage",
+   "limit": 75.0,
+   "sense": "max"
+  },
+  {
+   "name": "R2 power",
+   "value": "R2_power",
+   "limit": 0.1,
+   "sense": "max"
+  },
+  {
+   "name": "R2 voltage",
+   "value": "R2_voltage",
+   "limit": 75.0,
+   "sense": "max"
+  },
+  {
+   "name": "C1 voltage",
+   "value": "C1_voltage",
+   "limit": 16.0,
+   "sense": "max"
+  },
+  {
+   "name": "U1 supply voltage",
+   "value": "U1_supply_voltage",
+   "limit": 32.0,
+   "sense": "max"
+  },
+  {
+   "name": "U1 output current",
+   "value": "U1_output_current",
+   "limit": 0.04,
+   "sense": "max"
+  },
+  {
+   "name": "U1 temperature",
+   "value": "U1_temperature",
+   "limit": 150.0,
+   "sense": "max"
+  },
+  {
+   "name": "CCABLE voltage",
+   "value": "CCABLE_voltage",
+   "limit": 16.0,
+   "sense": "max"
+  },
+  {
+   "name": "RADC power",
+   "value": "RADC_power",
+   "limit": 0.1,
+   "sense": "max"
+  },
+  {
+   "name": "RADC voltage",
+   "value": "RADC_voltage",
+   "limit": 75.0,
+   "sense": "max"
+  }
+ ]
 }

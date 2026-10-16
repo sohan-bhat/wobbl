@@ -1,0 +1,15 @@
+{
+ "domain": "circuit",
+ "analysis": "ac",
+ "spec": {
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/opamp-cable.cir",
+  "kind": "netlist",
+  "question": "Is this buffer stable driving the cable?",
+  "options": {
+   "ambient": [
+    "25 C"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

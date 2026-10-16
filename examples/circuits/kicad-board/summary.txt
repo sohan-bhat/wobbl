@@ -18,6 +18,7 @@ Checks:
   [info] supply range: solved at both ends of the supply (J1 10.8 to 13.2 V (10% either way, a guess)); the hardest parts there: C1 at 53%, C3 at 34%, Q1 at 34%
 
 Assumptions:
+  - Wobbl guessed: air temperature around the board not given, so Wobbl assumed 25 C.
   - Wobbl guessed: J2 (LED strip) drives 2A, as set.
   - U1: L7805 datasheet: 5 V, 2 V dropout at 1.5 A, 2.2 A limit, 35 V most in, TO-220.
   - C1: 25 V rating as marked, aluminum.

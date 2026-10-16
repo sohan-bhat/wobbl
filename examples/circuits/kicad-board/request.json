@@ -1,0 +1,18 @@
+{
+ "domain": "circuit",
+ "analysis": "ratings",
+ "spec": {
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/kicad-board.kicad_sch",
+  "kind": "kicad",
+  "question": "Will anything on this board overheat with a 2 A LED strip on J2?",
+  "options": {
+   "set": [
+    "J2.load=2A"
+   ],
+   "ambient": [
+    "25 C"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}

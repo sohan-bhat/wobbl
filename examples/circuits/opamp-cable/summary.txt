@@ -12,9 +12,9 @@ Checks:
   [pass] tolerance convergence: every part's power and current agree to 0% with solver tolerances 100 times tighter
   [pass] model provenance: models: 7 from the parts library
   [info] loop stability: U1: loop gain 99879 at low frequency crosses 1 at 47133 Hz with 2 degrees of phase margin and 5 dB of gain margin; it will ring hard or oscillate
-  [info] supply range: solved at both ends of the supply (V1 4.75 to 5.25 V); the hardest parts there: CCABLE at 16%, C1 at 16%, RADC at 4%
 
 Assumptions:
+  - Wobbl guessed: air temperature around the board not given, so Wobbl assumed 25 C.
   - V1: USB port: 5 V (4.75 to 5.25 V), 0.15 ohm inside, 0.5 A most.
   - U1: LM358 datasheet: 0.7 MHz, 0.3 V/us, swing to 1.5 V of V+ and 0.02 V of V-, 40 mA short circuit, 3 to 32 V supply.
   - Ambient 25 C; temperatures are ambient plus average power times each part's thermal resistance.

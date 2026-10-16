@@ -1,0 +1,78 @@
+{
+ "thing": "opamp-cable.cir",
+ "question": "Is this buffer stable driving the cable?",
+ "plan": {
+  "thing": "opamp-cable.cir",
+  "question": "Is this buffer stable driving the cable?",
+  "domain": "circuit",
+  "kind": "netlist",
+  "analyses": [
+   "ac"
+  ],
+  "reasons": [
+   {
+    "decided": "opamp-cable.cir is a .cir file, read as a circuit (netlist)",
+    "override": "--domain circuit"
+   },
+   {
+    "decided": "physics ac from \"stable\"",
+    "override": "--physics ac"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "circuit",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "fail",
+ "situation": {
+  "objects": [
+   "breadboard"
+  ],
+  "environment": {
+   "ambient": "25 C"
+  },
+  "circuit": {
+   "playback": "playback.json",
+   "parts": 7,
+   "verdict": "fails",
+   "hottest": [
+    {
+     "ref": "CCABLE",
+     "use": 0.15637318454795826,
+     "tj": null
+    },
+    {
+     "ref": "C1",
+     "use": 0.15624974921816645,
+     "tj": null
+    },
+    {
+     "ref": "RADC",
+     "use": 0.033359612703564426,
+     "tj": null
+    }
+   ]
+  }
+ },
+ "steps": [
+  {
+   "analysis": "ac",
+   "domain": "circuit",
+   "verdict": "fails",
+   "headline": "U1 (LM358) does not work as wired: 2 degrees of phase margin at 47133 Hz: it oscillates or rings hard.",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/opamp-cable",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/opamp-cable/report.html",
+   "assumptions": [
+    {
+     "assumed": "air temperature around the board not given, so Wobbl assumed 25 C",
+     "override": "--ambient '25 C'"
+    }
+   ]
+  }
+ ]
+}

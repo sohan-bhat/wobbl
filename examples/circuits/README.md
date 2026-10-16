@@ -24,3 +24,9 @@ again before offering them.
 Each folder holds `report.html`, `summary.txt`, `outcome.json`, the netlist Wobbl solved,
 `playback.json` with every part's voltage, current and power over the run for the site to animate,
 and the bench and schematic drawings in `images/`.
+
+Each run also has a 3D bench you can work with (`wobbl view led`). A slider sets the one input its
+question points at and the circuit is solved again at every step. The LED run moves the series
+resistor from 15 to 470 ohm, the buck and MOSFET runs move the load current, the board moves the
+current of the strip on J2 up to 6 A, and the buffer moves the cable's capacitance from 1 nF to
+10 uF. Each part is shaded by its share of its limit, and the LED glows with its current.

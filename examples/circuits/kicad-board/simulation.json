@@ -1,0 +1,83 @@
+{
+ "thing": "kicad-board.kicad_sch",
+ "question": "Will anything on this board overheat with a 2 A LED strip on J2?",
+ "plan": {
+  "thing": "kicad-board.kicad_sch",
+  "question": "Will anything on this board overheat with a 2 A LED strip on J2?",
+  "domain": "circuit",
+  "kind": "kicad",
+  "analyses": [
+   "ratings"
+  ],
+  "reasons": [
+   {
+    "decided": "kicad-board.kicad_sch is a .kicad_sch file, read as a circuit (kicad)",
+    "override": "--domain circuit"
+   },
+   {
+    "decided": "physics ratings from \"anything\"",
+    "override": "--physics ratings"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "circuit",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "pass",
+ "situation": {
+  "objects": [
+   "board",
+   "pcb"
+  ],
+  "environment": {
+   "ambient": "25 C"
+  },
+  "circuit": {
+   "playback": "playback.json",
+   "parts": 12,
+   "verdict": "ok",
+   "hottest": [
+    {
+     "ref": "C1",
+     "use": 0.528,
+     "tj": null
+    },
+    {
+     "ref": "C3",
+     "use": 0.3391151920010826,
+     "tj": null
+    },
+    {
+     "ref": "Q1",
+     "use": 0.33527953936179655,
+     "tj": 32.728628275875
+    }
+   ]
+  }
+ },
+ "steps": [
+  {
+   "analysis": "ratings",
+   "domain": "circuit",
+   "verdict": "ok",
+   "headline": "Works and nothing is stressed: the hardest working part is C1 (capacitor) at 53% of its voltage rating.",
+   "confidence": "high",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/kicad-board",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/kicad-board/report.html",
+   "assumptions": [
+    {
+     "assumed": "air temperature around the board not given, so Wobbl assumed 25 C",
+     "override": "--ambient '25 C'"
+    },
+    {
+     "assumed": "J2 (LED strip) drives 2A, as set",
+     "override": ""
+    }
+   ]
+  }
+ ]
+}

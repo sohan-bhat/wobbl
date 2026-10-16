@@ -1,6 +1,6 @@
 {
  "domain": "circuit",
- "part": "kicad-board.kicad_sch",
+ "part": "../kicad-board.kicad_sch",
  "question": "Will anything on this board overheat with a 2 A LED strip on J2?",
  "verdict": "ok",
  "headline": "Works and nothing is stressed: the hardest working part is C1 (capacitor) at 53% of its voltage rating.",
@@ -124,6 +124,7 @@
   }
  ],
  "assumptions": [
+  "Wobbl guessed: air temperature around the board not given, so Wobbl assumed 25 C.",
   "Wobbl guessed: J2 (LED strip) drives 2A, as set.",
   "U1: L7805 datasheet: 5 V, 2 V dropout at 1.5 A, 2.2 A limit, 35 V most in, TO-220.",
   "C1: 25 V rating as marked, aluminum.",
@@ -603,7 +604,140 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 1.396022,
+ "t_total": 1.894152,
  "solver": "ngspice 41",
- "criteria": []
+ "criteria": [
+  {
+   "name": "U1 input voltage",
+   "value": "U1_input_voltage",
+   "limit": 35.0,
+   "sense": "max"
+  },
+  {
+   "name": "U1 output current",
+   "value": "U1_output_current",
+   "limit": 1.5,
+   "sense": "max"
+  },
+  {
+   "name": "U1 temperature",
+   "value": "U1_temperature",
+   "limit": 125.0,
+   "sense": "max"
+  },
+  {
+   "name": "C1 voltage",
+   "value": "C1_voltage",
+   "limit": 25.0,
+   "sense": "max"
+  },
+  {
+   "name": "C2 voltage",
+   "value": "C2_voltage",
+   "limit": 50.0,
+   "sense": "max"
+  },
+  {
+   "name": "U2 supply voltage",
+   "value": "U2_supply_voltage",
+   "limit": 6.0,
+   "sense": "max"
+  },
+  {
+   "name": "U2 supply current",
+   "value": "U2_supply_current",
+   "limit": 0.06,
+   "sense": "max"
+  },
+  {
+   "name": "U2 pin PB1 current",
+   "value": "U2_pin_PB1_current",
+   "limit": 0.04,
+   "sense": "max"
+  },
+  {
+   "name": "U2 temperature",
+   "value": "U2_temperature",
+   "limit": 125.0,
+   "sense": "max"
+  },
+  {
+   "name": "C3 voltage",
+   "value": "C3_voltage",
+   "limit": 16.0,
+   "sense": "max"
+  },
+  {
+   "name": "R1 power",
+   "value": "R1_power",
+   "limit": 0.125,
+   "sense": "max"
+  },
+  {
+   "name": "R1 voltage",
+   "value": "R1_voltage",
+   "limit": 150.0,
+   "sense": "max"
+  },
+  {
+   "name": "D1 forward current",
+   "value": "D1_forward_current",
+   "limit": 0.03,
+   "sense": "max"
+  },
+  {
+   "name": "D1 reverse voltage",
+   "value": "D1_reverse_voltage",
+   "limit": 5.0,
+   "sense": "max"
+  },
+  {
+   "name": "R2 power",
+   "value": "R2_power",
+   "limit": 0.125,
+   "sense": "max"
+  },
+  {
+   "name": "R2 voltage",
+   "value": "R2_voltage",
+   "limit": 150.0,
+   "sense": "max"
+  },
+  {
+   "name": "R3 power",
+   "value": "R3_power",
+   "limit": 0.125,
+   "sense": "max"
+  },
+  {
+   "name": "R3 voltage",
+   "value": "R3_voltage",
+   "limit": 150.0,
+   "sense": "max"
+  },
+  {
+   "name": "Q1 drain voltage",
+   "value": "Q1_drain_voltage",
+   "limit": 55.0,
+   "sense": "max"
+  },
+  {
+   "name": "Q1 gate voltage",
+   "value": "Q1_gate_voltage",
+   "limit": 16.0,
+   "sense": "max"
+  },
+  {
+   "name": "Q1 drain current",
+   "value": "Q1_drain_current",
+   "limit": 47.0,
+   "sense": "max"
+  },
+  {
+   "name": "Q1 temperature",
+   "value": "Q1_temperature",
+   "limit": 175.0,
+   "sense": "max"
+  }
+ ]
 }
