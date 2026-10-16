@@ -77,6 +77,28 @@ export function fitTo(o, box, least) {
   o.update();
 }
 
+/**
+ * fitTo, then slide the target sideways and up until the points sit in the middle of the view, and fit again,
+ * so a subject that is not symmetric about its box's center still fills the frame evenly.
+ */
+export function fitCentered(o, pts, least) {
+  fitTo(o, pts, least);
+  for (let pass = 0; pass < 2; pass++) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of pts) {
+      const r = [p[0] - o.target[0], p[1] - o.target[1], p[2] - o.target[2]];
+      const w = o.dist - dot(r, o.z);
+      if (w <= 0) continue;
+      const sx = dot(r, o.x) / w, sy = dot(r, o.y) / w;
+      x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+    }
+    if (!Number.isFinite(x0)) return;
+    const mx = ((x0 + x1) / 2) * o.dist, my = ((y0 + y1) / 2) * o.dist;
+    o.target = [0, 1, 2].map((i) => o.target[i] + o.x[i] * mx + o.y[i] * my);
+    fitTo(o, pts, least);
+  }
+}
+
 /** The eight corners of the box lo to hi. */
 export const corners = (lo, hi) => [0, 1, 2, 3, 4, 5, 6, 7].map((c) => [c & 1 ? hi[0] : lo[0], c & 2 ? hi[1] : lo[1], c & 4 ? hi[2] : lo[2]]);
 

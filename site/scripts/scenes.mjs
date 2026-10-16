@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { autoMagnify, fieldPeaks, readScene, sceneBounds, sig } from '../src/scripts/scene-file.js';
+import { autoMagnify, fieldPeaks, readScene, sceneBounds, sceneFraming, sig } from '../src/scripts/scene-file.js';
 
 const hash = (b) => createHash('sha1').update(b).digest('hex').slice(0, 10);
 
@@ -99,12 +99,13 @@ export function scenePlay(h, arr) {
   const exag = Math.max(1, ...h.objects.filter((o) => o.deform && !o.guide).map((o) => o.deform.exaggerate || 1));
   const cam = h.camera || {};
   const d = cam.dir || [0.62, -1.05, 0.62], l = Math.hypot(...d);
+  const bounds = sceneBounds(h, arr), { subject, follow, hold } = sceneFraming(h, arr, bounds);
   return {
     kind: 'scene', title: h.title || '', domain: h.domain || '',
     input: { label: cap(tl.label || 'frame'), unit: tl.unit || '', t: t.map(r6), between: tl.between, kind: tl.kind || 'time', home: r6(home), design: tl.design ?? null },
     q, peaks: peaks && peaks.map((p) => p && { v: p.v, p0: p.p0, pe: p.pe }), event, also, alts,
     exag: +exag.toPrecision(3), magnify: h.magnify ? { factor: h.magnify.factor, label: h.magnify.label || 'Drawn', groups: h.magnify.groups } : null,
-    camera: { view: d.map((x) => x / l), fov: cam.fov || 30 }, bounds: sceneBounds(h, arr),
+    camera: { view: d.map((x) => x / l), fov: cam.fov || 30 }, bounds, subject, follow, hold,
     verdict: h.verdict ? { word: h.verdict.word, tone: h.verdict.tone, line: h.verdict.line } : null,
   };
 }

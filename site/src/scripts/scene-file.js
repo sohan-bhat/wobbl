@@ -199,14 +199,16 @@ export function sceneBounds(h, arr) {
   return b || boundsOf(h, arr, () => true) || { lo: [-1, -1, -1], hi: [1, 1, 1] };
 }
 
-function boundsOf(h, arr, keep) {
+/** The box of the objects keep(o, index) passes, magnified or not, over every frame or at frame only. */
+function boundsOf(h, arr, keep, mag = true, frame = -1) {
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   const grow = (p, r = 0) => {
     for (let k = 0; k < 3; k++) if (Number.isFinite(p[k])) { lo[k] = Math.min(lo[k], p[k] - r); hi[k] = Math.max(hi[k], p[k] + r); }
   };
   const F = h.timeline.frames;
   h.objects.forEach((o, oi) => {
-    if (o.kind === 'ground' || skipped(o) || !keep(o)) return;
+    if (o.kind === 'ground' || skipped(o) || !keep(o, oi)) return;
+    if (frame >= 0 && !shownAt(o.when, h.timeline.t[frame])) return;
     if (o.kind === 'mesh' || o.kind === 'body') {
       // the object's own box, then that box's corners at every pose it takes
       let blo, bhi;
@@ -225,8 +227,9 @@ function boundsOf(h, arr, keep) {
       const pp = arr(o.pose ? o.pose.pos : o.pos), pq = arr(o.pose ? o.pose.quat : o.quat);
       const many = pp.length > 3 || pq.length > 4;
       for (let f = 0; f < (many ? F : 1); f++) {
-        const pose = poseAt(pp, pq, f, f, 0);
-        for (const c of box) grow(placeAt(h, oi, o, pose, c, true));
+        const at = frame >= 0 && many ? frame : f;
+        const pose = poseAt(pp, pq, at, at, 0);
+        for (const c of box) grow(placeAt(h, oi, o, pose, c, mag));
       }
     } else if (o.kind === 'lines' || o.kind === 'points' || o.kind === 'atoms') {
       const P = arr(o.pos);
@@ -265,4 +268,57 @@ export function autoMagnify(h, arr, bounds) {
   const factor = [1, 2, 5, 10].map((x) => x * p).reduce((a, b) => (Math.abs(b - raw) < Math.abs(a - raw) ? b : a));
   const label = name ? name[0].toUpperCase() + name.slice(1) : 'Drawn';
   return { factor, label, groups: [{ objects: small, anchor: null }] };
+}
+
+const SOLID = new Set(['mesh', 'body', 'points', 'atoms']);
+const radiusOf = (b) => (b ? Math.hypot(b.hi[0] - b.lo[0], b.hi[1] - b.lo[1], b.hi[2] - b.lo[2]) / 2 : 0);
+
+/**
+ * What the camera frames, beyond the box sceneBounds gives. subject is the box of the solid things the run is
+ * about (no props, no lines or arrows), at their true size, when it is well inside that box: a wiper's linkage
+ * inside the arcs its blade sweeps, framed up close with the glass and the arcs as context. follow is set when
+ * the scene had to magnify small moving things (a rocket on its 3 km flight, a rock falling 300 m): their
+ * center at every saved frame and their radius, at their true size, so the main view can follow them up close
+ * as NASA's Eyes follows a craft, with the whole scene in an inset. dir is the side the scene looks at them
+ * from, from a camera preset that follows one of them when it has one.
+ */
+export function sceneFraming(h, arr, bounds = sceneBounds(h, arr)) {
+  const all = radiusOf(bounds);
+  // what holds the subject and is not much bigger than it (a crucible, a mold box) is framed with it, where a
+  // bench or the ground under it runs out of the view
+  const mid = [0, 1, 2].map((k) => (bounds.lo[k] + bounds.hi[k]) / 2);
+  let hold = null;
+  h.objects.forEach((o, oi) => {
+    if (!o.prop || skipped(o) || !(o.kind === 'mesh' || o.kind === 'body')) return;
+    const b = boundsOf(h, arr, (x, i) => i === oi, true);
+    if (!b || radiusOf(b) > 1.5 * all || ![0, 1, 2].every((k) => b.lo[k] <= mid[k] && b.hi[k] >= mid[k])) return;
+    hold = hold || { lo: [...bounds.lo], hi: [...bounds.hi] };
+    for (let k = 0; k < 3; k++) { hold.lo[k] = Math.min(hold.lo[k], b.lo[k]); hold.hi[k] = Math.max(hold.hi[k], b.hi[k]); }
+  });
+  let subject = boundsOf(h, arr, (o) => !o.prop && SOLID.has(o.kind), false);
+  if (subject && radiusOf(subject) > 0.6 * all) subject = null;
+  if (subject) hold = null;
+  let follow = null;
+  const g = h.magnify && h.magnify.groups && h.magnify.groups[0];
+  if (g && g.objects.length) {
+    const F = h.timeline.frames, c = [];
+    // the solid members only: a see through copy left at the start (a rock's release point) is context
+    const solid = g.objects.filter((oi) => (h.objects[oi].opacity ?? 1) >= 1);
+    const members = solid.length ? solid : g.objects;
+    let r = 0, long = 1;
+    for (let f = 0; f < F; f++) {
+      const b = boundsOf(h, arr, (o, oi) => members.includes(oi), false, f);
+      if (!b) { c.push(c[c.length - 1] || [0, 0, 0]); continue; }
+      c.push([0, 1, 2].map((k) => +((b.lo[k] + b.hi[k]) / 2).toPrecision(7)));
+      r = Math.max(r, radiusOf(b));
+      const d = [0, 1, 2].map((k) => b.hi[k] - b.lo[k]).sort((x, y) => y - x);
+      long = Math.max(long, d[0] / Math.max(d[1], 1e-12));
+    }
+    const preset = ((h.camera && h.camera.presets) || []).find((p) => p.follow !== undefined && g.objects.includes(p.follow) && p.dir);
+    // a long thin subject (a rocket) fills the view along its length; a compact one (a rock) is shown with room
+    // round it for the ground and the path it came down
+    const fill = long > 3 ? 1.15 : 2.4;
+    if (r > 0) follow = { c, r: +r.toPrecision(6), fill, dir: preset ? preset.dir.map((x) => +x.toPrecision(6)) : null };
+  }
+  return { subject, follow, hold };
 }
