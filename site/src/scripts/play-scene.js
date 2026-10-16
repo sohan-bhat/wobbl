@@ -4,11 +4,13 @@
 // are round tubes and props are solid and matte. The viewer's text labels and its readout list are left
 // to the page, which shows only the peak marker and the probe.
 import {
-  BackSide, Box3, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, CylinderGeometry, DoubleSide,
-  DataTexture, Group, InstancedBufferAttribute, LinearFilter, InstancedMesh, LineBasicMaterial, LineSegments, Matrix4, Mesh,
-  PlaneGeometry, Quaternion, Raycaster, Scene, ShaderMaterial, SphereGeometry, TorusGeometry, Vector3,
+  BackSide, Box3, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, CustomBlending, CylinderGeometry,
+  DoubleSide, DataTexture, Group, InstancedBufferAttribute, LinearFilter, InstancedMesh, LineBasicMaterial, LineSegments,
+  Matrix4, Mesh, MeshPhysicalMaterial, OneFactor, OneMinusSrcAlphaFactor, PlaneGeometry, Quaternion, Raycaster, Scene,
+  ShaderMaterial, SphereGeometry, TorusGeometry, Vector3,
 } from 'three';
 import { LIT, arrow, edgeLines } from './play-draw.js';
+import { FINISHES, SRGB, finishOf, studioShader } from './play-look.js';
 import { contactShadow } from './contact-shadow.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
 
@@ -102,31 +104,127 @@ const bytes = (c) => colorHex(c).map((x) => Math.round(x * 255));
 // darker and matte, so the part the run is about stays the brightest thing in the view.
 const BG = [14, 15, 17];
 const behind = (rgb, a, least = 0.3) => rgb.map((c, i) => Math.round(BG[i] + (c - BG[i]) * Math.min(1, Math.max(a, least) * 1.25)));
-const PROP = 0.62;
+const PROP = 0.82;
 
-function material(o, { prop = false, shell = false, field = null } = {}) {
+function fieldUniforms(field, uniforms) {
+  const rgba = new Uint8Array(256 * 4);
+  for (let i = 0; i < 256; i++) { rgba.set(field.lut.subarray(i * 3, i * 3 + 3), i * 4); rgba[i * 4 + 3] = 255; }
+  const tex = new DataTexture(rgba, 256, 1);
+  tex.magFilter = LinearFilter;
+  tex.minFilter = LinearFilter;
+  tex.needsUpdate = true;
+  uniforms.uLut = { value: tex };
+  uniforms.uLimit = { value: field.limit !== undefined ? (field.limit - field.lo) / (field.hi - field.lo || 1) : 1e30 };
+}
+
+/** The flat lit material outlines are drawn in, sharing the face material's uniforms so they cut and color with it. */
+function outline(faces, field) {
+  return new ShaderMaterial({
+    vertexShader: VERT, fragmentShader: frag(), uniforms: faces.uniforms, defines: field ? { FIELD: '', EDGE: '' } : { EDGE: '' },
+    side: DoubleSide,
+  });
+}
+
+// ---- the physically based look (play-look.js) ----
+// Every object is a three.js MeshPhysicalMaterial in the studio's light, with what the scene stores on top: its
+// color per vertex (tint), a field looked up per pixel, a print revealed layer by layer (cutv), a line's tube
+// grown about its axis, a glow. A see through pane is real glass now: its reflections stay whole while what
+// is behind it shows through.
+function sceneShader(sh, { field, tube, glass, unlit, lift }) {
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', `#include <common>
+attribute vec3 tint;
+attribute float cutv;
+varying vec3 vC;
+varying float vR;
+${tube ? 'attribute vec3 axis;\nuniform float uTube;' : ''}
+${field ? 'attribute vec2 fval;\nvarying vec2 vF;' : ''}`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>
+  vC = tint;
+#ifdef USE_INSTANCING_COLOR
+  vC = instanceColor;
+#endif
+  vR = cutv;
+  ${tube ? 'transformed = axis + (transformed - axis) * uTube;' : ''}
+  ${field ? 'vF = fval;' : ''}`);
+  const none = NONE.map((x) => (x / 255).toFixed(4)).join(', '), over = OVER.map((x) => (x / 255).toFixed(4)).join(', ');
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+uniform float uCut;
+uniform float uGlow;
+uniform vec3 uGlowC;
+uniform float uAlpha;
+varying vec3 vC;
+varying float vR;
+${field ? 'uniform sampler2D uLut;\nuniform float uLimit;\nvarying vec2 vF;' : ''}
+${SRGB}`)
+    .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+  // a print rising layer by layer, or a line drawn up to the moment shown
+  if (vR > uCut) discard;`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+  vec3 baseC = vC;
+  ${field ? `// the field's value carried across each triangle and only then looked up in the map, as ParaView does
+  baseC = vF.y > 0.5 ? vec3(${none}) : vF.x > uLimit ? vec3(${over})
+    : texture2D(uLut, vec2(clamp(vF.x, 0.0, 1.0) * (255.0 / 256.0) + 0.5 / 256.0, 0.5)).rgb;` : ''}
+  diffuseColor.rgb = toLinear(baseC);
+  ${lift ? `{
+    // a very dark color of a map lifted until it reads as a lit solid, keeping its hue (Moreland)
+    float y = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+    diffuseColor.rgb *= clamp(0.06 / max(y, 1e-4), 1.0, 4.5);
+  }` : ''}`)
+    .replace('#include <opaque_fragment>', `
+  ${unlit ? 'outgoingLight = diffuseColor.rgb * 1.5;' : ''}
+  outgoingLight = mix(outgoingLight, toLinear(uGlowC) * 1.6, uGlow);
+  ${glass ? `// glass: what is behind shows through, the reflections stay whole (premultiplied, one minus alpha)
+  outgoingLight = totalDiffuse * uAlpha + totalSpecular;
+  diffuseColor.a = clamp(uAlpha + dot(totalSpecular, vec3(0.3333)), 0.0, 1.0);` : 'diffuseColor.a = uAlpha;'}
+#include <opaque_fragment>`);
+}
+
+function material(o, { prop = false, shell = false, field = null, tube = false, finish = 'painted', glass = false, unlit = false } = {}) {
   // a closed shell is cut open whenever it was asked to be see through, an open surface when mostly clear
-  const a = o.opacity ?? 1, cut = a < 1 && (shell || a < 0.5);
+  const a = o.opacity ?? 1, cut = !glass && a < 1 && (shell || a < 0.5);
   const uniforms = {
     uCut: { value: 1e30 }, uSpec: { value: prop ? 0.25 : 1 }, uGlow: { value: 0 }, uGlowC: { value: new Color(1, 0.85, 0.2) },
-    uAlpha: { value: 1 },
+    uAlpha: { value: glass ? Math.min(0.32, Math.max(0.08, a * 0.45)) : 1 },
   };
-  if (field) {
-    const rgba = new Uint8Array(256 * 4);
-    for (let i = 0; i < 256; i++) { rgba.set(field.lut.subarray(i * 3, i * 3 + 3), i * 4); rgba[i * 4 + 3] = 255; }
-    const tex = new DataTexture(rgba, 256, 1);
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearFilter;
-    tex.needsUpdate = true;
-    uniforms.uLut = { value: tex };
-    uniforms.uLimit = { value: field.limit !== undefined ? (field.limit - field.lo) / (field.hi - field.lo || 1) : 1e30 };
-  }
-  return new ShaderMaterial({
-    vertexShader: VERT, fragmentShader: frag(), uniforms, defines: field ? { FIELD: '' } : {},
+  if (tube) uniforms.uTube = { value: 1 };
+  if (field) fieldUniforms(field, uniforms);
+  const f = FINISHES[finish] || FINISHES.painted;
+  const m = new MeshPhysicalMaterial({
+    metalness: f.metalness, roughness: f.roughness, clearcoat: f.clearcoat, clearcoatRoughness: 0.12,
     side: cut ? BackSide : DoubleSide,
     // a cut open shell gives way to whatever it touches, such as the plate a part sits on
     polygonOffset: cut, polygonOffsetFactor: cut ? 2 : 0, polygonOffsetUnits: cut ? 2 : 0,
   });
+  if (glass) {
+    Object.assign(m, { transparent: true, depthWrite: false, blending: CustomBlending, blendSrc: OneFactor, blendDst: OneMinusSrcAlphaFactor });
+  }
+  const opts = { field: !!field, tube, glass, unlit, lift: !prop };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uniforms);
+    studioShader(sh);
+    sceneShader(sh, opts);
+  };
+  m.customProgramCacheKey = () => `wobbl-scene-${+opts.field}${+tube}${+glass}${+unlit}${+opts.lift}`;
+  // the uniforms the stage brings to each frame, as on the shader materials before
+  m.uniforms = uniforms;
+  return m;
+}
+
+/** What an object is made of, from its name and what it is: a pin is bare steel, a motor's can black paint. */
+function finishFor(o, run, pane) {
+  const n = (o.name || '').toLowerCase();
+  if (pane || /glass|windshield|window|pane\b|beaker|jar/.test(n)) return 'glass';
+  if (/exhaust|flame|plume|fire|spark|glow/.test(n)) return 'emissive';
+  if (!o.prop && o.field && run.material) return finishOf(run.material);
+  if (/\bpin\b|shaft|axle|bolt|screw|nut\b|washer|rail|spindle|rod\b|spring|wire|hook|chain|bearing/.test(n)) return 'steel_bare';
+  if (/nozzle|closure|casing|plate|flange|bracket|frame|stand|saddle/.test(n)) return o.prop ? 'aluminum_bare' : 'aluminum_machined';
+  if (/motor|gearbox|housing|can\b/.test(n)) return 'paint_black';
+  if (/rubber|tire|tyre|blade|seal|gasket/.test(n)) return 'rubber';
+  if (/grain|propellant|wood|bench|desk|table/.test(n)) return 'matte';
+  if (/bed\b|ground|floor|pad\b/.test(n)) return 'floor';
+  return o.prop ? 'painted' : 'paint_gloss';
 }
 
 /** A primitive as Wobbl's scenes size it (MuJoCo's sizes), standing along z. */
@@ -186,15 +284,18 @@ export function sceneParts({ arrays, run }) {
     if (!d) return;
     if (near && o.kind === 'lines' && far(d.P)) return;
     let rgb = bytes(o.color || '#9aa0a6');
-    if (o.prop && o.kind !== 'ground') {
-      // a prop is darker and a little grayer, so lit in linear light it stays behind the part the run is about
-      const y = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
-      rgb = rgb.map((c) => Math.round((c + (y - c) * 0.3) * PROP));
-    }
-    // a see through pane (a windshield) is a faint backdrop, fainter than a see through shell or block
+    // a see through pane (a windshield) is glass
     const z = o.kind === 'body' && o.size, pane = o.prop && z && (o.shape === 'plane' || (o.shape === 'box' && Math.min(...z) < 0.05 * Math.max(...z)));
+    const fin = o.kind === 'ground' ? 'floor' : finishFor(o, run, pane && (o.opacity ?? 1) < 1), glass = fin === 'glass' && o.kind !== 'mesh' || (fin === 'glass' && (o.opacity ?? 1) < 1);
+    const metal = (FINISHES[fin] || FINISHES.painted).metalness > 0.5;
+    if (o.prop && o.kind !== 'ground' && !metal && !glass) {
+      // a prop is a little darker and grayer, so it stays behind the part the run is about
+      const y = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+      rgb = rgb.map((c) => Math.round((c + (y - c) * 0.15) * PROP));
+    }
     const a = o.opacity ?? 1;
-    const it = { o, d, oi, mag: magnifyOf(h, oi), f: o.field ? fields[o.field.f] : null, base: a < 1 ? (pane ? behind(rgb, a * 0.45, 0) : behind(rgb, a)) : rgb };
+    const it = { o, d, oi, fin, glass, mag: magnifyOf(h, oi), f: o.field ? fields[o.field.f] : null, base: a < 1 && !glass ? behind(rgb, a) : rgb };
+    const look = { prop: !!o.prop, finish: fin, glass, unlit: fin === 'emissive' };
     if (o.kind === 'mesh') {
       const geo = new BufferGeometry(), nv = d.node.length;
       geo.setIndex(new BufferAttribute(d.index, 1));
@@ -210,15 +311,16 @@ export function sceneParts({ arrays, run }) {
       it.n = d.P.length / 3;
       it.cur = d.P.slice();
       it.val = new Float32Array(it.n).fill(NaN);
-      it.mesh = new Mesh(geo, material(o, { prop: !!o.prop, shell: d.closed, field: it.f && d.fv ? it.f : null }));
+      const field = it.f && d.fv ? it.f : null;
+      it.mesh = new Mesh(geo, material(o, { ...look, shell: d.closed, field }));
       it.colored = false;
       // a shell drawn cut open shows its inside, where outlines would only clutter it
-      if (it.mesh.material.side !== BackSide) {
-        const lines = edgeLines(geo, d.edges, it.mesh.material);
+      if (it.mesh.material.side !== BackSide && !glass) {
+        const lines = edgeLines(geo, d.edges, outline(it.mesh.material, field), it.mesh.material);
         if (lines) it.mesh.add(lines);
       }
     } else if (o.kind === 'body') {
-      it.mesh = new Mesh(tinted(primitive(o.shape, o.size), it.base), material(o, { prop: !!o.prop, shell: o.shape !== 'plane' }));
+      it.mesh = new Mesh(tinted(primitive(o.shape, o.size), it.base), material(o, { ...look, shell: o.shape !== 'plane' }));
       if (o.glow) it.mesh.material.uniforms.uGlowC.value.setRGB(...colorHex(o.color).map((v) => Math.min(1, v * 0.5 + 0.55)));
     } else if (o.kind === 'lines') {
       const geo = new BufferGeometry(), nv = d.position.length / 3;
@@ -238,10 +340,7 @@ export function sceneParts({ arrays, run }) {
       }
       geo.setAttribute('cutv', new BufferAttribute(cut, 1));
       geo.setAttribute('axis', new BufferAttribute(d.axis, 3));
-      const mat = material({ ...o, opacity: 1 }, { prop: !!o.prop });
-      mat.defines.TUBE = '';
-      mat.uniforms.uTube = { value: 1 };
-      it.mesh = new Mesh(geo, mat);
+      it.mesh = new Mesh(geo, material({ ...o, opacity: 1 }, { prop: !!o.prop, tube: true, finish: 'paint_gloss' }));
       it.cuts = !!(d.td || o.at);
     } else if (o.kind === 'points' || o.kind === 'atoms') {
       const atoms = o.kind === 'atoms', sh = o.pos.shape;
@@ -254,12 +353,12 @@ export function sceneParts({ arrays, run }) {
         it.rad[i] = e ? (RAD[e] || 1.2) * o.radius : o.size || R * 0.01;
       }
       const geo = tinted(new SphereGeometry(1, 24, 16), [255, 255, 255]);
-      it.mesh = new InstancedMesh(geo, material(o), it.n);
+      it.mesh = new InstancedMesh(geo, material(o, { finish: 'paint_gloss' }), it.n);
       it.mesh.instanceColor = new InstancedBufferAttribute(cols, 3);
       it.mesh.frustumCulled = false;
       if (d.bonds && d.bonds.length) {
         const bg = tinted(new CylinderGeometry(1, 1, 1, 14), [150, 154, 160]);
-        it.bonds = new InstancedMesh(bg, material(o), d.bonds.length / 2);
+        it.bonds = new InstancedMesh(bg, material(o, { finish: 'paint_gloss' }), d.bonds.length / 2);
         it.bonds.frustumCulled = false;
         scene.add(it.bonds);
       }
@@ -271,7 +370,8 @@ export function sceneParts({ arrays, run }) {
       for (let i = 0; i < it.n; i++) { const g = arrow(o.color || '#ffd400'); it.arrows.push(g); it.mesh.add(g); }
     } else if (o.kind === 'ground') {
       const g = new Group(), s = o.size;
-      const plane = new Mesh(tinted(new PlaneGeometry(s, s), it.base), material(o, { prop: true }));
+      const plane = new Mesh(tinted(new PlaneGeometry(s, s), it.base), material(o, { prop: true, finish: 'floor' }));
+      plane.receiveShadow = true;
       plane.position.set(o.center[0], o.center[1], o.z - R * 2e-4);
       g.add(plane);
       if (o.grid) {
@@ -287,6 +387,12 @@ export function sceneParts({ arrays, run }) {
     }
     if (!it.mesh) return;
     it.mesh.frustumCulled = false;
+    // every solid casts and takes the key light's soft shadow; glass, glows and lines do neither
+    if (['mesh', 'body', 'points', 'atoms'].includes(o.kind) && !glass && fin !== 'emissive') {
+      it.mesh.castShadow = !it.d?.rv;
+      it.mesh.receiveShadow = true;
+      if (it.bonds) { it.bonds.castShadow = true; it.bonds.receiveShadow = true; }
+    }
     scene.add(it.mesh);
     items.push(it);
   });
