@@ -109,6 +109,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 28.054786,
- "solver": "Cantera 3.2.0"
+ "t_total": 36.490609,
+ "solver": "Cantera 3.2.0",
+ "criteria": []
 }
