@@ -220,6 +220,30 @@ def test_the_example_buck_layouts_join_the_netlist(monkeypatch, tmp_path):
         assert said
 
 
+def test_hot_loop_closes_through_the_switch_and_input_capacitor():
+    from wobbl.circuits.netlist import parse_spice
+    from wobbl.fields import pcbfield
+
+    c = parse_spice("""* buck
+V1 VIN 0 DC 12
+C1 VIN 0 22u
+VG G 0 PULSE(0 5 0 5n 5n 0.85u 2u)
+S1 VIN SW G 0 SWMOD
+CS1 VIN SW 300p
+.model SWMOD SW(VT=2.5 VH=0.1 RON=0.05 ROFF=1e6)
+D1 0 SW DMOD
+.model DMOD D(IS=5e-5)
+L1 SW VOUT 10u
+C2 VOUT 0 22u
+R1 VOUT 0 2.5
+.tran 2n 30u
+.end
+""")
+    loop = pcbfield.hot_loop(c, "D1")
+    assert set(loop) == {"D1", "S1", "CS1", "C1"}       # not the switch's gate pair, the inductor or the supply
+    assert pcbfield.hot_loop(c, "C2")[0] == "C2"
+
+
 # --- solves --------------------------------------------------------------------------------------
 @pytest.mark.solver
 @needs_getdp

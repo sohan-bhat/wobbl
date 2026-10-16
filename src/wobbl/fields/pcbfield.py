@@ -433,25 +433,14 @@ def _match(c, spec: dict) -> dict:
             "source": spec["source"]}
 
 
-def compare_spice(path: Path, spec: dict, work: Path, log) -> dict | None:
-    """A SPICE netlist with a transient: run it as drawn and with the board's parasitics on a time step fine
-    enough for the ringing they add, and compare every part's peak voltage and every net's swing."""
-    from ..circuits.netlist import join_parasitics, parse_spice
-    from ..solvers import base
-    from ..units import parse_spice_value
+def _with_board(c0, used: dict):
+    """The circuit with the board's traces spliced in and each net's copper capacitance spread over its net node
+    and the pin ends of its traces, a pi model of the copper, so no pin hangs on an inductance with nothing to
+    ground behind it."""
+    from ..circuits.netlist import Element, join_parasitics, safe_node
 
-    c0 = parse_spice(Path(path).read_text(), Path(path).parent)
-    tran = next((a for a in c0.analyses if a.lower().startswith(".tran")), None)
-    if tran is None:
-        return None
-    used = _match(c0, spec)
-    if not used["traces"] and not used["nets"]:
-        return {"error": "no net of the board matched a net of the netlist by name"}
     c1 = c0.copy()
     join_parasitics(c1, {**used, "nets": {}})
-    # spread each net's copper capacitance over its net node and the pin ends of its traces, a pi model of the
-    # copper, so no pin hangs on an inductance with nothing to ground behind it
-    from ..circuits.netlist import Element, safe_node
     ends = defaultdict(list)
     for e in c1.elements:
         if e.kind == "parasitic" and e.name.lower().startswith(("lpar", "rpar")):
@@ -464,6 +453,145 @@ def compare_spice(path: Path, spec: dict, work: Path, log) -> dict | None:
         for j, s in enumerate(spots):
             c1.elements.append(Element(f"Cpar{k}_{j}", "c", [s, "0"], [f"{v['c'] / len(spots):.6g}"], ["1", "2"],
                                        "parasitic"))
+    return c1
+
+
+# parts a fast edge's current loop closes through: capacitors, switches, diodes and transistors. Inductors and
+# resistors hold the current back, and a supply is only taken when no capacitor closes the loop
+FAST = ("c", "s", "w", "d", "m", "q", "j", "z")
+# the nodes a part's main current runs between: a switch's contacts, not its control pair, a transistor's drain
+# and source or collector and emitter, not its gate or base
+MAIN = {"s": (0, 1), "w": (0, 1), "m": (0, 2), "q": (0, 2), "j": (0, 2), "z": (0, 2)}
+
+
+def _main(x) -> list[str]:
+    k = MAIN.get(x.letter)
+    return [x.nodes[i] for i in k if i < len(x.nodes)] if k else list(x.nodes)
+
+
+def hot_loop(c, part: str) -> list[str]:
+    """The parts of the shortest loop through a part that its fast current takes: from one of its nodes back to
+    the other through capacitors, switches, diodes and transistors (or a supply when nothing else closes it),
+    with every part in parallel on the way. The board's traces to these parts are the loop's inductance."""
+    e = c.element(part)
+    if e is None or len(e.nodes) < 2:
+        return [part]
+    for letters in (FAST, FAST + ("v",)):
+        edges = defaultdict(list)
+        for x in c.elements:
+            if x is e or x.letter not in letters or len(x.nodes) < 2:
+                continue
+            ends = _main(x)
+            for a in ends:
+                for b in ends:
+                    if a != b:
+                        edges[a].append((b, x))
+        start, goal = e.nodes[0], e.nodes[1]
+        prev, todo = {start: None}, [start]
+        while todo and goal not in prev:
+            nxt = []
+            for n in todo:
+                for m, x in edges[n]:
+                    if m not in prev:
+                        prev[m] = (n, x)
+                        nxt.append(m)
+            todo = nxt
+        if goal in prev:
+            refs, n = [e.name], goal
+            while prev[n] is not None:
+                a, x = prev[n]
+                refs += [y.name for y in c.elements if y.letter in letters and {a, n} <= set(_main(y))
+                         and y.name not in refs and y is not e]
+                n = a
+            return refs
+    return [part]
+
+
+LOOP_FACTORS = np.round(np.linspace(0.0, 3.0, 13), 3)        # times the board's own loop inductance
+
+
+def sweep_loop(c0, used: dict, part: str, card: str, work: Path, log) -> dict | None:
+    """The board's circuit solved again with the hot loop's trace inductance scaled from none to three times the
+    board's, every other trace as the board has it. Each value keeps the peak voltage across the part, every
+    net's peak voltage and every pad connection's peak current."""
+    from ..circuits.netlist import safe_node
+    from ..solvers import base
+    from ..units import parse_spice_value
+
+    loop = hot_loop(c0, part)
+    mine = [k for k, tr in enumerate(used["traces"]) if tr["to"].split(".")[0].lower() in
+            {r.lower() for r in loop}]
+    L0 = sum(used["traces"][k]["l"] for k in mine)
+    if not mine or L0 <= 0:
+        return None
+    sp = base.for_domain("circuit")
+    rows = []
+    for f in LOOP_FACTORS:
+        u = {**used, "traces": [{**tr, "l": tr["l"] * f} if k in mine else tr for k, tr in enumerate(used["traces"])]}
+        c = _with_board(c0, u)
+        nodes = [n for n in c.nodes() if n != "0"]
+        log("solve", f"the board's circuit with {fmt(f * L0 * 1e9)} nH in the hot loop")
+        d, _, _ = sp.run(c.spice(analyses=[card]), work / "loop" / f"x{f:g}", [f"v({n})" for n in nodes], "loop",
+                         timeout=900)
+
+        def v(n):
+            return np.zeros_like(d["time"]) if n == "0" else d[f"v({n})"]
+
+        e = c.element(part)
+        y = np.abs(v(e.nodes[0]) - v(e.nodes[1]))
+        cur = []
+        for k, tr in enumerate(u["traces"]):
+            r = c.element(f"Rpar{k}")
+            if r is not None:
+                rr = max(parse_spice_value(r.rest[0]), 1e-9)
+                cur.append(float(np.max(np.abs(v(r.nodes[0]) - v(r.nodes[1])))) / rr)
+            else:
+                cur.append(0.0)
+        rows.append({"peak": float(y.max()), "current": cur,
+                     "nodes": {n: float(np.max(np.abs(v(n)))) for n in c.nodes() if n != "0"
+                               and not re.search(r"_p[te]\d+$", n)}})
+    return {"factors": [float(f) for f in LOOP_FACTORS], "L0": L0, "loop": loop,
+            "traces": [used["traces"][k]["to"] for k in mine], "part": part,
+            "peak": [r["peak"] for r in rows],
+            "current": [r["current"] for r in rows],
+            "nodes": {n: [r["nodes"].get(n, 0.0) for r in rows] for n in rows[0]["nodes"]},
+            "trace_to": [tr["to"] for tr in used["traces"]], "trace_net": [safe_node(tr["net"]) for tr in used["traces"]]}
+
+
+def rating(path: Path, part: str) -> tuple[float | None, str]:
+    """A part's voltage rating as Wobbl's parts library knows it from the netlist's note on that line (as
+    '; part=SS34'), with where it comes from, or None."""
+    from ..circuits.bind import bind
+    from ..circuits.netlist import parse_spice
+
+    try:
+        c = parse_spice(Path(path).read_text(), Path(path).parent)
+        bind(c)
+    except Exception:  # noqa: BLE001
+        return None, ""
+    e = c.element(part)
+    if e is None:
+        return None, ""
+    r = (e.part or {}).get("ratings") or {}
+    key = next((k for k in ("vr_V", "vds_V", "vceo_V", "voltage_V", "vka_V", "vin_V") if r.get(k)), None)
+    return (float(r[key]), str((e.part or {}).get("key") or "")) if key else (None, "")
+
+
+def compare_spice(path: Path, spec: dict, work: Path, log) -> dict | None:
+    """A SPICE netlist with a transient: run it as drawn and with the board's parasitics on a time step fine
+    enough for the ringing they add, and compare every part's peak voltage and every net's swing."""
+    from ..circuits.netlist import parse_spice
+    from ..solvers import base
+    from ..units import parse_spice_value
+
+    c0 = parse_spice(Path(path).read_text(), Path(path).parent)
+    tran = next((a for a in c0.analyses if a.lower().startswith(".tran")), None)
+    if tran is None:
+        return None
+    used = _match(c0, spec)
+    if not used["traces"] and not used["nets"]:
+        return {"error": "no net of the board matched a net of the netlist by name"}
+    c1 = _with_board(c0, used)
     bare = [e.name for e in c0.elements if e.letter in ("s", "w") and not any(
         x.letter == "c" and set(x.nodes) == set(e.nodes[:2]) for x in c0.elements)]
     tok = tran.split()
@@ -527,8 +655,18 @@ def compare_spice(path: Path, spec: dict, work: Path, log) -> dict | None:
             except Exception:  # noqa: BLE001
                 pass
         wave["values"] = vals
+    loop = None
+    if worst:
+        try:
+            loop = sweep_loop(c0, used, worst["part"], card, work, log)
+        except Exception as e:  # noqa: BLE001  the sweep feeds the 3D view, never the result
+            log("solve", f"the hot loop sweep was skipped ({e})")
+        if loop:
+            loop["rating_V"], loop["rated_as"] = rating(path, worst["part"])
+            loop["ideal_V"] = worst["ideal_V"]
     return {"parts": parts, "worst": worst, "wave": wave, "bare_switches": bare, "traces_used": len(used["traces"]),
-            "traces_all": len(spec["traces"]), "nets_used": len(used["nets"]), "step": tmax, "schematic": str(path)}
+            "traces_all": len(spec["traces"]), "nets_used": len(used["nets"]), "step": tmax, "schematic": str(path),
+            "loop": loop}
 
 
 def run_circuits(sch: Path, spec: dict, question: str, out: Path, log) -> dict | None:
