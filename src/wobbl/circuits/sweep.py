@@ -179,6 +179,9 @@ def solve(inp: Input, w, work: Path, ambient: float = 25.0, *, rerun: Callable |
     def again(cc, tag):
         return rerun(cc, tag) if rerun is not None else tol._solve(cc, w, work, tag)
 
+    if getattr(w, "kind", "") == "tran" and len(inp.values) > 13:     # a transient costs more: every other value
+        at = int(np.argmin(np.abs(inp.values - inp.design)))
+        inp.values = inp.values[sorted(set(range(at % 2, len(inp.values), 2)) | {at})]
     ac_on = False
     rows, plans, heats, names = [], [], [], {}
     lo, mid = inp.make(float(inp.values[0])), inp.make(float(inp.design))
@@ -228,7 +231,7 @@ def solve(inp: Input, w, work: Path, ambient: float = 25.0, *, rerun: Callable |
         names.update({p["name"]: p for p in pl["parts"]})
         row = {"readouts": list(extra.get("readouts", [])), "hard": hard[0],
                "hard_ref": hard[1].ref if hard[1] is not None else "", "pm": pm,
-               "supply": _supply_current(pl)}
+               "supply": _supply_current(pl, st, cc)}
         rows.append(row)
 
     at = int(np.argmin(np.abs(inp.values - inp.design)))
@@ -256,7 +259,14 @@ def solve(inp: Input, w, work: Path, ambient: float = 25.0, *, rerun: Callable |
     return out
 
 
-def _supply_current(pl: dict) -> float | None:
+def _supply_current(pl: dict, stress=(), c: Circuit | None = None) -> float | None:
+    """What the main supply delivers: its own judged current over the settled window, else its lead's current."""
+    src = _main_supply(c) if c is not None else None
+    if src is not None:
+        for s in stress:
+            it = next((x for x in s.items if x.what == "current drawn"), None)
+            if s.ref == src.ref and it is not None and it.value:
+                return abs(float(it.value))
     sup = next((i for i in pl.get("instruments", []) if i.get("kind") == "supply" and i.get("leads")), None)
     return abs(float(sup["leads"][0].get("current") or 0.0)) if sup else None
 

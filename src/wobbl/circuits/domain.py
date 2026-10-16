@@ -97,6 +97,9 @@ def _template(job, kind: str, text: str, params: dict):
     tpl, p, guesses = read_circuit_question(text)
     for g in guesses:
         key = g.split(" not given")[0].split()[0].lower()
+        key = {"thermal": "theta_ja"}.get(key, key)
+        if key in params:                # given with --set, so not a guess
+            continue
         val = re.search(r"assumed (\S+)", g)
         job.assume(g, f"--set {key}={val.group(1)}" if val else "")
     p.update({k: v for k, v in params.items() if k not in ("ambient", "parasitics")})
