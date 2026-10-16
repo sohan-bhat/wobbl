@@ -21,7 +21,7 @@ from .. import props_flight as F
 from ..scene import Scene
 from .common import quats_along, read, verdict, words
 
-ROCK, BODY, NOSE, FIN = "#b8ab98", "#e9e9e4", "#ffd400", "#2c2f34"
+ROCK, BODY, NOSE, FIN, NOZZLE = "#b8ab98", "#ecebe6", "#d6402f", "#24272b", "#4a4d52"
 UP, DROGUE, MAIN, PLUMB = "#ffd400", "#ffb020", "#ff6b3d", "#7d838c"
 TALL = ("cliff", "building", "tower", "roof", "bridge", "balcony", "ledge", "skyscraper")
 
@@ -152,7 +152,7 @@ def _rocket(out, o, st, inp, runs):
                 s.lines([P3[sel]], color=color, width=w, name=name).show(a, b)
         ax, az = r.events["apogee"][1:3] if "apogee" in r.events else (r.x[r.z.argmax()], r.z.max())
         s.lines([np.array([[ax, 0, 0], [ax, 0, az]])], color=PLUMB, width=1.0, name="under apogee",
-                prop=True).show(a, b)
+                prop=True).show(a, b).as_guide()
 
     # the rocket at apogee, nose into the air it meets there
     apo = np.array([[*(r.events["apogee"][1:3] if "apogee" in r.events else (r.x[r.z.argmax()], r.z.max()))]
@@ -166,12 +166,17 @@ def _rocket(out, o, st, inp, runs):
     q = quats_along(np.array(d, float))
     parts = F.airframe(L, dia, af.nose_length if af else dia * 4, af.nose_shape if af else "ogive",
                        af.fins if af else None)
-    colors = {"nose": NOSE, "body tube": BODY, "fins": FIN}
+    colors = {"nose": NOSE, "body tube": BODY, "fins": FIN, "nozzle": NOZZLE}
+    airframe, chute = [], None
     for name, (X, T) in parts.items():
         m = s.mesh(X - [0, 0, cg], T, name=name if name != "body tube" else "rocket", color=colors[name],
-                   max_vertices=3000, smooth=name != "fins")
+                   max_vertices=4000, smooth=name != "fins")
         m.move(pos, q)
+        airframe.append(m)
     body = next(ob for ob in s.objects if ob.name == "rocket")
+    # a rocket a couple of metres long is a speck on a flight kilometres across, so it is drawn larger, with
+    # the pad and the rail grown about the pad and the parachute about where it opens, and the view says so
+    grow = F.nice_step(span * 0.25 / L, 1)
 
     # the main parachute where it opens, at its real size
     main = st.chute("main")
@@ -180,6 +185,7 @@ def _rocket(out, o, st, inp, runs):
         Xc, Tc = F.canopy(main.diameter, max(main.diameter * 1.3, L * 0.5))
         cm = s.mesh(Xc, Tc, name="main parachute", color=MAIN, max_vertices=900)
         cm.move(mp, (1, 0, 0, 0))
+        chute = cm
         s.label("main opens", [0, 0, main.diameter * 2], follow=cm, kind="note")
 
     # where it lands, colored by the landing speed against the soft landing limit
@@ -191,17 +197,25 @@ def _rocket(out, o, st, inp, runs):
     s.label("lands {landing distance} out at {landing speed}", [0, 0, mark * 3], follow=spot, kind="peak")
     s.label("apogee {apogee}", [0, 0, L], follow=body, kind="peak")
     if n > 2:
-        s.lines([land + [0, 0, mark * 0.05]], color="#9aa0a6", width=1.2, name="landing spots", prop=True)
+        s.lines([land + [0, 0, mark * 0.05]], color="#9aa0a6", width=1.2, name="landing spots",
+                prop=True).as_guide()
         s.label(f"{inp.values[0]:g} {inp.unit}", land[0] + [0, -mark * 4, 0], kind="note")
         s.label(f"{inp.values[-1]:g} {inp.unit}", land[-1] + [0, -mark * 4, 0], kind="note")
 
     # the pad, the rail, the wind as an arrow that grows with the slider, a height scale and the ground
+    first = len(s.objects)
     P.pad(s, [0, 0, 0], max(dia * 6, 0.5))
     rail = float(st.rail_length or 0)
     if rail > 0:
         foot = np.array([-rail_dir[0] * (L - cg), 0, 0]) + [dia * 0.9, 0, 0]
         s.body("box", [dia * 0.12, dia * 0.12, rail / 2], pos=foot + rail_dir * rail / 2,
                quat=P.z_to(rail_dir), color=P.BOLT, name="launch rail", prop=True)
+    # the rocket by the most; the pad, the rail and the canopy by a fifth of that, so a rail kilometres tall
+    # never stands over the flight and the canopy never covers where it lands
+    s.magnify(airframe, grow, label="Rocket")
+    s.magnify(s.objects[first:], grow / 5, label="Pad", anchor=[0, 0, 0])
+    if chute is not None:
+        s.magnify([chute], grow / 5, label="Parachute")
     if inp.key == "wind" and inp.values.max() > 0:
         sign = -1.0 if st.wind >= 0 else 1.0
         at = np.array([x1 + span * 0.1, 0, top * 0.55])

@@ -29,15 +29,19 @@ def nose_profile(shape: str, R: float, L: float, n: int = 14) -> list[tuple[floa
 
 
 def airframe(length: float, diameter: float, nose_length: float, nose_shape: str = "ogive", fins=None,
-             seg: int = 28) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    """The rocket as three meshes, nose, body tube and fins, with the aft end at z = 0 and the tip at z = length.
-    fins carries count, root, tip, span, sweep and position (root leading edge from the tip), in metres."""
+             seg: int = 48) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """The rocket as meshes, nose, body tube, motor nozzle and fins, with the aft end at z = 0 and the tip at
+    z = length. fins carries count, root, tip, span, sweep and position (root leading edge from the tip), in metres.
+    The nozzle stands out of the aft end as a motor's does, a converging and diverging bell."""
     R, L = diameter / 2, length
     nl = min(max(nose_length, diameter), L * 0.6)
-    prof = nose_profile(nose_shape, R, nl)
+    prof = nose_profile(nose_shape, R, nl, n=28)
     nose = lathe([(r, L - x) for r, x in prof][::-1] + [(0.0, L - nl)], seg)
     tube = lathe([(0.0, 0.0), (R, 0.0), (R, L - nl), (0.0, L - nl)], seg)
-    out = {"nose": nose, "body tube": tube}
+    d = diameter
+    nozzle = lathe([(0.0, 0.0), (R * 0.5, 0.0), (R * 0.5, -d * 0.06), (R * 0.3, -d * 0.2), (R * 0.44, -d * 0.5),
+                    (R * 0.38, -d * 0.5), (R * 0.24, -d * 0.22), (0.0, -d * 0.16)], seg)
+    out = {"nose": nose, "body tube": tube, "nozzle": nozzle}
     if fins is not None and getattr(fins, "count", 0):
         th = max(diameter * 0.035, 0.002)
         z_le = L - (fins.position if fins.position else L - fins.root)
@@ -130,13 +134,14 @@ def nice_step(span: float, ticks: int = 6) -> float:
 
 
 def mast(s, at, top: float, step: float, name: str = "height scale", unit: str = "m"):
-    """A thin pole standing at at with a tick and a label every step up to top, so heights read at a glance."""
+    """A thin pole standing at at with a tick and a label every step up to top, so heights read at a glance. It is a
+    guide for its labels, so a view without labels leaves it out."""
     at = np.asarray(at, float)
     r = max(top * 0.0012, 0.02)
-    s.body("cylinder", [r, top / 2], pos=at + [0, 0, top / 2], color="#5b6068", name=name, prop=True)
+    s.body("cylinder", [r, top / 2], pos=at + [0, 0, top / 2], color="#5b6068", name=name, prop=True).as_guide()
     ticks = [np.array([at + [-r * 8, 0, z], at + [r * 8, 0, z]]) for z in np.arange(step, top + 1e-9, step)]
     if ticks:
-        s.lines(ticks, color="#9aa0a6", width=1.5, name=f"{name} ticks", prop=True)
+        s.lines(ticks, color="#9aa0a6", width=1.5, name=f"{name} ticks", prop=True).as_guide()
     for z in np.arange(step, top + 1e-9, step):
         s.label(f"{z:g} {unit}", at + [r * 10, 0, z], kind="note")
 
