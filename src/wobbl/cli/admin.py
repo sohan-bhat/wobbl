@@ -77,10 +77,13 @@ def setup(agents, no_agents, no_solvers, only, project, force, dry_run):
         from ..life.tools import footprint as life_footprint
         from ..mechanism.install import footprint as mechanism_footprint
         from ..motion.tools import footprint
-        ui.bullets([f()["line"] for f in (footprint, life_footprint, chem_footprint, mechanism_footprint)])
+        with ui.status("checking the tools each domain installs on first use"):
+            lines = [f()["line"] for f in (footprint, life_footprint, chem_footprint, mechanism_footprint)]
+        ui.bullets(lines)
     if not no_agents and agents != "none":
         ui.section("agents")
-        found = ag.detect()
+        with ui.status("looking for coding agents"):
+            found = ag.detect()
         if agents == "detected":
             chosen = [a for a, ok in found.items() if ok]
             if not chosen:
@@ -93,7 +96,9 @@ def setup(agents, no_agents, no_solvers, only, project, force, dry_run):
             if bad:
                 ui.fail(f"unknown agent {bad}; choose from {', '.join(ag.AGENTS)}")
         if chosen:
-            r = ag.register(chosen, log, dry_run)
+            # registering through an agent's own CLI can take several seconds each, so it spins meanwhile
+            with ui.status(f"connecting Wobbl to {', '.join(chosen)}"):
+                r = ag.register(chosen, log, dry_run)
             if project:
                 r.project_rules(Path.cwd())
             ui.say("Backups of changed files are in ~/.wobbl/backups, and wobbl uninstall undoes it all.",

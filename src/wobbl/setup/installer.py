@@ -426,7 +426,10 @@ def _install(rep: progress.Reporter, force: bool, only: list[str] | None) -> dic
     status["chosen"] = chosen
     status["platform"] = p["platform"]
     status["unavailable"] = {**status.get("unavailable", {}), **unavailable}
-    status["size"] = sizes()
+    # walking the whole home folder takes a while on a big install, so it shows as its own stage
+    with rep.stage("measure disk use") as st:
+        status["size"] = sizes()
+        st.detail = f"{progress.nbytes(status['size'].get('total', 0))} in all"
     status["seconds"] = round(time.time() - rep.t0, 1)
     (home / "config.json").write_text(json.dumps(status, indent=1))
     return status

@@ -19,20 +19,32 @@ from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
+from rich.theme import Theme
 
-console = Console(highlight=False, stderr=False)
-err = Console(stderr=True, highlight=False)
+# Wobbl's own colors, the same as the site's (crash test yellow, and the green, amber and red of its verdict
+# badges). The style names the commands already use resolve here first, so plain ANSI green and terminal dim
+# never show, and a truecolor terminal gets the exact brand colors.
+YELLOW, OK, WARN, FAIL, INK, MUTED, INFO = "#ffd400", "#46d17f", "#ffb020", "#ff5a4a", "#0e0f11", "#9ca099", "#3e9bfe"
+THEME = Theme({
+    "dim": MUTED, "green": OK, "yellow": YELLOW, "red": FAIL, "cyan": INFO, "blue": INFO,
+    "bold green": f"bold {OK}", "bold yellow": f"bold {YELLOW}", "bold red": f"bold {FAIL}",
+    "bold cyan": f"bold {INFO}", "bold blue": f"bold {INFO}",
+    "bold black on green": f"bold {INK} on {OK}", "bold black on yellow": f"bold {INK} on {WARN}",
+    "bold white on red": f"bold {INK} on {FAIL}",
+})
+console = Console(highlight=False, stderr=False, theme=THEME)
+err = Console(stderr=True, highlight=False, theme=THEME)
 
 MAX_WIDTH = 88
 
-STATUS_STYLE = {"pass": "bold green", "warn": "bold yellow", "fail": "bold red", "info": "bold cyan",
+STATUS_STYLE = {"pass": "bold green", "warn": f"bold {WARN}", "fail": "bold red", "info": "bold cyan",
                 "skip": "dim"}
 VERDICT_STYLE = {"holds": "bold black on green", "marginal": "bold black on yellow", "fails": "bold white on red",
                  "ok": "bold black on green", "hot": "bold white on red", "warm": "bold black on yellow",
                  "pass": "bold black on green", "fail": "bold white on red"}
-BORDER = {"holds": "green", "ok": "green", "pass": "green", "marginal": "yellow", "warm": "yellow",
+BORDER = {"holds": "green", "ok": "green", "pass": "green", "marginal": WARN, "warm": WARN,
           "fails": "red", "hot": "red", "fail": "red"}
-CONF_STYLE = {"high": "bold green", "medium": "bold yellow", "low": "bold red"}
+CONF_STYLE = {"high": "bold green", "medium": f"bold {WARN}", "low": "bold red"}
 
 
 def plain(c: Console | None = None) -> bool:
@@ -113,8 +125,10 @@ class _Ticker:
     def __rich__(self):
         dt = time.time() - self.t0
         clock = f"{dt:4.0f}s"
-        if self.eta:
-            clock += f" of about {_dur(self.eta)}" if dt < self.eta * 1.5 else ", longer than usual"
+        # an estimate under a few seconds says nothing useful, and a run a second or two slower than a quick
+        # one is not "longer than usual", so the estimate only shows for runs that take a while
+        if self.eta and self.eta >= 5:
+            clock += f" of about {_dur(self.eta)}" if dt < self.eta * 1.5 + 5 else ", longer than usual"
         room = max(10, width() - len(self.stage) - len(clock) - 8)
         detail = self.detail if len(self.detail) <= room else self.detail[:room - 3] + "..."
         t = Text()
