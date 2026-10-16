@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased
+## 0.1.2
+
+**npm installs that work**
+- `npm i -g wobbl` and `npm i wobbl` now leave a working `wobbl` command. A postinstall
+  installs the real Wobbl from PyPI with uv or pipx, or with a pinned uv it downloads and
+  checks, so a plain `wobbl` works in any terminal. It never fails the npm install, skips
+  CI and `--ignore-scripts`, never edits a shell profile, and prints the exact line that
+  puts the tool folder on PATH when it is missing.
+- The install shows one line per step, with a progress bar while packages download and the
+  time each step took. The installer's full output goes to `~/.wobbl/logs/install.log` and
+  is printed only when something fails, so `npx wobbl setup` no longer dumps 60 lines of uv.
+- The launcher installs the newest Wobbl that is at least its own version and never runs an
+  older one, so a stale npm launcher can not hand anyone an old CLI.
+- The release workflow asks npm whether it accepts a trusted publish before anything goes
+  out, and a failed npm publish now fails the release. 0.1.1 reached PyPI but not npm while
+  its run still showed green.
+- The landing page leads with `npm i -g wobbl` and has tabs for npm, pipx, uv and npx.
 
 **Motor drive questions through simulate**
 - `wobbl simulate` answers whether a motor can drive a mechanism: the torque, speed,
