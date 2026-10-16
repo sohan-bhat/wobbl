@@ -31,9 +31,9 @@ globalThis.drawScenePoster = async ({ b64, run, w, h, px, sizes }) => {
   const T = run.input.t, p = run.input.home, a = Math.floor(p), b = Math.min(a + 1, T.length - 1);
   const k = run.input.between === 'step' ? 0 : p - a;
   stage.frame({
-    camera: { position: orbit.eye, target: orbit.target, fov: orbit.fov, aspect: orbit.aspect },
+    camera: { position: orbit.eye, target: orbit.target, fov: orbit.fov, aspect: orbit.aspect, near: orbit.near, far: orbit.far },
     views: [[0, 0, w, h]], k: 1, radius,
-    scene: { a, b, k, t: k ? T[a] + (T[b] - T[a]) * k : T[a], bend: true, mag: true },
+    scenes: [{ a, b, k, t: k ? T[a] + (T[b] - T[a]) * k : T[a], bend: true, mag: true }],
   });
   // onto the page's own background, at each size asked for, straight after the frame is drawn
   const out = sizes.map((s) => {

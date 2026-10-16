@@ -66,14 +66,15 @@ const bytes = (c) => colorHex(c).map((x) => Math.round(x * 255));
 
 // Nothing is drawn see through. Where a scene asked for a see through surface (glass, a mold box, a beaker,
 // a shell round a field), it is drawn solid in the color it would have shown over the page's background,
-// and when it is a closed shell, with its near side cut away so what it holds still shows. Props are drawn
+// and when it is a closed shell or mostly clear, with its near side cut away so what it holds still shows. Props are drawn
 // darker and matte, so the part the run is about stays the brightest thing in the view.
 const BG = [14, 15, 17];
 const behind = (rgb, a) => rgb.map((c, i) => Math.round(BG[i] + (c - BG[i]) * Math.min(1, Math.max(a, 0.3) * 1.25)));
 const PROP = 0.62;
 
 function material(o, { prop = false, shell = false } = {}) {
-  const cut = shell && (o.opacity ?? 1) < 1;
+  // a closed shell is cut open whenever it was asked to be see through, an open surface when mostly clear
+  const a = o.opacity ?? 1, cut = a < 1 && (shell || a < 0.5);
   return new ShaderMaterial({
     vertexShader: VERT, fragmentShader: frag(),
     uniforms: {

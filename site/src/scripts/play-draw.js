@@ -247,12 +247,12 @@ export function createStage({ canvas, w, h, px, kind }) {
 
   const Y = new Vector3(0, 1, 0), dir = new Vector3(), at = new Vector3();
   /** Point a part's arrow for the load fraction k: a pull starts at its point, a push ends on the face. */
-  function aim(part, k, radius) {
+  function aim(part, k, radius, bend) {
     const a = part.run.arrow, g = part.load;
     const len = 0.42 * radius * Math.max(k, 0.02);
     g.visible = k > 0.005;
     dir.fromArray(a.dir);
-    const f = part.run.exag * k;
+    const f = (bend === false ? 1 : part.run.exag) * k;
     at.set(a.point[0] + f * a.disp[0], a.point[1] + f * a.disp[1], a.point[2] + f * a.disp[2]);
     g.quaternion.setFromUnitVectors(Y, dir);
     const s = radius / 60; // arrow thickness in proportion to the part
@@ -301,6 +301,8 @@ export function createStage({ canvas, w, h, px, kind }) {
       camera.lookAt(c.target[0], c.target[1], c.target[2]);
       camera.fov = c.fov;
       camera.aspect = c.aspect;
+      // a scene can be metres or kilometres across, so the clipping planes come with the camera
+      if (c.near) { camera.near = c.near; camera.far = c.far; }
       camera.updateProjectionMatrix();
       camera.updateMatrixWorld();
       renderer.setScissor(0, 0, cssW, cssH);
@@ -309,8 +311,10 @@ export function createStage({ canvas, w, h, px, kind }) {
       parts.forEach((part) => {
         const [x, y, vw, vh] = f.views[part.row];
         part.uniforms.uK.value = f.k;
-        if (part.sp) part.sp.set(f.scene);
-        if (part.load) aim(part, f.k, f.radius);
+        // the bending toggle: drawn larger than it is, or at its true size
+        if (part.uniforms.uExag) part.uniforms.uExag.value = f.bend === false ? 1 : part.run.exag;
+        if (part.sp) part.sp.set(f.scenes ? f.scenes[part.row] : f.scene);
+        if (part.load) aim(part, f.k, f.radius, f.bend);
         if (f.heat) {
           frames(part, f.heat.i0, f.heat.i1);
           part.uniforms.uMix.value = f.heat.mix;

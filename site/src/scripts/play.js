@@ -183,7 +183,40 @@ function weld(P, tri) {
   // triangles that collapsed in the weld are dropped
   const keep = [];
   for (let t = 0; t < wt.length; t += 3) if (wt[t] !== wt[t + 1] && wt[t + 1] !== wt[t + 2] && wt[t] !== wt[t + 2]) keep.push(wt[t], wt[t + 1], wt[t + 2]);
-  return { pos: wp, tri: Uint32Array.from(keep), rep: Int32Array.from(rep), n: rep.length };
+  return { pos: wp, tri: Uint32Array.from(keep), rep: Int32Array.from(rep), id, n: rep.length };
+}
+
+/**
+ * A light Taubin smoothing of a mesh Wobbl thinned to fit its scene (thousands of vertices kept by clustering),
+ * which leaves a zigzag along sharp edges: each pass pulls every vertex toward its neighbours and then pushes
+ * it back a little further, so the zigzag evens out while the part keeps its size.
+ */
+function taubin(pos, tri, n, passes = 10) {
+  const start = new Uint32Array(n + 1);
+  for (let t = 0; t < tri.length; t += 3) for (let e = 0; e < 3; e++) { start[tri[t + e] + 1] += 2; }
+  for (let i = 0; i < n; i++) start[i + 1] += start[i];
+  const fill = start.slice(0, n), nb = new Uint32Array(start[n]);
+  for (let t = 0; t < tri.length; t += 3) {
+    for (let e = 0; e < 3; e++) {
+      const a = tri[t + e], b = tri[t + ((e + 1) % 3)], c = tri[t + ((e + 2) % 3)];
+      nb[fill[a]++] = b; nb[fill[a]++] = c;
+    }
+  }
+  const tmp = new Float32Array(pos.length);
+  const step = (f) => {
+    for (let i = 0; i < n; i++) {
+      const s0 = start[i], s1 = start[i + 1];
+      if (s1 === s0) { tmp.set(pos.subarray(i * 3, i * 3 + 3), i * 3); continue; }
+      let x = 0, y = 0, z = 0;
+      for (let j = s0; j < s1; j++) { const k = nb[j] * 3; x += pos[k]; y += pos[k + 1]; z += pos[k + 2]; }
+      const c = s1 - s0;
+      tmp[i * 3] = pos[i * 3] + f * (x / c - pos[i * 3]);
+      tmp[i * 3 + 1] = pos[i * 3 + 1] + f * (y / c - pos[i * 3 + 1]);
+      tmp[i * 3 + 2] = pos[i * 3 + 2] + f * (z / c - pos[i * 3 + 2]);
+    }
+    pos.set(tmp);
+  };
+  for (let p = 0; p < passes; p++) { step(0.5); step(-0.53); }
 }
 
 /** A polyline as a round tube: positions, normals, triangles and, for each vertex, the point it rings. */
@@ -252,6 +285,11 @@ export function decodeScene(run, buf) {
     const d = {};
     if (o.kind === 'mesh') {
       const P = arr(o.pos), w = weld(P, arr(o.tri));
+      // a part thinned to fit the file is smoothed a little along the zigzag its thinning left
+      if (w.n > 4000 && !o.flat) {
+        taubin(w.pos, w.tri, w.n);
+        for (let i = 0; i < P.length / 3; i++) { const k = w.id[i] * 3; P[i * 3] = w.pos[k]; P[i * 3 + 1] = w.pos[k + 1]; P[i * 3 + 2] = w.pos[k + 2]; }
+      }
       const { index, vNode, normal } = shade(w.pos, w.tri, w.n);
       const nv = vNode.length, node = new Uint32Array(nv), nrm = new Int8Array(nv * 3);
       for (let v = 0; v < nv; v++) {
