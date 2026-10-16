@@ -495,7 +495,30 @@ def run_material(q: Query, phys: str, opts, out_dir, log=None, options: dict | N
         except Exception as e:  # noqa: BLE001
             imgs["error"] = str(e)
     from . import playback
-    values["files"] = {"playback": playback.crystal(out, name, atoms, desc, frames, list(V), list(E), values)}
+    from .sweep import eos as fit_eos, strains
+    # the view's sweep: the cell strained either side of its relaxed size, each strain its own energy, with the
+    # pressure and stiffness there from the fit. Periodic DFT reuses the fit's own volumes, which cost minutes each.
+    if isinstance(eng, DFTEngine):
+        sw_frames, sw_E = frames, list(E)
+    else:
+        sw_frames = []
+        for e in strains():
+            b = atoms.copy()
+            b.set_cell(np.array(atoms.cell) * s0 * (1 + e), scale_atoms=True)
+            sw_frames.append(b)
+        sw_E = [eng.energy(b) for b in sw_frames]
+    sw_V = np.array([b.get_volume() for b in sw_frames])
+    at = fit_eos(V, E, n)["at"](sw_V)
+    extra = {"strain_pct": list(np.round(100 * ((sw_V / v0) ** (1 / 3) - 1), 4)),
+             "pressure_GPa": list(np.round(at["pressure_GPa"], 4)), "bulk_GPa": list(at["bulk_GPa"])}
+    # the heat that melts it, per atom: strain storing more than that leaves the lattice no reason to hold
+    from .sweep import phase_change
+    melt = phase_change(sp, "melts") if sp is not None else None
+    if melt and melt[1] > 0:
+        values["fusion_eV_atom"] = melt[1] / 96485.33212 / max(sum(sp.counts.values()), 1)
+        values["melting_K"] = melt[0]
+    values["files"] = {"playback": playback.crystal(out, name, atoms, desc, sw_frames, list(sw_V), sw_E, values,
+                                                    extra=extra)}
     from .reference import ACCURACY
     acc = ACCURACY.get(eng.name.split()[0], {})
     assumptions = [f"{desc} at 0 K with the measured shape held as the volume changes, by {eng.name}"
