@@ -424,8 +424,8 @@ def sweep_top(study: ThermalStudy, t_max: float) -> float:
 
 
 def power_sweep(study: ThermalStudy, coarse, fine, feats, mat, adapter, work: Path) -> dict:
-    """The model solved at other powers on the coarsest mesh, carried to the finest by the difference each makes
-    there, so the asked power keeps the converged field. Returns the arrays fields.npz keeps: sweep_W (the powers),
+    """The model solved at other powers on the coarsest mesh and carried to the finest, so the asked power keeps the
+    converged field. Returns the arrays fields.npz keeps: sweep_W (the powers),
     sweep_T (the field at each, at the end of a transient) and, for a transient, sweep_hot (the hottest point over
     the run's saved times at each power)."""
     from dataclasses import replace
@@ -434,9 +434,10 @@ def power_sweep(study: ThermalStudy, coarse, fine, feats, mat, adapter, work: Pa
 
     mesh0, _, _, res0 = coarse
     mesh, _, _, res = fine
-    k = np.unique(np.round(np.r_[np.linspace(0.0, sweep_top(study, float(res.T.max())), SWEEP_POINTS), 1.0], 6))
+    k = np.linspace(0.0, sweep_top(study, float(res.T.max())), SWEEP_POINTS)
+    k = np.sort(np.r_[k[np.abs(k - 1.0) > 1e-9], 1.0])
     near = cKDTree(mesh0.X).query(mesh.X)[1]
-    t_f = np.asarray(res.history_t, float)
+    t_f = np.asarray(res.history_t, float) if study.duration > 0 else np.zeros(0)
     hot_f = np.asarray(res.history_T, float).max(1) if len(t_f) else None
 
     def hot(r):
@@ -456,9 +457,11 @@ def power_sweep(study: ThermalStudy, coarse, fine, feats, mat, adapter, work: Pa
             model, _ = build_heat(mesh0, replace(study, power=study.power * f), feats.faces, feats.bbox, mat)
             r = adapter.solve_heat(model, work / f"sweep{i}")
             Tc, hc = r.T, (hot(r) if len(t_f) else None)
-        fields.append(res.T + (Tc - res0.T)[near])
+        # the coarse field, plus the fine mesh's own correction in proportion to the power, so no heat gives the air
+        # exactly and the asked power gives the converged field
+        fields.append(Tc[near] + f * (res.T - res0.T[near]))
         if len(t_f):
-            hots.append(hot_f + hc - hot(res0))
+            hots.append(hc + f * (hot_f - hot(res0)))
     d = {"sweep_W": k * study.power / 1000, "sweep_T": np.asarray(fields, np.float32)}
     if len(t_f):
         d["sweep_hot"] = np.asarray(hots, np.float32)

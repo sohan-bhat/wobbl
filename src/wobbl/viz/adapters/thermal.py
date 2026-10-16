@@ -99,12 +99,13 @@ def build(out: Path) -> Path | None:
     amb = float(st.get("ambient", 25.0) or 25.0)
     limit = (o.get("values") or {}).get("limit_C")
     p0 = float(st.get("power", 0) or 0) / 1000
-    transient = len(ht) > 0 and len(hT) == len(ht)
+    transient = float(st.get("duration") or 0) > 0 and len(ht) > 0 and len(hT) == len(ht)
     hot0 = np.asarray(hT, float).max(1) if transient else None
     cells = _cells(X, st)
     if "sweep_W" in d.files:
-        W, F = np.asarray(d["sweep_W"], float), np.asarray(d["sweep_T"], float)
-        H = np.asarray(d["sweep_hot"], float) if "sweep_hot" in d.files else None
+        W = np.array([float(f"{w:.5g}") for w in d["sweep_W"]])
+        F = np.asarray(d["sweep_T"], float)
+        H = np.asarray(d["sweep_hot"], float) if transient and "sweep_hot" in d.files else None
         between = "interpolated"
         how = (f"Radiation or held temperatures make the result depend on the power in a nonlinear way, so the run "
                f"solved the model at {len(W)} powers and the view blends between them.")
