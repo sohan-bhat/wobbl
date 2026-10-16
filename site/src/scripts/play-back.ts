@@ -9,6 +9,8 @@ export interface Back {
   /** Fetch a run's file and draw it in view row, in place of whatever was there. */
   add(row: number, file: string, run: Record<string, any>, top: number): Promise<void>;
   frame(f: Record<string, any>): void;
+  /** What a scene's main field reads under a ray in view row, or null where it meets nothing colored. */
+  probe(row: number, origin: number[], dir: number[]): Promise<Record<string, any> | null>;
   size(w: number, h: number, px: number): void;
   dispose(): void;
 }
@@ -56,12 +58,12 @@ export function decoder() {
 export function inWorker(canvas: HTMLCanvasElement, kind: string, w: number, h: number, px: number): Back {
   const off = canvas.transferControlToOffscreen();
   const worker = new Worker(new URL('./play-stage-worker.js', import.meta.url), { type: 'module' });
-  const waiting: Waiting<void> = new Map();
+  const waiting: Waiting<any> = new Map();
   let id = 0;
   worker.onmessage = (e) => {
     const d = e.data, w8 = waiting.get(d.id);
     waiting.delete(d.id);
-    if (d.type === 'error') w8?.fail(new Error(d.message)); else w8?.ok();
+    if (d.type === 'error') w8?.fail(new Error(d.message)); else w8?.ok(d.hit ?? null);
   };
   worker.onerror = (e) => { for (const w8 of waiting.values()) w8.fail(new Error(e.message || 'the drawing worker failed')); waiting.clear(); };
   worker.postMessage({ type: 'init', canvas: off, kind, w, h, px }, [off]);
@@ -71,6 +73,10 @@ export function inWorker(canvas: HTMLCanvasElement, kind: string, w: number, h: 
       worker.postMessage({ type: 'part', id, row, file: abs(file), run, top });
     }),
     frame: (f) => worker.postMessage({ type: 'frame', frame: f }),
+    probe: (row, origin, dir) => new Promise((ok, fail) => {
+      waiting.set(++id, { ok, fail });
+      worker.postMessage({ type: 'probe', id, row, origin, dir });
+    }),
     size: (nw, nh, npx) => worker.postMessage({ type: 'size', w: nw, h: nh, px: npx }),
     dispose() { worker.postMessage({ type: 'dispose' }); setTimeout(() => worker.terminate(), 200); },
   };
@@ -90,6 +96,7 @@ export async function onPage(canvas: HTMLCanvasElement, kind: string, w: number,
       stage.compile();
     },
     frame: (f) => stage.frame(f),
+    probe: async (row, origin, dir) => stage.probe(row, origin, dir),
     size: (nw, nh, npx) => stage.size(nw, nh, npx),
     dispose: () => stage.dispose(),
   };

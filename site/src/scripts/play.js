@@ -3,6 +3,7 @@
 // part uses (scripts/export_site_part.py), so the byte planes, the residuals and the smooth shading are
 // part.js's own.
 import { integers, planes, shade } from './part.js';
+import { readScene, skipped } from './scene-file.js';
 
 /** Nodes and triangles of the surface, and a reader for the integer fields stored on its nodes. */
 function surface(run, bytes) {
@@ -155,4 +156,149 @@ function section(cut, L, bytes, buf, F, step) {
     base += nu * nv;
   }
   return { cutPosition, cutNormal, cutIndex: np < 65536 ? Uint16Array.from(tris) : Uint32Array.from(tris), cutFrames };
+}
+
+// ---- scenes ----------------------------------------------------------------------------------------
+// A scene.wobbl laid out for the same drawing: every mesh welded where its vertices coincide and shaded
+// smooth across its faces with sharp CAD edges kept sharp (part.js's shade), every line made a round tube,
+// and each object's per frame data kept as it was stored, for the stage to bring to any slider position.
+
+/** Vertices at the same place merged, so a mesh stored with its corners split still shades smooth. */
+function weld(P, tri) {
+  const n = P.length / 3;
+  let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < n * 3; i++) { const k = i % 3; if (P[i] < lo[k]) lo[k] = P[i]; if (P[i] > hi[k]) hi[k] = P[i]; }
+  const tol = Math.max(Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 1e-6, 1e-12);
+  const seen = new Map(), id = new Int32Array(n), rep = [];
+  for (let i = 0; i < n; i++) {
+    const key = `${Math.round(P[i * 3] / tol)},${Math.round(P[i * 3 + 1] / tol)},${Math.round(P[i * 3 + 2] / tol)}`;
+    let w = seen.get(key);
+    if (w === undefined) { w = rep.length; seen.set(key, w); rep.push(i); }
+    id[i] = w;
+  }
+  const wp = new Float32Array(rep.length * 3);
+  rep.forEach((i, w) => { wp[w * 3] = P[i * 3]; wp[w * 3 + 1] = P[i * 3 + 1]; wp[w * 3 + 2] = P[i * 3 + 2]; });
+  const wt = new Uint32Array(tri.length);
+  for (let j = 0; j < tri.length; j++) wt[j] = id[tri[j]];
+  // triangles that collapsed in the weld are dropped
+  const keep = [];
+  for (let t = 0; t < wt.length; t += 3) if (wt[t] !== wt[t + 1] && wt[t + 1] !== wt[t + 2] && wt[t] !== wt[t + 2]) keep.push(wt[t], wt[t + 1], wt[t + 2]);
+  return { pos: wp, tri: Uint32Array.from(keep), rep: Int32Array.from(rep), n: rep.length };
+}
+
+/** A polyline as a round tube: positions, normals, triangles and, for each vertex, the point it rings. */
+function tubes(P, runs, radius, seg = 10) {
+  const pos = [], nrm = [], idx = [], pt = [], run = [];
+  let p0 = 0;
+  runs.forEach((r, ri) => {
+    const pts = [];
+    for (let i = 0; i < r; i++) {
+      const j = (p0 + i) * 3, q = [P[j], P[j + 1], P[j + 2]];
+      if (!Number.isFinite(q[0])) continue;
+      const last = pts[pts.length - 1];
+      if (last && Math.hypot(q[0] - last.q[0], q[1] - last.q[1], q[2] - last.q[2]) < radius * 0.05) continue;
+      pts.push({ q, i: p0 + i });
+    }
+    p0 += r;
+    if (pts.length < 2) return;
+    // a frame carried along the line so the tube never twists
+    const tan = (i) => {
+      const a = pts[Math.max(i - 1, 0)].q, b = pts[Math.min(i + 1, pts.length - 1)].q;
+      const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l = Math.hypot(...d) || 1;
+      return d.map((x) => x / l);
+    };
+    let t = tan(0), u = Math.abs(t[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const unit = (a) => { const l = Math.hypot(...a) || 1; return a.map((x) => x / l); };
+    let nx = unit(cross(t, u));
+    const base = pos.length / 3;
+    pts.forEach((p, i) => {
+      t = tan(i);
+      let ny = unit(cross(t, nx));
+      nx = unit(cross(ny, t));
+      for (let s = 0; s < seg; s++) {
+        const a = (s / seg) * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a);
+        const d = [0, 1, 2].map((k) => nx[k] * c + ny[k] * sn);
+        pos.push(p.q[0] + d[0] * radius, p.q[1] + d[1] * radius, p.q[2] + d[2] * radius);
+        nrm.push(Math.round(d[0] * 127), Math.round(d[1] * 127), Math.round(d[2] * 127));
+        pt.push(p.i);
+        run.push(ri);
+      }
+      if (i) {
+        const r0 = base + (i - 1) * seg, r1 = base + i * seg;
+        for (let s = 0; s < seg; s++) {
+          const s1 = (s + 1) % seg;
+          idx.push(r0 + s, r1 + s, r1 + s1, r0 + s, r1 + s1, r0 + s1);
+        }
+      }
+    });
+  });
+  return { position: new Float32Array(pos), normal: new Int8Array(nrm), index: new Uint32Array(idx), point: new Uint32Array(pt), run: new Uint16Array(run) };
+}
+
+/**
+ * Everything the stage needs for a scene: its header and, for each object it draws, the arrays as stored
+ * plus a smooth shaded surface for meshes and a tube for lines. run is the page's summary (scripts/scenes.mjs).
+ */
+export function decodeScene(run, buf) {
+  const { h, arr } = readScene(new Uint8Array(buf));
+  // the magnification the build worked out, when the scene gave none of its own
+  if (run.magnify) h.magnify = run.magnify;
+  const lo = run.bounds.lo, hi = run.bounds.hi;
+  const R = Math.max(Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2, 1e-9);
+  let vertices = 0;
+  const objs = h.objects.map((o) => {
+    if (skipped(o)) return null;
+    const d = {};
+    if (o.kind === 'mesh') {
+      const P = arr(o.pos), w = weld(P, arr(o.tri));
+      const { index, vNode, normal } = shade(w.pos, w.tri, w.n);
+      const nv = vNode.length, node = new Uint32Array(nv), nrm = new Int8Array(nv * 3);
+      for (let v = 0; v < nv; v++) {
+        node[v] = w.rep[vNode[v]];
+        for (let k = 0; k < 3; k++) nrm[v * 3 + k] = Math.round(normal[v * 3 + k] * 127);
+      }
+      // closed when nearly every edge is shared by two triangles: a shell that can be drawn cut open
+      const edges = new Map();
+      for (let t = 0; t < w.tri.length; t += 3) {
+        for (let e = 0; e < 3; e++) {
+          const a = w.tri[t + e], b = w.tri[t + ((e + 1) % 3)], key = a < b ? a * w.n + b : b * w.n + a;
+          edges.set(key, (edges.get(key) || 0) + 1);
+        }
+      }
+      let two = 0;
+      for (const c of edges.values()) if (c === 2) two++;
+      d.closed = edges.size > 0 && two / edges.size > 0.95;
+      Object.assign(d, { P, node, normal: nrm, index: nv < 65536 ? Uint16Array.from(index) : index });
+      if (o.field) d.fv = arr(o.field.values || o.field.frames);
+      if (o.deform) d.du = arr(o.deform.values || o.deform.frames);
+      if (o.reveal) d.rv = arr(o.reveal.values);
+      if (o.pose) { d.pp = arr(o.pose.pos); d.pq = arr(o.pose.quat); }
+      vertices += nv;
+    } else if (o.kind === 'body') {
+      d.pp = arr(o.pos); d.pq = arr(o.quat);
+    } else if (o.kind === 'lines') {
+      d.P = arr(o.pos);
+      if (o.field) d.fv = arr(o.field.values);
+      if (o.drawn) d.td = arr(o.drawn);
+      Object.assign(d, tubes(d.P, o.runs, Math.max(o.width || 1, 0.6) * R * 0.0016));
+      vertices += d.position.length / 3;
+    } else if (o.kind === 'points' || o.kind === 'atoms') {
+      d.P = arr(o.pos);
+      if (o.field) d.fv = arr(o.field.values || o.field.frames);
+      if (o.bonds) d.bonds = arr(o.bonds);
+    } else if (o.kind === 'arrows') {
+      d.O = arr(o.origin); d.V = arr(o.vec);
+    }
+    return d;
+  });
+  delete h.buffers;
+  return { arrays: { header: h, objs }, vertices };
+}
+
+/** Every typed array in what decodeScene returns, to hand over without copying. */
+export function transfers(arrays) {
+  const out = [];
+  for (const d of arrays.objs || []) if (d) for (const v of Object.values(d)) if (ArrayBuffer.isView(v)) out.push(v.buffer);
+  return [...new Set(out)];
 }

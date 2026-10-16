@@ -3,7 +3,7 @@
 // for the landing page's part. The page sends the camera and the moment to show as they change; this
 // draws the latest of them once per display frame.
 import { createStage } from './play-draw.js';
-import { decodePlay } from './play.js';
+import { decodePlay, decodeScene } from './play.js';
 
 let stage = null, latest = null, queued = false;
 const parts = [];
@@ -17,7 +17,7 @@ async function load(file, run) {
   if (head[0] === 0x1f && head[1] === 0x8b) {
     buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
   }
-  return decodePlay(run, buf);
+  return run.kind === 'scene' ? decodeScene(run, buf) : decodePlay(run, buf);
 }
 
 function draw() {
@@ -40,6 +40,9 @@ self.onmessage = async (e) => {
     } else if (m.type === 'frame') {
       latest = m.frame;
       if (!queued) { queued = true; later(draw); }
+    } else if (m.type === 'probe') {
+      // the scene as last drawn, so the reading matches what is on screen
+      self.postMessage({ type: 'probe', id: m.id, hit: stage ? stage.probe(m.row, m.origin, m.dir) : null });
     } else if (m.type === 'size') {
       stage?.size(m.w, m.h, m.px);
       if (latest && !queued) { queued = true; later(draw); }
