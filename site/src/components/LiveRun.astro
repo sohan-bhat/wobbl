@@ -16,8 +16,10 @@ import { num, sig } from '../scripts/scene-file.js';
 import { url } from '../lib/site';
 import '../styles/live-run.css';
 
-interface Props { ex: Example; run: Run; first?: boolean }
-const { ex, run, first = false } = Astro.props;
+// beside: other runs of the example over the same input, shown side by side with run (a board laid out two ways)
+// also: other studies of the same command whose view would repeat this one, whose numbers join it under the toggle
+interface Props { ex: Example; run: Run; first?: boolean; beside?: Run[]; also?: Run[] }
+const { ex, run, first = false, beside = [], also = [] } = Astro.props;
 const word = (v: string) => v.toUpperCase();
 const checks = (run.outcome.checks ?? []).filter((c) => c.status !== 'skip');
 const sc = playFor(ex, run) ? null : sceneRun(run);
@@ -37,6 +39,32 @@ const lerpAt = (vs: (number | null)[], p: number) => {
   return k ? x + (y - x) * k : x;
 };
 const sceneText = (v: number, unit: string, d = 3) => `${sig(v, d)}${unit ? ` ${unit}` : ''}`;
+const inputText = (v: number) => `${num(v)}${inp!.unit ? ` ${inp!.unit}` : ''}`;
+const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
+// the scene's panes: the run itself, or the run and the others of its example over the same input, or the
+// values along its input that the run compares (wet and dry glass), the one the question asked about first
+interface ScenePane { rel: string; name: string; at?: string; src: string; play: NonNullable<typeof sp>; home: number; asked: boolean; verdict: string;
+  poster: { src: string; width: number; height: number } | null }
+const scenePanes: ScenePane[] = !sc ? [] : beside.length
+  ? [run, ...beside].map((r) => { const x = sceneRun(r)!; return { rel: r.rel, name: cap(r.rel.split('/').pop()!.replace(/-/g, ' ')), src: x.src, play: x.play,
+    home: x.play.input.home, asked: true, verdict: r.outcome.verdict, poster: x.poster }; })
+  : sp!.alts ? (() => {
+    const named = sp!.alts!.map((a) => ({ ...a, asked: Math.abs(a.at - inp!.home) < 0.5 }));
+    const list = named.some((a) => a.asked) ? [...named.filter((a) => a.asked), ...named.filter((a) => !a.asked)]
+      : [{ name: 'As asked', at: inp!.home, asked: true }, ...named];
+    return list.map((a) => ({ rel: run.rel, name: a.name, at: inputText(lerpAt(inp!.t, a.at)), src: sc.src, play: sp!, home: a.at,
+      asked: a.asked, verdict: run.outcome.verdict, poster: sc.poster }));
+  })()
+  : [{ rel: run.rel, name: 'As asked', src: sc.src, play: sp!, home: inp!.home, asked: true, verdict: run.outcome.verdict, poster: sc.poster }];
+const sceneShown = scenePanes.length > 1 ? [scenePanes[0], scenePanes[1]] : scenePanes;
+// a compared value's verdict is its reading against the limit, as the page works it out live
+const levelOf = (v: number) => {
+  const q = sp?.q;
+  if (!q || q.limit === null || !Number.isFinite(v)) return 'info';
+  return v > q.limit ? 'fails' : q.target !== null && v > q.target ? 'marginal' : 'holds';
+};
+const paneValue = (pn: ScenePane) => (pn.play.q ? lerpAt(pn.play.q.values, pn.home) : NaN);
+const paneVerdict = (pn: ScenePane) => (pn.asked ? pn.verdict : levelOf(paneValue(pn)));
 
 const kind = sc ? 'scene' : lead!.kind;
 const m = sp ? (sp.q ? { lo: sp.q.lo, top: sp.q.top, marks: sp.q.marks } : { lo: 0, top: 1, marks: [] }) : meter(lead!);
@@ -63,7 +91,6 @@ const eventOf = (pane: Pane) => {
 const event = sp ? (sp.event && { k: sp.event.at, text: sp.event.text }) : shown.map(eventOf).find((e) => e) ?? null;
 const label = sp ? inp!.label : kind === 'strength' ? 'Load' : 'Time';
 const steady = lead?.kind === 'heat' && !lead.transient;
-const inputText = (v: number) => `${num(v)}${inp!.unit ? ` ${inp!.unit}` : ''}`;
 const total = sp ? inputText(lerpAt(inp!.t, inp!.home))
   : kind === 'strength' ? loadText : steady ? 'Steady state' : clock(p.span);
 const alt = (name: string) => sp ? `The ${sp.title.toLowerCase()}, as the run left it at ${total}`
@@ -78,24 +105,32 @@ const charts = sp ? runImages(run).map((i) => i.name).filter((n) => !/setup/.tes
 const qHome = sp?.q ? lerpAt(sp.q.values, inp!.home) : NaN;
 const final = sp ? (sp.q ? sig(qHome, sp.q.digits) : '') : '';
 const alsoText = sp ? sp.also.map((a, i) => `${i ? a.name : a.name[0].toUpperCase() + a.name.slice(1)} ${sceneText(lerpAt(a.values, inp!.home), a.unit, a.digits)}`).join(', ') : '';
-const toggles = sp ? [
-  ...(sp.exag > 1 ? [{ key: 'bend', text: `Bending ×${sp.exag}`, title: 'Draw the bending larger than it is' }] : []),
-  ...(sp.magnify ? [{ key: 'mag', text: `${sp.magnify.label} ×${sp.magnify.factor}`, title: `Draw the ${sp.magnify.label.toLowerCase()} larger than it is` }] : []),
-] : [];
-const rows = sp ? [{ name: 'As drawn', v: qHome, verdict: run.outcome.verdict, finalText: final }]
+// the toggles beside the load or the input: the bending drawn larger than it is, as on the landing part, and
+// small parts of a scene drawn larger so they show
+const exag = sp ? sp.exag : kind === 'strength' ? (lead as StrengthRun).exag : 1;
+const toggles = [
+  ...(exag > 1 ? [{ key: 'bend', text: `Bending ×${exag}`, title: 'Show the bending larger than it is' }] : []),
+  ...(sp?.magnify ? [{ key: 'mag', text: `${sp.magnify.label} ×${sp.magnify.factor}`, title: `Show the ${sp.magnify.label.toLowerCase()} larger than it is` }] : []),
+];
+const rows = sp ? sceneShown.map((pn) => ({ name: pn.name, at: pn.at, v: paneValue(pn), verdict: paneVerdict(pn), finalText: pn.play.q ? sig(paneValue(pn), pn.play.q.digits) : '' }))
   : shown.map((pane) => {
     const q = pane.play;
-    return { name: pane.name, v: q.kind === 'strength' ? q.governing_MPa : q.t_max_C, verdict: q.verdict, finalText: finalValue(q) };
+    return { name: pane.name, at: undefined as string | undefined, v: q.kind === 'strength' ? q.governing_MPa : q.t_max_C, verdict: q.verdict, finalText: finalValue(q) };
   });
-const panes = sp ? [{ name: 'As drawn', pic: sc!.poster ? { src: sc!.poster.src, srcset: '', width: sc!.poster.width, height: sc!.poster.height } : null }]
+const panes = sp ? sceneShown.map((pn) => ({ name: pn.name, pic: pn.poster ? { src: pn.poster.src, srcset: '', width: pn.poster.width, height: pn.poster.height } : null }))
   : shown.map((pane) => ({ name: pane.name, pic: pane.poster ? picture(pane.poster) : null }));
 const T0 = sp ? inp!.t[0] : 0, T1 = sp ? inp!.t[inp!.t.length - 1] : 0;
 const homeAt = sp ? inp!.home / Math.max(inp!.t.length - 1, 1) : 0;
+// the slider moves every pane along the same input; panes that are values along one input have none
+const sliding = !!sp && inp!.t.length > 1 && !(sp.alts && !beside.length);
+// the choices for the right pane, as buttons, when there are more than two
+const choices = sp ? scenePanes.map((pn) => pn.name) : all.map((pane) => pane.name);
 
 const data = JSON.stringify(sp ? {
-  kind, fix: -1, pace: p, meter: m, unit, loads: [], steady: false, total, title: sp.title.toLowerCase(),
-  panes: [{ rel: run.rel, name: 'As drawn', file: sc!.src, run: sp, event, final, verdict: run.outcome.verdict,
-    poster: sc!.poster && { src: sc!.poster.src, srcset: '', width: sc!.poster.width, height: sc!.poster.height, alt: alt('') } }],
+  kind, fix: scenePanes.length > 1 ? 1 : -1, pace: p, meter: m, unit, loads: [], steady: false, total, title: sp.title.toLowerCase(),
+  panes: scenePanes.map((pn) => ({ rel: pn.rel, name: pn.name, at: pn.at, file: pn.src, run: pn.play, home: pn.home, asked: pn.asked,
+    event: pn.play.event && { k: pn.play.event.at, text: pn.play.event.text }, final: pn.play.q ? sig(paneValue(pn), pn.play.q.digits) : '', verdict: pn.verdict,
+    poster: pn.poster && { src: pn.poster.src, srcset: '', width: pn.poster.width, height: pn.poster.height, alt: alt(pn.name) } })),
 } : {
   kind, fix, pace: p, meter: m, unit, loads, steady, total, title: ex.title.toLowerCase(),
   panes: all.map((pane) => {
@@ -129,23 +164,23 @@ const data = JSON.stringify(sp ? {
         <button type="button" class="btn-outline btn-sm lrun-replay" hidden>Replay</button>
         <p class="viewer-status lrun-status" role="status"></p>
       </div>
-      {all.length > 2 && (
-        <div class="lrun-fixes" role="group" aria-label="Fixed version beside the part as drawn">
-          {all.slice(1).map((pane, i) => (
-            <button type="button" class="btn-outline btn-sm" data-fix={i + 1} aria-pressed={String(i + 1 === fix)}>{pane.name}</button>
+      {choices.length > 2 && (
+        <div class="lrun-fixes" role="group" aria-label={sp ? 'What plays beside the value asked about' : 'Fixed version beside the part as drawn'}>
+          {choices.slice(1).map((name, i) => (
+            <button type="button" class="btn-outline btn-sm" data-fix={i + 1} aria-pressed={String(i + 1 === (sp ? 1 : fix))}>{name}</button>
           ))}
         </div>
       )}
       <div class="lrun-read">
         <p class="lrun-clock">
           <span><span class="lrun-k">{label}</span> <span class="lrun-now" data-now>{total}</span><span class="lrun-of" data-of hidden> of {total}</span></span>
-          {sp ? (toggles.length > 0 && (
+          {toggles.length > 0 ? (
             <span class="lrun-toggles">
-              {toggles.map((t) => <button type="button" class="lrun-toggle" data-toggle={t.key} aria-pressed="true" title={t.title}><i aria-hidden="true"></i>{t.text}</button>)}
+              {toggles.map((t) => <button type="button" class="btn-outline btn-sm bend" data-toggle={t.key} aria-pressed="true" title={t.title}><span class="bend-box" aria-hidden="true"></span>{t.text}</button>)}
             </span>
-          )) : <span class="lrun-tag" hidden>{p.tag}</span>}
+          ) : p.tag && <span class="lrun-tag" hidden>{p.tag}</span>}
         </p>
-        {sp && inp!.t.length > 1 && (
+        {sliding && (
           <div class="lrun-slider">
             <input type="range" min="0" max={inp!.t.length - 1} step={inp!.between === 'exact' ? 'any' : '1'} value={inp!.home} disabled
                    aria-label={label} aria-valuetext={total} />
@@ -158,8 +193,8 @@ const data = JSON.stringify(sp ? {
         )}
         {rows.map((row, i) => (
           <div class="lrun-row" data-row={i}>
-            {rows.length > 1 && <p class="lrun-row-name" data-name>{row.name}</p>}
-            {sp && sp.q && <p class="lrun-row-name lrun-q">{sp.q.name}</p>}
+            {rows.length > 1 && <p class="lrun-row-name"><span data-name>{row.name}</span>{row.at && <span class="lrun-at" data-at>{row.at}</span>}</p>}
+            {sp && sp.q && rows.length === 1 && <p class="lrun-row-name lrun-q">{sp.q.name}</p>}
             {(!sp || sp.q) && (
               <div class="lrun-meter" aria-hidden="true">
                 <span class="lrun-fill" data-fill data-level={COLOR[row.verdict] ?? 'marginal'} style={`--f: ${frac(row.v)}`}></span>
@@ -176,7 +211,7 @@ const data = JSON.stringify(sp ? {
             )}
           </div>
         ))}
-        {alsoText && <p class="lrun-also" data-also>{alsoText}</p>}
+        {alsoText && rows.length === 1 && <p class="lrun-also" data-also>{alsoText}</p>}
         {event && <p class="lrun-event" data-event hidden={sp ? inp!.home < event.k : undefined}>{event.text}</p>}
         {steady && <p class="lrun-note">The run solved the steady state, and Wobbl's lumped check of the same sink times the warm up.</p>}
         <p class="visually-hidden" data-said aria-live="polite"></p>
@@ -199,6 +234,13 @@ const data = JSON.stringify(sp ? {
                       : sp ? `${name.replace(/-/g, ' ')}, as Wobbl plotted it` : alt('As drawn')} />;
       })}
       {run.summary && <Term code={run.summary} lang="text" label="summary.txt" />}
+      {[...beside, ...also].map((o) => (
+        <>
+          <p class="run-verdict"><span class="vword" data-verdict={COLOR[o.outcome.verdict] ?? 'marginal'}>{word(o.outcome.verdict)}</span><samp class="run-said" translate="no">{o.outcome.headline}</samp></p>
+          <dl class="readout">{metrics(o).map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+          {o.summary && <Term code={o.summary} lang="text" label={`${o.rel.split('/').pop()} summary.txt`} />}
+        </>
+      ))}
     </details>
   </div>
 </div>

@@ -13,7 +13,11 @@ import { num, sig } from './scene-file.js';
 
 interface Ev { k: number; text: string }
 interface Poster { src: string; srcset: string; width: number; height: number; alt: string }
-interface PaneData { rel: string; name: string; file: string; run: Record<string, any>; event: Ev | null; final: string; poster: Poster | null; verdict?: string }
+interface PaneData {
+  rel: string; name: string; file: string; run: Record<string, any>; event: Ev | null; final: string; poster: Poster | null;
+  /** a scene pane: the run's own verdict, the frame position it stands at once played and whether that is the value asked about */
+  verdict?: string; home?: number; asked?: boolean; at?: string;
+}
 interface Data {
   kind: 'strength' | 'heat' | 'scene'; fix: number; unit: string; loads: string[]; steady: boolean; total: string; title: string;
   pace: { tag: string; seconds: number; speed: number; span: number };
@@ -95,51 +99,57 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   };
   const verdictColor: Record<string, string> = { holds: 'holds', ok: 'holds', marginal: 'marginal', warm: 'marginal', fails: 'fails', hot: 'fails' };
 
-  // ---- a scene: where along its input the view stands --------------------------------------
-  // pos is a frame position, 0 to the last frame, with the question's own value at home
-  const sc = sceneRun ? data.panes[0].run : null;
-  const F = sc ? sc.input.t.length : 1;
-  const home = sc ? sc.input.home : 0;
-  let pos = home, free = false;
-  const frameAt = (p: number) => {
-    const a = Math.min(Math.max(Math.floor(p), 0), F - 1), b = Math.min(a + 1, F - 1);
-    return { a, b, k: sc.input.between === 'step' ? 0 : Math.min(Math.max(p - a, 0), 1) };
+  // ---- a scene: where along its input each pane stands --------------------------------------
+  // pos[row] is a frame position, 0 to the last frame, with the pane's own value at its home
+  const homeOf = (pi: number) => data.panes[pi].home ?? data.panes[pi].run.input.home;
+  const pos: number[] = shown.map((pi) => (sceneRun ? homeOf(pi) : 0));
+  let free = false;
+  const frameAt = (run: any, p: number) => {
+    const F = run.input.t.length, a = Math.min(Math.max(Math.floor(p), 0), F - 1), b = Math.min(a + 1, F - 1);
+    return { a, b, k: run.input.between === 'step' ? 0 : Math.min(Math.max(p - a, 0), 1) };
   };
-  const along = (vs: (number | null)[], p: number) => {
-    const { a, b, k } = frameAt(p), x = vs[a] ?? NaN, y = vs[b] ?? NaN;
+  const along = (run: any, vs: (number | null)[], p: number) => {
+    const { a, b, k } = frameAt(run, p), x = vs[a] ?? NaN, y = vs[b] ?? NaN;
     return k ? x + (y - x) * k : x;
   };
   const withUnit = (v: number, unit: string, d = 3) => `${sig(v, d)}${unit ? NB + unit : ''}`;
   const verdictWord: Record<string, string> = { holds: 'HOLDS', marginal: 'MARGINAL', fails: 'FAILS' };
 
-  /** The scene's readings at pos: the input, the meter's reading and its verdict, the other readings and the event. */
+  /** The scene's readings: the input, each pane's reading and verdict, the other readings and the event. */
   function sceneReadings(end: boolean) {
-    const inp = sc.input, p0 = data.panes[0], rq = sc.q;
-    const atHome = Math.abs(pos - home) < 1e-6;
-    put(now, `${num(along(inp.t, pos))}${inp.unit ? NB + inp.unit : ''}`);
+    const r0 = data.panes[shown[0]].run, inp = r0.input;
+    put(now, `${num(along(r0, inp.t, pos[0]))}${inp.unit ? NB + inp.unit : ''}`);
     of.hidden = free || end;
-    const el = rowEls[0], v = rq ? along(rq.values, pos) : NaN;
-    if (rq) {
-      put(q('[data-n]', el), sig(v, rq.digits));
-      const fill = q('[data-fill]', el);
-      fill.style.setProperty('--f', frac(v).toFixed(4));
+    shown.forEach((pi, row) => {
+      const p = data.panes[pi], r = p.run, rq = r.q, el = rowEls[row], v = rq ? along(r, rq.values, pos[row]) : NaN;
+      if (rq) {
+        put(q('[data-n]', el), sig(v, rq.digits));
+        q('[data-fill]', el).style.setProperty('--f', frac(v).toFixed(4));
+      }
+      const w = q('[data-word]', el);
+      // the run's own verdict at the value it was asked about, else the reading against its limit
+      const atHome = p.asked !== false && Math.abs(pos[row] - homeOf(pi)) < 1e-6;
+      const lv = atHome && (end || free) ? verdictColor[p.verdict ?? ''] ?? 'marginal' : level(p, v);
+      if (rq) set(q('[data-fill]', el), 'data-level', lv === 'info' ? 'holds' : lv);
+      if ((end || free) && (atHome || lv !== 'info')) {
+        set(w, 'data-verdict', lv);
+        put(w, atHome ? (p.verdict ?? '').toUpperCase() : verdictWord[lv] ?? '');
+        if (w.hasAttribute('data-hide')) { w.removeAttribute('data-hide'); if (end && !free) w.setAttribute('data-land', ''); }
+      } else {
+        set(w, 'data-hide', '');
+        w.removeAttribute('data-land');
+      }
+    });
+    if (alsoEl) put(alsoEl, r0.also.map((x: any, i: number) => `${i ? x.name : x.name[0].toUpperCase() + x.name.slice(1)} ${withUnit(along(r0, x.values, pos[0]), x.unit, x.digits)}`).join(', '));
+    if (eventEl) {
+      const row = shown.findIndex((pi) => data.panes[pi].event);
+      const ev = row >= 0 ? data.panes[shown[row]].event! : null;
+      eventEl.hidden = !ev || pos[row] < ev.k - 1e-9;
+      if (ev) put(eventEl, ev.text);
     }
-    const w = q('[data-word]', el);
-    // the run's own verdict at the value it was asked about, else the reading against its limit
-    const lv = atHome && (end || free) ? verdictColor[p0.verdict ?? ''] ?? 'marginal' : level(p0, v);
-    if (rq) set(q('[data-fill]', el), 'data-level', lv === 'info' ? 'holds' : lv);
-    if ((end || free) && (atHome || lv !== 'info')) {
-      set(w, 'data-verdict', lv);
-      put(w, atHome ? (p0.verdict ?? '').toUpperCase() : verdictWord[lv] ?? '');
-      if (w.hasAttribute('data-hide')) { w.removeAttribute('data-hide'); if (end && !free) w.setAttribute('data-land', ''); }
-    } else {
-      set(w, 'data-hide', '');
-      w.removeAttribute('data-land');
-    }
-    if (alsoEl) put(alsoEl, sc.also.map((x: any, i: number) => `${i ? x.name : x.name[0].toUpperCase() + x.name.slice(1)} ${withUnit(along(x.values, pos), x.unit, x.digits)}`).join(', '));
-    if (eventEl && p0.event) eventEl.hidden = pos < p0.event.k - 1e-9;
     if (slider) {
-      if (!slider.matches(':active')) slider.value = String(pos);
+      if (!slider.matches(':active')) slider.value = String(pos[0]);
+      const rq = r0.q, v = rq ? along(r0, rq.values, pos[0]) : NaN;
       slider.setAttribute('aria-valuetext', `${now.textContent}${rq ? `, ${rq.name} ${sig(v, rq.digits)}${rq.unit ? ` ${rq.unit}` : ''}` : ''}`);
     }
   }
@@ -156,7 +166,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   function readings(u: number) {
     const end = u >= 1;
     if (sceneRun) {
-      if (!free) pos = home * u;
+      if (!free) shown.forEach((pi, row) => { pos[row] = homeOf(pi) * u; });
       sceneReadings(end);
       return;
     }
@@ -204,8 +214,10 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   /** What a screen reader hears once a run has played. */
   function sayEnd() {
     if (sceneRun) {
-      const p0 = data.panes[0], rq = sc.q;
-      said.textContent = `At ${now.textContent}${rq ? `, ${rq.name} ${p0.final}${rq.unit ? ` ${rq.unit}` : ''}` : ''}, ${p0.verdict ?? ''}.`;
+      said.textContent = shown.map((pi) => {
+        const p = data.panes[pi], rq = p.run.q, who = shown.length > 1 ? `${p.name}, ` : `At ${now.textContent}, `;
+        return `${who}${rq ? `${rq.name} ${p.final}${rq.unit ? ` ${rq.unit}` : ''}, ` : ''}${p.verdict ?? ''}.`;
+      }).join(' ');
       return;
     }
     const parts = shown.map((pi) => {
@@ -220,6 +232,8 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     shown[row] = pi;
     const p = data.panes[pi], cell = paneEls[row];
     for (const el of qa('[data-name]', cell).concat(qa('[data-name]', rowEls[row]))) put(el, p.name);
+    const at = rowEls[row].querySelector('[data-at]');
+    if (at && p.at) put(at, p.at);
     const img = cell.querySelector<HTMLImageElement>('.lrun-poster');
     if (img && p.poster) {
       img.srcset = p.poster.srcset;
@@ -269,12 +283,15 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     if (!ready || !back || !orbit) return;
     const k = u();
     const f: any = {
-      camera: { position: orbit.eye, target: orbit.target, fov: orbit.fov, aspect: orbit.aspect },
-      views: views(), k, radius,
+      camera: { position: orbit.eye, target: orbit.target, fov: orbit.fov, aspect: orbit.aspect, near: orbit.near, far: orbit.far },
+      views: views(), k, radius, bend: look.bend,
     };
     if (sceneRun) {
-      const { a, b, k: kk } = frameAt(pos), T = lead.input.t;
-      f.scene = { a, b, k: kk, t: kk ? T[a] + (T[b] - T[a]) * kk : T[a], bend: look.bend, mag: look.mag };
+      // each pane's scene at its own place along the input
+      f.scenes = shown.map((pi, row) => {
+        const r = data.panes[pi].run, { a, b, k: kk } = frameAt(r, pos[row]), T = r.input.t;
+        return { a, b, k: kk, t: kk ? T[a] + (T[b] - T[a]) * kk : T[a], bend: look.bend, mag: look.mag };
+      });
       f.k = 1;
     } else if (!strength) {
       if (lead.transient) {
@@ -301,16 +318,16 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       if (sceneRun) {
         const pk = r.peaks;
         if (pk) {
-          const { a, b, k: kk } = frameAt(pos), A = pk[a], B = pk[b] ?? A;
+          const { a, b, k: kk } = frameAt(r, pos[row]), A = pk[a], B = pk[b] ?? A;
           if (A && B) {
             const key = look.bend ? 'pe' : 'p0';
             at = A[key].map((x: number, i: number) => x + (B[key][i] - x) * kk);
             const mv = mark.querySelector('[data-mark-v]');
-            if (mv) put(mv, withUnit(A.v + (B.v - A.v) * kk, r.q && r.q.field ? r.q.unit : (lead.q?.unit ?? ''), r.q?.digits ?? 3));
+            if (mv) put(mv, withUnit(A.v + (B.v - A.v) * kk, r.q && r.q.field ? r.q.unit : '', r.q?.digits ?? 3));
           }
         }
       } else if (strength) {
-        const f = r.exag * k;
+        const f = (look.bend ? r.exag : 1) * k;
         at = r.governing_xyz.map((x: number, i: number) => x + f * r.governing_disp[i]);
       } else if (r.marker) {
         at = r.hot_xyz;
@@ -429,6 +446,14 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     });
     ro.observe(view);
     abort.signal.addEventListener('abort', () => ro.disconnect(), { once: true });
+    for (const b of toggleBtns) {
+      on(b, 'click', () => {
+        const k = b.dataset.toggle as 'bend' | 'mag';
+        look[k] = !look[k];
+        b.setAttribute('aria-pressed', String(look[k]));
+        requestDraw();
+      });
+    }
     if (sceneRun) sceneControls();
     draw();
     maybeStart();
@@ -440,21 +465,13 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       // taking the slider ends the replay where it is, and the slider moves the scene from then on
       if (playing || !done) { pause(); done = true; replay.hidden = false; }
       free = true;
-      pos = Math.min(Math.max(p, 0), F - 1);
+      shown.forEach((pi, row) => { pos[row] = Math.min(Math.max(p, 0), data.panes[pi].run.input.t.length - 1); });
       readings(1);
       requestDraw();
     };
     if (slider) {
       slider.disabled = false;
       on(slider, 'input', () => goTo(Number(slider.value)));
-    }
-    for (const b of toggleBtns) {
-      on(b, 'click', () => {
-        const k = b.dataset.toggle as 'bend' | 'mag';
-        look[k] = !look[k];
-        b.setAttribute('aria-pressed', String(look[k]));
-        requestDraw();
-      });
     }
     if (!probeEl || !canvas) return;
     let hover: PointerEvent | null = null, pr = 0, asked = 0;
@@ -495,12 +512,14 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
         for (const o of fixBtns) o.setAttribute('aria-pressed', String(o === b));
         if (!ready) {
           showPane(1, pi);
+          if (sceneRun) pos[1] = homeOf(pi);
           finalState();
           return;
         }
         try { await back!.add(1, data.panes[pi].file, data.panes[pi].run, top); } catch { return; }
         if (abort.signal.aborted || b.getAttribute('aria-pressed') !== 'true') return;
         showPane(1, pi);
+        if (sceneRun) pos[1] = homeOf(pi);
         restart();
       });
     }

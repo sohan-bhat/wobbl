@@ -1,12 +1,15 @@
 ---
 // One page per example: each run with its question, command, checks, result and report,
-// the fixed versions when there are some, the example's README, and how to run it.
+// the fixed versions when there are some, the example's README, and how to run it. An example that studies
+// the same part and run as another (lib/examples.ts FOLDED) is a section of that page, and its own address
+// forwards there.
 import Base from '../../layouts/Base.astro';
 import RunCard from '../../components/RunCard.astro';
 import LiveRun from '../../components/LiveRun.astro';
 import FixStrip from '../../components/FixStrip.astro';
 import Term from '../../components/Term.astro';
-import { examples, readmeBody } from '../../lib/examples';
+import Redirect from '../../components/Redirect.astro';
+import { examples, foldedInto, gallery, readmeBody, type Run } from '../../lib/examples';
 import { playFor } from '../../lib/playback';
 import { render } from '../../lib/markdown';
 import { hasSim } from '../../lib/sim';
@@ -14,11 +17,15 @@ import { sceneRun } from '../../lib/scenes';
 import { repoUrl, url } from '../../lib/site';
 
 export function getStaticPaths() {
-  const all = examples();
-  return all.map((ex, i) => ({ params: { name: ex.name }, props: { ex, prev: all[i - 1] ?? null, next: all[i + 1] ?? null } }));
+  const shown = gallery();
+  return examples().map((ex) => {
+    const i = shown.indexOf(ex);
+    return { params: { name: ex.name }, props: { ex, prev: i > 0 ? shown[i - 1] : null, next: i >= 0 ? shown[i + 1] ?? null : null } };
+  });
 }
 const { ex, prev, next } = Astro.props;
 const html = render(readmeBody(ex), `examples/${ex.name}/README.md`).html;
+const folded = foldedInto(ex.name).map((f) => ({ f, html: render(readmeBody(f), `examples/${f.name}/README.md`).html }));
 // a motion example plays its run back above, and so does a strength, heat or scene run, so the README's
 // charts fold away behind their own titles
 const notes = ex.runs.some((r) => hasSim(r) || playFor(ex, r) || sceneRun(r))
@@ -26,7 +33,24 @@ const notes = ex.runs.some((r) => hasSim(r) || playFor(ex, r) || sceneRun(r))
     (_m, inner: string, alt: string) => `<details class="ex-chart"><summary>${alt}</summary><figure>${inner}</figure></details>`)
   : html;
 const first = ex.runs[0];
+// what the page shows for each run: a run of the same question over the same input plays beside the one before
+// it (a board laid out two ways), and a run whose scene repeats an earlier one's (two studies of one command)
+// adds its numbers under that one instead of a second view of the same thing
+interface Item { run: Run; beside: Run[]; also: Run[] }
+const items: Item[] = [];
+const sceneKey = (r: Run) => { const x = sceneRun(r); return x ? JSON.stringify([x.play.title, x.play.q?.values]) : null; };
+for (const r of ex.runs) {
+  const s = sceneRun(r), key = sceneKey(r);
+  if (s) {
+    const dup = items.find((it) => sceneKey(it.run) === key);
+    if (dup) { dup.also.push(r); continue; }
+    const pair = items.find((it) => { const x = sceneRun(it.run); return x && it.run.question === r.question && x.play.input.label === s.play.input.label; });
+    if (pair) { pair.beside.push(r); continue; }
+  }
+  items.push({ run: r, beside: [], also: [] });
+}
 ---
+{ex.into ? <Redirect to={`examples/${ex.into}/`} /> : (
 <Base title={`${ex.title} example | Wobbl`} path={`examples/${ex.name}/`} search
       description={`${first.question} ${first.outcome.headline.replace(/[:;] /g, ', ')}`}>
   <div class="wrap page">
@@ -38,13 +62,25 @@ const first = ex.runs[0];
       {ex.subtitle && <p class="page-lead">{ex.subtitle}</p>}
     </header>
     <div class="ex-runs">
-      {ex.runs.map((r) => (
+      {items.map(({ run: r, beside, also }) => (
         <>
-          {playFor(ex, r) || sceneRun(r) ? <LiveRun ex={ex} run={r} first={r === ex.runs[0]} /> : <RunCard run={r} />}
+          {playFor(ex, r) || sceneRun(r) ? <LiveRun ex={ex} run={r} first={r === ex.runs[0]} beside={beside} also={also} /> : <RunCard run={r} />}
           {r.fixes.length > 0 && !playFor(ex, r) && <FixStrip run={r} />}
         </>
       ))}
     </div>
+    {folded.map(({ f, html: fh }) => (
+      <section class="ex-fold" aria-labelledby={`fold-${f.name}`}>
+        <h2 class="ex-h" id={`fold-${f.name}`}>{f.title}</h2>
+        {f.subtitle && <p class="page-lead">{f.subtitle}</p>}
+        <div class="ex-runs">{f.runs.map((r) => <RunCard run={r} />)}</div>
+        <div class="prose ex-fold-notes">
+          <Fragment set:html={fh} />
+          <Term code={`cd wobbl/examples/${f.name} && ./run.sh`} />
+          <p>Its script, the readings and every output are in <a href={repoUrl(`examples/${f.name}`, true)}>examples/{f.name}</a> on GitHub.</p>
+        </div>
+      </section>
+    ))}
     <div class="ex-notes prose">
       {notes.trim() && <h2>About this example</h2>}
       {notes.trim() && <Fragment set:html={notes} />}
@@ -58,3 +94,4 @@ const first = ex.runs[0];
     </nav>
   </div>
 </Base>
+)}

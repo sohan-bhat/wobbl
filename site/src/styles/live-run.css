@@ -108,15 +108,6 @@
 /* A scene run: the input's slider, the toggles that draw the bending or a small part larger than it is,
    the peak's value beside its marker, the probe under the mouse and the other readings in one line */
 .lrun-toggles { display: flex; flex-wrap: wrap; gap: 8px; }
-.lrun-toggle {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px; cursor: pointer;
-  background: var(--bg-3); border: 1px solid var(--line-2); color: var(--muted);
-  font: 500 12px/1 var(--mono); letter-spacing: 0.04em;
-}
-.lrun-toggle i { width: 10px; height: 10px; border: 1.5px solid currentColor; }
-.lrun-toggle[aria-pressed="true"] { color: var(--fg); border-color: var(--fg-2); }
-.lrun-toggle[aria-pressed="true"] i { background: var(--yellow); border-color: var(--yellow); }
-.lrun-toggle:hover { border-color: var(--yellow); }
 .lrun-slider input[type="range"] { margin: 0; }
 .lrun-slider input[type="range"]:disabled { cursor: default; opacity: 0.55; }
 .lrun-sticks { margin-top: 2px; margin-right: 10px; margin-left: 10px; }
@@ -131,3 +122,4 @@
 .lrun-probe[hidden] { display: none; }
 .lrun-probe.l { transform: translate(calc(-100% - 14px), -50%); }
 .lrun-also { margin: 0; font: 500 13px/1.4 var(--mono); color: var(--fg-2); font-variant-numeric: tabular-nums; }
+.lrun-at { margin-left: 10px; letter-spacing: 0.02em; text-transform: none; color: var(--muted); }
