@@ -12,7 +12,7 @@
   ],
   "reasons": [
    {
-    "decided": "domain chemistry, as asked",
+    "decided": "the words \"thermite\" point to chemistry (reaction)",
     "override": "--domain chemistry"
    },
    {
@@ -56,8 +56,8 @@
    "verdict": "ok",
    "headline": "2 Al(s) + Fe2O3(s) -> Al2O3(s) + 2 Fe(s) releases 850.4 kJ per mole as written and goes forward on its own at 298 K (dG = -838.9 kJ, K = 10^147). Left to keep its own heat it reaches 3139 K, where boiling or melting holds it.",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/thermite/output/reaction",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/thermite/output/reaction/report.html",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/thermite/output/reaction",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/thermite/output/reaction/report.html",
    "assumptions": [
     {
      "assumed": "temperature not given: assumed 25 C (298.15 K)",
@@ -75,8 +75,8 @@
    "verdict": "ok",
    "headline": "2 Al(s) + Fe2O3(s) -> Al2O3(s) + 2 Fe(s) releases 850.4 kJ per mole as written and goes forward on its own at 298 K (dG = -838.9 kJ, K = 10^147). Left to keep its own heat it reaches 3139 K, where boiling or melting holds it.",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/thermite/output/combustion",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/thermite/output/combustion/report.html",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/thermite/output/combustion",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/thermite/output/combustion/report.html",
    "assumptions": []
   }
  ]
