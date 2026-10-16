@@ -81,3 +81,25 @@ def test_every_synonym_compiles_and_names_something():
         assert rxs, name
         for rx in rxs:
             re.compile(rx)
+
+
+TYPICAL = [("drop my phone case from 1.5 m", "case.py", {"material": ["pc"], "mass": ["150 g @ 0,0,6 r=26"]}),
+           ("will a bracket hold 200 N", "bracket.py", {"load": ["200 N down @ top and within 12 of 65,12.5,6"]}),
+           ("how hot does a 10 W LED get on this heat sink", "heatsink.py", {"material": ["6063-t5"]}),
+           ("will a steel hook hold 3 kN", "hook.py", {"load": ["3 kN -z @ within 5 of 22,0,-16"]})]
+
+
+@pytest.mark.parametrize("words,part,brings", TYPICAL, ids=[t[0][:40] for t in TYPICAL])
+def test_a_part_named_in_words_runs_on_a_typical_one(words, part, brings):
+    p = route(words, "")
+    assert p.thing.endswith(part) and p.kind == "parametric" and p.question == words
+    said = " ".join(t + " " + o for t, o in p.assumed)
+    assert "no part file given" in said and "your own STEP, STL or Python part first" in said
+    got = {n: v for n, v, _ in p.defaults}
+    for k, v in brings.items():
+        assert got.get(k) == v, got
+
+
+def test_a_material_in_the_words_beats_the_typical_one():
+    p = route("will a steel hook hold 3 kN", "")
+    assert "material" not in {n for n, _, _ in p.defaults}

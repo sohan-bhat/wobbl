@@ -39,6 +39,7 @@ class Domain:
     results: tuple[str, ...] = ()         # the domain names its finished outcome.json files carry
     priority: int = 0                      # breaks a tie in favour of the higher one
     example: str = ""
+    stock: tuple = ()                      # typical things (stock.Stock) to run on when words name one without a file
 
 
 @dataclass

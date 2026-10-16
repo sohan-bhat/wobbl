@@ -261,6 +261,13 @@ def _jobs(plan, options: dict[str, list[str]], out: Path, log, quick: bool, dry:
     for a in plan.analyses:
         job = Job(a, plan.thing, plan.kind, plan.question, dict(carry), out / a.name if many else out, quick,
                   earlier, log, part=focus.get(a.name, ""), dry=dry)
+        for text, override in getattr(plan, "assumed", []) or []:
+            job.assume(text, override)
+        for name, values, means in getattr(plan, "defaults", []) or []:   # what a typical part brings
+            if a.takes(name) and name not in options:
+                job.options[name] = list(values)
+                job.assume(means,
+                           " ".join(f"--{name} {_quote(v)}" for v in values))
         job.situate(objects=objects_named(plan.question))
         step = Step(a, job)
         yield step

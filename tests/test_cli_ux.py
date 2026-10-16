@@ -53,13 +53,15 @@ def test_nonsense_says_so_kindly_and_exits_nonzero():
     assert 'found nothing to simulate in "asdf qwer zxcv"' in r.output and "wobbl simulate --list" in r.output
 
 
-def test_a_part_question_without_its_file_says_what_to_pass():
+def test_a_part_question_without_its_file_runs_on_a_typical_part():
     for args in (["will my bracket crack under 200 N"], ["simulate", "will my bracket crack under 200 N"]):
-        r = run(*args)
-        assert r.exit_code == 2
-        assert "needs its file" in r.output
-        assert 'wobbl simulate bracket.step "will my bracket crack under 200 N"' in " ".join(r.output.split())
-        assert ".step" in r.output
+        r = run(*args, "--plan", "--json")
+        assert r.exit_code == 0, r.output
+        d = json.loads(r.output)
+        assert d["domain"] == "part" and d["analyses"] == ["stress"] and d["thing"].endswith("bracket.py")
+        said = " ".join(a["assumed"] + " " + a["override"] for a in d["assumptions"])
+        assert "typical L shelf bracket" in said and "your own STEP, STL or Python part first" in said
+        assert any(a["override"] == "--load '200 N down @ top and within 12 of 65,12.5,6'" for a in d["assumptions"])
 
 
 def test_a_typo_of_a_command_asks_what_was_meant():

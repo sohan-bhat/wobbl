@@ -33,6 +33,8 @@ class Plan:
     reasons: list[tuple[str, str]] = field(default_factory=list)    # (what was decided and why, the override)
     candidates: list[tuple[str, int]] = field(default_factory=list)   # every domain that scored, best first
     focus: dict[str, str] = field(default_factory=dict)   # the part of the question each analysis answers
+    assumed: list[tuple[str, str]] = field(default_factory=list)   # guesses about the thing itself, with overrides
+    defaults: list[tuple[str, list[str], str]] = field(default_factory=list)   # (option, values, meaning) it brings
 
     @property
     def names(self) -> list[str]:
@@ -41,7 +43,10 @@ class Plan:
     def to_dict(self) -> dict:
         return {"thing": self.thing, "question": self.question, "domain": self.domain, "kind": self.kind,
                 "analyses": self.names, "reasons": [{"decided": r, "override": o} for r, o in self.reasons],
-                "candidates": [{"domain": d, "score": s} for d, s in self.candidates], "focus": self.focus}
+                "candidates": [{"domain": d, "score": s} for d, s in self.candidates], "focus": self.focus,
+                **({"assumed": [{"assumed": t, "override": o} for t, o in self.assumed]} if self.assumed else {}),
+                **({"defaults": [{"option": n, "values": v, "means": m} for n, v, m in self.defaults]}
+                   if self.defaults else {})}
 
 
 def _as_path(thing: str) -> Path | None:
@@ -295,8 +300,23 @@ def route(thing: str = "", question: str = "", physics: list[str] | None = None,
     if kind:
         reasons.append((f"kind {kind}, as asked", f"--kind {kind}"))
     text = " ".join(x for x in (question, "" if _as_path(thing) else thing) if x)
+    assumed, typical = [], None
+    if d.stock and _as_path(thing) is None:   # a thing named in words that needs its file: run on a typical one
+        from . import stock
+        typical = stock.pick(d.stock, text)
+        if typical is not None:
+            thing, question, was = str(typical.path), text, k
+            k = kind or score(d, "", "", typical.path)[1] or k
+            reasons[0] = (reasons[0][0].replace(f"({was})", f"({k})"), reasons[0][1])
+            assumed.append((f"no {d.name} file given, so Wobbl ran on {typical.what}",
+                            f'your own STEP, STL or Python part first, as in wobbl simulate your-part.step "{text}"'))
+            reasons += assumed
     chosen, reason, focus = choose(d, k, text, physics)
     reasons.append((reason, f"--physics {','.join(a.name for a in chosen)}"))
     for name, part in focus.items():
         reasons.append((f'{name} answers "{part}"', ""))
-    return Plan(thing, question, d.name, k, chosen, reasons, [(r[1].name, r[0]) for r in found], focus)
+    plan = Plan(thing, question, d.name, k, chosen, reasons, [(r[1].name, r[0]) for r in found], focus, assumed)
+    if typical is not None:
+        from .stock import defaults
+        plan.defaults = defaults(typical, text, plan.names)
+    return plan

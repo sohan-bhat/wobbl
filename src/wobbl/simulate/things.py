@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .intent import phrases
 from .registry import Domain, Option, register
+from .stock import PART_STOCK
 
 PART_OPTIONS = (
     Option("material", "Material name from 'wobbl materials', or custom:E=..,nu=..,yield=..", "6061-t6"),
@@ -95,7 +96,7 @@ register(Domain(
     "part", "A part as a CAD file (STEP, STL, BREP, IGES or a parametric Python part)",
     extensions={".step": "step", ".stp": "step", ".stl": "stl", ".brep": "brep", ".brp": "brep", ".iges": "iges",
                 ".igs": "iges", ".py": ""},
-    sniff=sniff_part, options=PART_OPTIONS, default_kind="step", priority=2, words=PART_WORDS,
+    sniff=sniff_part, options=PART_OPTIONS, default_kind="step", priority=2, words=PART_WORDS, stock=PART_STOCK,
     results=("strength", "thermal", "buckling", "vibration", "fatigue", "plastic"),
     example='wobbl simulate bracket.step "will it hold 200 N and stay under 60 C?"'))
 
@@ -152,11 +153,11 @@ register(Domain(
            r"\bdrones?\b", r"\bquad(?:copter)?s?\b", r"multirotor", r"\bhover", r"\bhulls?\b", r"\bboats?\b",
            r"\bships?\b", r"\bvessel\b", r"\bkayak\b", r"pressure drop", r"flow rate", r"l/min|\blpm\b|\bgpm\b|\bcfm\b",
            r"m3/h", r"\bpumps?\b", r"\bfluids?\b", r"\bmixtures?\b", r"viscosity", r"reynolds", r"\bknots?\b",
-           r"\d\s*kn\b", r"wind load", r"\bairflow\b", r"\bapcs?f?_", r"\b\d+x\d+(?:\.\d+)?\b"),
+           r"(?-i:\d\s*kn\b)", r"wind load", r"\bairflow\b", r"\bapcs?f?_", r"\b\d+x\d+(?:\.\d+)?\b"),
     kinds={"pipe": r"\bpipes?\b|\bducts?\b|\bhoses?\b|\btubing\b|pressure drop|flow rate|l/min|\blpm\b|\bgpm\b|"
                    r"\bcfm\b|m3/h|\bpump",
            "prop": r"propeller|\bprops?\b|drone|\bquad|multirotor|\bhover|\brotors?\b|\bapcs?f?_",
-           "hull": r"\bhulls?\b|\bboats?\b|\bships?\b|\bvessel\b|kayak|\bknots?\b|\d\s*kn\b|displacement",
+           "hull": r"\bhulls?\b|\bboats?\b|\bships?\b|\bvessel\b|kayak|\bknots?\b|(?-i:\d\s*kn\b)|displacement",
            "drag": r"\bdrag\b|wind load|\bsphere\b|\bcylinder\b|\bplate\b|\bcube\b|\bdisk\b"},
     default_kind="drag", results=("flow",),
     example='wobbl simulate "drone with apcsf_10x4.7 props, 1.2 kg, 4 rotors, can it hover?"'))

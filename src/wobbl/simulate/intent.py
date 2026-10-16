@@ -21,7 +21,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
                      r"motor\s+class"),
     "burn": (r"burn[\s-]+times?", r"burn[\s-]+rates?", r"how\s+long\s+(?:does\s+it|will\s+it|it)\s+burns?",
              r"burns?\s+for\s+how\s+long", r"burn(?:s|ed|ing)?\s+(?:out|through)", r"burnout"),
-    "chamber pressure": (r"chamber[\s-]+pressures?", r"(?:motor|casing|case)\s+pressures?", r"\bkn\b",
+    "chamber pressure": (r"chamber[\s-]+pressures?", r"(?:motor|casing|case)\s+pressures?", r"(?-i:\bKn\b)",
                          r"(?:casing|case)\s+(?:burst|bursts|rupture)", r"\bcato\b", r"blow\s+(?:up|apart)"),
     # flights
     "apogee": (r"apogee", r"how\s+high", r"max(?:imum)?\s+altitude", r"peak\s+altitude", r"how\s+far\s+up",
