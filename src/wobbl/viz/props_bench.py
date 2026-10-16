@@ -55,9 +55,10 @@ def arch(a, b, height: float, n: int = 7) -> np.ndarray:
     return pts
 
 
-def resistor(s, a, b, ohms, name: str, lift: float = 3.0):
+def resistor(s, a, b, ohms, name: str, lift: float = 3.0, sweep=None):
     """An axial resistor between two holes: leads bent down into them and a tan body with its color bands.
-    Returns the body, which the caller may color by heat."""
+    Returns the body, which the caller may color by heat. sweep, a list of (ohms, from, until) on the timeline,
+    gives a resistor the slider changes its bands for each stretch of values, shown only over that stretch."""
     a, b = np.asarray(a, float), np.asarray(b, float)
     d = b - a
     L = float(np.linalg.norm(d)) or 2.54
@@ -68,9 +69,12 @@ def resistor(s, a, b, ohms, name: str, lift: float = 3.0):
     wire(s, [a, a + [0, 0, lift], mid - u * bl / 2], 0.25, LEAD, f"{name} lead")
     wire(s, [mid + u * bl / 2, b + [0, 0, lift], b], 0.25, LEAD, f"{name} lead")
     body = s.body("capsule", [1.1, bl / 2 - 1.1], pos=mid, quat=q, color=BODY_TAN, name=name)
-    for i, c in enumerate(bands(ohms)):
-        at = -bl * 0.3 + i * bl * 0.17 + (bl * 0.08 if i == 3 else 0)
-        s.body("cylinder", [1.16, bl * 0.035], pos=mid + u * at, quat=q, color=c, name=f"{name} band")
+    for val, t0, t1 in sweep or [(ohms, None, None)]:
+        for i, c in enumerate(bands(val)):
+            at = -bl * 0.3 + i * bl * 0.17 + (bl * 0.08 if i == 3 else 0)
+            band = s.body("cylinder", [1.16, bl * 0.035], pos=mid + u * at, quat=q, color=c, name=f"{name} band")
+            if t0 is not None or t1 is not None:
+                band.show(t0, t1)
     return body
 
 

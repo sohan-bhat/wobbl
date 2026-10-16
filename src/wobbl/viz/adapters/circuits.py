@@ -2,8 +2,8 @@
 gives them, round wires between, and a bench supply with its leads. A slider sets the one input the question
 points at (the series resistor, the load current, a part's value or the supply), and every frame is the circuit
 solved at that value. Each part warms from tan toward red by its share of its limit, an LED glows by its solved
-current, the glows in each wire move at the current solved there, and a part past its rating is ringed on itself
-over the values where it is.
+current, a still glow marks each wire that carries current at that value, and a part past its rating is ringed on
+itself over the values where it is.
 
 board.json, written by the circuit run next to its outcome, holds the plan (circuits/board.py), the key reading
 and the sweep (circuits/sweep.py), which circuit_frames.py turns into frames.
@@ -50,8 +50,8 @@ def build(out: Path) -> Path | None:
     F = frames(b, pb)
     n = len(F["t"])
     s = Scene("The circuit on the bench", domain="circuit", question=o.get("question", ""),
-              source="Parts sit in the holes the board plan gives them. The glows in each wire move at the current "
-                     "solved there, and each part warms by its share of its limit, most often its rating.")
+              source="Parts sit in the holes the board plan gives them. A glow marks each wire that carries current "
+                     "at the value set, and each part warms by its share of its limit, most often its rating.")
     if n > 1 and F["kind"] == "sweep":
         s.timeline(F["t"], unit=F["unit"], label=F["label"], between="step", kind="input", design=F["design"],
                    note="Each step is the whole circuit solved again at that value.")
@@ -95,7 +95,7 @@ def build(out: Path) -> Path | None:
         if not pins:
             continue
         cur, heat = F["parts"][j], F["heat"][j]
-        body, top = place(s, p, pins, cur, heat, o.get("question", ""))
+        body, top = place(s, p, pins, cur, heat, o.get("question", ""), bands_over(F, p, T, b))
         a, c = pins[0], pins[-1] if len(pins) > 1 else pins[0]
         for q in (a, c):
             paths.append(np.array([q + [0, 0, 0.2], q + [0, 0, top]]))
@@ -156,13 +156,35 @@ def build(out: Path) -> Path | None:
     return s.save(out)
 
 
-def place(s, p, pins, cur, heat, question: str = "") -> tuple:
-    """The part on the board. Returns its body and how high its leads rise."""
+OHMS = {"mohm": 1e-3, "mOhm": 1e-3, "ohm": 1.0, "Ohm": 1.0, "kohm": 1e3, "kOhm": 1e3, "Mohm": 1e6, "MOhm": 1e6}
+
+
+def bands_over(F: dict, p: dict, T: np.ndarray, b: dict) -> list | None:
+    """For the resistor the slider sets, its value over each stretch of the slider whose color bands stay the
+    same, as (ohms, from, until). None for any other part."""
+    if F["kind"] != "sweep" or p.get("body") != "axial-resistor" or len(T) < 2 or \
+            p["name"] not in ((b.get("sweep") or {}).get("changed") or []):
+        return None
+    k = OHMS.get(str(F.get("unit") or "").strip())
+    if k is None:
+        return None
+    ohms = np.asarray(F["t"], float) * k
+    out, i = [], 0
+    for j in range(1, len(ohms) + 1):
+        if j == len(ohms) or B.bands(ohms[j]) != B.bands(ohms[i]):
+            out.append((float(ohms[i]), None if i == 0 else float(T[i]), None if j == len(ohms) else float(T[j - 1])))
+            i = j
+    return out
+
+
+def place(s, p, pins, cur, heat, question: str = "", sweep: list | None = None) -> tuple:
+    """The part on the board. Returns its body and how high its leads rise. sweep is a swept resistor's values
+    over the slider (bands_over)."""
     body, name = p.get("body") or "", p["name"]
     a, c = pins[0], pins[-1]
     top = 3.0
     if body == "axial-resistor" and len(pins) == 2:
-        bd = B.resistor(s, a, c, p.get("value"), name)
+        bd = B.resistor(s, a, c, p.get("value"), name, sweep=sweep)
     elif body == "axial-diode" and len(pins) == 2:
         bd = B.diode(s, a, c, name)
     elif body == "led-5mm":

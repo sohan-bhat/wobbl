@@ -130,6 +130,12 @@ def test_swept_input_is_a_slider_with_each_value_solved(tmp_path):
     assert "follow" not in h["camera"] and h["camera"]["presets"]
     led = next(o for o in h["objects"] if o.get("name") == "D1")
     assert led["color"] == "#34c759"                           # a model that names its color beats the question
+    # the swept resistor's bands follow the slider: one set per stretch of values, each shown only over it
+    sets = [o for o in h["objects"] if o.get("name") == "R1 band"]
+    assert len(sets) > 4 and all("when" in o for o in sets)
+    at = lambda v: [o["color"] for o in sets if (o["when"][0] is None or o["when"][0] <= v)  # noqa: E731
+                    and (o["when"][1] is None or v <= o["when"][1])]
+    assert at(r[0]) == bands(r[0]) and at(r[-1]) == bands(r[-1])
 
 
 def test_the_question_picks_the_input():
