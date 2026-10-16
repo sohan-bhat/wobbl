@@ -10,8 +10,8 @@ template would build it at each value.
 solve() runs the circuit at every value the way the run itself was solved (an operating point or the same
 transient), judges every part against its ratings there, and returns per value the current in every wire, part
 and lead of the board plan, each part's share of its limit, and the readouts that answer the question. A part's
-share of its limit is the most used of its ratings, so 1 is at the rating, and an op amp's is 45 degrees of
-phase margin over the margin it has.
+share of its limit is the most used of its ratings, so 1 is at the rating. An op amp's is 1 at the 45 degrees
+of phase margin a loop needs, 2 with none left and 0 at twice that.
 """
 from __future__ import annotations
 
@@ -223,7 +223,7 @@ def solve(inp: Input, w, work: Path, ambient: float = 25.0, *, rerun: Callable |
                 heat[refs.get(s.ref, s.ref)] = float(it.use)
         for r, v in pm.items():
             nm = refs.get(r, r)
-            heat[nm] = max(heat.get(nm, 0.0), PM_NEEDED / max(v, 1.0))
+            heat[nm] = max(heat.get(nm, 0.0), max(0.0, 2.0 - v / PM_NEEDED))
         heat.update(extra.get("heat", {}))
         heats.append(heat)
         hard = max(((s.worst.use, s) for s in st if s.worst is not None and s.worst.use is not None),
