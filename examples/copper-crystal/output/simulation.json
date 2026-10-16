@@ -11,7 +11,7 @@
   ],
   "reasons": [
    {
-    "decided": "domain chemistry, as asked",
+    "decided": "the words \"copper\", \"crystal\" point to chemistry (element)",
     "override": "--domain chemistry"
    },
    {
@@ -41,8 +41,8 @@
    "verdict": "ok",
    "headline": "Fcc copper by EMT: lattice constant 3.590 A, density 9.12 g/cm3, bulk modulus 133 GPa and cohesive energy 3.52 eV per atom. Measured, the lattice constant is 3.610 A.",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/copper-crystal/output",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a68432c71b1830296/examples/copper-crystal/output/report.html",
+   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/copper-crystal/output",
+   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-chem/examples/copper-crystal/output/report.html",
    "assumptions": [
     {
      "assumed": "temperature not given: assumed 25 C (298.15 K)",

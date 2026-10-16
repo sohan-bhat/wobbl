@@ -114,6 +114,8 @@
     "Energy against volume, the equation of state"
    ]
   ],
+  "fusion_eV_atom": 0.136186,
+  "melting_K": 1358.000055,
   "files": {
    "playback": "playback.json"
   }
@@ -125,7 +127,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 2.547261,
+ "t_total": 18.131225,
  "solver": "EMT with ASE",
  "criteria": []
 }
