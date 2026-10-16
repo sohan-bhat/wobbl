@@ -22,20 +22,20 @@
   },
   "cast-motor-mount": {
     "add": [
-      {"file": "cast-motor-mount/plate.glb"},
-      {"file": "cast-motor-mount/motor.glb"},
-      {"file": "cast-motor-mount/motor-flange.glb"},
-      {"file": "cast-motor-mount/motor-shaft.glb"},
-      {"file": "cast-motor-mount/pulley.glb"}
+      {"file": "cast-motor-mount/plate.glb", "covers": ["plate"]},
+      {"file": "cast-motor-mount/motor.glb", "covers": ["motor"]},
+      {"file": "cast-motor-mount/motor-flange.glb", "covers": ["motor flange"]},
+      {"file": "cast-motor-mount/motor-shaft.glb", "covers": ["motor shaft"]},
+      {"file": "cast-motor-mount/pulley.glb", "covers": ["pulley"]}
     ]
   },
   "cast-mount-credibility": {
     "add": [
-      {"file": "cast-mount-credibility/plate.glb"},
-      {"file": "cast-mount-credibility/motor.glb"},
-      {"file": "cast-mount-credibility/motor-flange.glb"},
-      {"file": "cast-mount-credibility/motor-shaft.glb"},
-      {"file": "cast-mount-credibility/pulley.glb"}
+      {"file": "cast-mount-credibility/plate.glb", "covers": ["plate"]},
+      {"file": "cast-mount-credibility/motor.glb", "covers": ["motor"]},
+      {"file": "cast-mount-credibility/motor-flange.glb", "covers": ["motor flange"]},
+      {"file": "cast-mount-credibility/motor-shaft.glb", "covers": ["motor shaft"]},
+      {"file": "cast-mount-credibility/pulley.glb", "covers": ["pulley"]}
     ]
   },
   "circuits/buck": {
@@ -75,9 +75,9 @@
   },
   "drone-arm": {
     "add": [
-      {"file": "drone-arm/bolt.glb"},
-      {"file": "drone-arm/bolt-head.glb"},
-      {"file": "drone-arm/mounting-plate.glb"}
+      {"file": "drone-arm/bolt.glb", "covers": ["bolt"]},
+      {"file": "drone-arm/bolt-head.glb", "covers": ["bolt head"]},
+      {"file": "drone-arm/mounting-plate.glb", "covers": ["mounting plate"]}
     ]
   },
   "falling-rock": {
@@ -93,7 +93,7 @@
   },
   "heat-sink": {
     "add": [
-      {"file": "heat-sink/heat-source.glb"}
+      {"file": "heat-sink/heat-source.glb", "covers": ["heat source"]}
     ]
   },
   "knsb-motor": {
@@ -111,13 +111,13 @@
   },
   "motor-mount": {
     "add": [
-      {"file": "motor-mount/bolt.glb"},
-      {"file": "motor-mount/bolt-head.glb"},
-      {"file": "motor-mount/mounting-plate.glb"},
-      {"file": "motor-mount/motor.glb"},
-      {"file": "motor-mount/motor-flange.glb"},
-      {"file": "motor-mount/motor-shaft.glb"},
-      {"file": "motor-mount/pulley.glb"}
+      {"file": "motor-mount/bolt.glb", "covers": ["bolt"]},
+      {"file": "motor-mount/bolt-head.glb", "covers": ["bolt head"]},
+      {"file": "motor-mount/mounting-plate.glb", "covers": ["mounting plate"]},
+      {"file": "motor-mount/motor.glb", "covers": ["motor"]},
+      {"file": "motor-mount/motor-flange.glb", "covers": ["motor flange"]},
+      {"file": "motor-mount/motor-shaft.glb", "covers": ["motor shaft"]},
+      {"file": "motor-mount/pulley.glb", "covers": ["pulley"]}
     ]
   },
   "printed-lid": {
@@ -143,11 +143,11 @@
   },
   "shelf-bracket": {
     "add": [
-      {"file": "shelf-bracket/bolt.glb"},
-      {"file": "shelf-bracket/bolt-head.glb"},
-      {"file": "shelf-bracket/wall.glb"},
-      {"file": "shelf-bracket/shelf.glb"},
-      {"file": "shelf-bracket/load-on-the-shelf.glb"}
+      {"file": "shelf-bracket/bolt.glb", "covers": ["bolt"]},
+      {"file": "shelf-bracket/bolt-head.glb", "covers": ["bolt head"]},
+      {"file": "shelf-bracket/wall.glb", "covers": ["wall"]},
+      {"file": "shelf-bracket/shelf.glb", "covers": ["shelf"]},
+      {"file": "shelf-bracket/load-on-the-shelf.glb", "covers": ["load on the shelf"]}
     ]
   },
   "steel-hook": {

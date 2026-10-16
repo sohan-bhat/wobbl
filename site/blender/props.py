@@ -473,7 +473,8 @@ def main():
             rel = f'{folder}/{slug(name)}.glb'
             kit.export(ob, rel)
             if key in STRENGTH or name in extra:
-                add.append({'file': rel})
+                # covers: the scene objects this model stands for, which a still or a scene view leaves out
+                add.append({'file': rel, 'covers': [name]} if name in models else {'file': rel})
             else:
                 replace.append({'object': name, 'file': rel})
         entry = {}

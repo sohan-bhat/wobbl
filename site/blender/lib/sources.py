@@ -21,6 +21,7 @@ AMBIENTCG = {
 # Poly Haven HDRI: (url, md5 Poly Haven publishes for the file)
 HDRI = {
     'studio_small_09': ('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/studio_small_09_2k.hdr', 'b056fea247bc84b81d2e0987d44c87d8'),
+    'studio_small_08': ('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/studio_small_08_2k.hdr', '18571cc63a24b0b7b9e9e7c909b3e8ee'),
 }
 UA = {'User-Agent': 'wobbl-site-build/1.0 (+https://github.com/sohan-bhat/wobbl)'}
 
