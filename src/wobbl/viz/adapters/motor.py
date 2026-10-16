@@ -188,9 +188,10 @@ def build(out: Path, pb: dict, o: dict | None = None) -> Path | None:
     shell = place(s.mesh(Xc[0], Tc, name="casing", color="#b9bdc4", smooth=False))
     if n > 1:
         shell.deform(Xc - Xc[0])
+    # as the run judges the casing: past yield it fails, past yield over the target safety factor it is marginal
     shell.color_by("hoop stress", np.nan_to_num(lame), unit="MPa", colormap="turbo",
-                   range=(0, sy or max(hoop.max(), 1e-9)), limit=allow_hoop,
-                   limit_label=f"allowable, yield over {tsf:g}" if allow_hoop else "")
+                   range=(0, sy or max(hoop.max(), 1e-9)), limit=sy, limit_label="yield" if sy else "",
+                   target=allow_hoop if sy and tsf > 1 else None)
     # forward closure
     wall = float(Ro0 - Ri0)
     Xf, Tf = arc_solid([0, 0], [-6 - wall * 4, -6], [Ri0, Ri0], [-6 - wall * 4, -6])
@@ -247,10 +248,12 @@ def build(out: Path, pb: dict, o: dict | None = None) -> Path | None:
     s.ground(0, size=L * 4, grid=50, center=(L * 0.4, 0))
 
     sf = num("safety_factor")
-    s.readout("peak pressure", Pm, unit="MPa", digits=3, limit=allow_p)
+    p_yield = None if allow_p is None else allow_p * tsf
+    s.readout("peak pressure", Pm, unit="MPa", digits=3, limit=p_yield,
+              target=allow_p if tsf > 1 and np.ndim(allow_p) == 0 else None)
     if np.isfinite(sf).any():
         s.readout("casing safety factor", sf, digits=3)
-    s.readout("hoop stress", hoop, unit="MPa", digits=3, limit=allow_hoop)
+    s.readout("hoop stress", hoop, unit="MPa", digits=3, limit=sy, target=allow_hoop if tsf > 1 else None)
     if np.isfinite(num("impulse_Ns")).all():
         s.readout("total impulse", num("impulse_Ns"), unit="N s", digits=4)
     s.readout("peak thrust", Fn, unit="N", digits=4)
@@ -258,6 +261,10 @@ def build(out: Path, pb: dict, o: dict | None = None) -> Path | None:
         s.readout("Kn", num("kn"), digits=3)
     if np.isfinite(num("port_throat")).all():
         s.readout("port to throat", num("port_throat"), digits=3)
+    if np.isfinite(num("mass_flux")).any():
+        from ...chem.motor import MASS_FLUX_LIMIT
+        # past the usual erosive burning limit the run calls the motor marginal, as the slider does
+        s.readout("core mass flux", num("mass_flux"), unit="kg/(m2 s)", digits=4, target=MASS_FLUX_LIMIT)
 
     # where on the slider the casing and the ports change their verdict
     if n > 1 and np.isfinite(sf).any():

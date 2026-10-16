@@ -478,6 +478,9 @@ def test_motor_cutaway_is_swept_over_its_throat(tmp_path, shape, extra):
     assert {"casing", "grain", "grain 2", "burning port", "nozzle", "exhaust"} <= names
     hoop = next(f for f in h["fields"] if f["name"] == "hoop stress")
     assert hoop["limit"] > 0 and hoop["limit_label"]
+    assert 0 < hoop["target"] < hoop["limit"]                     # marginal past yield over the target factor
+    flux = next(r for r in h["readouts"] if r["name"] == "core mass flux")
+    assert flux["target"] == 1406.0 and "limit" not in flux     # erosive burning is marginal, as the run says
     ro = {r["name"]: r["values"] for r in h["readouts"]}
     assert h["readouts"][0]["name"] == "peak pressure" and h["readouts"][0]["limit"] > 0
     assert ro["peak pressure"][0] > 1.5 * ro["peak pressure"][-1]     # a narrower throat raises the pressure

@@ -43,8 +43,8 @@
    "verdict": "marginal",
    "headline": "Peak chamber pressure 4.14 MPa against a casing that yields at 16.8 MPa, a safety factor of 4.07 (target 2). J602 motor, 1238 N s over 2.06 s at 120 s Isp.",
    "confidence": "medium",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-motor/examples/knsb-motor/output",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-motor/examples/knsb-motor/output/report.html",
+   "result_dir": "output",
+   "report": "output/report.html",
    "assumptions": []
   }
  ]
