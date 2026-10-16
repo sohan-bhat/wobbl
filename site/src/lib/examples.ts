@@ -20,6 +20,10 @@ export const ORDER = ['antenna-2g4', 'antenna-pcb', 'speaker-box', 'solenoid-act
 
 const EX = resolve(ROOT, 'examples');
 
+/** Examples that study the very part and run of another, shown as a section of that example's page. Their own
+ * address forwards there, and the gallery shows the part once. */
+export const FOLDED: Record<string, string> = { 'cast-mount-credibility': 'cast-motor-mount' };
+
 /** Site images (public/img, made by scripts/build_site_images.py) for each run's output images. */
 export const RUN_IMAGES: Record<string, Record<string, string>> = {
   'cast-motor-mount/output': { stress: 'cast-mount-stress' },
@@ -85,6 +89,8 @@ export interface Run {
 
 export interface Example {
   name: string; title: string; subtitle: string; subtitleFromBody: boolean; readme: string; runs: Run[]; domain: string;
+  /** the example whose page this one is a section of */
+  into?: string;
 }
 
 const tracked: Set<string> | null = (() => {
@@ -216,7 +222,7 @@ function load(name: string): Example {
     }
   }
   return {
-    name, title, subtitle: sub ? sub[0].toUpperCase() + sub.slice(1) : '', subtitleFromBody, readme, runs,
+    name, title, subtitle: sub ? sub[0].toUpperCase() + sub.slice(1) : '', subtitleFromBody, readme, runs, into: FOLDED[name],
     // an example that ends in wobbl credibility is about how far the run can be trusted
     domain: runs[0].command.includes('wobbl credibility') ? 'Credibility' : DOMAIN[runs[0].outcome.domain] ?? '',
   };
@@ -226,6 +232,16 @@ let cache: Example[] | null = null;
 export function examples(): Example[] {
   cache ??= ORDER.filter((n) => existsSync(resolve(EX, n, 'run.sh'))).map(load);
   return cache;
+}
+
+/** The examples that have their own page and card: every one but those folded into another's page. */
+export function gallery(): Example[] {
+  return examples().filter((e) => !e.into);
+}
+
+/** The examples folded into an example's page, as sections of it. */
+export function foldedInto(name: string): Example[] {
+  return examples().filter((e) => e.into === name);
 }
 
 export function findRun(rel: string): { ex: Example; run: Run } {
