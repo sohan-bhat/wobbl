@@ -46,8 +46,8 @@
    "verdict": "fails",
    "headline": "Warps 3.81 mm off flat, over the 0.8 mm tolerance, with a corner lifting 3.81 mm when it comes off the bed.",
    "confidence": "medium",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a4f2acd6793533012/examples/printed-lid/output",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a4f2acd6793533012/examples/printed-lid/output/report.html",
+   "result_dir": "output",
+   "report": "output/report.html",
    "assumptions": [
     {
      "assumed": "bed temperature not given, so Wobbl assumed 100 C, usual for ABS",

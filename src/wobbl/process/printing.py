@@ -264,7 +264,7 @@ def run_print_warp(study: W.WarpStudy, out_dir: str | Path, progress=None, keep:
     imgs = warp_images(out, lv, m, tol)
     notes = list(prep.notes)
     try:
-        warp_scene(out, lv, m, study, fil, flat, tol, verdict, head)
+        warp_scene(out, lv, m, study, fil, flat, tol, verdict, head, t_env)
     except Exception as e:  # noqa: BLE001  the answer stands without its animation
         notes.append(f"the 3D view was not written: {e}")
     metrics = [("flatness", f"{fmt(flat)} mm"), ("tolerance", f"{fmt(tol)} mm"),
@@ -379,32 +379,42 @@ def warp_images(out: Path, lv: dict, m: dict, tol: float) -> dict:
     return imgs
 
 
-def warp_scene(out: Path, lv: dict, m: dict, study, fil, flat: float, tol: float, verdict: str, head: str):
-    """The print rising layer by layer on its bed, then coming off and curling, drawn larger so it shows."""
+def warp_scene(out: Path, lv: dict, m: dict, study, fil, flat: float, tol: float, verdict: str, head: str,
+               t_env: float | None = None):
+    """The part off the bed and warped, with the air around the print as the input a designer can change.
+
+    Each layer locks in the shrinkage from the glass transition down to the surroundings, and the model is linear
+    elastic, so the warp at any chamber temperature is the solved warp times (Tg - T) / (Tg - T0). Every step of
+    the slider is that exact result, from an open printer up to a chamber close to the glass transition."""
     from ..viz import Scene
 
     X, ws, mesh = lv["X"], lv["ws"], lv["mesh"]
-    H = float(X[:, 2].max())
-    n_build, n_cool = 48, 24
-    heights = np.concatenate([np.linspace(0.0, H, n_build), np.full(n_cool, H)])
-    release = np.concatenate([np.zeros(n_build), np.linspace(0.0, 1.0, n_cool)])
-    t = np.arange(len(heights), dtype=float)
-    s = Scene(f"{Path(study.part).stem} printing and coming off the bed", domain="warp", question=study.question)
-    s.timeline(t, unit="", label="step", seconds=10, between="interpolated",
-               note="first the layers go down, then the part cools and comes off the bed")
+    t0 = float(t_env if t_env is not None else env_temperature(study))
+    tg = float(fil.tg)
+    temps = np.unique(np.r_[np.linspace(t0 - 10.0, max(tg - 10.0, t0 + 10.0), 36), t0])
+    ratio = np.clip(tg - temps, 0.0, None) / max(tg - t0, 1e-9)
+    s = Scene(f"{Path(study.part).stem} off the bed", domain="warp", question=study.question,
+              source="The warp scales exactly with the shrinkage each layer locks in, which runs from the glass "
+                     "transition down to the air around the print, so every chamber temperature is exact.")
+    s.timeline(temps, unit="C", label="air around the print", between="exact", kind="input", design=t0)
     span = float(np.ptp(X, axis=0).max())
     lo, hi = X.min(0), X.max(0)
     s.body("box", [hi[0] - lo[0] + 0.3 * span, hi[1] - lo[1] + 0.3 * span, 0.02 * span],
            pos=[(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, -0.01 * span], color="#3a3d42", name="print bed", prop=True)
-    part = s.mesh(X, mesh.tris, name=fil.name)
-    part.reveal(X[:, 2], heights)
+    part = s.mesh(X, mesh.tris, name=fil.name, keep=[int(np.argmin(np.linalg.norm(X - m["lift_xyz"], axis=1)))])
     U = W.resting(X, ws)
     ex = 0.08 * span / max(float(np.abs(U).max()), 1e-12)
-    part.deform(U, scale=release, exaggerate=ex)
-    part.color_by("lift", U[:, 2], scale=release, unit="mm", colormap="viridis")
-    s.readout("layer height", heights, unit="mm")
-    s.readout("warp", release * flat, unit="mm", limit=tol)
-    s.event(float(n_build - 1), "print done", "the part cools and comes off the bed")
-    s.label(f"corner lift {fmt(m['corner_lift_mm'])} mm", m["lift_xyz"], t0=float(n_build), kind="note")
+    part.deform(U, scale=ratio, exaggerate=ex)
+    top = float(np.abs(U[:, 2]).max()) * float(ratio.max())
+    part.color_by("lift", U[:, 2], scale=ratio, unit="mm", colormap="viridis", range=(0.0, max(top, 1.2 * tol)),
+                  limit=tol, limit_label="flatness tolerance")
+    s.readout("warp", ratio * flat, unit="mm", limit=tol)
+    s.readout("corner lift", ratio * m["corner_lift_mm"], unit="mm", limit=tol)
+    s.readout("locked in shrinkage", 100 * fil.props.cte * np.clip(tg - temps, 0.0, None), unit="%", digits=3)
+    if flat > tol and tg > t0:
+        s.event(float(tg - tol / flat * (tg - t0)), "within tolerance", f"warm air keeps it under {fmt(tol)} mm",
+                kind="info")
+    s.label("corner lift {corner lift}", m["lift_xyz"], kind="peak")
     s.verdict(verdict.upper(), head, {"ok": "pass", "marginal": "warn", "fails": "fail"}.get(verdict, "info"))
+    s.camera(target=(lo + hi) / 2, direction=(0.45, -1.0, 0.75), distance=1.25 * span)
     s.save(out, budget=450_000)

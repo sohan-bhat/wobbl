@@ -9,10 +9,10 @@ stress on the bed: 15.8 MPa
 Checks:
   [pass] mesh convergence: flatness after release settled: 3.79 -> 3.81 mm over 2 meshes, last change 0.4%
   [pass] hand calculation: a free plate 14.5 mm thick with the same shrinkage curves to 0.557 1/m, 3.62 mm over its 220 by 60 mm footprint; the solve gives 3.81 mm (1.05x)
-  [pass] balance on the bed: the shrinkage loads itself, so the bed's pulls and pushes cancel to 3.3e-08 of 9668 N
-  [pass] units and sanity: locked in shrinkage up to 0.72%, largest movement 7.58 mm on a 220 mm part
+  [pass] balance on the bed: the shrinkage loads itself, so the bed's pulls and pushes cancel to 1.6e-08 of 9654 N
+  [pass] units and sanity: locked in shrinkage up to 0.72%, largest movement 7.57 mm on a 220 mm part
   [fail] flatness: the face on the bed comes off 3.81 mm out of flat, its corners up to 3.81 mm, against a 0.8 mm tolerance
-  [info] bed peel: while it prints, the corner at (220, 60) mm pulls up on the bed with 339 N, about 0.369 MPa over its 34.2 mm patch
+  [info] bed peel: while it prints, the corner at (220, 0) mm pulls up on the bed with 336 N, about 0.365 MPa over its 34.2 mm patch
 
 Assumptions:
   - Wobbl guessed: bed temperature not given, so Wobbl assumed 100 C, usual for ABS.
@@ -25,11 +25,12 @@ Assumptions:
   - The part is held flat on the bed until the print ends, then released; corners that peel during the print are not followed, so a part that lifts early warps more than this.
   - The part is solid.
   - Supports, the seam and the cooling fan are not modeled, and the layers are treated as one bonded solid.
+  - Predicted 9 min for the first 2 mesh levels against a budget of 10 min, so the meshes were left as they were. It solved 2 levels of 26,082, 52,070 nodes in 3 min. The budget can be raised with --budget.
 
 Suggested fixes:
   - Print in an enclosure near 45 C: The locked in shrinkage runs from the glass transition down to the air around the part, so air at 45 C instead of 25 C cuts the warp to about 2.86 mm.
   - Print it in PETG: PETG locks in 0.33% against 0.72% here, for about 1.75 mm of warp, if its strength and heat resistance suit the part.
-  - Add a brim and keep the bed hot: While it prints a corner pulls up with about 339 N. A 5 to 8 mm brim gives that corner more bed to hold, and a bed near 100 C keeps the first layers soft and stuck, which this model assumes; it does not change the warp after release.
+  - Add a brim and keep the bed hot: While it prints a corner pulls up with about 336 N. A 5 to 8 mm brim gives that corner more bed to hold, and a bed near 100 C keeps the first layers soft and stuck, which this model assumes; it does not change the warp after release.
 
 Images: warp: images/warp.png, stress: images/stress.png, flatness: images/flatness.png
 Report: report.html
