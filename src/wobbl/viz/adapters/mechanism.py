@@ -19,7 +19,7 @@ import numpy as np
 
 from .. import props as P
 from ..scene import Scene
-from .common import plain, read, verdict, words
+from .common import join, lathe, plain, read, verdict, words
 from .mech_joints import joints as joint_poses, masses, rotate
 
 FAIL_WORDS = ("limit", "stall", "slip", "tip", "bind", "collide", "hits", "lift off", "separat", "touches")
@@ -292,6 +292,41 @@ def setting(s, out, pb, J, w, plane, reach, drawn):
             s.ground(z, size=reach * 5, grid=_grid(reach), color="#1d1f23", center=np.asarray(plane["pos"])[:2])
 
 
+def _prism(x0, x1, w0, w1, z0, z1, top0=None, top1=None):
+    """A bar along x from x0 to x1, w0 then w1 wide, from z0 up to z1 (or to top0 and top1 at either end)."""
+    t0, t1 = (z1 if top0 is None else top0), (z1 if top1 is None else top1)
+    V = np.array([[x0, -w0 / 2, z0], [x0, w0 / 2, z0], [x0, w0 / 2, t0], [x0, -w0 / 2, t0],
+                  [x1, -w1 / 2, z0], [x1, w1 / 2, z0], [x1, w1 / 2, t1], [x1, -w1 / 2, t1]], float)
+    T = [(0, 2, 1), (0, 3, 2), (4, 5, 6), (4, 6, 7), (0, 1, 5), (0, 5, 4), (3, 7, 6), (3, 6, 2), (1, 2, 6), (1, 6, 5),
+         (0, 4, 7), (0, 7, 3)]
+    return V, np.array(T)
+
+
+def wiper_arm(arm: float, reach: float):
+    """A wiper arm in its own frame, the pivot at the origin and the arm out along +x over the glass at z = 0: a
+    round head on the spindle, the spring housing over its first third and a bar that tapers and drops to the
+    blade's clip at its end."""
+    r, h = reach * 0.045, reach * 0.05
+    head = lathe([(0.0, 0.0), (r, 0.0), (r, h * 0.8), (r * 0.8, h), (0.0, h)], 32)
+    housing = _prism(-r * 0.4, arm * 0.32, reach * 0.06, reach * 0.042, h * 0.15, h * 1.05, h * 1.05, h * 0.75)
+    bar = _prism(arm * 0.3, arm * 0.97, reach * 0.032, reach * 0.022, h * 0.2, h * 0.75, h * 0.75, h * 0.45)
+    clip = _prism(arm * 0.94, arm * 1.0, reach * 0.03, reach * 0.03, h * 0.12, h * 0.5)
+    return join(head, housing, bar, clip)
+
+
+def wiper_blade(blade: float, reach: float):
+    """A wiper blade in its own frame, centered on the arm's clip, lying along x on the glass at z = 0: a rubber
+    lip that narrows to an edge on the glass, the steel spine over it and the yoke that takes the arm's clip."""
+    L, w = blade, reach * 0.022
+    lip = _prism(-L / 2, L / 2, w * 0.15, w * 0.15, 0.0, w * 0.5)
+    lip_top = _prism(-L / 2, L / 2, w * 0.7, w * 0.7, w * 0.45, w * 0.8)
+    spine = _prism(-L * 0.49, L * 0.49, w, w, w * 0.8, w * 1.25)
+    # the yoke rises in the middle to the clip, tapered at either end
+    yoke = join(_prism(-L * 0.3, 0.0, w * 0.9, w * 1.1, w * 1.2, w * 1.4, w * 1.4, w * 2.6),
+                _prism(0.0, L * 0.3, w * 1.1, w * 0.9, w * 1.2, w * 1.4, w * 2.6, w * 1.4))
+    return join(lip, lip_top, spine, yoke)
+
+
 def windshield(s, pb, name, j, J, reach):
     """Glass over the linkage, its normal along the output joint's axis, and a wiper arm and blade fixed on the
     output link's angle, sweeping the glass. The arm and blade are drawn, not simulated."""
@@ -314,10 +349,11 @@ def windshield(s, pb, name, j, J, reach):
     quats = np.array([P.quat(a, b, n) for a, b in zip(d, side)])
     s.body("cylinder", [reach * 0.02, lift / 2], pos=piv + n * lift / 2, quat=P.z_to(n), color="#2b2e33",
            name="wiper spindle", prop=True)
-    s.body("box", [arm / 2, reach * 0.018, reach * 0.01], pos=base + n * reach * 0.03 + d * arm / 2, quat=quats,
-           color="#1f2124", name="wiper arm", prop=True)
-    s.body("box", [blade / 2, reach * 0.012, reach * 0.016], pos=base + n * reach * 0.012 + d * arm * 0.98,
-           quat=quats, color="#111214", name="wiper blade", prop=True)
+    Xa, Ta = wiper_arm(arm, reach)
+    s.mesh(Xa, Ta, name="wiper arm", color="#55595f", prop=True, max_vertices=4000).move(base, quats)
+    Xb, Tb = wiper_blade(blade, reach)
+    s.mesh(Xb, Tb, name="wiper blade", color="#3a3d42", prop=True, max_vertices=4000).move(
+        base + n * reach * 0.002 + d * arm * 0.98, quats)
     t = np.asarray(pb["t"], float)
     tip, root = base + d * (arm * 0.98 + blade / 2), base + d * (arm * 0.98 - blade / 2)
     swing = (pb.get("swing") or {}).get(body["name"])
