@@ -10,7 +10,7 @@ import { examples, readmeBody } from '../../lib/examples';
 import { playFor } from '../../lib/playback';
 import { render } from '../../lib/markdown';
 import { hasSim } from '../../lib/sim';
-import { sceneFor } from '../../lib/scenes';
+import { sceneRun } from '../../lib/scenes';
 import { repoUrl, url } from '../../lib/site';
 
 export function getStaticPaths() {
@@ -19,9 +19,9 @@ export function getStaticPaths() {
 }
 const { ex, prev, next } = Astro.props;
 const html = render(readmeBody(ex), `examples/${ex.name}/README.md`).html;
-// a motion example plays its run back above, and so does a strength or heat run, so the README's
+// a motion example plays its run back above, and so does a strength, heat or scene run, so the README's
 // charts fold away behind their own titles
-const notes = ex.runs.some((r) => hasSim(r) || playFor(ex, r) || sceneFor(r.rel))
+const notes = ex.runs.some((r) => hasSim(r) || playFor(ex, r) || sceneRun(r))
   ? html.replace(/<figure>([\s\S]*?alt="([^"]*)"[\s\S]*?)<\/figure>/g,
     (_m, inner: string, alt: string) => `<details class="ex-chart"><summary>${alt}</summary><figure>${inner}</figure></details>`)
   : html;
@@ -40,7 +40,7 @@ const first = ex.runs[0];
     <div class="ex-runs">
       {ex.runs.map((r) => (
         <>
-          {playFor(ex, r) ? <LiveRun ex={ex} run={r} first={r === ex.runs[0]} /> : <RunCard run={r} />}
+          {playFor(ex, r) || sceneRun(r) ? <LiveRun ex={ex} run={r} first={r === ex.runs[0]} /> : <RunCard run={r} />}
           {r.fixes.length > 0 && !playFor(ex, r) && <FixStrip run={r} />}
         </>
       ))}

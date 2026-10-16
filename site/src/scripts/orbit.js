@@ -61,6 +61,26 @@ export class Orbit {
 }
 
 /**
+ * Back the camera off along its view until every point of box is inside the view with a margin, and never
+ * nearer than least. The live playback and the posters drawn at build time frame a part the same way.
+ */
+export function fitTo(o, box, least) {
+  o.update();
+  const tv = Math.tan((o.fov * Math.PI) / 360) * 0.93, th = tv * o.aspect;
+  let d = least;
+  for (const p of box) {
+    const r = [p[0] - o.target[0], p[1] - o.target[1], p[2] - o.target[2]];
+    const cx = Math.abs(dot(r, o.x)), cy = Math.abs(dot(r, o.y)), cz = dot(r, o.z);
+    d = Math.max(d, cz + cx / th, cz + cy / tv);
+  }
+  o.dist = d;
+  o.update();
+}
+
+/** The eight corners of the box lo to hi. */
+export const corners = (lo, hi) => [0, 1, 2, 3, 4, 5, 6, 7].map((c) => [c & 1 ? hi[0] : lo[0], c & 2 ? hi[1] : lo[1], c & 4 ? hi[2] : lo[2]]);
+
+/**
  * Drag to turn the camera round its target and pinch to move in and out, as OrbitControls does. A
  * plain wheel scrolls the page; a pinch on a trackpad, which browsers send as a wheel with ctrl held,
  * zooms. onStart runs once a drag or pinch really moves, never for a press that turns into a page

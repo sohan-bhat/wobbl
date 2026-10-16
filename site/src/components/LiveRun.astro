@@ -1,32 +1,52 @@
 ---
-// A strength or heat run on its example page, played back from its own results: the question, the
-// command, and the part in 3D with the load ramping up (or the temperatures rising over the run's
-// saved times), one live number per part and the verdict once it ends. A run that was fixed plays
-// beside the fix chosen under it. Before the script runs, without WebGL or with reduced motion, the
-// figure shows Wobbl's own heatmap and the final numbers. The checks, the other numbers, the charts
-// and summary.txt sit in a closed toggle under it, and the full report is a link.
+// A run on its example page, played back from its own results: the question, the command, and the part in
+// 3D with the load ramping up (or the temperatures rising over the run's saved times), one live number per
+// part and the verdict once it ends. A run that was fixed plays beside the fix chosen under it. A run with a
+// scene (its scene.wobbl) plays in the same view: the scene's input ramps from its first value to the value
+// the question asked about, and then the slider under the view is free to drag. Before the script runs,
+// without WebGL or with reduced motion, the figure shows a still of the view and the final numbers. The
+// checks, the other numbers, the charts and summary.txt sit in a closed toggle under it, and the full
+// report is a link.
 import Term from './Term.astro';
-import { picture } from '../lib/images';
-import { COLOR, metrics, type Example, type Run } from '../lib/examples';
-import { clock, finalValue, firstFix, fmt, meter, pace, panes as panesOf, type Pane, type StrengthRun } from '../lib/playback';
+import { picture, publicSize } from '../lib/images';
+import { COLOR, metrics, runImages, type Example, type Run } from '../lib/examples';
+import { clock, finalValue, firstFix, fmt, meter, pace, panes as panesOf, playFor, type Pane, type StrengthRun } from '../lib/playback';
+import { sceneRun } from '../lib/scenes';
+import { num, sig } from '../scripts/scene-file.js';
 import { url } from '../lib/site';
 import '../styles/live-run.css';
 
 interface Props { ex: Example; run: Run; first?: boolean }
 const { ex, run, first = false } = Astro.props;
-const all = panesOf(ex, run);
-const fix = firstFix(all);
-const shown = fix > 0 ? [all[0], all[fix]] : [all[0]];
-const lead = all[0].play;
-const kind = lead.kind;
-const m = meter(lead);
-const p = pace(lead);
+const word = (v: string) => v.toUpperCase();
+const checks = (run.outcome.checks ?? []).filter((c) => c.status !== 'skip');
+const sc = playFor(ex, run) ? null : sceneRun(run);
+
+// ---- a strength or heat run ----------------------------------------------------------------------
+const all = sc ? [] : panesOf(ex, run);
+const fix = sc ? -1 : firstFix(all);
+const shown = sc ? [] : fix > 0 ? [all[0], all[fix]] : [all[0]];
+const lead = sc ? null : all[0].play;
+
+// ---- a scene run -----------------------------------------------------------------------------------
+const sp = sc?.play ?? null;
+const inp = sp?.input;
+const lerpAt = (vs: (number | null)[], p: number) => {
+  const a = Math.floor(p), b = Math.min(a + 1, vs.length - 1), k = inp!.between === 'step' ? 0 : p - a;
+  const x = vs[a] ?? NaN, y = vs[b] ?? NaN;
+  return k ? x + (y - x) * k : x;
+};
+const sceneText = (v: number, unit: string, d = 3) => `${sig(v, d)}${unit ? ` ${unit}` : ''}`;
+
+const kind = sc ? 'scene' : lead!.kind;
+const m = sp ? (sp.q ? { lo: sp.q.lo, top: sp.q.top, marks: sp.q.marks } : { lo: 0, top: 1, marks: [] }) : meter(lead!);
+const p = sp ? { tag: '', seconds: 4.5, speed: 1, span: 1 } : pace(lead!);
 const frac = (v: number) => Math.min(Math.max((v - m.lo) / (m.top - m.lo), 0), 1);
 const pct = (v: number) => `${frac(v) * 100}%`;
-const unit = kind === 'strength' ? 'MPa' : 'C';
-const word = (v: string) => v.toUpperCase();
+const unit = sp ? sp.q?.unit ?? '' : kind === 'strength' ? 'MPa' : 'C';
 const loads = kind === 'strength' ? (lead as StrengthRun).loads : [];
-const loadText = loads.join(' and ');
+// each load as the page writes every number, 2,000 N rather than 2000 N
+const loadText = loads.map((l) => { const [v, u] = l.split(' '); return Number.isFinite(Number(v)) ? `${fmt(Number(v), Number(v) < 100 ? 1 : 0)} ${u}` : l; }).join(' and ');
 // the moment a part passes its limit, when it does: the load at that point (stress scales with it)
 // or the time the run itself reported
 const eventOf = (pane: Pane) => {
@@ -40,16 +60,43 @@ const eventOf = (pane: Pane) => {
   }
   return q.cross_s != null ? { k: q.cross_s, text: `Passes ${fmt(q.limit_C)} C at ${clock(q.cross_s)}` } : null;
 };
-const event = shown.map(eventOf).find((e) => e) ?? null;
-const label = kind === 'strength' ? 'Load' : 'Time';
-const steady = lead.kind === 'heat' && !lead.transient;
-const total = kind === 'strength' ? loadText : steady ? 'Steady state' : clock(p.span);
-const alt = (name: string) => `Wobbl's ${kind === 'strength' ? 'stress' : 'temperature'} heatmap of the ${ex.title.toLowerCase()}${all.length > 1 ? `, ${name.toLowerCase()}` : ''}`;
-const checks = (run.outcome.checks ?? []).filter((c) => c.status !== 'skip');
+const event = sp ? (sp.event && { k: sp.event.at, text: sp.event.text }) : shown.map(eventOf).find((e) => e) ?? null;
+const label = sp ? inp!.label : kind === 'strength' ? 'Load' : 'Time';
+const steady = lead?.kind === 'heat' && !lead.transient;
+const inputText = (v: number) => `${num(v)}${inp!.unit ? ` ${inp!.unit}` : ''}`;
+const total = sp ? inputText(lerpAt(inp!.t, inp!.home))
+  : kind === 'strength' ? loadText : steady ? 'Steady state' : clock(p.span);
+const alt = (name: string) => sp ? `The ${sp.title.toLowerCase()}, as the run left it at ${total}`
+  : `Wobbl's ${kind === 'strength' ? 'stress' : 'temperature'} heatmap of the ${ex.title.toLowerCase()}${all.length > 1 ? `, ${name.toLowerCase()}` : ''}`;
 // the convergence chart the site keeps for the bracket; a README's own charts fold away in its notes
 const extra = run.rel === 'shelf-bracket/output' ? ['bracket-convergence'] : [];
-const heatmap = all[0].poster;
-const data = JSON.stringify({
+const heatmap = sp ? null : all[0].poster;
+// a scene run keeps the charts Wobbl drew for it under the toggle
+const charts = sp ? runImages(run).map((i) => i.name).filter((n) => !/setup/.test(n) && publicSize(`/img/${n}.webp`)) : [];
+
+// the readings at the value the question asked about
+const qHome = sp?.q ? lerpAt(sp.q.values, inp!.home) : NaN;
+const final = sp ? (sp.q ? sig(qHome, sp.q.digits) : '') : '';
+const alsoText = sp ? sp.also.map((a, i) => `${i ? a.name : a.name[0].toUpperCase() + a.name.slice(1)} ${sceneText(lerpAt(a.values, inp!.home), a.unit, a.digits)}`).join(', ') : '';
+const toggles = sp ? [
+  ...(sp.exag > 1 ? [{ key: 'bend', text: `Bending ×${sp.exag}`, title: 'Draw the bending larger than it is' }] : []),
+  ...(sp.magnify ? [{ key: 'mag', text: `${sp.magnify.label} ×${sp.magnify.factor}`, title: `Draw the ${sp.magnify.label.toLowerCase()} larger than it is` }] : []),
+] : [];
+const rows = sp ? [{ name: 'As drawn', v: qHome, verdict: run.outcome.verdict, finalText: final }]
+  : shown.map((pane) => {
+    const q = pane.play;
+    return { name: pane.name, v: q.kind === 'strength' ? q.governing_MPa : q.t_max_C, verdict: q.verdict, finalText: finalValue(q) };
+  });
+const panes = sp ? [{ name: 'As drawn', pic: sc!.poster ? { src: sc!.poster.src, srcset: '', width: sc!.poster.width, height: sc!.poster.height } : null }]
+  : shown.map((pane) => ({ name: pane.name, pic: pane.poster ? picture(pane.poster) : null }));
+const T0 = sp ? inp!.t[0] : 0, T1 = sp ? inp!.t[inp!.t.length - 1] : 0;
+const homeAt = sp ? inp!.home / Math.max(inp!.t.length - 1, 1) : 0;
+
+const data = JSON.stringify(sp ? {
+  kind, fix: -1, pace: p, meter: m, unit, loads: [], steady: false, total, title: sp.title.toLowerCase(),
+  panes: [{ rel: run.rel, name: 'As drawn', file: sc!.src, run: sp, event, final, verdict: run.outcome.verdict,
+    poster: sc!.poster && { src: sc!.poster.src, srcset: '', width: sc!.poster.width, height: sc!.poster.height, alt: alt('') } }],
+} : {
   kind, fix, pace: p, meter: m, unit, loads, steady, total, title: ex.title.toLowerCase(),
   panes: all.map((pane) => {
     const pic = pane.poster ? picture(pane.poster) : null;
@@ -58,28 +105,27 @@ const data = JSON.stringify({
   }),
 }).replace(/</g, '\\u003c');
 ---
-<div class:list={['run', 'lrun-run', { 'lrun-wide': shown.length > 1 }]}>
+<div class:list={['run', 'lrun-run', { 'lrun-wide': panes.length > 1 }]}>
   <div class="run-steps">
     <div class="run-step"><p class="run-label">You ask</p><p class="run-ask">{run.question}</p></div>
     <div class="run-step"><p class="run-label">Wobbl runs</p><Term code={run.command} /></div>
   </div>
   <div class="run-result">
-    <figure class="lrun" data-lrun data-kind={kind} data-panes={shown.length}>
+    <figure class="lrun" data-lrun data-kind={kind} data-panes={panes.length}>
       <div class="lrun-view" data-state="poster">
         <div class="lrun-panes">
-          {shown.map((pane, i) => {
-            const pic = pane.poster ? picture(pane.poster) : null;
-            return (
-              <div class="lrun-pane" data-i={i}>
-                {pic && <img class="lrun-poster" src={pic.src} srcset={pic.srcset} sizes={shown.length > 1 ? '(min-width: 1000px) 640px, 100vw' : '(min-width: 1000px) 46vw, 100vw'}
-                             width={pic.width} height={pic.height} loading={first ? undefined : 'lazy'} fetchpriority={first && i === 0 ? 'high' : undefined}
-                             decoding="async" alt={alt(pane.name)} />}
-                {shown.length > 1 && <p class="lrun-name" data-name>{pane.name}</p>}
-                <span class="lrun-mark" hidden aria-hidden="true"><span class="target"></span></span>
-              </div>
-            );
-          })}
+          {panes.map((pane, i) => (
+            <div class="lrun-pane" data-i={i}>
+              {pane.pic && <img class="lrun-poster" src={pane.pic.src} srcset={pane.pic.srcset || undefined}
+                                sizes={pane.pic.srcset ? (panes.length > 1 ? '(min-width: 1000px) 640px, 100vw' : '(min-width: 1000px) 46vw, 100vw') : undefined}
+                                width={pane.pic.width} height={pane.pic.height} loading={first ? undefined : 'lazy'} fetchpriority={first && i === 0 ? 'high' : undefined}
+                                decoding="async" alt={alt(pane.name)} />}
+              {panes.length > 1 && <p class="lrun-name" data-name>{pane.name}</p>}
+              <span class="lrun-mark" hidden aria-hidden="true"><span class="target"></span>{sp && <span class="peak-tag-v lrun-mark-v" data-mark-v></span>}</span>
+            </div>
+          ))}
         </div>
+        {sp && <div class="probe lrun-probe" hidden aria-hidden="true"><b data-probe-v></b><span data-probe-k></span><span class="x" data-probe-x></span></div>}
         <button type="button" class="btn-outline btn-sm lrun-replay" hidden>Replay</button>
         <p class="viewer-status lrun-status" role="status"></p>
       </div>
@@ -91,27 +137,47 @@ const data = JSON.stringify({
         </div>
       )}
       <div class="lrun-read">
-        <p class="lrun-clock"><span><span class="lrun-k">{label}</span> <span class="lrun-now" data-now>{total}</span><span class="lrun-of" data-of hidden> of {total}</span></span><span class="lrun-tag" hidden>{p.tag}</span></p>
-        {shown.map((pane, i) => {
-          const q = pane.play;
-          const v = q.kind === 'strength' ? q.governing_MPa : q.t_max_C;
-          return (
-            <div class="lrun-row" data-row={i}>
-              {shown.length > 1 && <p class="lrun-row-name" data-name>{pane.name}</p>}
+        <p class="lrun-clock">
+          <span><span class="lrun-k">{label}</span> <span class="lrun-now" data-now>{total}</span><span class="lrun-of" data-of hidden> of {total}</span></span>
+          {sp ? (toggles.length > 0 && (
+            <span class="lrun-toggles">
+              {toggles.map((t) => <button type="button" class="lrun-toggle" data-toggle={t.key} aria-pressed="true" title={t.title}><i aria-hidden="true"></i>{t.text}</button>)}
+            </span>
+          )) : <span class="lrun-tag" hidden>{p.tag}</span>}
+        </p>
+        {sp && inp!.t.length > 1 && (
+          <div class="lrun-slider">
+            <input type="range" min="0" max={inp!.t.length - 1} step={inp!.between === 'exact' ? 'any' : '1'} value={inp!.home} disabled
+                   aria-label={label} aria-valuetext={total} />
+            <div class="lrun-ticks lrun-sticks" aria-hidden="true">
+              <span style="left: 0">{inputText(T0)}</span>
+              {homeAt > 0.12 && homeAt < 0.88 && <span style={`left: ${homeAt * 100}%`}>{inp!.kind === 'input' ? 'asked' : ''}</span>}
+              <span style="left: 100%">{inputText(T1)}</span>
+            </div>
+          </div>
+        )}
+        {rows.map((row, i) => (
+          <div class="lrun-row" data-row={i}>
+            {rows.length > 1 && <p class="lrun-row-name" data-name>{row.name}</p>}
+            {sp && sp.q && <p class="lrun-row-name lrun-q">{sp.q.name}</p>}
+            {(!sp || sp.q) && (
               <div class="lrun-meter" aria-hidden="true">
-                <span class="lrun-fill" data-fill data-level={COLOR[q.verdict] ?? 'marginal'} style={`--f: ${frac(v)}`}></span>
+                <span class="lrun-fill" data-fill data-level={COLOR[row.verdict] ?? 'marginal'} style={`--f: ${frac(row.v)}`}></span>
                 {m.marks.map((mk) => <span class="lrun-mk" style={`left: ${pct(mk.at)}`}></span>)}
               </div>
-              <p class="lrun-n"><span data-n>{finalValue(q)}</span>&nbsp;{unit}</p>
-              <p class="vword lrun-verdict" data-verdict={COLOR[q.verdict] ?? 'marginal'} data-word>{word(q.verdict)}</p>
+            )}
+            <p class="lrun-n"><span data-n>{row.finalText}</span>{unit && <>&nbsp;{unit}</>}</p>
+            <p class="vword lrun-verdict" data-verdict={COLOR[row.verdict] ?? 'marginal'} data-word>{word(row.verdict)}</p>
+            {(!sp || sp.q) && (
               <div class="lrun-ticks" aria-hidden="true">
-                <span style="left: 0">{kind === 'strength' ? '0' : `${fmt(m.lo)} C air`}</span>
+                <span style="left: 0">{sp ? sig(m.lo, 3) : kind === 'strength' ? '0' : `${fmt(m.lo)} C air`}</span>
                 {m.marks.map((mk) => <span style={`left: ${pct(mk.at)}`}>{mk.text}</span>)}
               </div>
-            </div>
-          );
-        })}
-        {event && <p class="lrun-event" data-event>{event.text}</p>}
+            )}
+          </div>
+        ))}
+        {alsoText && <p class="lrun-also" data-also>{alsoText}</p>}
+        {event && <p class="lrun-event" data-event hidden={sp ? inp!.home < event.k : undefined}>{event.text}</p>}
         {steady && <p class="lrun-note">The run solved the steady state, and Wobbl's lumped check of the same sink times the warm up.</p>}
         <p class="visually-hidden" data-said aria-live="polite"></p>
       </div>
@@ -125,13 +191,14 @@ const data = JSON.stringify({
       {checks.length > 0 && (
         <ul class="run-checks">{checks.map((c) => <li data-status={c.status}><span class="st">{c.status}</span>{c.name}</li>)}</ul>
       )}
-      {[...(heatmap ? [heatmap] : []), ...extra].map((name) => {
+      {[...(heatmap ? [heatmap] : []), ...extra, ...charts].map((name) => {
         const pic = picture(name);
         return <img class="lrun-more-img" src={pic.src} srcset={pic.srcset} sizes="(min-width: 1000px) 46vw, 100vw" width={pic.width} height={pic.height}
                     loading="lazy" decoding="async" alt={name.includes('convergence') ? 'Peak stress at each mesh level, as Wobbl plotted it'
-                      : name.includes('history') ? 'Hottest point and average temperature over the run, as Wobbl plotted them' : alt('As drawn')} />;
+                      : name.includes('history') ? 'Hottest point and average temperature over the run, as Wobbl plotted them'
+                      : sp ? `${name.replace(/-/g, ' ')}, as Wobbl plotted it` : alt('As drawn')} />;
       })}
-      <Term code={run.summary} lang="text" label="summary.txt" />
+      {run.summary && <Term code={run.summary} lang="text" label="summary.txt" />}
     </details>
   </div>
 </div>

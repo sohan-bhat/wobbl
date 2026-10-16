@@ -1,18 +1,21 @@
 // Strength and heat runs on the example pages, played back from their own results. A strength run's
 // load ramps from zero to the run's load and, since the models are linear elastic, every stress and
 // displacement grows in step with it, so each frame is exact. A heat run plays its saved temperature
-// fields on a sped up clock. The part loads once the figure comes near the screen and plays once it is
+// fields on a sped up clock. A scene run's input ramps from its first value to the value its question
+// asked about, once, and then the slider under the view moves it, with a probe under the mouse. The part
+// loads once the figure comes near the screen and plays once it is
 // on screen; it pauses off screen and in a hidden tab. With reduced motion, without WebGL or before
 // the script runs, the figure keeps Wobbl's own heatmap and the final numbers. Nothing here reads or
 // writes the URL. initLiveRuns returns a function that tears everything down when the page is left.
-import { Orbit, orbitControls } from './orbit.js';
+import { Orbit, corners, fitTo, orbitControls } from './orbit.js';
 import { decoder, inWorker, offscreen, onPage, webgl, type Back } from './play-back';
+import { num, sig } from './scene-file.js';
 
 interface Ev { k: number; text: string }
 interface Poster { src: string; srcset: string; width: number; height: number; alt: string }
-interface PaneData { rel: string; name: string; file: string; run: Record<string, any>; event: Ev | null; final: string; poster: Poster | null }
+interface PaneData { rel: string; name: string; file: string; run: Record<string, any>; event: Ev | null; final: string; poster: Poster | null; verdict?: string }
 interface Data {
-  kind: 'strength' | 'heat'; fix: number; unit: string; loads: string[]; steady: boolean; total: string; title: string;
+  kind: 'strength' | 'heat' | 'scene'; fix: number; unit: string; loads: string[]; steady: boolean; total: string; title: string;
   pace: { tag: string; seconds: number; speed: number; span: number };
   meter: { lo: number; top: number; marks: { at: number; text: string }[] };
   panes: PaneData[];
@@ -54,12 +57,18 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const data: Data = JSON.parse(fig.querySelector('[data-lrun-data]')!.textContent || '{}');
   const q = <T extends Element = HTMLElement>(s: string, r: ParentNode = fig) => r.querySelector<T>(s)!;
   const qa = <T extends Element = HTMLElement>(s: string, r: ParentNode = fig) => [...r.querySelectorAll<T>(s)];
-  const view = q('.lrun-view'), tag = q('.lrun-tag'), replay = q<HTMLButtonElement>('.lrun-replay'), status = q('.lrun-status');
+  const view = q('.lrun-view'), tag = fig.querySelector<HTMLElement>('.lrun-tag'), replay = q<HTMLButtonElement>('.lrun-replay'), status = q('.lrun-status');
   const paneEls = qa('.lrun-pane'), rowEls = qa('.lrun-row');
   const now = q('[data-now]'), of = q('[data-of]'), said = q('[data-said]');
   const eventEl = fig.querySelector<HTMLElement>('[data-event]');
   const fixBtns = qa<HTMLButtonElement>('[data-fix]');
   const strength = data.kind === 'strength';
+  const sceneRun = data.kind === 'scene';
+  const slider = fig.querySelector<HTMLInputElement>('.lrun-slider input');
+  const alsoEl = fig.querySelector<HTMLElement>('[data-also]');
+  const probeEl = fig.querySelector<HTMLElement>('.lrun-probe');
+  const toggleBtns = qa<HTMLButtonElement>('[data-toggle]');
+  const look = { bend: true, mag: true };
   const shown = data.fix > 0 ? [0, data.fix] : [0];
   const abort = new AbortController();
   const on = (el: EventTarget, type: string, fn: (e: any) => void, o?: AddEventListenerOptions) =>
@@ -76,10 +85,64 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const frac = (v: number) => clamp01((v - data.meter.lo) / (data.meter.top - data.meter.lo));
   const level = (p: PaneData, v: number) => {
     const r = p.run;
+    if (sceneRun) {
+      const q = r.q;
+      if (!q || q.limit === null || !Number.isFinite(v)) return 'info';
+      return v > q.limit ? 'fails' : q.target !== null && v > q.target ? 'marginal' : 'holds';
+    }
     if (strength) return v >= r.allowable_MPa ? 'fails' : v >= r.allowable_MPa / r.target_sf ? 'marginal' : 'holds';
     return v > r.limit_C ? 'fails' : v >= r.limit_C - 5 ? 'marginal' : 'holds';
   };
   const verdictColor: Record<string, string> = { holds: 'holds', ok: 'holds', marginal: 'marginal', warm: 'marginal', fails: 'fails', hot: 'fails' };
+
+  // ---- a scene: where along its input the view stands --------------------------------------
+  // pos is a frame position, 0 to the last frame, with the question's own value at home
+  const sc = sceneRun ? data.panes[0].run : null;
+  const F = sc ? sc.input.t.length : 1;
+  const home = sc ? sc.input.home : 0;
+  let pos = home, free = false;
+  const frameAt = (p: number) => {
+    const a = Math.min(Math.max(Math.floor(p), 0), F - 1), b = Math.min(a + 1, F - 1);
+    return { a, b, k: sc.input.between === 'step' ? 0 : Math.min(Math.max(p - a, 0), 1) };
+  };
+  const along = (vs: (number | null)[], p: number) => {
+    const { a, b, k } = frameAt(p), x = vs[a] ?? NaN, y = vs[b] ?? NaN;
+    return k ? x + (y - x) * k : x;
+  };
+  const withUnit = (v: number, unit: string, d = 3) => `${sig(v, d)}${unit ? NB + unit : ''}`;
+  const verdictWord: Record<string, string> = { holds: 'HOLDS', marginal: 'MARGINAL', fails: 'FAILS' };
+
+  /** The scene's readings at pos: the input, the meter's reading and its verdict, the other readings and the event. */
+  function sceneReadings(end: boolean) {
+    const inp = sc.input, p0 = data.panes[0], rq = sc.q;
+    const atHome = Math.abs(pos - home) < 1e-6;
+    put(now, `${num(along(inp.t, pos))}${inp.unit ? NB + inp.unit : ''}`);
+    of.hidden = free || end;
+    const el = rowEls[0], v = rq ? along(rq.values, pos) : NaN;
+    if (rq) {
+      put(q('[data-n]', el), sig(v, rq.digits));
+      const fill = q('[data-fill]', el);
+      fill.style.setProperty('--f', frac(v).toFixed(4));
+    }
+    const w = q('[data-word]', el);
+    // the run's own verdict at the value it was asked about, else the reading against its limit
+    const lv = atHome && (end || free) ? verdictColor[p0.verdict ?? ''] ?? 'marginal' : level(p0, v);
+    if (rq) set(q('[data-fill]', el), 'data-level', lv === 'info' ? 'holds' : lv);
+    if ((end || free) && (atHome || lv !== 'info')) {
+      set(w, 'data-verdict', lv);
+      put(w, atHome ? (p0.verdict ?? '').toUpperCase() : verdictWord[lv] ?? '');
+      if (w.hasAttribute('data-hide')) { w.removeAttribute('data-hide'); if (end && !free) w.setAttribute('data-land', ''); }
+    } else {
+      set(w, 'data-hide', '');
+      w.removeAttribute('data-land');
+    }
+    if (alsoEl) put(alsoEl, sc.also.map((x: any, i: number) => `${i ? x.name : x.name[0].toUpperCase() + x.name.slice(1)} ${withUnit(along(x.values, pos), x.unit, x.digits)}`).join(', '));
+    if (eventEl && p0.event) eventEl.hidden = pos < p0.event.k - 1e-9;
+    if (slider) {
+      if (!slider.matches(':active')) slider.value = String(pos);
+      slider.setAttribute('aria-valuetext', `${now.textContent}${rq ? `, ${rq.name} ${sig(v, rq.digits)}${rq.unit ? ` ${rq.unit}` : ''}` : ''}`);
+    }
+  }
 
   // ---- the readings, at playback progress u (0 to 1) -------------------------------------
   const simSeconds = (u: number) => u * data.pace.span;
@@ -92,11 +155,16 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   }
   function readings(u: number) {
     const end = u >= 1;
+    if (sceneRun) {
+      if (!free) pos = home * u;
+      sceneReadings(end);
+      return;
+    }
     if (strength) {
       if (data.loads.length === 1) {
         const [v, unit] = data.loads[0].split(' ');
         const x = Number(v) * u;
-        put(now, end ? data.loads[0] : `${fmt(x, Number(v) < 100 ? 1 : 0)}${NB}${unit}`);
+        put(now, end ? data.total : `${fmt(x, Number(v) < 100 ? 1 : 0)}${NB}${unit}`);
       } else {
         put(now, end ? data.total : `${fmt(u * 100)}%`);
       }
@@ -135,6 +203,11 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
 
   /** What a screen reader hears once a run has played. */
   function sayEnd() {
+    if (sceneRun) {
+      const p0 = data.panes[0], rq = sc.q;
+      said.textContent = `At ${now.textContent}${rq ? `, ${rq.name} ${p0.final}${rq.unit ? ` ${rq.unit}` : ''}` : ''}, ${p0.verdict ?? ''}.`;
+      return;
+    }
     const parts = shown.map((pi) => {
       const p = data.panes[pi], who = shown.length > 1 ? `${p.name}, ` : '';
       return strength ? `${who}peak ${p.final} megapascals, ${p.run.verdict}.` : `${who}hottest point ${p.final} C, ${p.run.verdict}.`;
@@ -165,7 +238,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const duration = data.pace.seconds;
   const u = () => clamp01((t - LEAD) / duration);
   const lead = data.panes[0].run;
-  const lo = lead.mesh.bounds_min, hi = lead.mesh.bounds_max;
+  const lo = sceneRun ? lead.bounds.lo : lead.mesh.bounds_min, hi = sceneRun ? lead.bounds.hi : lead.mesh.bounds_max;
   const radius = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2;
   const top = strength ? Math.max(...data.panes.map((p) => p.run.governing_MPa)) : 0;
 
@@ -173,27 +246,16 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const views = () => (shown.length === 1 ? [[0, 0, w, h]]
     : w >= h ? [[0, 0, w / 2, h], [w / 2, 0, w / 2, h]] : [[0, 0, w, h / 2], [0, h / 2, w, h / 2]]);
   // the points the view has to hold: the corners of the part's box, and the arrow's ends at full load
-  const box = [0, 1, 2, 3, 4, 5, 6, 7].map((c) => [c & 1 ? hi[0] : lo[0], c & 2 ? hi[1] : lo[1], c & 4 ? hi[2] : lo[2]]);
+  const box = corners(lo, hi);
   if (strength && lead.arrow) {
     const a = lead.arrow, len = 0.42 * radius * (a.pull ? 1 : -1);
     box.push(a.point, a.point.map((x: number, i: number) => x + len * a.dir[i]));
   }
   /** Back the camera off until every one of those points is inside the view with a margin. */
   function fitCamera() {
-    const o = orbit!;
     const [, , vw, vh] = views()[0];
-    o.aspect = vw / vh;
-    o.update();
-    const tv = Math.tan(Math.PI / 12) * 0.93, th = tv * o.aspect;
-    let d = radius * 1.2;
-    for (const p of box) {
-      const r = [p[0] - o.target[0], p[1] - o.target[1], p[2] - o.target[2]];
-      const dot = (a: number[]) => r[0] * a[0] + r[1] * a[1] + r[2] * a[2];
-      const cx = Math.abs(dot(o.x)), cy = Math.abs(dot(o.y)), cz = dot(o.z);
-      d = Math.max(d, cz + cx / th, cz + cy / tv);
-    }
-    o.dist = d;
-    o.update();
+    orbit!.aspect = vw / vh;
+    fitTo(orbit!, box, radius * 1.2);
   }
   function homeCamera() {
     const v = lead.camera.view;
@@ -210,7 +272,11 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       camera: { position: orbit.eye, target: orbit.target, fov: orbit.fov, aspect: orbit.aspect },
       views: views(), k, radius,
     };
-    if (!strength) {
+    if (sceneRun) {
+      const { a, b, k: kk } = frameAt(pos), T = lead.input.t;
+      f.scene = { a, b, k: kk, t: kk ? T[a] + (T[b] - T[a]) * kk : T[a], bend: look.bend, mag: look.mag };
+      f.k = 1;
+    } else if (!strength) {
       if (lead.transient) {
         const s = simSeconds(k), ts: number[] = lead.times_s;
         let i = 0;
@@ -232,7 +298,18 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     views().forEach(([, , vw, vh], row) => {
       const p = data.panes[shown[row]], r = p.run, mark = q('.lrun-mark', paneEls[row]);
       let at: number[] | null = null;
-      if (strength) {
+      if (sceneRun) {
+        const pk = r.peaks;
+        if (pk) {
+          const { a, b, k: kk } = frameAt(pos), A = pk[a], B = pk[b] ?? A;
+          if (A && B) {
+            const key = look.bend ? 'pe' : 'p0';
+            at = A[key].map((x: number, i: number) => x + (B[key][i] - x) * kk);
+            const mv = mark.querySelector('[data-mark-v]');
+            if (mv) put(mv, withUnit(A.v + (B.v - A.v) * kk, r.q && r.q.field ? r.q.unit : (lead.q?.unit ?? ''), r.q?.digits ?? 3));
+          }
+        }
+      } else if (strength) {
         const f = r.exag * k;
         at = r.governing_xyz.map((x: number, i: number) => x + f * r.governing_disp[i]);
       } else if (r.marker) {
@@ -278,6 +355,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   function restart() {
     pause();
     t = 0;
+    free = false;
     done = false;
     started = true;
     replay.hidden = true;
@@ -294,7 +372,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       canvas!.style.opacity = '';
       // the poster stays under the canvas while it fades in
       setTimeout(() => { if (ready) view.dataset.state = 'live'; }, 320);
-      tag.hidden = false;
+      if (tag) tag.hidden = false;
       status.textContent = '';
       restart();
     } else if (!done) {
@@ -303,7 +381,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   }
 
   async function build() {
-    status.textContent = strength ? 'Loading the 3D part' : 'Loading the run';
+    status.textContent = strength ? 'Loading the 3D part' : sceneRun ? 'Loading the 3D scene' : 'Loading the run';
     w = view.clientWidth || 1;
     h = view.clientHeight || 1;
     const coarse = matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 600;
@@ -311,7 +389,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     canvas = document.createElement('canvas');
     canvas.tabIndex = 0;
     canvas.setAttribute('role', 'img');
-    canvas.setAttribute('aria-label', `3D ${strength ? 'stress' : 'temperature'} map of the ${data.title}, played from the run's own results. ` +
+    canvas.setAttribute('aria-label', `${sceneRun ? `3D view of ${data.title}` : `3D ${strength ? 'stress' : 'temperature'} map of the ${data.title}`}, played from the run's own results. ` +
       'Drag or press the arrow keys to turn it, and double click or press Home to put it back.');
     canvas.style.opacity = '0';
     canvas.style.transition = 'opacity 0.3s ease';
@@ -326,7 +404,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     if (abort.signal.aborted) return;
     ready = true;
     const target = [0, 1, 2].map((i) => (lo[i] + hi[i]) / 2);
-    orbit = new Orbit({ target, az: 0, el: 0, dist: radius * 4, fov: 30, aspect: 1, near: radius / 50, far: radius * 40,
+    orbit = new Orbit({ target, az: 0, el: 0, dist: radius * 4, fov: sceneRun ? lead.camera.fov : 30, aspect: 1, near: radius / 50, far: radius * 40,
       minDist: radius * 1.1, maxDist: radius * 8 });
     homeCamera();
     on(canvas, 'dblclick', () => { homeCamera(); requestDraw(); });
@@ -351,8 +429,61 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     });
     ro.observe(view);
     abort.signal.addEventListener('abort', () => ro.disconnect(), { once: true });
+    if (sceneRun) sceneControls();
     draw();
     maybeStart();
+  }
+
+  // ---- a scene's slider, its toggles and the probe under the mouse ------------------------------
+  function sceneControls() {
+    const goTo = (p: number) => {
+      // taking the slider ends the replay where it is, and the slider moves the scene from then on
+      if (playing || !done) { pause(); done = true; replay.hidden = false; }
+      free = true;
+      pos = Math.min(Math.max(p, 0), F - 1);
+      readings(1);
+      requestDraw();
+    };
+    if (slider) {
+      slider.disabled = false;
+      on(slider, 'input', () => goTo(Number(slider.value)));
+    }
+    for (const b of toggleBtns) {
+      on(b, 'click', () => {
+        const k = b.dataset.toggle as 'bend' | 'mag';
+        look[k] = !look[k];
+        b.setAttribute('aria-pressed', String(look[k]));
+        requestDraw();
+      });
+    }
+    if (!probeEl || !canvas) return;
+    let hover: PointerEvent | null = null, pr = 0, asked = 0;
+    const hide = () => { hover = null; probeEl.hidden = true; };
+    const read = async () => {
+      pr = 0;
+      if (!hover || !orbit || !back) return;
+      const e = hover, r = canvas!.getBoundingClientRect();
+      const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = 1 - ((e.clientY - r.top) / r.height) * 2;
+      const { origin, dir } = orbit.ray(nx, ny), id = ++asked;
+      const hit = await back.probe(0, origin, dir).catch(() => null);
+      if (id !== asked || !hover) return;
+      if (!hit) { probeEl.hidden = true; return; }
+      put(q('[data-probe-v]', probeEl), withUnit(hit.v, hit.unit, hit.digits + 1));
+      put(q('[data-probe-k]', probeEl), hit.name);
+      put(q('[data-probe-x]', probeEl), hit.limit > 0 ? `${Math.round((hit.v / hit.limit) * 100)}% of ${hit.limitLabel || 'the limit'}` : '');
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      probeEl.classList.toggle('l', x > r.width - 200);
+      probeEl.style.translate = `${x.toFixed(1)}px ${y.toFixed(1)}px`;
+      probeEl.hidden = false;
+    };
+    on(canvas, 'pointermove', (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' || e.buttons) { hide(); return; }
+      hover = e;
+      if (!pr) pr = requestAnimationFrame(read);
+    }, { passive: true });
+    on(canvas, 'pointerleave', hide);
+    on(canvas, 'pointerdown', hide);
+    abort.signal.addEventListener('abort', () => cancelAnimationFrame(pr), { once: true });
   }
 
   // ---- when to load, play and pause ------------------------------------------------------------

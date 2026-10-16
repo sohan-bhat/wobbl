@@ -104,3 +104,30 @@
 .lrun-more-img { width: 100%; margin-top: 20px; border: 1px solid var(--line); background: var(--bg); }
 .lrun-more .term { margin-top: 20px; }
 .lrun-more pre { max-height: 440px; overflow: auto; font-size: 12.5px; }
+
+/* A scene run: the input's slider, the toggles that draw the bending or a small part larger than it is,
+   the peak's value beside its marker, the probe under the mouse and the other readings in one line */
+.lrun-toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+.lrun-toggle {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px; cursor: pointer;
+  background: var(--bg-3); border: 1px solid var(--line-2); color: var(--muted);
+  font: 500 12px/1 var(--mono); letter-spacing: 0.04em;
+}
+.lrun-toggle i { width: 10px; height: 10px; border: 1.5px solid currentColor; }
+.lrun-toggle[aria-pressed="true"] { color: var(--fg); border-color: var(--fg-2); }
+.lrun-toggle[aria-pressed="true"] i { background: var(--yellow); border-color: var(--yellow); }
+.lrun-toggle:hover { border-color: var(--yellow); }
+.lrun-slider input[type="range"] { margin: 0; }
+.lrun-slider input[type="range"]:disabled { cursor: default; opacity: 0.55; }
+.lrun-sticks { margin-top: 2px; margin-right: 10px; margin-left: 10px; }
+.lrun-sticks span:last-child { transform: translateX(-100%); }
+.lrun-sticks span:first-child { transform: translateX(-10px); }
+.lrun-q { margin-top: 4px; }
+.lrun-row .lrun-q + .lrun-meter { grid-area: meter; }
+.lrun-mark { display: flex; }
+.lrun-mark-v { position: absolute; left: 14px; top: -11px; padding: 4px 6px; font: 600 12px/1 var(--mono); white-space: nowrap; }
+.lrun-mark-v:empty { display: none; }
+.lrun-probe { left: 0; top: 0; display: grid; }
+.lrun-probe[hidden] { display: none; }
+.lrun-probe.l { transform: translate(calc(-100% - 14px), -50%); }
+.lrun-also { margin: 0; font: 500 13px/1.4 var(--mono); color: var(--fg-2); font-variant-numeric: tabular-nums; }
