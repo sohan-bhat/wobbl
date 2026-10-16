@@ -275,7 +275,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 115.994271,
+ "t_total": 134.013779,
  "solver": "GetDP cross sections with gmsh",
  "criteria": []
 }

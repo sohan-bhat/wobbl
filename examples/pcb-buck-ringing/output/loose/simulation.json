@@ -48,8 +48,8 @@
    "verdict": "marginal",
    "headline": "buck_loose.kicad_pcb has 5 routed nets on 2 layers, with trace impedances from 82.9 to 113 ohm. The longest, SW, runs 39.6 mm with 19.3 nH, 2.81 pF and 19.5 mohm. In buck.cir the layout raises the peak across D1 from 13.2 V on the schematic alone to 31.5 V, ringing at 168 MHz.",
    "confidence": "medium",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/pcb-buck-ringing/output/loose",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/pcb-buck-ringing/output/loose/report.html",
+   "result_dir": "output/loose",
+   "report": "output/loose/report.html",
    "assumptions": []
   }
  ]

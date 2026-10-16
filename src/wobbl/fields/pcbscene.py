@@ -1,10 +1,14 @@
 """The 3D scene of a board run: the board as it is built and its circuit ringing on it.
 
 The board is an FR4 slab of the stackup's thickness. Its copper (tracks, pours and pads) stands on the slab at
-each layer's height, colored by its net's voltage as ngspice solved the circuit with the layout, frame by frame
-over the ringing window. Glows run along every track at a speed set by the current the solve put through that
-pad connection, so the hot loop is the copper that flickers and races. The parts stand on their pads as 3D
-packages from the bench props, chosen by their reference letter.
+each layer's height. The parts stand on their pads as 3D packages from the bench props, chosen by their reference
+letter.
+
+When the run swept its hot loop (fields.pcbfield.sweep_loop) the scene is a slider over that loop's trace
+inductance, from none to three times the board's, opening at the board's own. Each value is the circuit solved
+again by ngspice. The part that rings hardest is colored by its peak voltage against its rating, the copper by
+each net's peak voltage, and a still glow marks the tracks that carry current. Without the sweep the scene plays
+the ringing window of the board's one solve, the copper colored by its net's voltage frame by frame.
 """
 from __future__ import annotations
 
@@ -12,6 +16,8 @@ import re
 from pathlib import Path
 
 import numpy as np
+
+from ..units import fmt
 
 COPPER_MIN = 0.06          # mm, copper is drawn at least this thick so it reads as raised
 FR4 = "#2f6b3a"
@@ -73,10 +79,11 @@ def _node(net: str) -> str:
     return safe_node(net.lstrip("/"))
 
 
-def _parts(sc, b, values: dict, ztop: float):
-    """The parts as 3D packages on their pads, by reference letter."""
+def _parts(sc, b, values: dict, ztop: float) -> dict:
+    """The parts as 3D packages on their pads, by reference letter. Returns each part's body by reference."""
     from ..viz import props_bench as PB
 
+    bodies = {}
     refs: dict[str, list] = {}
     for p in b.pads:
         if p.ref and (not p.layers or any(lay.startswith("F.") or lay == "*.Cu" for lay in p.layers)):
@@ -88,15 +95,15 @@ def _parts(sc, b, values: dict, ztop: float):
         val = values.get(ref.upper())
         two = len(pts) == 2
         if letter == "C" and two:
-            PB.capacitor(sc, pts, val, ref, lift=0.0)
+            bodies[ref] = PB.capacitor(sc, pts, val, ref, lift=0.0)
         elif letter == "R" and two:
-            PB.resistor(sc, pts[0], pts[1], val, ref, lift=1.6)
+            bodies[ref] = PB.resistor(sc, pts[0], pts[1], val, ref, lift=1.6)
         elif letter == "D" and two:
-            PB.diode(sc, pts[0], pts[1], ref, lift=1.4)
+            bodies[ref] = PB.diode(sc, pts[0], pts[1], ref, lift=1.4)
         elif letter == "L" and two:
-            PB.inductor(sc, pts, ref)
+            bodies[ref] = PB.inductor(sc, pts, ref)
         elif letter == "LED" and two:
-            PB.led(sc, pts, "#e8453c", ref)
+            bodies[ref] = PB.led(sc, pts, "#e8453c", ref)[-1]
         else:
             # an SMD package over its pads, a connector a taller block with its terminal screws
             lo, hi = pts.min(0), pts.max(0)
@@ -104,12 +111,14 @@ def _parts(sc, b, values: dict, ztop: float):
             tall = 4.0 if letter in ("J", "P", "CN", "X") else 1.2
             color = "#2f6fd6" if tall > 2 else "#1c1d20"
             mid = (lo + hi) / 2
-            sc.body("box", [half[0], half[1], tall / 2], pos=mid + [0, 0, 0.3 + tall / 2], color=color, name=ref)
+            bodies[ref] = sc.body("box", [half[0], half[1], tall / 2], pos=mid + [0, 0, 0.3 + tall / 2], color=color,
+                                  name=ref)
             if tall > 2:
                 for q in pts:
                     sc.body("cylinder", [0.7, 0.3], pos=q + [0, 0, 0.3 + tall + 0.3], color="#c3c7cd",
                             name=f"{ref} screw")
         sc.label(ref, pts.mean(0) + [0, 0, 7.0 if letter in ("C", "L") else 4.0], kind="note")
+    return bodies
 
 
 def write(out, o, ex, circ, title: str, question: str):
@@ -120,13 +129,31 @@ def write(out, o, ex, circ, title: str, question: str):
     b = ex.board
     st = b.stackup
     th = st.board_thickness * 1e3
-    sc = Scene(f"{Path(title).stem} board", domain="board", question=question, length="mm",
-               source="The board is drawn from its file at its stackup's thickness. The copper is colored by its "
-                      "net's voltage and the glows move with the current, both as ngspice solved the circuit with "
-                      "the layout's parasitics.")
+    lp = (circ or {}).get("loop")
     wave = (circ or {}).get("wave") or {}
+    if lp:
+        src = ("The board is drawn from its file at its stackup's thickness. Each value of the slider is the board's "
+               "circuit solved again by ngspice with the traces of its hot loop scaled, every other trace as laid out.")
+    else:
+        src = ("The board is drawn from its file at its stackup's thickness. The copper is colored by its net's "
+               "voltage as ngspice solved the circuit with the layout's parasitics.")
+    sc = Scene(f"{Path(title).stem} board", domain="board", question=question, length="mm", source=src)
     m = np.array([0])
-    if wave:
+    part = None
+    if lp:
+        part = lp["part"]
+        x = np.asarray(lp["factors"], float) * lp["L0"] * 1e9
+        loop = ", ".join(r for r in lp["loop"] if r != part)
+        sc.timeline(x, unit="nH", label="hot loop inductance", between="step", kind="input", design=lp["L0"] * 1e9,
+                    note=f"the trace inductance of the loop {part} closes through {loop}, solved at each value")
+        nodes = {k: np.asarray(v, float) for k, v in lp["nodes"].items()}
+        nf = len(x)
+        rate, ideal = lp.get("rating_V"), float(lp["ideal_V"])
+        # the run calls the layout marginal once it lifts the part's peak 30% over the schematic alone
+        sc.field(f"peak across {part}", "V", colormap="inferno", range=[0.0, max(rate or 0, max(lp["peak"]) * 1.1)],
+                 limit=rate, limit_label=f"{lp.get('rated_as') or part} rating" if rate else "",
+                 target=1.3 * ideal if rate else None)
+    elif wave:
         t, yb, yi = wave["time"], wave["board"], wave["ideal"]
         i = int(np.argmax(yb))
         span = max(40 * circ["step"], 0.02 * (t[-1] - t[0]))
@@ -137,7 +164,10 @@ def write(out, o, ex, circ, title: str, question: str):
         part = circ["worst"]["part"]
         sc.readout(f"{part} with the layout", yb[m], unit="V")
         sc.readout(f"{part} on the schematic alone", yi[m], unit="V")
-    nodes = {k: np.asarray(v)[m] for k, v in (wave.get("nodes") or {}).items()}
+        nodes = {k: np.asarray(v)[m] for k, v in (wave.get("nodes") or {}).items()}
+        nf = len(m)
+    else:
+        nodes, nf = {}, 1
     # the FR4 slab
     for ring in b.outline[:1]:
         pts = np.asarray(ring) * 1e3
@@ -176,12 +206,28 @@ def write(out, o, ex, circ, title: str, question: str):
         X, T = np.vstack(cu.X), np.vstack(cu.T)
         mesh = sc.mesh(X, T, name="copper", color="#c98a4a", smooth=False, max_vertices=max(12000, cu.n + 1))
         if nodes:
-            per = np.array([nodes.get(_node(n), np.zeros(len(m))) for n in cu.net]).T
+            per = np.array([nodes.get(_node(n), np.zeros(nf)) for n in cu.net]).T
             hi = max(float(np.max(np.abs(per))), 1e-3)
-            mesh.color_by("net voltage", per, unit="V", colormap="viridis", range=[0.0, hi], digits=3)
-    _parts(sc, b, wave.get("values") or {}, zs(names[0])[1])
-    # current as glows along the tracks, a little above the copper
-    cur = wave.get("currents") or []
+            mesh.color_by("net peak voltage" if lp else "net voltage", per, unit="V", colormap="viridis",
+                          range=[0.0, hi], digits=3)
+    bodies = _parts(sc, b, wave.get("values") or {}, zs(names[0])[1])
+    if lp:
+        pk = np.asarray(lp["peak"], float)
+        body = bodies.get(part.upper()) or bodies.get(part)
+        if body is not None:
+            body.color_by(f"peak across {part}", pk)
+        sc.readout(f"peak across {part}", pk, unit="V", digits=3, limit=lp.get("rating_V"),
+                   target=1.3 * float(lp["ideal_V"]))
+        sc.readout(f"{part} on the schematic alone", np.full(nf, float(lp["ideal_V"])), unit="V", digits=3)
+        if body is not None:
+            sc.label(f"{part} {{peak across {part}}}", np.asarray(body.pos, float) + [0, 0, 6.0], kind="peak")
+    # the tracks that carry current, each marked by a glow a little above its copper
+    cur = []
+    if lp:
+        cur = [{"net": n, "to": to, "i": np.asarray(lp["current"], float)[:, k]}
+               for k, (to, n) in enumerate(zip(lp["trace_to"], lp["trace_net"]))]
+    elif wave.get("currents"):
+        cur = [{**c, "i": np.asarray(c["i"])[m]} for c in wave["currents"]]
     if cur and pieces:
         pads = {p.name: np.array(p.at) * 1e3 for p in b.pads}
         by_ref = {}
@@ -195,7 +241,7 @@ def write(out, o, ex, circ, title: str, question: str):
                 hits = [v for (r, n), v in by_ref.items() if r == ref and _node(n) == _node(c["net"])]
                 at = hits[0][0] if hits else None
             if at is not None:
-                conn.append((_node(c["net"]), at, np.asarray(c["i"])[m]))
+                conn.append((_node(c["net"]), at, c["i"]))
         top = max([float(np.max(np.abs(i))) for _, _, i in conn] + [1e-6])
         paths, speed = [], []
         for p in pieces:
@@ -221,6 +267,19 @@ def write(out, o, ex, circ, title: str, question: str):
                        {"name": "underside", "target": target, "dir": (0.2, -0.5, -1), "dist": 1.5 * size}])
     word, tn = V.tone(o.verdict)
     sc.verdict(word, o.headline, tn)
-    sc.note("Copper is drawn at least 0.06 mm thick so it reads as raised. Its color is its net's voltage with the "
-            "layout, and the glows move with the current at each pad connection, faster for more current.")
+    if lp:
+        sc.note(f"Copper is drawn at least 0.06 mm thick so it reads as raised. Its color is its net's peak voltage at "
+                f"the inductance set, and {part} is colored by the peak across it. A glow marks each track that "
+                "carries current.")
+        sc.note(f"{part} turns marginal past 1.3 times its {fmt(float(lp['ideal_V']))} V on the schematic alone, the "
+                "point where the run calls the layout marginal" + (f", and fails past its {fmt(lp['rating_V'])} V "
+                                                                   "rating." if lp.get("rating_V") else "."))
+        pk = np.asarray(lp["peak"], float)[np.asarray(lp["factors"]) > 0]
+        if len(pk) > 1 and np.ptp(pk) < 0.05 * pk.mean():
+            sc.note(f"Any loop inductance at all rings {part} to about {fmt(float(pk.mean()))} V, since the netlist's "
+                    "switch turns off in no time and nothing in the loop damps it. The inductance sets how fast the "
+                    "loop rings, not how high, and only a loop with none keeps the schematic's peak.")
+    else:
+        sc.note("Copper is drawn at least 0.06 mm thick so it reads as raised. Its color is its net's voltage with "
+                "the layout, and a glow marks each track that carries current at that moment.")
     return sc.save(out)

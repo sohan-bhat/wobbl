@@ -6,7 +6,8 @@ VG G 0 PULSE(0 5 0 5n 5n 0.85u 2u)
 S1 VIN SW G 0 SWMOD
 CS1 VIN SW 300p
 .model SWMOD SW(VT=2.5 VH=0.1 RON=0.05 ROFF=1e6)
-D1 0 SW SCHOTTKY
+* the catch diode, a 40 V 3 A Schottky, rated as the SS34 its note names
+D1 0 SW SCHOTTKY ; part=SS34
 .model SCHOTTKY D(IS=5e-5 N=1.05 RS=0.02 CJO=100p)
 L1 SW VOUT 10u IC=2
 C2 VOUT 0 22u IC=5

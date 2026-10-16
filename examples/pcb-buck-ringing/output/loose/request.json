@@ -2,7 +2,7 @@
  "domain": "board",
  "analysis": "parasitics",
  "spec": {
-  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/pcb-buck-ringing/buck_loose.kicad_pcb",
+  "thing": "buck_loose.kicad_pcb",
   "kind": "kicad",
   "question": "how hard does the switch node ring with this layout?",
   "options": {
