@@ -26,12 +26,13 @@
     "wobbl": "bin/wobbl.js"
   },
   "files": [
-    "bin/"
+    "bin/",
+    "lib/"
   ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test test/launcher.test.js test/install.test.js"
+    "test": "node --test test/launcher.test.js test/install.test.js test/progress.test.js"
   }
 }
