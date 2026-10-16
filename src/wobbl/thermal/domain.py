@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ..simulate import Analysis, Option, register
+from ..simulate.intent import phrases
 from ..structural.domain import PART_KINDS, material
 
 
@@ -47,7 +48,7 @@ register(Analysis(
     dry=True, kinds=PART_KINDS, legacy="wobbl thermal",
     keywords=(r"overheat", r"\bheat\b(?!\s*sink)", r"\bhot\b", r"temperature", r"thermal", r"\bcool", r"\bwarm",
               r"\b\d+(?:\.\d+)?\s*(?:k?w|watts?)\b", r"\b-?\d+(?:\.\d+)?\s*(?:°\s*)?[cf]\b(?![\w/])",
-              r"celsius|fahrenheit|°"),
+              r"celsius|fahrenheit|°", *phrases("heat soak")),
     aliases=("thermal", "temperature"),
     options=(Option("power", "Heat made inside the part, e.g. '12 W'"),
              Option("heat-faces", "Put the power on these faces instead of through the volume"),

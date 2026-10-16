@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .intent import phrases
 from .registry import Domain, Option, register
 
 PART_OPTIONS = (
@@ -73,15 +74,28 @@ def sniff_flight(path: Path) -> str | None:
     return None
 
 
+# a commercial motor by its designation, as C6-5, H128 or a J class motor, said next to a rocket or a motor
+MOTOR = r"\b[a-o]\d{1,4}(?:-\d{1,2}[a-z]?)?\s+(?:rocket\s+)?(?:motors?|engines?|rockets?)\b|" \
+        r"\b(?:motor|engine)\s+(?:an?\s+)?[a-o]\d{1,4}\b|\b[a-o][\s-]class\s+(?:rocket\s+)?(?:motors?|engines?|rockets?)\b"
+
+
 def sniff_fluid(path: Path) -> str | None:
     return "cfd" if path.is_dir() and (path / "system" / "controlDict").exists() else None
 
+
+# things that are a part, so a question with no file can still run on a typical one of them (see stock.py)
+PART_WORDS = (r"\bbrackets?\b", r"\b(?:motor|wall|shelf|camera|engine|sensor|panel)\s+mounts?\b", r"\bmounting plates?\b",
+              r"\benclosures?\b", r"\bhousings?\b", r"\b(?:phone|camera|device|handheld|remote|tablet)\s+cases?\b",
+              r"\bheat\s*sinks?\b", r"\bheatsinks?\b", r"\bi-?beams?\b|\bcantilever\b", r"\bhooks?\b", r"\bflanges?\b",
+              r"\blids?\b", r"\bpulleys?\b", r"\bshelf\b|\bshelves\b", r"\bstruts?\b", r"\bdrone\s+arms?\b",
+              r"\b3d[\s-]?print(?:ed)?\b", r"\bprinted\s+(?:part|bracket|mount|case|lid)s?\b", r"\bcad\b",
+              r"\b(?:step|stl)\s+file\b")
 
 register(Domain(
     "part", "A part as a CAD file (STEP, STL, BREP, IGES or a parametric Python part)",
     extensions={".step": "step", ".stp": "step", ".stl": "stl", ".brep": "brep", ".brp": "brep", ".iges": "iges",
                 ".igs": "iges", ".py": ""},
-    sniff=sniff_part, options=PART_OPTIONS, default_kind="step", priority=2,
+    sniff=sniff_part, options=PART_OPTIONS, default_kind="step", priority=2, words=PART_WORDS,
     results=("strength", "thermal", "buckling", "vibration", "fatigue", "plastic"),
     example='wobbl simulate bracket.step "will it hold 200 N and stay under 60 C?"'))
 
@@ -104,11 +118,11 @@ register(Domain(
     words=(r"\bservos?\b", r"robot(?:ic)? arm", r"pick and place", r"\blinkage\b", r"four.?bar", r"\bcrank\b",
            r"\brocker\b", r"\bgears?\b", r"gearbox", r"\bteeth\b", r"\bpendulum\b", r"tip(?:s|ping)? over",
            r"\btopple", r"fall over", r"\bwiper\b", r"\bmechanism\b", r"\bimpact\b", r"collid|collision",
-           r"dropped onto|drop onto", r"peak (?:contact )?force", r"\bhits?\b", r"\btorque\b"),
+           r"dropped onto|drop onto", r"peak (?:contact )?force", r"\bhits?\b", r"\btorque\b", *phrases("tip over")),
     kinds={"pendulum": r"\bpendulum\b", "slider": r"slider.?crank|crank.?slider|\bpiston\b|connecting rod|scotch yoke",
            "fourbar": r"four.?bar|linkage|wiper|\bcrank\b|\brocker\b",
            "gears": r"\bgears?\b|gearbox|gear train|\bteeth\b|gear ratio",
-           "tip": r"tip(?:s|ping)? over|topple|fall over|knock(?:ed)? over",
+           "tip": r"tip(?:s|ping)? over|topple|fall over|knock(?:ed)? over|" + "|".join(phrases("tip over")),
            "impact": r"\bimpact\b|collid|collision|\bhits?\b|dropped onto|drop onto|peak force",
            "arm": r"\bservos?\b|robot arm|\barm\b|pick and place|\blift\b"},
     default_kind="arm", results=("mechanism",),
@@ -121,9 +135,12 @@ register(Domain(
            r"\btrajector(?:y|ies)\b", r"\bfall(?:s|ing)? from\b", r"dropped from|drop(?:ped)? from",
            r"\bparachutes?\b", r"terminal velocity", r"\bhow far\b", r"\bballs?\b", r"\bcannon", r"\bfall time\b",
            r"impact speed", r"\blands?\b", r"solid (?:rocket )?motor", r"\bgrains?\b", r"\bbates\b",
-           r"\bnozzle\b", r"thrust curve", r"total impulse", r"motor class", r"\bstability margin\b"),
+           r"\bnozzle\b", r"thrust curve", r"total impulse", r"motor class", r"\bstability margin\b",
+           *phrases("static fire", "chamber pressure", "apogee"), MOTOR, r"\b(?:knsb|kndx|knsu|sugar)\s+motors?\b",
+           r"\b\d+\s*mm\s+(?:rocket\s+|solid\s+)?motors?\b"),
     kinds={"motor": r"solid (?:rocket )?motor|\bgrains?\b|\bbates\b|\bnozzle\b|thrust curve|total impulse|"
-                    r"chamber pressure|motor class",
+                    r"chamber pressure|motor class|" + "|".join(phrases("static fire", "burn", "chamber pressure")) +
+                    r"|\b(?:knsb|kndx|knsu|sugar)\s+motors?\b|\b\d+\s*mm\s+(?:rocket\s+|solid\s+)?motors?\b",
            "rocket": r"\brockets?\b|apogee|parachute|stability margin", "body": r"."},
     default_kind="body", results=("motion", "motor"),
     example='wobbl simulate "a 9 cm rock dropped from 300 m, how fast does it land?"'))

@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 
 from ..simulate import Analysis, Option, register
+from ..simulate.intent import phrases
 from ..structural.domain import PART_KINDS, study
 
 
@@ -133,7 +134,7 @@ register(Analysis(
     "or of the loads, or of random input", vibration, dry=True, kinds=PART_KINDS, legacy="wobbl vibration",
     keywords=(r"vibrat", r"resona", r"natural frequenc", r"\bmodes?\b", r"\bmodal\b", r"\brpm\b", r"\bshaker\b",
               r"sine sweep", r"random vibration", r"\bpsd\b", r"gevs", r"blade pass", r"\bhz\b", r"\bharmonic\b",
-              r"forced response", r"\b(?:un|im)balance"),
+              r"forced response", r"\b(?:un|im)balance", *phrases("shake test")),
     aliases=("modal", "resonance", "frequencies", "harmonic"),
     options=PART_OPTS + (
         Option("mass", "A mass the part carries, e.g. '45 g at 150,0,25 @ top'", multiple=True),

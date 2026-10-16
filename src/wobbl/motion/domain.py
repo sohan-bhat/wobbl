@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from ..simulate import Analysis, Option, register
+from ..simulate.intent import phrases
 
 # regulation balls: mass, diameter and a typical drag coefficient at the speeds they fly
 BALLS = {"baseball": ("145 g", "7.4 cm", 0.35), "golf ball": ("45.9 g", "4.27 cm", 0.25),
@@ -110,7 +111,8 @@ register(Analysis(
     "flight", "trajectory", "Drops, throws and rocket flights under gravity, air drag, wind, thrust and parachutes",
     trajectory, dry=True, kinds=("body", "rocket"), default=True, legacy="wobbl motion",
     keywords=(r"\bfall", r"\bdrop", r"\bthrow|\bthrown", r"\blaunch", r"apogee", r"\bland", r"how (?:far|high|fast)",
-              r"\brange\b", r"impact speed", r"trajector", r"stability", r"parachute", r"\bflight\b|\bfly\b"),
+              r"\brange\b", r"impact speed", r"trajector", r"stability", r"parachute", r"\bflight\b|\bfly\b",
+              *phrases("apogee", "range")),
     aliases=("motion", "flight", "ballistics"),
     options=FLIGHT_OPTS + (
         Option("mass", "Mass of the body, e.g. '145 g'"), Option("density", "Density of a solid round body"),
@@ -124,7 +126,7 @@ register(Analysis(
     "flight", "motor", "Solid rocket motor ballistics: thrust curve, chamber pressure against the casing, Kn and "
     "erosive burning", motor, dry=True, kinds=("motor",), default=True, legacy="wobbl motor",
     keywords=(r"thrust curve", r"chamber pressure", r"\bcasing\b", r"total impulse", r"motor class", r"\bburn\b",
-              r"\bkn\b", r"erosive"),
+              r"\bkn\b", r"erosive", *phrases("static fire", "thrust curve", "burn", "chamber pressure")),
     aliases=("ballistics-internal", "solid-motor"),
     options=(Option("propellant", "knsb, kndx, knsu, ocean-water or cherry-limeade"),
              Option("grain", "A grain, e.g. 'bates d=48 core=18 L=80 x4' (mm)", multiple=True),

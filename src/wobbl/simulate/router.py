@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import registry
+from .intent import best, weight
 from .registry import Analysis, Domain
 
 
@@ -41,10 +42,6 @@ class Plan:
         return {"thing": self.thing, "question": self.question, "domain": self.domain, "kind": self.kind,
                 "analyses": self.names, "reasons": [{"decided": r, "override": o} for r, o in self.reasons],
                 "candidates": [{"domain": d, "score": s} for d, s in self.candidates], "focus": self.focus}
-
-
-def _search(rx: str, text: str):
-    return re.search(rx, text, re.I) if text else None
 
 
 def _as_path(thing: str) -> Path | None:
@@ -76,11 +73,20 @@ def _result_domain(p: Path) -> tuple[str, str] | None:
 
 
 def _kind_from_words(d: Domain, text: str, question: str) -> str:
-    for src in (text, question):
-        for k, rx in d.kinds.items():
-            if _search(rx, src):
-                return k
-    return d.default_kind
+    """The kind whose words weigh most in the thing and the question. A kind gets its own words and the keywords of
+    the analyses that take only that kind, so "a rocket thrust test" is a motor on a stand and not a rocket in
+    flight. A tie goes to the kind listed first, then to the domain's usual kind."""
+    both = " ".join(x for x in (text, question) if x)
+    own = registry.analyses(d.name)
+    top, pick = 0.0, d.default_kind
+    for k, rx in d.kinds.items():
+        w = best((rx,), both)[0]
+        for a in own:
+            if a.kinds == (k,):
+                w = max(w, best((*a.keywords, *a.kind_keywords.get(k, ())), both)[0])
+        if w > top + 1e-9:
+            top, pick = w, k
+    return pick
 
 
 def score(d: Domain, thing: str, question: str, path: Path | None) -> tuple[int, str, str]:
@@ -94,13 +100,13 @@ def score(d: Domain, thing: str, question: str, path: Path | None) -> tuple[int,
             return 0, "", ""
         kind = d.extensions[suf] or (registry.call(d.sniff, path) if d.sniff else None)
         return (100, kind, f"{path.name} is a {suf} file, read as a {d.name} ({kind})") if kind else (0, "", "")
-    s, hits = 0, []
-    for rx in d.words:
-        m = _search(rx, thing)
-        if m:
-            s, hits = s + 3, hits + [m.group(0)]
-        elif (m := _search(rx, question)):
-            s, hits = s + 1, hits + [m.group(0)]
+    s, hits = 0.0, []
+    for rx in d.words:   # a word in the description counts three times one in the question, a phrase more
+        w, said, _ = best((rx,), thing)
+        if w:
+            s, hits = s + 3 * w, hits + [said]
+        elif (w := best((rx,), question)[0]):
+            s, hits = s + w, hits + [best((rx,), question)[1]]
     kind = ""
     r = registry.call(d.recognize, thing, question) if d.recognize else None
     if r:
@@ -110,8 +116,9 @@ def score(d: Domain, thing: str, question: str, path: Path | None) -> tuple[int,
     if not s:
         return 0, "", ""
     kind = kind or _kind_from_words(d, thing, question)
+    hits = [hits[0]] + sorted(hits[1:], key=weight, reverse=True) if r else sorted(hits, key=weight, reverse=True)
     shown = ", ".join(f'"{h.strip()[:40]}"' for h in dict.fromkeys(hits[:3]))
-    return s, kind, f"the words {shown} point to {d.name} ({kind})"
+    return round(s, 2), kind, f"the words {shown} point to {d.name} ({kind})"
 
 
 def recognize(thing: str, question: str = "", only: str | None = None) -> list[tuple[int, Domain, str, str]]:
@@ -191,12 +198,19 @@ def choose(d: Domain, kind: str, text: str, physics: list[str] | None = None
         reason = f"physics {', '.join(a.name for a in chosen)}, as asked"
     else:
         hits: dict[str, dict[int, str]] = {}
+        spans: dict[int, list[tuple[float, tuple[int, int], str]]] = {}
         for a in pool:
             for i, part in enumerate(parts):
-                m = next((m for rx in (*a.keywords, *a.kind_keywords.get(kind, ())) if (m := _search(rx, part))),
-                         None)
-                if m:
-                    hits.setdefault(a.key, {})[i] = m.group(0).strip()
+                w, said, at = best((*a.keywords, *a.kind_keywords.get(kind, ())), part)
+                if w:
+                    hits.setdefault(a.key, {})[i] = said.strip()
+                    spans.setdefault(i, []).append((w, at, a.key))
+        # a word that sits inside a longer phrase another analysis claims is that phrase's, as "test" in "drop test"
+        for i, found in spans.items():
+            for w, (s0, s1), key in found:
+                if any(w2 > w and t0 <= s0 and s1 <= t1 and k2 != key for w2, (t0, t1), k2 in found):
+                    hits[key].pop(i, None)
+        hits = {k: v for k, v in hits.items() if v}
         chosen = [a for a in pool if a.key in hits]
 
         def reach(a: Analysis) -> set[int]:

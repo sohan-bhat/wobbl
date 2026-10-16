@@ -6,6 +6,7 @@ import shlex
 from pathlib import Path
 
 from ..simulate import Analysis, Option, register
+from ..simulate.intent import phrases
 
 PART_KINDS = ("step", "stl", "brep", "iges", "parametric")
 FORCE = r"\b\d+(?:\.\d+)?\s*(?:k?n|newtons?|lbf|lbs?|pounds?|kgf|kips?)\b"
@@ -102,7 +103,7 @@ register(Analysis(
     stress, dry=True, kinds=PART_KINDS, default=True, legacy="wobbl run",
     keywords=(r"\bhold", r"\bcrack", r"\bbreak", r"\bsurviv", r"\bfail", r"\bbend", r"\bstress", r"safety factor",
               r"\bstrong", r"\bstrength", r"\bdeflect", r"\bsnap", FORCE, r"\b\d+(?:\.\d+)?\s*(?:mpa|kpa|psi|bar)\b",
-              r"\b\d+(?:\.\d+)?\s*g'?s\b|\bg load"),
+              r"\b\d+(?:\.\d+)?\s*g'?s\b|\bg load", *phrases("bend test", "pull test", "load test")),
     aliases=("strength", "static", "structural"),
     options=(Option("shell", "Solve thin walls as shells on their midsurface, checked against a coarse solid (thin "
                              "walled parts get this on their own)", flag=True),

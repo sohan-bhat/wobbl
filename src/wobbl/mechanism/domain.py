@@ -11,6 +11,7 @@ import re
 
 from ..simulate import Analysis, Option, register
 from ..simulate.registry import domain
+from ..simulate.intent import phrases
 from .general import DRIVE_WORDS, KEYWORDS
 
 FILES = ("urdf", "mjcf", "spec")
@@ -145,7 +146,7 @@ _add("collision", "Whether its parts run into each other or the floor anywhere i
      (r"\binterference\b",), ("interference", "self-collision"),
      'wobbl simulate robot.urdf "does it collide with itself?"')
 _add("stability", "Whether it tips over standing, and in which pose it comes closest", ("tip",),
-     (), ("tipping", "tip"), 'wobbl simulate robot.urdf "will it tip over with 2 kg in the gripper?"')
+     phrases("tip over"), ("tipping", "tip"), 'wobbl simulate robot.urdf "will it tip over with 2 kg in the gripper?"')
 _add("contact", "What each foot, wheel or contact carries once it settles, or the peak force of an impact",
      ("impact",), (r"\bimpact\b", r"peak (?:contact )?force", r"dropped onto|drop onto", r"\bbounce"),
      ("forces", "impact"), 'wobbl simulate go1.xml "what does each foot carry?"')
