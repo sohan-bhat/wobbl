@@ -35,7 +35,9 @@ circuit solver or physics loop.
    command that repeats the run with nothing guessed (MCP `decisions`, `assumptions` and `explicit`). When a
    guess does not match what the user said or built, run again with that option. Before a long run, add
    `--plan` (MCP `plan_only=true`) to see the route and every guess without solving, and `--estimate` to
-   see the time, memory and disk it needs.
+   see the time, memory and disk it needs. When the user wants the result as a file, add `--export gif`,
+   `mp4`, `png` or `report` with `--out` set to a folder or a file name (words like "a gif in downloads" do
+   the same), and Wobbl prints where it wrote it.
 4. **Give Wobbl what you know.** Pass the material, loads and supports the user gave rather than leaving
    them to guesses. For a part, look first with `wobbl inspect bracket.step --json` (MCP
    `inspect_geometry`) for the bounding box (mm), holes, fillets, sharp inside corners, wall thickness and
