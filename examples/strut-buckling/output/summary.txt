@@ -1,30 +1,30 @@
-MARGINAL. Buckles at 3.25 times the applied load (22764 N) in a column mode. With a knockdown of 0.81 for imperfections and yielding the design factor is 2.65 against a target of 3.
+MARGINAL. Buckles at 3.25 times the applied load (22767 N) in a column mode. With a knockdown of 0.81 for imperfections and yielding the design factor is 2.64 against a target of 3.
 
 Confidence: high. passed mesh convergence, force balance, hand calculation, mode separation, yield before buckling, units and sanity
 buckling factor: 3.25
 knockdown: 0.81
-design factor: 2.65
+design factor: 2.64
 target: 3
 
 Checks:
   [pass] mesh convergence: first buckling factor settled: 3.25 -> 3.25 times the load over 2 meshes, last change 0.0%
-  [pass] force balance: reactions balance the loads to 2.8e-05% (forces) and 2.6e-06% (moments)
-  [pass] hand calculation: Euler's column, clamped at the base and pinned at the loaded end (K = 0.699), with I = 5857 mm4 over 600 mm gives 22644 N, a factor of 3.23, and the finite element factor is 3.25 (+0.5%)
+  [pass] force balance: reactions balance the loads to 4.2e-05% (forces) and 3.7e-06% (moments)
+  [pass] hand calculation: Euler's column, clamped at the base and pinned at the loaded end (K = 0.699), with I = 5838 mm4 over 600 mm gives 22570 N, a factor of 3.22, and the finite element factor is 3.25 (+0.9%)
   [pass] mode separation: the first factor repeats, the same buckle in two directions of a symmetric section, and the next distinct mode is at 9.42, 2.90 times the first
-  [pass] yield before buckling: the most stressed point (51.1 MPa von Mises stress at the reference load, away from the supports) reaches 276 MPa at 5.41 times the load, after it buckles, so buckling governs
+  [pass] yield before buckling: the most stressed point (50.9 MPa von Mises stress at the reference load, away from the supports) reaches 276 MPa at 5.42 times the load, after it buckles, so buckling governs
   [pass] units and sanity: buckling factor 3.25, deflection 0.381 mm under the reference load (0.063% of size): plausible
 
 Assumptions:
   - Linear eigenvalue buckling, where the stiffness the loads take away is found from the stress they cause in the perfect, undeformed part, and the loads keep their direction as it deflects. It overpredicts the collapse load of real parts, most of all for thin shells, which is what the knockdown is for.
-  - The shape class is column, a straight member 600 mm long pushed along its length, slenderness L/r 99, and the knockdown comes from EN 1999-1-1 class A alloys (imperfection factor 0.2), whose relative slenderness of 1.39 keeps 0.418 of the squash load of 44272 N.
+  - The shape class is column, a straight member 600 mm long pushed along its length, slenderness L/r 99, and the knockdown comes from EN 1999-1-1 class A alloys (imperfection factor 0.2), whose relative slenderness of 1.39 keeps 0.419 of the squash load of 44138 N.
   - Aluminum 6061-T6: E 68900 MPa, Poisson 0.33, von Mises vs yield 276 MPa (ASM Aerospace Specification Metals, Aluminum 6061-T6).
   - The design factor also counts crookedness, eccentricity and yielding, through the column curve.
   - Fixed faces are perfectly rigid. A support that gives a little, or turns, lowers the buckling load, and for a column that is clamped on paper it can lower it by half or more.
   - Wrought metal treated as isotropic; rolled, drawn or extruded stock is close to it at yield.
 
 Suggested fixes:
-  - Raise the column's second moment of area 1.2 times: The elastic buckling load scales with I, now 5857 mm4 about the weak axis. On the column curve the design factor reaches 3 at 1.2 times that, a section 1.04 times as wide in every direction, or a larger tube of the same weight, which puts the material farther from the axis.
-  - Shorten the unbraced length to 554 mm: The elastic buckling load scales with 1/L^2, so 554 mm of the 600 mm column reaches the target. A brace that stops sideways motion at mid length halves the buckling length and does far more.
+  - Raise the column's second moment of area 1.2 times: The elastic buckling load scales with I, now 5838 mm4 about the weak axis. On the column curve the design factor reaches 3 at 1.2 times that, a section 1.04 times as wide in every direction, or a larger tube of the same weight, which puts the material farther from the axis.
+  - Shorten the unbraced length to 553 mm: The elastic buckling load scales with 1/L^2, so 553 mm of the 600 mm column reaches the target. A brace that stops sideways motion at mid length halves the buckling length and does far more.
   - Use a stiffer material: Elastic buckling scales with Young's modulus, 68900 MPa now, so a material 1.2 times as stiff reaches the target if it is also strong enough not to yield first.
 
 Images: mode1: images/mode1.jpg, modes: images/modes.jpg, convergence: images/convergence.png

@@ -1,0 +1,53 @@
+{
+ "thing": "strut.py",
+ "question": "Does this aluminum strut carry 7 kN with a factor of 3 against buckling?",
+ "plan": {
+  "thing": "strut.py",
+  "question": "Does this aluminum strut carry 7 kN with a factor of 3 against buckling?",
+  "domain": "part",
+  "kind": "parametric",
+  "analyses": [
+   "buckling"
+  ],
+  "reasons": [
+   {
+    "decided": "strut.py is a .py file, read as a part (parametric)",
+    "override": "--domain part"
+   },
+   {
+    "decided": "physics buckling, as asked",
+    "override": "--physics buckling"
+   }
+  ],
+  "candidates": [
+   {
+    "domain": "part",
+    "score": 100
+   }
+  ],
+  "focus": {}
+ },
+ "verdict": "marginal",
+ "situation": {
+  "supports": [
+   "fixed z=min",
+   "fixed-xy z=max"
+  ],
+  "loads": [
+   "7 kN -z @ z=max"
+  ],
+  "material": "6061-t6"
+ },
+ "steps": [
+  {
+   "analysis": "buckling",
+   "domain": "part",
+   "verdict": "marginal",
+   "headline": "Buckles at 3.25 times the applied load (22767 N) in a column mode. With a knockdown of 0.81 for imperfections and yielding the design factor is 2.64 against a target of 3.",
+   "confidence": "high",
+   "result_dir": "output",
+   "report": "output/report.html",
+   "assumptions": []
+  }
+ ]
+}

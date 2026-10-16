@@ -34,7 +34,7 @@
     "stiffness": 0.0
    }
   ],
-  "target_sf": null,
+  "target_sf": 3.0,
   "quality": "normal",
   "budget": 300.0,
   "max_levels": 4,

@@ -3,7 +3,7 @@
  "part": "../strut.py",
  "question": "Does this aluminum strut carry 7 kN with a factor of 3 against buckling?",
  "verdict": "marginal",
- "headline": "Buckles at 3.25 times the applied load (22764 N) in a column mode. With a knockdown of 0.81 for imperfections and yielding the design factor is 2.65 against a target of 3.",
+ "headline": "Buckles at 3.25 times the applied load (22767 N) in a column mode. With a knockdown of 0.81 for imperfections and yielding the design factor is 2.64 against a target of 3.",
  "metrics": [
   [
    "buckling factor",
@@ -15,7 +15,7 @@
   ],
   [
    "design factor",
-   "2.65"
+   "2.64"
   ],
   [
    "target",
@@ -34,9 +34,9 @@
    "detail": {
     "values": [
      3.252684,
-     3.251994
+     3.252393
     ],
-    "last_change": 0.000212,
+    "last_change": 8.9e-05,
     "tolerance": 0.02,
     "stopped_by": "converged"
    }
@@ -44,7 +44,7 @@
   {
    "name": "force balance",
    "status": "pass",
-   "summary": "reactions balance the loads to 2.8e-05% (forces) and 2.6e-06% (moments)",
+   "summary": "reactions balance the loads to 4.2e-05% (forces) and 3.7e-06% (moments)",
    "detail": {
     "applied_N": [
      0.0,
@@ -52,9 +52,9 @@
      -7000.0
     ],
     "reaction_N": [
-     -1.8e-05,
-     -4.1e-05,
-     7000.001953
+     -0.000361,
+     -0.000212,
+     7000.00293
     ],
     "force_error": 0.0,
     "moment_error": 0.0
@@ -63,11 +63,11 @@
   {
    "name": "hand calculation",
    "status": "pass",
-   "summary": "Euler's column, clamped at the base and pinned at the loaded end (K = 0.699), with I = 5857 mm4 over 600 mm gives 22644 N, a factor of 3.23, and the finite element factor is 3.25 (+0.5%)",
+   "summary": "Euler's column, clamped at the base and pinned at the loaded end (K = 0.699), with I = 5838 mm4 over 600 mm gives 22570 N, a factor of 3.22, and the finite element factor is 3.25 (+0.9%)",
    "detail": {
-    "euler_N": 22644.043323,
-    "euler_factor": 3.234863,
-    "slenderness": 99.291701,
+    "euler_N": 22569.91101,
+    "euler_factor": 3.224273,
+    "slenderness": 99.304351,
     "k": 0.699
    }
   },
@@ -77,20 +77,20 @@
    "summary": "the first factor repeats, the same buckle in two directions of a symmetric section, and the next distinct mode is at 9.42, 2.90 times the first",
    "detail": {
     "factors": [
-     3.251994,
-     3.252037,
-     9.417528,
-     9.417652
+     3.252393,
+     3.252496,
+     9.418055,
+     9.418325
     ]
    }
   },
   {
    "name": "yield before buckling",
    "status": "pass",
-   "summary": "the most stressed point (51.1 MPa von Mises stress at the reference load, away from the supports) reaches 276 MPa at 5.41 times the load, after it buckles, so buckling governs",
+   "summary": "the most stressed point (50.9 MPa von Mises stress at the reference load, away from the supports) reaches 276 MPa at 5.42 times the load, after it buckles, so buckling governs",
    "detail": {
-    "yield_factor": 5.406287,
-    "peak_MPa": 51.051678
+    "yield_factor": 5.421599,
+    "peak_MPa": 50.907486
    }
   },
   {
@@ -98,13 +98,13 @@
    "status": "pass",
    "summary": "buckling factor 3.25, deflection 0.381 mm under the reference load (0.063% of size): plausible",
    "detail": {
-    "factor": 3.251994
+    "factor": 3.252393
    }
   }
  ],
  "assumptions": [
   "Linear eigenvalue buckling, where the stiffness the loads take away is found from the stress they cause in the perfect, undeformed part, and the loads keep their direction as it deflects. It overpredicts the collapse load of real parts, most of all for thin shells, which is what the knockdown is for.",
-  "The shape class is column, a straight member 600 mm long pushed along its length, slenderness L/r 99, and the knockdown comes from EN 1999-1-1 class A alloys (imperfection factor 0.2), whose relative slenderness of 1.39 keeps 0.418 of the squash load of 44272 N.",
+  "The shape class is column, a straight member 600 mm long pushed along its length, slenderness L/r 99, and the knockdown comes from EN 1999-1-1 class A alloys (imperfection factor 0.2), whose relative slenderness of 1.39 keeps 0.419 of the squash load of 44138 N.",
   "Aluminum 6061-T6: E 68900 MPa, Poisson 0.33, von Mises vs yield 276 MPa (ASM Aerospace Specification Metals, Aluminum 6061-T6).",
   "The design factor also counts crookedness, eccentricity and yielding, through the column curve.",
   "Fixed faces are perfectly rigid. A support that gives a little, or turns, lowers the buckling load, and for a column that is clamped on paper it can lower it by half or more.",
@@ -112,21 +112,21 @@
  ],
  "values": {
   "analysis": "buckling",
-  "load_factor": 3.251994,
+  "load_factor": 3.252393,
   "load_factors": [
-   3.251994,
-   3.252037,
-   9.417528,
-   9.417652
+   3.252393,
+   3.252496,
+   9.418055,
+   9.418325
   ],
-  "critical_load_N": 22763.958,
+  "critical_load_N": 22766.751,
   "applied_load_N": 7000.0,
   "shape": "column",
   "shape_reason": "a straight member 600 mm long pushed along its length, slenderness L/r 99",
-  "knockdown": 0.81373,
-  "knockdown_reason": "EN 1999-1-1 class A alloys (imperfection factor 0.2), whose relative slenderness of 1.39 keeps 0.418 of the squash load of 44272 N",
-  "yield_factor": 5.406287,
-  "design_factor": 2.646247,
+  "knockdown": 0.813233,
+  "knockdown_reason": "EN 1999-1-1 class A alloys (imperfection factor 0.2), whose relative slenderness of 1.39 keeps 0.419 of the squash load of 44138 N",
+  "yield_factor": 5.421599,
+  "design_factor": 2.644953,
   "target_sf": 3.0,
   "interaction": "crookedness, eccentricity and yielding, through the column curve",
   "levels": [
@@ -145,14 +145,14 @@
    },
    {
     "level": 1,
-    "n_nodes": 42463,
+    "n_nodes": 44641,
     "h": 3.295709,
-    "factor": 3.251994,
+    "factor": 3.252393,
     "factors": [
-     3.251994,
-     3.252037,
-     9.417528,
-     9.417652
+     3.252393,
+     3.252496,
+     9.418055,
+     9.418325
     ],
     "t_solve": 0.0
    }
@@ -160,9 +160,9 @@
   "exclusion_radius_mm": 3.295709,
   "column": {
    "length_mm": 600.0,
-   "area_mm2": 160.404024,
-   "i_min_mm4": 5857.224389,
-   "slenderness": 99.291701,
+   "area_mm2": 159.919635,
+   "i_min_mm4": 5838.048945,
+   "slenderness": 99.304351,
    "k": 0.699,
    "ends": "clamped at the base and pinned at the loaded end"
   },
@@ -192,22 +192,22 @@
      [
       1,
       "3.25",
-      "22764"
+      "22767"
      ],
      [
       2,
       "3.25",
-      "22764"
+      "22767"
      ],
      [
       3,
       "9.42",
-      "65923"
+      "65926"
      ],
      [
       4,
       "9.42",
-      "65924"
+      "65928"
      ]
     ],
     "Negative factors buckle the part only with every load reversed."
@@ -225,18 +225,18 @@
   {
    "kind": "stiffen",
    "title": "Raise the column's second moment of area 1.2 times",
-   "summary": "The elastic buckling load scales with I, now 5857 mm4 about the weak axis. On the column curve the design factor reaches 3 at 1.2 times that, a section 1.04 times as wide in every direction, or a larger tube of the same weight, which puts the material farther from the axis.",
+   "summary": "The elastic buckling load scales with I, now 5838 mm4 about the weak axis. On the column curve the design factor reaches 3 at 1.2 times that, a section 1.04 times as wide in every direction, or a larger tube of the same weight, which puts the material farther from the axis.",
    "params": {
-    "i_min": 6876.799799
+    "i_min": 6860.24942
    },
    "auto": false
   },
   {
    "kind": "brace",
-   "title": "Shorten the unbraced length to 554 mm",
-   "summary": "The elastic buckling load scales with 1/L^2, so 554 mm of the 600 mm column reaches the target. A brace that stops sideways motion at mid length halves the buckling length and does far more.",
+   "title": "Shorten the unbraced length to 553 mm",
+   "summary": "The elastic buckling load scales with 1/L^2, so 553 mm of the 600 mm column reaches the target. A brace that stops sideways motion at mid length halves the buckling length and does far more.",
    "params": {
-    "length": 553.73757
+    "length": 553.496862
    },
    "auto": false
   },
@@ -245,7 +245,7 @@
    "title": "Use a stiffer material",
    "summary": "Elastic buckling scales with Young's modulus, 68900 MPa now, so a material 1.2 times as stiff reaches the target if it is also strong enough not to yield first.",
    "params": {
-    "E": 80893.521348
+    "E": 80963.89556
    },
    "auto": false
   }
@@ -255,7 +255,14 @@
  ],
  "report": "report.html",
  "workdir": ".",
- "t_total": 316.949267,
+ "t_total": 152.261149,
  "solver": "CalculiX 2.23",
- "criteria": []
+ "criteria": [
+  {
+   "name": "buckling",
+   "value": "design_factor",
+   "limit": 3.0,
+   "sense": "min"
+  }
+ ]
 }

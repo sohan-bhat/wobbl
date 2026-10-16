@@ -1,0 +1,25 @@
+{
+ "domain": "part",
+ "analysis": "buckling",
+ "spec": {
+  "thing": "strut.py",
+  "kind": "parametric",
+  "question": "Does this aluminum strut carry 7 kN with a factor of 3 against buckling?",
+  "options": {
+   "target-sf": [
+    "3"
+   ],
+   "material": [
+    "6061-t6"
+   ],
+   "load": [
+    "7 kN -z @ z=max"
+   ],
+   "fix": [
+    "fixed z=min",
+    "fixed-xy z=max"
+   ]
+  }
+ },
+ "wobbl": "0.1.1"
+}
