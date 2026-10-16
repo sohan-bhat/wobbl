@@ -84,15 +84,19 @@ def build_sweep(out: Path, sw: dict) -> Path:
         s.event(float(e["t_s"]), e["name"], e.get("detail", ""), kind=e.get("kind", "info"))
     s.note("Each value of the slider is its own run, shown at the instant its motors are asked the most.")
     verdict(s, o)
+    # the whole setting in view, the mechanism and what the question put around it, with a close view of each
     c = s.cam or {}
-    target = c.get("target", centre.tolist())
-    dist = c.get("dist", reach * 2.6 + 0.2)
-    s.camera(target=target, direction=c.get("dir", (0.55, -1.0, 0.6)), distance=dist,
-             presets=[{"name": "Front", "target": target, "dir": (0.0, -1.0, 0.25), "dist": dist},
-                      {"name": "Top", "target": target, "dir": (0.0, -0.05, 1.0), "dist": dist},
-                      {"name": "Side", "target": target, "dir": (1.0, 0.0, 0.25), "dist": dist},
-                      {"name": "Mechanism", "target": centre.tolist(), "dir": (0.55, -1.0, 0.6),
-                       "dist": reach * 2.6 + 0.2}])
+    near = reach * 2.6 + 0.2
+    there = np.asarray(c.get("target", centre), float)
+    target = ((centre + there) / 2).tolist()
+    dist = float(c.get("dist", near)) + 0.8 * float(np.linalg.norm(centre - there))
+    presets = [{"name": "Front", "target": target, "dir": (0.0, -1.0, 0.25), "dist": dist},
+               {"name": "Top", "target": target, "dir": (0.0, -0.05, 1.0), "dist": dist},
+               {"name": "Side", "target": target, "dir": (1.0, 0.0, 0.25), "dist": dist},
+               {"name": "Mechanism", "target": centre.tolist(), "dir": (0.55, -1.0, 0.6), "dist": near}]
+    if c:
+        presets.append({"name": "Setting", "target": c["target"], "dir": c["dir"], "dist": c["dist"]})
+    s.camera(target=target, direction=(0.35, -1.0, 0.85), distance=dist, presets=presets)
     return s.save(out)
 
 
