@@ -350,9 +350,9 @@ def windshield(s, pb, name, j, J, reach):
     s.body("cylinder", [reach * 0.02, lift / 2], pos=piv + n * lift / 2, quat=P.z_to(n), color="#2b2e33",
            name="wiper spindle", prop=True)
     Xa, Ta = wiper_arm(arm, reach)
-    s.mesh(Xa, Ta, name="wiper arm", color="#55595f", prop=True, max_vertices=4000).move(base, quats)
+    s.mesh(Xa, Ta, name="wiper arm", color="#7a7f86", prop=True, max_vertices=4000).move(base, quats)
     Xb, Tb = wiper_blade(blade, reach)
-    s.mesh(Xb, Tb, name="wiper blade", color="#3a3d42", prop=True, max_vertices=4000).move(
+    s.mesh(Xb, Tb, name="wiper blade", color="#55595f", prop=True, max_vertices=4000).move(
         base + n * reach * 0.002 + d * arm * 0.98, quats)
     t = np.asarray(pb["t"], float)
     tip, root = base + d * (arm * 0.98 + blade / 2), base + d * (arm * 0.98 - blade / 2)
