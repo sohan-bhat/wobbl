@@ -5,11 +5,16 @@
 // takes over and the gallery's card shows the small one, as a plain picture. Stills are kept in
 // .cache/posters by the hash of the scene, its summary and the drawing code, so only a new or changed
 // scene is drawn again. Without Chrome the page starts on its live view and the card on Wobbl's own image.
+//
+// The gallery's card is the photoreal Cycles still of the same view when one is committed for the scene in
+// site/blender/stills and its key (scripts/still-key.mjs) still matches the scene, its framing and its context
+// models. A scene whose still is out of date keeps the stage's card until site/blender/stills.mjs draws it again.
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { stillKey } from './still-key.mjs';
 
-const VERSION = 2;                        // bump when the stills' look changes outside the drawing code
+const VERSION = 3;                        // bump when the stills' look changes outside the drawing code
 const W = 640, H = 480, PX = 2;           // the page's view in CSS pixels, drawn at twice that
 const SIZES = [[W * PX, H * PX], [W, H]]; // the page's still, then the card's
 
@@ -42,6 +47,9 @@ export async function drawPosters(site) {
   const mf = join(out, 'manifest.json');
   if (!existsSync(mf)) return;
   const m = JSON.parse(readFileSync(mf, 'utf-8'));
+  // the page's studio light, so the stage's stills are lit as the live view is
+  const envPath = resolve(site, 'public/env/studio.rgbe');
+  const env = existsSync(envPath) ? readFileSync(envPath).toString('base64') : null;
   let js;
   try { js = await bundle(site); } catch (err) { console.warn(`[posters] could not bundle the drawing code: ${err.message ?? err}`); return; }
   mkdirSync(cache, { recursive: true });
@@ -49,7 +57,7 @@ export async function drawPosters(site) {
   for (const [rel, e] of Object.entries(m.scenes)) {
     if (!e.file || !e.play) continue;
     const bytes = readFileSync(join(out, e.file));
-    const key = createHash('sha1').update(String(VERSION)).update(js).update(bytes).update(JSON.stringify(e.play)).digest('hex').slice(0, 16);
+    const key = createHash('sha1').update(String(VERSION)).update(js).update(env ?? '').update(bytes).update(JSON.stringify(e.play)).digest('hex').slice(0, 16);
     todo.push({ rel, e, bytes, key });
   }
   const missing = todo.filter((t) => !existsSync(join(cache, `${t.key}.webp`)) || !existsSync(join(cache, `${t.key}.card.webp`)));
@@ -68,7 +76,7 @@ export async function drawPosters(site) {
       for (const t of missing) {
         try {
           const [big, small] = await page.evaluate((a) => globalThis.drawScenePoster(a),
-            { b64: t.bytes.toString('base64'), run: t.e.play, w: W, h: H, px: PX, sizes: SIZES });
+            { b64: t.bytes.toString('base64'), run: t.e.play, w: W, h: H, px: PX, sizes: SIZES, env });
           writeFileSync(join(cache, `${t.key}.webp`), Buffer.from(big.split(',')[1], 'base64'));
           writeFileSync(join(cache, `${t.key}.card.webp`), Buffer.from(small.split(',')[1], 'base64'));
         } catch (err) {
@@ -88,6 +96,19 @@ export async function drawPosters(site) {
     copyFileSync(join(cache, `${t.key}.card.webp`), join(out, t.e.card));
     Object.assign(t.e, { posterW: SIZES[0][0], posterH: SIZES[0][1] });
   }
+  // the Cycles stills for the gallery's cards, where they are up to date
+  const stills = resolve(site, 'blender/stills'), indexPath = join(stills, 'index.json');
+  const index = existsSync(indexPath) ? JSON.parse(readFileSync(indexPath, 'utf-8')) : {};
+  const stale = [];
+  for (const t of todo) {
+    if (!t.e.poster) continue;
+    const s = index[t.rel];
+    if (s && existsSync(join(stills, s.file)) && s.key === stillKey(site, t.rel, t.bytes, t.e.play)) {
+      t.e.card = t.e.file.replace(/\.wobbl$/, '.still.webp');
+      copyFileSync(join(stills, s.file), join(out, t.e.card));
+    } else stale.push(t.rel);
+  }
+  if (stale.length) console.warn(`[posters] ${stale.length} Cycles stills are out of date, so their cards show the stage's still: ${stale.join(', ')}. node site/blender/stills.mjs draws them again.`);
   writeFileSync(mf, JSON.stringify(m));
 }
 
