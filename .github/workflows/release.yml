@@ -130,7 +130,8 @@ jobs:
         if: steps.state.outputs.publish == 'true'
         run: |
           version=$(node -p "require('./package.json').version")
-          for i in 1 2 3 4 5 6; do
+          # npm says a new version may take a few minutes to show, so this waits up to 10 minutes
+          for i in $(seq 1 60); do
             test "$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/wobbl/$version")" = 200 && exit 0
             sleep 10
           done
