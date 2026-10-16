@@ -50,3 +50,14 @@ def test_the_plan_says_what_it_designed_and_how_to_give_the_real_one():
         said = [(t, o) for s in steps for t, o in s.job.assumptions]
         assert any(needle in t and override in o for t, o in said), said
         assert not any(s.error for s in steps), [s.error for s in steps]
+
+
+def test_without_a_resistor_is_taken_at_its_word():
+    steps = preview(route("will a 9V battery and a red LED without a resistor fry", ""), {})
+    said = [t for s in steps for t, _ in s.job.assumptions]
+    assert any("no resistor, as the words say" in t for t in said) and not any("470 ohm" in t for t in said)
+
+
+def test_a_typical_motor_is_named_for_its_propellant_and_casing():
+    steps = preview(route("a rocket thrust test", ""), {})
+    assert steps[0].job.options["casing"] == ["6061-t6 od=54 wall=1.6 L=400 sf=2"]

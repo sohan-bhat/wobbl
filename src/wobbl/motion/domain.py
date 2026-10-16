@@ -118,8 +118,10 @@ def motor(job):
                        ", or pass your motor.toml first, as in examples/knsb-motor/motor.toml")
             for k, v in flags.items():
                 job.options[k] = [v]
+        od = re.search(r"od=([\d.]+)", job.value("casing") or "")
         source = spec_from_flags(job.value("propellant") or "", job.values("grain"), job.value("throat") or "",
-                                 job.value("exit") or "", job.value("casing") or "", job.number("efficiency"))
+                                 job.value("exit") or "", job.value("casing") or "", job.number("efficiency"),
+                                 name=f"{job.value('propellant') or 'motor'}-{od.group(1)}" if od else "motor")
     ms = read_spec(source, job.question)
     job.situate(objects=["test stand"], environment={"ambient": "1 atm"})
     job.ready()

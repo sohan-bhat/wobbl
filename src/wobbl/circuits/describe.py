@@ -195,15 +195,27 @@ def _leds(b: _B, rail: str, vr: float, sup: str, vs: float) -> bool:
     if gpio:
         src = gpio[0]
     r_given = re.search(rf"{NUM}\s*(k|m)?\s*(?:ohm|r\b|resistor)", b.t)
+    bare = b.has(r"\b(?:without|no)\s+(?:a\s+|any\s+)?(?:series\s+|current[\s-]+limiting\s+)?resistors?\b")
     if "resistor" in b.p:
         r = parse_spice_value(str(b.p["resistor"]))
     elif r_given:
         r = parse_spice_value(r_given.group(1) + (r_given.group(2) or ""))
+    elif bare:   # taken at its word: the LED straight across its source, only the source's own resistance between
+        r = 0.0
+        b.say("no resistor, as the words say, so the LED sits straight across its source", "--set resistor=470")
     else:
         drop = v - (n * vf if series else vf)
         r = e_series(max(drop, 0.1) / 0.015)
         b.guess("LED resistor", f"{r:g} ohm (about 15 mA)", "resistor", f"{r:g}")
     model = f"LED_{color.upper()}"
+    if r <= 0:
+        a = src
+        for k in range(n):
+            nxt = "0" if not series or k == n - 1 else b.node("a")
+            b.add("d", [a if series else src, nxt], [model], ["a", "k"])
+            a = nxt
+        b.used.append("led")
+        return True
     if series:
         a = b.node("a")
         b.add("r", [src, a], [f"{r:g}"], ["1", "2"])
