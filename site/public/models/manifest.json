@@ -1,6 +1,19 @@
 {
 "version": 1,
 "examples": {
+  "knsb-motor": {
+    "replace": [
+      {"object": "nozzle", "file": "knsb-motor/nozzle.glb"},
+      {"object": "forward closure", "file": "knsb-motor/forward-closure.glb"},
+      {"object": "stand saddle", "file": "knsb-motor/cradle.glb"},
+      {"object": "thrust plate", "file": "knsb-motor/thrust-plate.glb"}
+    ],
+    "add": [
+      {"file": "knsb-motor/casing-bolts.glb"},
+      {"file": "knsb-motor/stand.glb"}
+    ],
+    "hide": ["ground"]
+  },
   "rocket-launch": {
     "replace": [
       {"object": "rocket", "file": "rocket-launch/airframe.glb"},
