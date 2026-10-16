@@ -398,7 +398,7 @@ def oven_sweep(cell: Cell, ta_cr: float, below: float, ambient: float, hours: fl
         rows["self_heating_C_min"].append(float(self_heating(cell, tr).max()) * 60)
         rows["sei_left"].append(float(max(tr.y[0, i] / tr.y[0, 0], 0.0)))
         rows["electrolyte_left"].append(float(max(tr.y[4, i] / tr.y[4, 0], 0.0)))
-        rows["runaway"].append(bool(Ta >= ta_cr))
+        rows["runaway"].append(bool(Ta >= ta_cr - 1e-3))       # ovens are kept to 0.001 K
     return rows
 
 

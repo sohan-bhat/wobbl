@@ -41,7 +41,7 @@ def build(out: Path, pb: dict | None = None) -> Path | None:
            f"heats itself faster than {TRIGGER:g} C/min. Past that trigger the kinetics no longer forecast it.")
     z = L / 2 + 6
     b = s.body("cylinder", [D / 2, L / 2], pos=[0, 0, z], color="#3c6e9e", name="cell")
-    b.color_by("self heating", rate, unit="C/min", colormap="inferno", range=(0.0, 2 * TRIGGER), limit=TRIGGER,
+    b.color_by("self heating", rate, unit="C/min", colormap="turbo", range=(0.0, 2 * TRIGGER), limit=TRIGGER,
                limit_label="runaway")
     b.light(np.clip((peak - 150) / 250, 0, 1))
     P.wire_box(s, [-L * 0.6, -L * 0.6, 0], [L * 0.6, L * 0.6, L * 1.4], name="oven")
@@ -55,10 +55,10 @@ def build(out: Path, pb: dict | None = None) -> Path | None:
     if onset is not None and oven[0] <= onset <= oven[-1]:
         s.event(onset, "runaway starts", c.get("trigger", ""), kind="fail")
         s.label("runs away, {peak self heating}", [0, 0, L + 14], t0=onset, kind="fail")
-        s.label("settles, {peak cell temperature}", [0, 0, L + 14], t1=onset, kind="peak")
+        s.label("settles, {peak cell temperature}", [0, 0, L + 14], t1=onset - 1e-3, kind="peak")
     if here is not None:
         s.event(here, "where the cell sits", "its surroundings in the question", kind="info")
     s.ground(0, size=L * 4, grid=10, color="#1d1f23")
     verdict(s, o)
-    s.camera(target=[0, 0, L * 0.6], direction=(0.3, -1, 0.45), distance=L * 3.4)
+    s.camera(target=[0, 0, L * 0.6], direction=(0.3, -1, 0.45), distance=L * 4.0)
     return s.save(out)
