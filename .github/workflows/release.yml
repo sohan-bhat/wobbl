@@ -30,7 +30,8 @@ jobs:
           code=$(curl -sS -o exchange.json -w '%{http_code}' -X POST \
             -H "Authorization: Bearer $id_token" \
             https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/wobbl)
-          if [ "$code" = 200 ]; then
+          # npm answers 201 Created with a short lived token when it will take the publish
+          if [ "$code" = 200 ] || [ "$code" = 201 ]; then
             echo "npm accepts trusted publishing for wobbl from release.yml in the npm environment."
             rm -f exchange.json
             exit 0
