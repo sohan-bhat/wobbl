@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.2
+## 0.1.2 (2026-10-16)
 
 **npm installs that work**
 - `npm i -g wobbl` and `npm i wobbl` now leave a working `wobbl` command. A postinstall
