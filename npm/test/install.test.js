@@ -149,10 +149,12 @@ test('turns installer failures into plain explanations', async () => {
   assert.match((await launcher.failure('uv', dns, online)).message, /network problem/);
   const missing = 'Because wobbl was not found in the package registry and you require wobbl==0.1.0';
   assert.match((await launcher.failure('uv', missing, online)).message, /is not on PyPI yet/);
+  const tooNew = 'Because only wobbl<=0.1.1 is available and you require wobbl>=0.1.2, we can conclude that your requirements are unsatisfiable.';
+  assert.match((await launcher.failure('uv', tooNew, online)).message, /or newer is not on PyPI yet/);
   const python = 'error: No interpreter found for Python >=3.10 in managed installations\nPython downloads are not allowed';
   assert.match((await launcher.failure('uv', python, online)).message, /needs Python 3\.10 or newer/);
   const other = await launcher.failure('pipx', 'something else broke', online);
-  assert.match(other.message, /pipx install wobbl==/);
+  assert.match(other.message, /pipx install "wobbl>=/);
   for (const e of [other, await launcher.failure('uv', dns, offline)]) {
     for (const line of e.lines.filter((l) => l && !l.startsWith('    '))) {
       assert.doesNotMatch(line, /[;–—→]|: /, `plain prose in ${JSON.stringify(line)}`);
@@ -194,9 +196,11 @@ test('with neither uv nor pipx, downloads uv and installs wobbl with it', { skip
   assert.equal(r.status, 0, r.stderr);
   const uv = path.join(box.home, '.wobbl', 'uv', 'uv');
   assert.ok(fs.existsSync(uv));
-  assert.match(r.stderr, new RegExp(`Installed uv ${launcher.UV_VERSION.replace(/\./g, '\\.')} at ${uv.replace(/[.\\/]/g, '\\$&')}`));
-  assert.match(r.stderr, /shell profile were not changed/);
-  assert.deepEqual(box.calls('uv')[0].args, ['tool', 'install', '--python', '>=3.10', `wobbl==${VERSION}`]);
+  assert.match(r.stderr, new RegExp(`Got uv ${launcher.UV_VERSION.replace(/\./g, '\\.')}, checked against its SHA256, done in \\d+s`));
+  const log = fs.readFileSync(launcher.logFile(box.env), 'utf8');
+  assert.ok(log.includes(`Saved uv at ${uv}`), log);
+  assert.match(log, /shell profiles were not changed/);
+  assert.deepEqual(box.calls('uv')[0].args, ['tool', 'install', '--python', '>=3.10', launcher.SPEC]);
   assert.deepEqual(box.calls('wobbl').map((c) => c.args), [['doctor']]);
   // a later run reuses the downloaded uv instead of fetching it again
   fs.rmSync(path.join(box.toolBin, 'wobbl'));
@@ -214,6 +218,7 @@ test('when pipx runs on an old Python, switches to a bootstrapped uv', { skip: N
   const r = await launchAsync(box, ['doctor'], { WOBBL_UV_DOWNLOAD_URL: url, FAKE_PIPX_FAIL: oldPython }).done;
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stderr, /Wobbl will use uv instead, which brings its own Python/);
+  assert.doesNotMatch(r.stderr, /Ignored the following versions/, 'pipx output stays in the log');
   assert.equal(box.calls('uv')[0].args[1], 'install');
   assert.deepEqual(box.calls('wobbl').map((c) => c.args), [['doctor']]);
 });

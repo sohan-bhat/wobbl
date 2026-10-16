@@ -97,12 +97,12 @@ jobs:
       - name: Launcher tests with fake uv, pipx and wobbl
         run: npm test
 
-      - name: Only bin/ and the docs go into the package
+      - name: Only bin/, lib/ and the docs go into the package
         shell: bash
         run: |
           npm pack --dry-run --json | node -e '
             const files = JSON.parse(require("fs").readFileSync(0, "utf8"))[0].files.map((f) => f.path).sort();
             console.log(files.join("\n"));
-            const want = ["LICENSE", "README.md", "bin/wobbl.js", "package.json"];
+            const want = ["LICENSE", "README.md", "bin/wobbl.js", "lib/progress.js", "package.json"];
             if (JSON.stringify(files) !== JSON.stringify(want)) process.exit(1);
           '

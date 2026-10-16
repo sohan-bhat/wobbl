@@ -3,14 +3,17 @@
 
 // npx wobbl runs the real Wobbl, which is a Python package, and installs it on first use.
 //
-//   1. A wobbl of this exact version is already installed. Run it.
-//   2. Otherwise install it for good with `uv tool install`, or `pipx install` when there
+//   1. A wobbl of this version or newer is already installed. Run it. An older one never
+//      runs, so a stale npm cache can not hand anyone an old CLI.
+//   2. Otherwise install the newest wobbl that is at least this version for good with
+//      `uv tool install`, or `pipx install` when there
 //      is no uv. An npx cache is not enough, because `wobbl setup` registers the installed
 //      command with Claude Code, Codex, Cursor and Gemini CLI, and it has to stay put.
 //   3. With neither uv nor pipx around, download a pinned uv into ~/.wobbl/uv, check it
 //      against the SHA256 checksums of its GitHub release, and install with that.
 //
-// Everything this script says goes to stderr, so `npx wobbl mcp` keeps stdout clean.
+// Everything this script says goes to stderr, so `npx wobbl mcp` keeps stdout clean. The
+// installers' own output goes to ~/.wobbl/logs/install.log, and is shown only on failure.
 
 const { spawn, spawnSync } = require('child_process');
 const crypto = require('crypto');
@@ -18,6 +21,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
+const { Display, UvTracker, seconds, sized } = require('../lib/progress');
 
 const VERSION = require('../package.json').version;
 const PYTHON_SPEC = '>=3.10'; // keep in step with requires-python in pyproject.toml
@@ -40,8 +44,19 @@ class Stop extends Error {
   }
 }
 
+// Where messages and the progress display go. The npm postinstall points this at the
+// terminal, since npm hides what install scripts write to stderr.
+let out = process.stderr;
+let display = new Display(out);
+
+// `shared` when npm draws its own spinner on the same terminal.
+function useOutput(stream, { shared = false } = {}) {
+  out = stream;
+  display = new Display(stream, { shared });
+}
+
 function say(...lines) {
-  process.stderr.write(`${lines.join('\n')}\n`);
+  display.say(`${lines.join('\n')}\n`);
 }
 
 function homeOf(env) {
@@ -159,15 +174,19 @@ function runSync(file, args, env, timeout = 60000) {
   return spawnSync(f, a, { ...opts, env, encoding: 'utf8', windowsHide: true, timeout });
 }
 
-// Run an installer, showing its output on stderr and keeping a copy to explain failures.
-function runInstaller(file, args, env) {
+// Run an installer. Its output goes to the install log and to `onOutput`, which drives the
+// progress display, and a copy is kept to explain failures.
+function runInstaller(file, args, env, onOutput = () => {}) {
+  log(env, `$ ${file} ${args.join(' ')}`);
   return new Promise((resolve) => {
     const [f, a, opts] = command(file, args, env);
     let out = '';
     const child = spawn(f, a, { ...opts, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     const tee = (chunk) => {
-      out += chunk;
-      process.stderr.write(chunk);
+      const text = chunk.toString();
+      out += text;
+      log(env, text, '');
+      onOutput(text);
     };
     child.stdout.on('data', tee);
     child.stderr.on('data', tee);
@@ -199,6 +218,37 @@ function canonical(version) {
   return release.join('.') + m[2];
 }
 
+// Sort keys for a canonical version, enough of PEP 440 for wobbl's own releases. A dev
+// release comes before its pre releases, those before the release, and post releases after.
+function versionKey(version) {
+  const m = /^(\d+(?:\.\d+)*)(?:(a|b|rc)(\d+))?(?:\.post(\d+))?(?:\.dev(\d+))?$/.exec(canonical(version));
+  if (!m) return null;
+  const pre = m[2] ? { a: 0, b: 1, rc: 2 }[m[2]] : m[5] !== undefined && m[4] === undefined ? -1 : 3;
+  return {
+    release: m[1].split('.').map(Number),
+    rest: [pre, Number(m[3] || 0), m[4] === undefined ? -1 : Number(m[4]), m[5] === undefined ? Infinity : Number(m[5])],
+  };
+}
+
+// True when `have` is `want` or newer. A version that can not be read never counts.
+function atLeast(have, want) {
+  const a = versionKey(have);
+  const b = versionKey(want);
+  if (!a || !b) return false;
+  for (let i = 0; i < Math.max(a.release.length, b.release.length); i++) {
+    const x = a.release[i] || 0;
+    const y = b.release[i] || 0;
+    if (x !== y) return x > y;
+  }
+  for (let i = 0; i < a.rest.length; i++) {
+    if (a.rest[i] !== b.rest[i]) return a.rest[i] > b.rest[i];
+  }
+  return true;
+}
+
+// What the installers are asked for. Never older than this launcher, and the newest PyPI has.
+const SPEC = `wobbl>=${canonical(VERSION)}`;
+
 // The version a wobbl command reports, 'launcher' for a copy of this script, or null when
 // it does not run.
 function probe(file, env) {
@@ -209,10 +259,9 @@ function probe(file, env) {
   return m ? m[1] : null;
 }
 
-// The first wobbl of this launcher's version, looking in firstDirs, then PATH, then the
-// usual uv and pipx folders. `others` lists the real wobbl commands that did not match.
+// The first wobbl of this launcher's version or newer, looking in firstDirs, then PATH,
+// then the usual uv and pipx folders. `others` lists the older wobbl commands it passed.
 function pickWobbl(env, firstDirs = []) {
-  const want = canonical(VERSION);
   const key = (file) => (IS_WIN ? realpath(file).toLowerCase() : realpath(file));
   const seen = new Set([key(__filename)]);
   const others = [];
@@ -222,7 +271,7 @@ function pickWobbl(env, firstDirs = []) {
     seen.add(key(file));
     const version = probe(file, env);
     if (!version || version === 'launcher') continue;
-    if (canonical(version) === want) return { match: file, others };
+    if (atLeast(version, VERSION)) return { match: file, version, others };
     others.push({ file, real: realpath(file), version });
   }
   return { match: null, others };
@@ -230,9 +279,49 @@ function pickWobbl(env, firstDirs = []) {
 
 // -- bootstrapping uv -------------------------------------------------------
 
-function uvDir(env) {
+function wobblHome(env) {
   const base = env.WOBBL_HOME ? env.WOBBL_HOME.replace(/^~(?=$|[\\/])/, homeOf(env)) : path.join(homeOf(env), '.wobbl');
-  return path.join(path.resolve(base), 'uv');
+  return path.resolve(base);
+}
+
+function uvDir(env) {
+  return path.join(wobblHome(env), 'uv');
+}
+
+// -- the install log --------------------------------------------------------
+
+function logFile(env) {
+  return path.join(wobblHome(env), 'logs', 'install.log');
+}
+
+// Begin a fresh log for one install.
+function startLog(env) {
+  try {
+    fs.mkdirSync(path.dirname(logFile(env)), { recursive: true });
+    const head = `wobbl npm launcher ${VERSION} on ${process.platform} ${process.arch}, node ${process.version}, ${new Date().toISOString()}`;
+    fs.writeFileSync(logFile(env), `${head}\n`);
+  } catch {
+    // no log is no reason to stop the install
+  }
+}
+
+function log(env, text, end = '\n') {
+  try {
+    fs.mkdirSync(path.dirname(logFile(env)), { recursive: true });
+    fs.appendFileSync(logFile(env), text + end);
+  } catch {
+    // no log is no reason to stop the install
+  }
+}
+
+// The end of the log, for printing beside an explanation.
+function logTail(env, count = 60) {
+  try {
+    const lines = fs.readFileSync(logFile(env), 'utf8').replace(/\s+$/, '').split(/\r?\n/);
+    return lines.length > count ? ['...', ...lines.slice(-count)] : lines;
+  } catch {
+    return [];
+  }
 }
 
 function existingUv(env) {
@@ -263,7 +352,8 @@ function uvTarget(platform = process.platform, arch = process.arch, glibc = plat
   return null;
 }
 
-function download(url, redirects = 5) {
+// `onProgress(got, total)` hears about each chunk when the server says how big the file is.
+function download(url, onProgress, redirects = 5) {
   return new Promise((resolve, reject) => {
     const client = url.startsWith('http:') ? require('http') : require('https');
     const req = client.get(url, { headers: { 'user-agent': `wobbl-npm/${VERSION}` } }, (res) => {
@@ -272,7 +362,7 @@ function download(url, redirects = 5) {
         res.resume();
         const next = new URL(headers.location, url).href;
         if (url.startsWith('https:') && !next.startsWith('https:')) reject(new Error(`refused to leave https for ${next}`));
-        else resolve(download(next, redirects - 1));
+        else resolve(download(next, onProgress, redirects - 1));
         return;
       }
       if (status !== 200) {
@@ -281,7 +371,13 @@ function download(url, redirects = 5) {
         return;
       }
       const chunks = [];
-      res.on('data', (c) => chunks.push(c));
+      const total = Number(headers['content-length']) || 0;
+      let got = 0;
+      res.on('data', (c) => {
+        chunks.push(c);
+        got += c.length;
+        if (total && onProgress) onProgress(got, total);
+      });
       res.on('end', () => resolve(Buffer.concat(chunks)));
       res.on('error', reject);
     });
@@ -371,7 +467,7 @@ async function downloadFailure(error, host, deps) {
 // Download uv into ~/.wobbl/uv and check its SHA256 before anything runs it. The binary
 // is written under a temporary name and renamed into place, so a broken download never runs.
 async function bootstrapUv(env, deps = {}) {
-  const tell = deps.say || say;
+  const show = deps.display || (deps.say ? new Display(null) : display);
   const target = uvTarget(deps.platform, deps.arch, deps.glibc);
   if (!target) {
     throw new Stop([
@@ -386,21 +482,24 @@ async function bootstrapUv(env, deps = {}) {
   const exeName = windows ? 'uv.exe' : 'uv';
   const base = `${(env.WOBBL_UV_DOWNLOAD_URL || UV_RELEASES).replace(/\/+$/, '')}/${UV_VERSION}`;
   const host = new URL(base).host;
-  tell(
-    'Wobbl needs uv or pipx to install itself, and neither is on this computer.',
-    `Downloading uv ${UV_VERSION} for ${target} from ${host}.`,
-    '',
-  );
+  log(env, `No uv or pipx found. Downloading uv ${UV_VERSION} for ${target} from ${base}/${asset}`);
+  show.start(`Downloading uv ${UV_VERSION}`);
+  show.detail(`from ${host}`);
   const get = deps.download || download;
   let archive;
   let sums;
   try {
-    [archive, sums] = await Promise.all([get(`${base}/${asset}`), get(`${base}/sha256.sum`)]);
+    [archive, sums] = await Promise.all([
+      get(`${base}/${asset}`, (got, total) => show.detail(sized(got, total))),
+      get(`${base}/sha256.sum`),
+    ]);
   } catch (e) {
+    show.fail();
     throw await downloadFailure(e, host, deps);
   }
   const want = checksumFor(sums.toString('utf8'), asset);
   if (want !== crypto.createHash('sha256').update(archive).digest('hex')) {
+    show.fail();
     throw new Stop([
       want
         ? 'The uv download did not match its published SHA256 checksum, so Wobbl threw it away without running it.'
@@ -410,6 +509,7 @@ async function bootstrapUv(env, deps = {}) {
   }
   const binary = windows ? fromZip(archive, exeName) : fromTarGz(archive, exeName);
   if (!binary) {
+    show.fail();
     throw new Stop([
       `The uv ${UV_VERSION} download has no ${exeName} in it.`,
       'Install uv yourself, then run the same command again.',
@@ -430,11 +530,8 @@ async function bootstrapUv(env, deps = {}) {
     fs.rmSync(part, { force: true });
     if (!fs.existsSync(exe)) throw e;
   }
-  tell(
-    `Installed uv ${UV_VERSION} at ${exe}. Its SHA256 matched the release checksums.`,
-    'Wobbl only uses it to install itself. Your PATH and shell profile were not changed.',
-    '',
-  );
+  show.done(`Got uv ${UV_VERSION}, checked against its SHA256`);
+  log(env, `Saved uv at ${exe}. Its SHA256 matched. It is only used to install wobbl, and PATH and shell profiles were not changed.`);
   return exe;
 }
 
@@ -452,7 +549,7 @@ function chooseInstaller({ uv, pipx, pipxOwnsWobbl }) {
 const PATTERNS = {
   network: /dns error|failed to lookup|name or service not known|nodename nor servname|getaddrinfo|name resolution|connection refused|connection reset|tcp connect|network is unreachable|timed out|error sending request|failed to fetch|could not fetch|newconnectionerror|max retries exceeded|proxyerror|sslerror|certificate verify/i,
   python: /no interpreter found|no python|python downloads are not allowed|python-downloads|require a different python|requires-python/i,
-  missing: /not found in the package registry|there is no version of wobbl|no versions of wobbl|no matching distribution found|could not find a version that satisfies/i,
+  missing: /not found in the package registry|there is no version of wobbl|no versions of wobbl|only wobbl\S* (?:is|are) available|no matching distribution found|could not find a version that satisfies/i,
   conflict: /already exists.*--force/i,
   oldPython: /require a different python|requires-python|bad interpreter/i,
 };
@@ -510,7 +607,7 @@ async function failure(tool, out, deps = {}) {
   }
   if (PATTERNS.missing.test(out)) {
     return new Stop([
-      `wobbl ${VERSION} is not on PyPI yet, so there is nothing to install.`,
+      `wobbl ${VERSION} or newer is not on PyPI yet, so there is nothing to install.`,
       'If it came out in the last few minutes, wait a moment and run the same command again.',
     ]);
   }
@@ -519,7 +616,7 @@ async function failure(tool, out, deps = {}) {
     `${tool} could not install wobbl ${VERSION}. Its output above says why.`,
     'You can also install it yourself and run wobbl directly',
     '',
-    `    ${manual} wobbl==${VERSION}`,
+    `    ${manual} "${SPEC}"`,
   ]);
 }
 
@@ -535,32 +632,54 @@ function binDirFrom(file, args, fallback, env) {
   return dir || fallback;
 }
 
+// A failed install's explanation, marked so the log is printed above it.
+async function installFailed(tool, out, deps) {
+  display.fail();
+  const stop = await failure(tool, out, deps);
+  stop.showLog = true;
+  return stop;
+}
+
 async function installWithPipx(pipx, env, deps) {
-  const r = await runInstaller(pipx, ['install', '--force', `wobbl==${VERSION}`], env);
+  display.start('Installing wobbl with pipx');
+  display.detail('pipx shows no progress, this takes a minute or two');
+  const r = await runInstaller(pipx, ['install', '--force', SPEC], env);
   if (r.code === 0) {
     const fallback = env.PIPX_BIN_DIR || path.join(homeOf(env), '.local', 'bin');
     const bin = binDirFrom(pipx, ['environment', '--value', 'PIPX_BIN_DIR'], fallback, env);
+    display.done('Installed wobbl with pipx');
     return { tool: 'pipx', bin, fix: `${shown(pipx, env)} ensurepath` };
   }
+  display.fail();
   if (PATTERNS.oldPython.test(r.out)) return null;
-  throw await failure('pipx', r.out, deps);
+  throw await installFailed('pipx', r.out, deps);
+}
+
+function uvDone(tracker) {
+  const what = tracker.version ? `wobbl ${tracker.version}` : 'wobbl';
+  return tracker.packages ? `Installed ${what} and its ${tracker.packages - 1} dependencies` : `Installed ${what}`;
 }
 
 async function installWithUv(uv, env, deps) {
-  const args = ['tool', 'install', '--python', PYTHON_SPEC, `wobbl==${VERSION}`];
-  let r = await runInstaller(uv, args, env);
+  const args = ['tool', 'install', '--python', PYTHON_SPEC, SPEC];
+  let tracker = new UvTracker(display, 'Installing wobbl');
+  let r = await runInstaller(uv, args, env, (text) => tracker.feed(text));
   if (r.code !== 0 && PATTERNS.conflict.test(r.out)) {
-    say('', `Another installer already put a wobbl command where uv keeps commands. Replacing it with wobbl ${VERSION}.`, '');
-    r = await runInstaller(uv, ['tool', 'install', '--force', ...args.slice(2)], env);
+    display.fail();
+    log(env, 'Another installer left a wobbl command where uv keeps commands. Replacing it.');
+    tracker = new UvTracker(display, 'Replacing an older wobbl command');
+    r = await runInstaller(uv, ['tool', 'install', '--force', ...args.slice(2)], env, (text) => tracker.feed(text));
   }
-  if (r.code !== 0) throw await failure('uv', r.out, deps);
+  if (r.code !== 0) throw await installFailed('uv', r.out, deps);
+  tracker.finish(uvDone);
   const fallback = env.UV_TOOL_BIN_DIR || env.XDG_BIN_HOME || path.join(homeOf(env), '.local', 'bin');
   const bin = binDirFrom(uv, ['tool', 'dir', '--bin'], fallback, env);
   return { tool: 'uv', bin, fix: `${shown(uv, env)} tool update-shell` };
 }
 
 async function install(env, others, deps = {}) {
-  say(`Setting up wobbl ${VERSION}. This happens once for each new version.`, '');
+  startLog(env);
+  say('Setting up Wobbl. This happens once.');
   const uv = onPath('uv', env)[0] || existingUv(env);
   const pipx = onPath('pipx', env)[0];
   const pipxOwnsWobbl = others.some((w) => /[\\/]pipx[\\/]venvs[\\/]/i.test(w.real));
@@ -568,12 +687,7 @@ async function install(env, others, deps = {}) {
   if (how === 'pipx') {
     const done = await installWithPipx(pipx, env, deps);
     if (done) return done;
-    say(
-      '',
-      'pipx has no Python 3.10 or newer to work with here, and Wobbl needs one.',
-      'Wobbl will use uv instead, which brings its own Python.',
-      '',
-    );
+    say('  pipx has no Python 3.10 or newer here, so Wobbl will use uv instead, which brings its own Python.');
   }
   return installWithUv(uv || (await bootstrapUv(env, deps)), env, deps);
 }
@@ -592,20 +706,18 @@ function pathHint(bin, fix, env) {
   const lines = [
     '',
     `${bin} is not on your PATH yet. Your agents find Wobbl anyway, because wobbl setup saves the full path.`,
-    'To type wobbl in new terminals as well, run this once',
-    '',
-    `    ${fix}`,
-    '',
   ];
+  if (fix) lines.push('To type wobbl in new terminals as well, run this once', '', `    ${fix}`, '');
+  const or = fix ? 'or ' : 'To type wobbl in new terminals as well, ';
   if (IS_WIN) {
     const add = `[Environment]::SetEnvironmentVariable("Path", "${bin};" + [Environment]::GetEnvironmentVariable("Path", "User"), "User")`;
-    lines.push('or run this in PowerShell', '', `    ${add}`);
+    lines.push(`${or}run this in PowerShell`, '', `    ${add}`);
   } else if (path.basename(env.SHELL || '') === 'fish') {
-    lines.push('or run this in fish', '', `    fish_add_path "${bin}"`);
+    lines.push(`${or}run this in fish`, '', `    fish_add_path "${bin}"`);
   } else {
     const home = homeOf(env);
     const dir = bin === home || bin.startsWith(home + path.sep) ? `$HOME${bin.slice(home.length)}` : bin;
-    lines.push(`or add this line to ${profileFile(env)} yourself`, '', `    export PATH="${dir}:$PATH"`);
+    lines.push(`${or}add this line to ${profileFile(env)} yourself`, '', `    export PATH="${dir}:$PATH"`);
   }
   return lines;
 }
@@ -664,30 +776,48 @@ function execWobbl(file, args, env) {
   });
 }
 
+// Find a wobbl of this version or newer, installing one when there is none. Returns the
+// command, and for a fresh install also what installed it and where.
+async function ensureWobbl(env, deps = {}) {
+  const found = pickWobbl(env);
+  if (found.match) return found;
+  const started = Date.now();
+  const done = await install(env, found.others, deps);
+  const after = pickWobbl(env, [done.bin]);
+  if (!after.match) {
+    throw new Stop([
+      `${done.tool} finished, but there is no wobbl ${VERSION} or newer in ${done.bin}.`,
+      `Please report this with the log at ${logFile(env)} to`,
+      '',
+      `    ${ISSUES}`,
+    ]);
+  }
+  say(`Wobbl ${after.version} is ready, set up in ${seconds(Date.now() - started)}. The command is ${after.match}`);
+  return { ...after, done };
+}
+
+// Print a Stop, with the end of the install log above it when an installer failed.
+function explain(e, env) {
+  display.fail();
+  if (e.showLog) {
+    const tail = logTail(env);
+    if (tail.length) say('', `The installer's output, also saved in ${logFile(env)}`, '', ...tail.map((l) => `  ${l}`));
+  }
+  say('', ...e.lines);
+}
+
 async function main(argv, env = process.env, deps = {}) {
   if (env[PROBE_ENV] === '1') {
     process.stdout.write(`${PROBE_REPLY} ${VERSION}\n`);
     return 0;
   }
   try {
-    let { match, others } = pickWobbl(env);
-    if (!match) {
-      const done = await install(env, others, deps);
-      ({ match } = pickWobbl(env, [done.bin]));
-      if (!match) {
-        throw new Stop([
-          `${done.tool} finished, but there is no wobbl ${VERSION} command in ${done.bin}.`,
-          'Please report this with the output above at',
-          '',
-          `    ${ISSUES}`,
-        ]);
-      }
-      say('', `Installed wobbl ${VERSION} with ${done.tool}. The wobbl command is ${match}.`, ...pathHint(done.bin, done.fix, env), '');
-    }
+    const { match, done } = await ensureWobbl(env, deps);
+    if (done) say(...pathHint(done.bin, done.fix, env), '');
     return await execWobbl(match, argv, env);
   } catch (e) {
     if (!(e instanceof Stop)) throw e;
-    say('', ...e.lines);
+    explain(e, env);
     return 1;
   }
 }
@@ -708,14 +838,25 @@ if (require.main === module) {
 module.exports = {
   VERSION,
   PYTHON_SPEC,
+  SPEC,
   UV_VERSION,
   Stop,
+  atLeast,
   bootstrapUv,
   canonical,
   checksumFor,
   chooseInstaller,
+  ensureWobbl,
+  explain,
   failure,
   fromTarGz,
   fromZip,
+  logFile,
+  onPath,
+  pathDirs,
+  pathHint,
+  sameFile,
+  say,
+  useOutput,
   uvTarget,
 };

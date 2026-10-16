@@ -30,8 +30,9 @@ function log(entry) {
 
 const binDir = (name) => process.env[name] || path.join(os.homedir(), '.local', 'bin');
 
-// `uv tool install ... wobbl==X` and `pipx install ... wobbl==X` drop a fake wobbl X in
-// their bin folder, unless the test asked for a failure.
+// `uv tool install ... wobbl>=X` and `pipx install ... wobbl>=X` drop a fake wobbl X in
+// their bin folder, or FAKE_INSTALLS_VERSION when PyPI has a newer one, unless the test
+// asked for a failure. FAKE_UV_OUTPUT is printed first, the way uv reports its progress.
 function install(args, binVar, failure) {
   if (failure) {
     process.stderr.write(`${failure}\n`);
@@ -41,8 +42,9 @@ function install(args, binVar, failure) {
     process.stderr.write('error: Executable already exists: wobbl (use `--force` to overwrite)\n');
     return 2;
   }
-  const spec = args.find((a) => a.startsWith('wobbl=='));
-  const version = process.env.FAKE_INSTALLS_VERSION || spec.slice('wobbl=='.length);
+  if (process.env.FAKE_UV_OUTPUT && binVar === 'UV_TOOL_BIN_DIR') process.stderr.write(process.env.FAKE_UV_OUTPUT);
+  const spec = args.find((a) => /^wobbl(==|>=)/.test(a));
+  const version = process.env.FAKE_INSTALLS_VERSION || spec.slice('wobbl>='.length);
   writeShim(binDir(binVar), 'wobbl', ['wobbl', version]);
   process.stderr.write('Installed 1 executable: wobbl\n');
   return 0;

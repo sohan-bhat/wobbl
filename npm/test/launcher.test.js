@@ -6,9 +6,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { SPEC, logFile } = require('../bin/wobbl');
 const { IS_WIN, LAUNCHER, VERSION, launch, launchAsync, sandbox, writeShim } = require('./support');
 
-const UV_INSTALL = ['tool', 'install', '--python', '>=3.10', `wobbl==${VERSION}`];
+const UV_INSTALL = ['tool', 'install', '--python', '>=3.10', SPEC];
+const NEWER = VERSION.replace(/^(\d+)\./, (_, major) => `${Number(major) + 1}.`);
 
 function firstOnPath(call) {
   return call.path.split(path.delimiter)[0];
@@ -25,7 +27,18 @@ test('runs an installed wobbl of the same version and installs nothing', (t) => 
   assert.deepEqual(box.calls('uv'), []);
 });
 
-test('leaves a wobbl of another version alone and installs the matching one with uv', (t) => {
+test('runs an installed wobbl that is newer than the launcher and installs nothing', (t) => {
+  const box = sandbox(t);
+  box.shim('wobbl', 'wobbl', NEWER);
+  box.shim('uv', 'uv');
+  const r = launch(box, ['doctor']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stderr, '');
+  assert.equal(box.calls('wobbl')[0].version, NEWER);
+  assert.deepEqual(box.calls('uv'), []);
+});
+
+test('never runs a wobbl older than the launcher and asks uv for this version or newer', (t) => {
   const box = sandbox(t);
   box.shim('wobbl', 'wobbl', '0.0.1');
   box.shim('uv', 'uv');
@@ -48,7 +61,7 @@ test('installs with uv, says where, and runs wobbl with its folder first on PATH
   assert.deepEqual(ran.args, ['setup']);
   // wobbl setup registers shutil.which("wobbl"), which has to be the lasting install
   assert.equal(firstOnPath(ran), box.toolBin);
-  assert.match(r.stderr, new RegExp(`Installed wobbl ${VERSION.replace(/\./g, '\\.')} with uv`));
+  assert.match(r.stderr, new RegExp(`Wobbl ${VERSION.replace(/\./g, '\\.')} is ready, set up in \\d+s`));
   assert.match(r.stderr, /is not on your PATH yet/);
   assert.match(r.stderr, /uv tool update-shell/);
 });
@@ -67,7 +80,7 @@ test('falls back to pipx when there is no uv', (t) => {
   const r = launch(box, ['doctor']);
   assert.equal(r.status, 0, r.stderr);
   const calls = box.calls('pipx').map((c) => c.args);
-  assert.deepEqual(calls[0], ['install', '--force', `wobbl==${VERSION}`]);
+  assert.deepEqual(calls[0], ['install', '--force', SPEC]);
   assert.deepEqual(box.calls('wobbl').map((c) => c.args), [['doctor']]);
   assert.match(r.stderr, /with pipx/);
   assert.match(r.stderr, /pipx ensurepath/);
@@ -116,7 +129,7 @@ test('replaces a wobbl command that another installer left where uv puts command
   assert.equal(r.status, 0, r.stderr);
   const installs = box.calls('uv').filter((c) => c.args[1] === 'install').map((c) => c.args);
   assert.deepEqual(installs, [UV_INSTALL, ['tool', 'install', '--force', ...UV_INSTALL.slice(2)]]);
-  assert.match(r.stderr, /Another installer already put a wobbl command/);
+  assert.match(fs.readFileSync(logFile(box.env), 'utf8'), /Another installer left a wobbl command/);
 });
 
 test('passes every argument through untouched', (t) => {
@@ -157,4 +170,49 @@ test('explains a version that is not on PyPI', (t) => {
   assert.equal(r.status, 1);
   assert.match(r.stderr, /is not on PyPI yet/);
   assert.deepEqual(box.calls('wobbl'), []);
+});
+
+// What uv writes to a pipe while it installs, trimmed.
+const UV_OUTPUT = [
+  'Downloading cpython-3.13.5-linux-x86_64-gnu (download) (31.0MiB)',
+  ' Downloaded cpython-3.13.5-linux-x86_64-gnu (download)',
+  'Resolved 3 packages in 120ms',
+  'Downloading numpy (6.5MiB)',
+  'Downloading scipy (22.0MiB)',
+  ' Downloaded numpy',
+  ' Downloaded scipy',
+  'Prepared 3 packages in 2.1s',
+  'Installed 3 packages in 80ms',
+  ' + numpy==2.5.4',
+  ' + scipy==1.18.1',
+  ` + wobbl==${NEWER}`,
+  'Installed 1 executable: wobbl',
+  '',
+].join('\n');
+
+test('shows one line per stage and keeps the installer output in the log', (t) => {
+  const box = sandbox(t);
+  box.shim('uv', 'uv');
+  const r = launch(box, ['doctor'], { FAKE_UV_OUTPUT: UV_OUTPUT, FAKE_INSTALLS_VERSION: NEWER });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, '', 'stdout stays clean for MCP');
+  assert.doesNotMatch(r.stderr, /Downloading numpy|\+ scipy|Resolved 3/);
+  assert.match(r.stderr, /Got Python 3\.13\.5, done in \d+s/);
+  assert.match(r.stderr, new RegExp(`Installed wobbl ${NEWER.replace(/\./g, '\\.')} and its 2 dependencies, done in \\d+s`));
+  assert.doesNotMatch(r.stderr, /\r|\x1b\[/, 'no redrawing when stderr is not a terminal');
+  const log = fs.readFileSync(logFile(box.env), 'utf8');
+  assert.match(log, /Downloading numpy \(6\.5MiB\)/);
+  assert.match(log, /\$ \S*uv\S* tool install --python >=3\.10 wobbl>=/);
+  assert.equal(box.calls('wobbl')[0].version, NEWER);
+});
+
+test('prints the installer log above the explanation when an install fails', (t) => {
+  const box = sandbox(t);
+  box.shim('uv', 'uv');
+  const r = launch(box, ['doctor'], { FAKE_UV_FAIL: 'error: the disk is full' });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /The installer's output, also saved in .*install\.log/);
+  assert.match(r.stderr, /error: the disk is full/);
+  assert.match(r.stderr, /uv could not install wobbl/);
+  assert.ok(fs.existsSync(logFile(box.env)));
 });
