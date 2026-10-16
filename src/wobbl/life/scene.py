@@ -88,8 +88,12 @@ def speed_sweep(s, X, tris, shapes, freqs, numbers, bands, *, zeta: float, margi
     top = float(D.max())
     lim = float(amplification(1 + 0.5 * margin, zeta))
     tgt = float(amplification(1 + margin, zeta))
-    worst = int(np.argmax(D.max(0)))
-    s.timeline(x, unit=unit, label=label, between="interpolated", kind="input", design=float(x[worst]))
+    # it opens where the run's worst resonance is: the first excitation, in the order given, that meets a mode it
+    # drives. Every exact meeting amplifies alike, so the largest frame alone would pick one by rounding
+    meets = [float(np.interp((f - lo) / (hi - lo), p, x)) for lo, hi, _ in bands if hi > lo
+             for f, num in zip(freqs, numbers) if lo <= f <= hi and num not in quiet]
+    design = meets[0] if meets else float(x[int(np.argmax(D.max(0)))])
+    s.timeline(x, unit=unit, label=label, between="interpolated", kind="input", design=design)
     span = float(np.linalg.norm(np.ptp(X, 0)))
     a = 0.08 * span / max(top, 1.0)
     U = np.stack([phi[lead[k]] * D[lead[k], k] * a for k in range(n)])
