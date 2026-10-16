@@ -282,7 +282,7 @@ const radiusOf = (b) => (b ? Math.hypot(b.hi[0] - b.lo[0], b.hi[1] - b.lo[1], b.
  * as NASA's Eyes follows a craft, with the whole scene in an inset. dir is the side the scene looks at them
  * from, from a camera preset that follows one of them when it has one.
  */
-export function sceneFraming(h, arr, bounds = sceneBounds(h, arr)) {
+export function sceneFraming(h, arr, bounds = sceneBounds(h, arr), frame = 0) {
   const all = radiusOf(bounds);
   // what holds the subject and is not much bigger than it (a crucible, a mold box) is framed with it, where a
   // bench or the ground under it runs out of the view
@@ -298,6 +298,19 @@ export function sceneFraming(h, arr, bounds = sceneBounds(h, arr)) {
   let subject = boundsOf(h, arr, (o) => !o.prop && SOLID.has(o.kind), false);
   if (subject && radiusOf(subject) > 0.6 * all) subject = null;
   if (subject) hold = null;
+  // the corners of each solid the subject is made of, where they stand at the frame the page opens on, so
+  // the camera fits the subject itself and not the box round it
+  let points = null;
+  if (subject) {
+    points = [];
+    h.objects.forEach((o, oi) => {
+      if (o.prop || !SOLID.has(o.kind) || skipped(o)) return;
+      const b = boundsOf(h, arr, (x, i) => i === oi, false, frame);
+      if (!b) return;
+      for (let c = 0; c < 8; c++) points.push([c & 1 ? b.hi[0] : b.lo[0], c & 2 ? b.hi[1] : b.lo[1], c & 4 ? b.hi[2] : b.lo[2]].map((x) => +x.toPrecision(6)));
+    });
+    if (!points.length) points = null;
+  }
   let follow = null;
   const g = h.magnify && h.magnify.groups && h.magnify.groups[0];
   if (g && g.objects.length) {
@@ -320,5 +333,5 @@ export function sceneFraming(h, arr, bounds = sceneBounds(h, arr)) {
     const fill = long > 3 ? 1.15 : 2.4;
     if (r > 0) follow = { c, r: +r.toPrecision(6), fill, dir: preset ? preset.dir.map((x) => +x.toPrecision(6)) : null };
   }
-  return { subject, follow, hold };
+  return { subject, points, follow, hold };
 }

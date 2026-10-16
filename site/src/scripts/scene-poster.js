@@ -26,7 +26,7 @@ globalThis.drawScenePoster = async ({ b64, run, w, h, px, sizes }) => {
   const T = run.input.t, p = run.input.home, a = Math.floor(p), b = Math.min(a + 1, T.length - 1);
   const k = run.input.between === 'step' ? 0 : p - a;
   // the camera the page opens on (scene-view.js): the subject framed, or followed with the whole scene inset
-  const orbit = mainOrbit(run, w, h, a, b, k), ins = insetView(run, w, h, orbit.az, orbit.el);
+  const orbit = mainOrbit(run, w, h, a, b, k, { search: true }), ins = insetView(run, w, h, orbit.az, orbit.el);
   const scene = { a, b, k, t: k ? T[a] + (T[b] - T[a]) * k : T[a], bend: true, mag: !run.follow };
   if (run.follow) {
     aimAt(orbit, followAt(run, a, b, k), w, h, ins && ins.rect);

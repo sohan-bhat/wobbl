@@ -21,7 +21,7 @@ export interface ScenePlay {
   alts: { name: string; at: number }[] | null;
   exag: number; magnify: { factor: number; label: string } | null;
   camera: { view: number[]; fov: number }; bounds: { lo: number[]; hi: number[] };
-  subject: { lo: number[]; hi: number[] } | null; hold: { lo: number[]; hi: number[] } | null; follow: { c: number[][]; r: number; fill: number; dir: number[] | null } | null;
+  subject: { lo: number[]; hi: number[] } | null; points: number[][] | null; hold: { lo: number[]; hi: number[] } | null; follow: { c: number[][]; r: number; fill: number; dir: number[] | null } | null;
   verdict: { word: string; tone: string; line: string } | null;
 }
 interface Entry { file?: string; bytes?: number; title?: string; frames?: number; broken?: string; play?: ScenePlay; poster?: string; posterW?: number; posterH?: number; card?: string }

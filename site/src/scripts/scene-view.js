@@ -22,7 +22,7 @@ export function followAt(run, a, b, k) {
  * The main camera of a scene run in a view vw by vh CSS pixels, at frame a, b, k: following the subject when the
  * scene magnified it, else fitted to the subject, else to the whole box.
  */
-export function mainOrbit(run, vw, vh, a = 0, b = 0, k = 0) {
+export function mainOrbit(run, vw, vh, a = 0, b = 0, k = 0, { search = false } = {}) {
   const all = run.bounds, R = radiusOf(all), aspect = vw / vh;
   if (run.follow) {
     const { az, el } = angles(run.follow.dir || run.camera.view), r = run.follow.r;
@@ -32,15 +32,42 @@ export function mainOrbit(run, vw, vh, a = 0, b = 0, k = 0) {
     return o;
   }
   const box = run.subject || run.hold || all, r = radiusOf(box);
-  const { az, el } = angles(run.camera.view);
+  const pts = run.subject && run.points ? run.points : corners(box.lo, box.hi);
+  const base = angles(run.camera.view);
   // a subject framed up close keeps the rest of the scene behind it in view, so the planes still come from the whole box
-  const o = new Orbit({ target: centerOf(box), az, el, dist: r * 4, fov: run.camera.fov, aspect, near: Math.min(r, R) / 50,
-    far: R * 40, minDist: r * 1.1, maxDist: Math.max(R, r) * 8 });
-  fitCentered(o, corners(box.lo, box.hi), r * 1.2);
+  const make = (az, el) => {
+    const o = new Orbit({ target: centerOf(box), az, el, dist: r * 4, fov: run.camera.fov, aspect, near: Math.min(r, R) / 50,
+      far: R * 40, minDist: r * 0.3, maxDist: Math.max(R, r) * 8 });
+    fitCentered(o, pts, r * 0.3);
+    return o;
+  };
+  let o = make(base.az, base.el);
+  if (search && run.subject && run.points) {
+    // a long thin subject (a linkage) is turned until it fills the frame, as a photographer turns a part to
+    // run corner to corner: around the scene's own view, never from below or straight down
+    let best = fillOf(o, pts);
+    for (let da = -60; da <= 60; da += 15) {
+      for (const de of [-10, 0, 12, 24]) {
+        const el = Math.min(Math.max(base.el + (de * Math.PI) / 180, (15 * Math.PI) / 180), (68 * Math.PI) / 180);
+        const c = make(base.az + (da * Math.PI) / 180, el), f = fillOf(c, pts);
+        if (f > best * 1.04) { best = f; o = c; }
+      }
+    }
+  }
   // a little air round it, so what stands beside the subject is not cut at the edge
   o.dist *= 1.06;
   o.update();
   return o;
+}
+
+/** How much of the view the points' outline on screen covers, 0 to 1. */
+function fillOf(o, pts) {
+  let x0 = 1, x1 = -1, y0 = 1, y1 = -1;
+  for (const p of pts) {
+    const [x, y] = o.project(p);
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+  }
+  return Math.max(0, x1 - x0) * Math.max(0, y1 - y0) / 4;
 }
 
 /** Back the camera off until a sphere of radius r round its target fills the narrower side of the view. */

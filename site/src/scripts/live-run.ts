@@ -288,6 +288,13 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     const v = sceneRun && lead.follow?.dir ? lead.follow.dir : lead.camera.view, l = Math.hypot(v[0], v[1], v[2]) || 1;
     orbit!.az = Math.atan2(v[1], v[0]);
     orbit!.el = Math.asin(Math.max(-1, Math.min(1, v[2] / l)));
+    if (sceneRun && lead.subject) {
+      // the side the subject fills the frame from, as the stills open on it (scene-view.js)
+      const [, , vw, vh] = views()[0], { a, b, k } = frameAt(lead, pos[0]);
+      const o = mainOrbit(lead, vw, vh, a, b, k, { search: true });
+      orbit!.az = o.az;
+      orbit!.el = o.el;
+    }
     fitCamera();
   }
   /** Each pane's camera, the inset beside a view that follows its subject, and the scene state each is drawn at. */
@@ -377,13 +384,23 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       const ins = insets[row];
       const inside = (r: number[], x: number, y: number) => x > r[0] && x < r[0] + r[2] && y > r[1] && y < r[1] + r[3];
       if (ins && shows && inside(ins.rect, sx, sy)) shows = false;
+      const lab = mark.querySelector<HTMLElement>('.lrun-mark-v');
+      let lx = '', ly = '';
       if (!shows && ins) {
-        // a peak out of the close view is marked where it shows in the inset
+        // a peak out of the close view is marked where it shows in the inset, its value kept inside the inset:
+        // slid left over the ring and lifted above it when the inset is too narrow beside the ring
         const [ix, iy, iw, ih] = ins.rect, [u, w2, z2] = ins.orbit.project(at);
         sx = ix + ((u + 1) / 2) * iw;
         sy = iy + ((1 - w2) / 2) * ih;
         shows = z2 < 1 && sx > ix + 4 && sy > iy + 4 && sx < ix + iw - 4 && sy < iy + ih - 4;
+        const lw = lab ? lab.offsetWidth : 0, right = ix + iw - 4;
+        if (lab && lw && sx + 14 + lw > right) {
+          const x = Math.max(right - lw - sx, ix + 4 - sx);
+          lx = `${x.toFixed(1)}px`;
+          if (x < 12) ly = sy - iy > 44 ? '-38px' : '14px';
+        }
       }
+      if (lab) { lab.style.left = lx; lab.style.top = ly; }
       mark.hidden = !shows;
       mark.style.translate = `${sx.toFixed(1)}px ${sy.toFixed(1)}px`;
     });

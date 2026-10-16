@@ -99,13 +99,13 @@ export function scenePlay(h, arr) {
   const exag = Math.max(1, ...h.objects.filter((o) => o.deform && !o.guide).map((o) => o.deform.exaggerate || 1));
   const cam = h.camera || {};
   const d = cam.dir || [0.62, -1.05, 0.62], l = Math.hypot(...d);
-  const bounds = sceneBounds(h, arr), { subject, follow, hold } = sceneFraming(h, arr, bounds);
+  const bounds = sceneBounds(h, arr), { subject, points, follow, hold } = sceneFraming(h, arr, bounds, Math.round(home));
   return {
     kind: 'scene', title: h.title || '', domain: h.domain || '',
     input: { label: cap(tl.label || 'frame'), unit: tl.unit || '', t: t.map(r6), between: tl.between, kind: tl.kind || 'time', home: r6(home), design: tl.design ?? null },
     q, peaks: peaks && peaks.map((p) => p && { v: p.v, p0: p.p0, pe: p.pe }), event, also, alts,
     exag: +exag.toPrecision(3), magnify: h.magnify ? { factor: h.magnify.factor, label: h.magnify.label || 'Drawn', groups: h.magnify.groups } : null,
-    camera: { view: d.map((x) => x / l), fov: cam.fov || 30 }, bounds, subject, follow, hold,
+    camera: { view: d.map((x) => x / l), fov: cam.fov || 30 }, bounds, subject, points, follow, hold,
     verdict: h.verdict ? { word: h.verdict.word, tone: h.verdict.tone, line: h.verdict.line } : null,
   };
 }
