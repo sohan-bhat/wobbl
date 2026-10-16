@@ -2,7 +2,7 @@
  "domain": "part",
  "analysis": "acoustic",
  "spec": {
-  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/speaker-box/box.step",
+  "thing": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-b-fields/examples/speaker-box/box.step",
   "kind": "step",
   "question": "where do standing waves form in the air inside the box below 1 kHz?",
   "options": {

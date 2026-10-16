@@ -102,7 +102,9 @@ def _is_box(b: Body) -> tuple | None:
 
 
 # --- problems ----------------------------------------------------------------------------------------
-def eigen_problem(msh, nev: int, shift_hz: float, pl: dict, shapes: int) -> str:
+def eigen_problem(msh, nev: int, shift_hz: float, pl: dict, shapes: int, drive: list | None = None) -> str:
+    """The air's modes. Each of the first shapes modes is printed on the plane, and with drive also at those points
+    together with its integral of p squared over the air, which a driven response needs to weight the modes."""
     vols = [n for n, t in msh.tags.items() if t < 100]
     out = [pro3d.groups(msh.tags, {"Dom": vols})]
     out.append(f"Function {{\n  c = {num(C_AIR)};\n}}\n")
@@ -120,8 +122,15 @@ def eigen_problem(msh, nev: int, shift_hz: float, pl: dict, shapes: int) -> str:
                f"    Operation {{ GenerateSeparate[A]; EigenSolve[A, {nev}, {num((2 * math.pi * shift_hz) ** 2)}, 0]; "
                "SaveSolutions[A]; }\n  }\n}\n")
     out.append("PostProcessing {\n  { Name H; NameOfFormulation H; Quantity {\n"
-               "      { Name p; Value { Local { [ {p} ]; In Dom; Jacobian Vol; } } } } }\n}\n")
+               "      { Name p; Value { Local { [ {p} ]; In Dom; Jacobian Vol; } } }\n"
+               "      { Name pnorm; Value { Integral { [ SquNorm[{p}] ]; In Dom; Jacobian Vol; Integration I2; } } }"
+               " } }\n}\n")
     po = [pro3d.print_plane("p", pl, f"mode{i}.txt", f" TimeStep {i},") for i in range(shapes)]
+    for i in range(shapes if drive else 0):
+        po.append(f'Print[ pnorm[Dom], OnGlobal, TimeStep {i}, Format Table, File "norm{i}.txt" ];')
+        for j, x in enumerate(drive):
+            po.append(f'Print[ p, OnPoint {{{num(x[0])}, {num(x[1])}, {num(x[2])}}}, TimeStep {i}, Format Table, '
+                      f'File "drive{i}_{j}.txt" ];')
     out.append("PostOperation {\n  { Name P; NameOfPostProcessing H; Operation {\n    " + "\n    ".join(po or [""]) +
                "\n  } }\n}\n")
     return "".join(out)
@@ -209,17 +218,21 @@ def run_modes(scene: Scene, roles: SoundRoles, out_dir, question="", quality="no
     bb = air_scene.bbox
     # off the middle, where half of all modes have a nodal plane and would show nothing
     pl["at"] = bb[pl["ik"]] + 0.3 * (bb[pl["ik"] + 3] - bb[pl["ik"]])
+    # a driver in a corner, where every mode of a box has an antinode; the first corner inside the air is used
+    corners = [[bb[i] + (0.08 if c else 0.92) * (bb[i + 3] - bb[i]) for i, c in enumerate(cs)]
+               for cs in itertools.product((1, 0), repeat=3)]
     levels = []
     for j, k in enumerate(ks):
         log("mesh", f"mesh {j + 1} of {len(ks)}")
         msh = mesh(air_scene, [], [b.name for b in air], work / f"l{j}" / "m.msh", k=k,
                    domain=Domain("none", max_size=h), sizes={b.name: h for b in air})
         log("solve", f"modes up to {fmt(fmax)} Hz ({msh.n_nodes:,} nodes)")
-        lg = solve.run(eigen_problem(msh, nev, 1.0, pl, 7 if j == len(ks) - 1 else 0), msh.path, work / f"l{j}",
-                       resolution="H", verbosity=4, timeout=1800)
+        last = j == len(ks) - 1
+        lg = solve.run(eigen_problem(msh, nev, 1.0, pl, max(nev, 7) if last else 0, drive=corners if last else None),
+                       msh.path, work / f"l{j}", resolution="H", verbosity=4, timeout=1800)
         w2 = [z.real for z in solve.eigenvalues(lg)]
         fr = sorted(math.sqrt(max(v, 0.0)) / (2 * math.pi) for v in w2)
-        levels.append({"msh": msh, "f": fr, "dir": work / f"l{j}"})
+        levels.append({"msh": msh, "f": fr, "dir": work / f"l{j}", "w2": w2})
     fine = levels[-1]
     rigid = [x for x in fine["f"] if x < 1e-3 * fmax]
     modes = [x for x in fine["f"] if 1e-3 * fmax <= x <= fmax]
@@ -276,8 +289,9 @@ def run_modes(scene: Scene, roles: SoundRoles, out_dir, question="", quality="no
     o = GenericOutcome("sound", title or "air", question, "ok", head, metrics, lvl, reasons, checks,
                        assumptions + scene.notes, values, images, [], solver=f"GetDP {solve.getdp().version()} with "
                        "SLEPc and gmsh", t_total=time.time() - t0)
-    _modes_playback(out, shapes, pl, air_scene, modes)
-    _modes_view(out, o, fine["msh"], [b.name for b in air], shapes, pl, title or "air", question)
+    drive = driven(fine["dir"], fine["w2"], pl, max(nev, 7), corners, V, fmax, modes)
+    _modes_playback(out, shapes, pl, air_scene, modes, drive)
+    _modes_view(out, o, fine["msh"], [b.name for b in air], shapes, pl, title or "air", question, drive)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out)
@@ -409,33 +423,99 @@ def run_radiation(scene: Scene, roles: SoundRoles, out_dir, question="", quality
     return o.write(out)
 
 
-def _modes_view(out, o, msh, air: list[str], shapes, pl, title, question):
-    """Each of the first modes breathing on the slice for one period, inside the air drawn from its mesh."""
+LOSS = 0.05              # modal loss factor of the driven response: a box with light lining, about Q = 20
+RINGING = 20.0           # dB over the even pressure: a mode ringing at ten times it
+
+
+def driven(d: Path, w2: list, pl: dict, n: int, corners: list, volume: float, fmax: float, modes: list,
+           loss: float = LOSS) -> dict | None:
+    """The steady sound field a small driver in a corner sets up at each frequency, summed from the solved modes:
+    p(x) = sum of phi(x) phi(s) / (N (k_n^2 - k^2 + j eta k_n^2)), with N the integral of phi squared over the air.
+    Each slice is given in dB against the even pressure the same driver makes in a box too small for any standing
+    wave (the uniform squeeze, 1 / (V k^2)), so 0 dB is no standing wave and positive is where one builds up."""
+    shapes, at, norm, k2 = [], [], [], []
+    for i in range(min(n, len(w2))):
+        g = pro3d.read_plane(Path(d) / f"mode{i}.txt", pl, comps=2)
+        try:
+            nm = float(solve.read_global(d, f"norm{i}.txt")[0])
+            pts = []
+            for jj in range(len(corners)):
+                v = solve.read_point(d, f"drive{i}_{jj}.txt")
+                pts.append(complex(v[0], v[1] if len(v) > 1 else 0.0) if len(v) else np.nan)
+        except (OSError, ValueError, IndexError):
+            continue
+        z = g[..., 0] + 1j * g[..., 1]
+        th = 0.5 * np.angle(np.nansum(z * z)) if np.isfinite(z).any() else 0.0
+        shapes.append(np.real(z * np.exp(-1j * th)))
+        at.append(np.real(np.asarray(pts) * np.exp(-1j * th)))
+        norm.append(nm)
+        k2.append(max(w2[i], 0.0) / C_AIR ** 2)
+    if len(shapes) < 2:
+        return None
+    at = np.asarray(at)
+    good = [jj for jj in range(at.shape[1]) if np.isfinite(at[:, jj]).all() and np.abs(at[:, jj]).max() > 0]
+    if not good:
+        return None
+    jj = good[0]
+    S, A, N, K2 = np.asarray(shapes), at[:, jj], np.asarray(norm), np.asarray(k2)
+    f1 = modes[0]
+    freqs = np.unique(np.round(np.r_[np.linspace(max(0.15 * f1, 10.0), fmax, 90), [m for m in modes if m <= fmax]],
+                               3))
+    # GetDP prints zero where the plane leaves the air; the uniform mode (k = 0) is nonzero all through the air
+    r0 = np.abs(S[int(np.argmin(K2))])
+    outside = ~(r0 > 0.2 * np.nanmax(r0))
+    frames, hot, cold = [], [], []
+    for f in freqs:
+        k = 2 * math.pi * f / C_AIR
+        p = np.tensordot(A / (N * (K2 - k * k + 1j * loss * K2)), S, axes=1)
+        ref = 1.0 / (volume * k * k)
+        L = np.clip(20 * np.log10(np.maximum(np.abs(p) / ref, 1e-6)), -30.0, 30.0)
+        L[outside] = np.nan
+        frames.append(L)
+        hot.append(float(np.nanmax(L)))
+        cold.append(float(np.nanmin(L)))
+    return {"freqs": freqs, "level": np.asarray(frames), "hot": np.asarray(hot), "cold": np.asarray(cold),
+            "point": corners[jj], "loss": loss, "at": A.tolist(), "norm": N.tolist(),
+            "mode_Hz": (np.sqrt(K2) * C_AIR / (2 * math.pi)).tolist()}
+
+
+def _modes_view(out, o, msh, air: list[str], shapes, pl, title, question, drive=None):
+    """The air's steady sound field as the frequency a driver plays is picked: each step is the pressure the driver
+    sets up at that frequency, so standing waves build up on the slice near each mode and fade between them."""
     try:
         from ..viz import Scene
 
         from . import view as V
     except ImportError:
         return None
-    if not shapes:
+    if not drive:
         return None
-    per = 12
-    frames, t, freq = [], [], []
-    for k, (f, g) in enumerate(shapes):
-        m = np.nanmax(np.abs(g)) or 1.0
-        for j in range(per):
-            frames.append(g / m * math.cos(2 * math.pi * j / per))
-            t.append(k + j / per)
-            freq.append(f)
-    sc = Scene(f"{Path(title).stem} standing waves", domain="sound", question=question, length="mm")
-    sc.timeline(t, unit="", label="mode", seconds=3.0 * len(shapes), between="exact",
-                note="each mode plays one period of its standing wave, its shape times cos(2 pi f t)")
+    freqs = drive["freqs"]
+    sc = Scene(f"{Path(title).stem} driven at the frequency you pick", domain="sound", question=question,
+               length="mm",
+               source="The pressure is summed from the solved modes of the air for a small driver in its corner, "
+                      f"each mode damped with a loss factor of {drive['loss']:g}, as a lightly lined box is.")
+    lows = [f for f in (o.values.get("modes_Hz") or []) if f > 0]
+    sc.timeline(freqs, unit="Hz", label="frequency", between="interpolated", kind="input",
+                design=float(lows[0]) if lows else float(freqs[len(freqs) // 2]))
     V.draw_bodies(sc, msh, {n: "air" for n in air}, {n: 0.18 for n in air})
-    V.slice_mesh(sc, pl, np.array(frames), "pressure", "relative", cmap="RdBu", frames=True, rng=(-1, 1))
-    sc.readout("mode frequency", freq, unit="Hz")
+    V.slice_mesh(sc, pl, drive["level"], "standing wave level", "dB", cmap="RdBu", frames=True, rng=(-20, 30))
+    f = next((x for x in sc.fields if x["name"] == "standing wave level"), None)
+    if f is not None:
+        f.update(limit=RINGING, limit_label="a mode ringing, ten times the even pressure")
+    sc.body("sphere", [0.03 * max(pl["u1"] - pl["u0"], pl["v1"] - pl["v0"]) * 1e3],
+            pos=np.asarray(drive["point"]) * 1e3, color="#ffd400", name="driver")
+    sc.readout("loudest spot", drive["hot"], unit="dB", limit=RINGING)
+    sc.readout("quietest spot", drive["cold"], unit="dB")
+    near = np.array([min(lows, key=lambda m: abs(m - x)) if lows else 0.0 for x in freqs])
+    sc.readout("nearest mode", near, unit="Hz", digits=4)
+    for k, m in enumerate(lows):
+        if m <= freqs[-1]:
+            sc.event(float(m), f"mode {k + 1}", f"{fmt(m)} Hz")
     word, tn = V.tone(o.verdict)
     sc.verdict(word, o.headline, tn)
-    sc.note("Mode shapes have no absolute size; red and blue are opposite phase.")
+    sc.note("0 dB is the even pressure the driver makes in a box with no standing waves. Red is where a standing "
+            "wave adds to it, blue where one cancels it.")
     return sc.save(out)
 
 
@@ -489,15 +569,22 @@ def _panel(path, shapes, pl):
     return plots.save(fig, path)
 
 
-def _modes_playback(out, shapes, pl, air_scene, modes):
+def _modes_playback(out, shapes, pl, air_scene, modes, drive=None):
     from . import playback as pb
 
     if not shapes:
         return None
-    return pb.write(out, "sound-modes-3d", {
-        "modes": "mode shapes on the slice, pressure packed on a range symmetric about zero; play shape times "
-                 "cos(2 pi f t)", "modes_Hz": "every mode found, Hz", "slice": "the plane and its ranges in mm",
-        "air": "each air volume's box in mm"},
-        {"slice": _pl_mm(pl), "modes": [{"frequency_Hz": round(f, 4), "shape": pb.pack_signed(g)} for f, g in shapes],
-         "modes_Hz": [round(f, 4) for f in modes],
-         "air": [[round(1e3 * x, 3) for x in b.bbox] for b in air_scene.bodies]})
+    manifest = {"modes": "the first mode shapes on the slice, pressure packed on a range symmetric about zero",
+                "modes_Hz": "every mode found, Hz", "slice": "the plane and its ranges in mm",
+                "air": "each air volume's box in mm"}
+    data = {"slice": _pl_mm(pl), "modes": [{"frequency_Hz": round(f, 4), "shape": pb.pack_signed(g)} for f, g in shapes],
+            "modes_Hz": [round(f, 4) for f in modes],
+            "air": [[round(1e3 * x, 3) for x in b.bbox] for b in air_scene.bodies]}
+    if drive:
+        manifest["drive"] = ("the corner driver of the driven response: its point in mm, the modal loss factor, and "
+                             "for every solved mode in GetDP's order its frequency, its value at the driver and its "
+                             "integral of p squared over the air (m3), on the same scale")
+        data["drive"] = {"point_mm": [round(1e3 * x, 3) for x in drive["point"]], "loss_factor": drive["loss"],
+                         "modes": [{"frequency_Hz": round(f, 4), "at_drive": pb._r(a), "norm": pb._r(nm)}
+                                   for f, a, nm in zip(drive["mode_Hz"], drive["at"], drive["norm"])]}
+    return pb.write(out, "sound-modes-3d", manifest, data)

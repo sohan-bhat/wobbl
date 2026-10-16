@@ -79,7 +79,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 27.874661,
+ "t_total": 17.241545,
  "solver": "GetDP 3.5.0 with SLEPc and gmsh",
  "criteria": []
 }

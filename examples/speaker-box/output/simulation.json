@@ -53,8 +53,8 @@
    "verdict": "ok",
    "headline": "The air has 4 standing wave modes below 1000 Hz, the lowest at 331 Hz and the next at 847 Hz.",
    "confidence": "low",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/speaker-box/output",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-ab3ba0b0ea559c790/examples/speaker-box/output/report.html",
+   "result_dir": "output",
+   "report": "output/report.html",
    "assumptions": []
   }
  ]
