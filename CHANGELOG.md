@@ -18,6 +18,21 @@
   its run still showed green.
 - The landing page leads with `npm i -g wobbl` and has tabs for npm, pipx, uv and npx.
 
+**A command line that behaves the same every time**
+- `wobbl simulate "question"` and `wobbl simulate thing "question"` are the one documented form. Anything that is
+  not a command goes to simulate unchanged, so `wobbl "question"` and `wobbl part.step "question"` always do the
+  same thing as the simulate form.
+- A greeting or a question with nothing to simulate gets a short note on what Wobbl does with three commands to
+  try. A part question with no file says which file to pass, and a typo of a command asks what was meant.
+- `wobbl doctor` runs each check in its own process with a time limit and shows every row live, so a slow or
+  stuck solver shows as timed out instead of hanging doctor.
+- `wobbl setup` and first use installs show a line per stage with a progress bar, bytes and percent for
+  downloads, a package count for installs and the time each took. The raw micromamba log goes to ~/.wobbl/logs
+  and a failure shows its end.
+- Results keep to 88 columns with the verdict badge in its color and the numbers lined up. A run shows a live
+  status with its stage, elapsed time and usual time. Pipes, agents and NO_COLOR get plain text, and --json is
+  unchanged.
+
 **Motor drive questions through simulate**
 - `wobbl simulate` answers whether a motor can drive a mechanism: the torque, speed,
   current and power it takes, whether it stalls or runs hot, and a quick return linkage's
