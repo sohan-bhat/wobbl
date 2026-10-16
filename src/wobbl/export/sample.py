@@ -19,7 +19,8 @@ GLOW = np.array([1.0, 0.85, 0.2])
 STOPS = {"viridis": "440154 482878 3e4989 31688e 26828e 1f9e89 35b779 6ece58 b5de2b fde725",
          "inferno": "000004 1b0c41 4a0c6b 781c6d a52c60 cf4446 ed6925 fb9b06 f7d13d fcffa4",
          "coolwarm": "3b4cc0 6889ee 9abbff c9d8ef edd1c2 f7a889 e26952 b40426",
-         "blues": "0b1a33 0f3b6e 1663a6 2f8fd1 6bb8e8 b6e0f7", "gray": "303338 e6e6e6", "heat": "9a9488 c9a05a e8742a f2401f"}
+         "blues": "0b1a33 0f3b6e 1663a6 2f8fd1 6bb8e8 b6e0f7", "gray": "303338 e6e6e6", "heat": "9a9488 c9a05a e8742a f2401f",
+         "RdBu": "053061 2166ac 4393c3 92c5de d1e5f0 f7f7f7 fddbc7 f4a582 d6604d b2182b 67001f"}
 CPK = {"H": "f2f2f2", "C": "555a60", "N": "3b6fe0", "O": "e8423b", "F": "7fd17f", "P": "ff8c1a", "S": "f2d230",
        "Cl": "33d14a", "Na": "a35cf2", "K": "8f40d4", "Li": "cc80ff", "Mg": "8aff00", "Al": "bfa6a6", "Si": "d9b380",
        "Fe": "e06633", "Cu": "c88033", "Zn": "7d80b0", "Ti": "bfc2c7", "Ni": "50d050", "Ca": "3dff00", "B": "ffb5b5",
@@ -279,10 +280,14 @@ class Scene:
         a, b, k = self._ab(u)
         t = self.time(u)
         surfaces, strokes = [], []
-        for o in self.h.get("objects", []):
+        grow = {i: (g.get("factor") or 1.0, g.get("anchor")) for g in (self.h.get("magnify") or {}).get("groups", [])
+                for i in g.get("objects", [])}
+        for i, o in enumerate(self.h.get("objects", [])):
             w = o.get("when")
-            if w and ((w[0] is not None and t < w[0] - 1e-9) or (w[1] is not None and t > w[1] + 1e-9)):
-                continue
+            if o.get("guide") or (w and ((w[0] is not None and t < w[0] - 1e-9) or
+                                         (w[1] is not None and t > w[1] + 1e-9))):
+                continue     # guides only carry labels, which a picture leaves out
+            n0 = len(surfaces)
             kind = o.get("kind")
             glow = self.series(o["glow"], a, b, k) if o.get("glow") else 0.0
             if kind == "mesh":
@@ -299,6 +304,11 @@ class Scene:
                 strokes += st
             elif kind == "lines":
                 strokes += self._lines(o, a, b, k, t)
+            if i in grow:   # small things drawn larger about their own place, as the viewer draws them
+                f, anchor = grow[i]
+                c = np.asarray(anchor, float) if anchor is not None else self.pose(o, a, b, k)[1]
+                for s in surfaces[n0:]:
+                    s.P = c + (s.P - c) * f
         return Posed(surfaces, strokes, t)
 
     def _mesh(self, o, a, b, k, glow) -> list[Surface]:
