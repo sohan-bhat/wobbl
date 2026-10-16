@@ -1,15 +1,30 @@
 ---
 // A run's scene.wobbl in Wobbl's viewer once it is near the screen (see scripts/scenes.ts).
-// card: a quiet view for the example cards, with only the part and its slider.
+// card: a quiet view for the example cards, with only the part and its slider. A card with a poster shows it at
+// once, with its slider drawn in place, and starts the live viewer only on a hover, a tap or focus.
 import { sceneFor, viewerSrc } from '../lib/scenes';
 interface Props { rel: string; card?: boolean; label?: string }
 const { rel, card = false, label } = Astro.props;
 const s = sceneFor(rel)!;
+const p = card ? s.poster : null;
 ---
-<div class:list={['scene', { 'scene-card': card }]} data-scene={s.src} data-viewer={viewerSrc()} data-mode={card ? 'card' : 'full'}
-     role={card ? 'img' : undefined} aria-label={card ? `${label ?? s.title}, a live 3D scene of the run` : undefined}>
-  <div class="scene-wait" aria-hidden="true"><span>{s.title}</span><span>Live 3D scene of the run</span></div>
-</div>
+{p ? (
+  <div class="scene scene-card has-poster" data-scene={s.src} data-viewer={viewerSrc()} data-mode="card" tabindex="0" role="group"
+       aria-label={`${label ?? s.title}, a 3D scene of the run. Hover, tap or focus it to turn the part and drag its slider.`}>
+    <img class="scene-poster" src={p.src} width={p.width} height={p.height} loading="lazy" decoding="async" alt="" />
+    {!p.slider.one && (
+      <div class="scene-row" aria-hidden="true">
+        <span class="scene-row-l"><span>{p.slider.label}</span><span class="scene-row-v">{p.slider.value}</span></span>
+        <span class="scene-row-t"><i style={`left: calc(${(p.slider.at * 100).toFixed(2)}% - ${(p.slider.at * 20).toFixed(1)}px)`}></i></span>
+      </div>
+    )}
+  </div>
+) : (
+  <div class:list={['scene', { 'scene-card': card }]} data-scene={s.src} data-viewer={viewerSrc()} data-mode={card ? 'card' : 'full'}
+       role={card ? 'img' : undefined} aria-label={card ? `${label ?? s.title}, a live 3D scene of the run` : undefined}>
+    <div class="scene-wait" aria-hidden="true"><span>{s.title}</span><span>Live 3D scene of the run</span></div>
+  </div>
+)}
 <script>
   import '../scripts/scenes';
 </script>

@@ -1,6 +1,8 @@
 // Shows each run's scene.wobbl in Wobbl's viewer, a model to turn and a slider to drag, never playing on its own.
 // A scene loads when it comes near the screen. Only a few WebGL views run at once (two on a phone): the rest
-// show a still of their own opening view, and take a live view back when one frees up. A view that scrolls away keeps
+// show a still of their own opening view, and take a live view back when one frees up. A gallery card with a
+// poster drawn at build time (scripts/posters.mjs) shows that at once and goes live only when someone hovers,
+// taps or focuses it. A view that scrolls away keeps
 // running state and camera until a scene on screen needs its context.
 type View = { dispose(): void; frames: number };
 declare global { interface Window { WobblView?: { mount(el: Element, o: Record<string, unknown>): Promise<View | null> } } }
@@ -9,7 +11,11 @@ const LIMIT = matchMedia('(max-width: 719px)').matches ? 2 : 5;
 // cards keep only the part and its slider: the page around them already says the rest
 const QUIET = `.bar,.nt,.ro,.lg,.live,.ts,.ttl,.lb,.bd{display:none!important}.wv{border:0}.st{aspect-ratio:4/3;min-height:0;max-height:none}.pc{padding:6px 12px 4px}.ctl label{font-size:13px}.ctl output{font-size:13px}.ctl input[type=range]{margin:0}.pc:has(.trk[hidden]){display:none}`;
 
-interface Slot { el: HTMLElement; host: HTMLElement | null; view: View | null; seen: boolean; busy: boolean; bytes?: Promise<Uint8Array> }
+interface Slot {
+  el: HTMLElement; host: HTMLElement | null; view: View | null; seen: boolean; busy: boolean; bytes?: Promise<Uint8Array>;
+  /** a card with a poster, live only once asked for (wanted) and kept while the pointer or focus is on it (hot) */
+  lazy: boolean; wanted: boolean; hot: boolean;
+}
 const slots = new Map<HTMLElement, Slot>();
 let viewer: Promise<void> | null = null;
 
@@ -59,7 +65,8 @@ function still(s: Slot) {
 
 function release(s: Slot) {
   if (!s.view) return;
-  still(s);
+  // a card with a poster goes back to it, and comes back live when it is reached for again
+  if (s.lazy) s.wanted = false; else still(s);
   s.view.dispose();
   s.view = null;
   s.host?.remove();
@@ -102,13 +109,13 @@ async function start(s: Slot) {
 
 /** Give free live views to scenes on screen, details pages' main views first, and stills to the rest. */
 function schedule() {
-  const want = [...slots.values()].filter((s) => s.seen && !s.view && !s.busy && !s.el.classList.contains('is-broken'));
+  const want = [...slots.values()].filter((s) => s.seen && (!s.lazy || s.wanted) && !s.view && !s.busy && !s.el.classList.contains('is-broken'));
   want.sort((a, b) => Number(card(a)) - Number(card(b)));
   for (const s of want) {
-    // a live view off screen keeps its place and camera until a scene on screen needs its context
-    if (live() >= LIMIT) { const idle = [...slots.values()].find((o) => o.view && !o.seen); if (idle) release(idle); }
+    // a live view off screen, or a card nobody is on, keeps its place and camera until another scene needs its context
+    if (live() >= LIMIT) { const idle = [...slots.values()].find((o) => o.view && o !== s && (!o.seen || (o.lazy && !o.hot))); if (idle) release(idle); }
     if (live() < LIMIT) start(s);
-    else if (!s.el.classList.contains('has-still')) poster(s).then(schedule);
+    else if (!s.lazy && !s.el.classList.contains('has-still')) poster(s).then(schedule);
   }
 }
 
@@ -124,8 +131,18 @@ const io = new IntersectionObserver((list) => {
 function scan() {
   for (const el of document.querySelectorAll<HTMLElement>('.scene[data-scene]')) {
     if (slots.has(el)) continue;
-    slots.set(el, { el, host: null, view: null, seen: false, busy: false });
+    const s: Slot = { el, host: null, view: null, seen: false, busy: false, lazy: el.classList.contains('has-poster'), wanted: false, hot: false };
+    slots.set(el, s);
     io.observe(el);
+    if (!s.lazy) continue;
+    // a mouse over the card, a tap (a click, so a swipe that scrolls the page does not count) or focus starts it
+    const go = () => { s.hot = true; if (!s.wanted) { s.wanted = true; s.seen = true; schedule(); } };
+    const off = () => { s.hot = el.matches(':hover') || el.contains(document.activeElement) || el.matches(':focus-within'); };
+    el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') go(); });
+    el.addEventListener('click', go);
+    el.addEventListener('focusin', go);
+    el.addEventListener('pointerleave', off);
+    el.addEventListener('focusout', off);
   }
 }
 

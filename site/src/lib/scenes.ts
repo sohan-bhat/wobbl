@@ -7,7 +7,8 @@ import { hasSim } from './sim';
 import { playRuns } from './playback';
 import type { Run } from './examples';
 
-interface Entry { file?: string; bytes?: number; title?: string; frames?: number; broken?: string }
+interface Slider { label: string; value: string; at: number; one: boolean }
+interface Entry { file?: string; bytes?: number; title?: string; frames?: number; broken?: string; poster?: string; posterW?: number; posterH?: number; slider?: Slider }
 interface Manifest { viewer: string; scenes: Record<string, Entry> }
 
 let cache: Manifest | null = null;
@@ -20,10 +21,12 @@ function manifest(): Manifest {
 }
 
 /** The scene of a run, by its folder under examples (circuits/led, rocket-launch/output), when it has a good one. */
-export function sceneFor(rel: string): { src: string; title: string; frames: number; bytes: number } | null {
+export function sceneFor(rel: string) {
   const e = manifest().scenes[rel];
   if (!e || !e.file) return null;
-  return { src: url(`data/scenes/${e.file}`), title: e.title ?? '', frames: e.frames ?? 1, bytes: e.bytes ?? 0 };
+  // the poster scripts/posters.mjs drew of the opening view, and what the slider under it says
+  const poster = e.poster ? { src: url(`data/scenes/${e.poster}`), width: e.posterW ?? 640, height: e.posterH ?? 480, slider: e.slider! } : null;
+  return { src: url(`data/scenes/${e.file}`), title: e.title ?? '', frames: e.frames ?? 1, bytes: e.bytes ?? 0, poster };
 }
 
 /** The viewer script the pages load once the first scene comes near the screen. */

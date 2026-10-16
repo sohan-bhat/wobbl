@@ -670,6 +670,17 @@ a.ex-card { padding-bottom: 18px; text-decoration: none; }
 .scene-wait span:first-child { color: var(--fg-2); }
 .scene-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .scene.has-still .scene-wait { display: none; }
+/* A card's poster with its slider drawn in place, as the live view draws them, until the live view takes over */
+.scene-card.has-poster { aspect-ratio: auto; overflow: visible; cursor: grab; }
+.scene-card.has-poster:focus-visible { outline: 2px solid var(--yellow); outline-offset: -2px; }
+.scene-poster { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; background: #0e0f11; }
+.scene-row { display: block; padding: 6px 12px 4px; border-top: 1px solid var(--line); }
+.scene-row-l { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font: 500 13px/1.3 var(--sans); color: var(--fg); }
+.scene-row-v { font: 500 13px var(--mono); color: var(--yellow); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scene-row-t { position: relative; display: block; height: 32px; }
+.scene-row-t::before { content: ""; position: absolute; left: 0; right: 0; top: 14px; height: 4px; background: var(--line-2); }
+.scene-row-t i { position: absolute; top: 6px; width: 20px; height: 20px; background: var(--yellow); border: 2px solid var(--ink); }
+.scene.is-live .scene-poster, .scene.is-live .scene-row { display: none; }
 .flight-scene { min-width: 0; }
 .flight-link { margin: 10px 0 0; font-weight: 600; }
 .ex-cat { margin: 16px 16px 0; font: 500 11px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--yellow); }
