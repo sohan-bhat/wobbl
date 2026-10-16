@@ -296,100 +296,153 @@ def _strained(pb: dict, o: dict, el, eos: dict, name: str, reps: int = 2):
 
 
 def _reaction(pb: dict, o: dict):
-    """The reaction happening in its vessel. A reaction with a liquid or a solution runs in a beaker, its gas
-    rising as bubbles in proportion to how far it has gone and the liquid warming or cooling by the run's
-    adiabatic change; an all solid charge burns in a crucible, a front running down through it from the top, the
-    burned part at the run's adiabatic temperature. The timeline is how far the reaction has gone, not clock time,
-    since the run solves the thermochemistry and not the rate."""
-    from ..viz.adapters.common import lathe
+    """The reaction as a model to drive by hand, across the input chem.sweep chose for it. A reaction in water
+    stands in a beaker sized to the solution the run assumed: the slider adds the solid in grams, the solution
+    warms or cools by what has reacted, any of the solid the solution cannot take sits on the bottom, and the gas
+    given off is gathered in one sphere at 1 atm so its true volume shows. A charge of solids burns in a crucible:
+    the slider sets the mixture, and the burned charge glows at the products' temperature solved for that mix,
+    with whatever is left over on top. Every frame is the whole finished result for its input, not a moment."""
+    sw = pb.get("sweep")
+    if not sw or not sw.get("points"):
+        return _reaction_by_temperature(pb, o)
     from ..viz import props as P
+    from ..viz.adapters.common import lathe
+    pts, inp = sw["points"], sw["input"]
+    x = np.array([p["x"] for p in pts], float)
+    n = len(x)
     T0 = float((pb.get("conditions") or {}).get("T_K") or 298.15)
-    ext = float(pb.get("equilibrium_extent") or 1.0)
-    adi = pb.get("adiabatic") or {}
-    rise = float(adi.get("rise_K") if adi.get("rise_K") is not None else (adi.get("T_K") or T0) - T0)
-    T_end = float(adi.get("T_K") or T0 + rise)
-    dH = float((pb.get("energies") or {}).get("dH_kJ") or 0.0)
-    gas = float(pb.get("gas_L") or 0.0)
-    phases = {sp.get("phase") for sp in pb.get("reactants", [])}
-    wet = bool(phases & {"aq", "l"})
-    n = 90
-    prog = np.linspace(0, 1, n) * ext
+    lim = sw.get("limit") or {}
     s = _scene(pb.get("equation") or "reaction", o,
-               "The timeline is the share of the reaction done, not clock time. Gas, heat and temperature at each "
-               "point are the run's totals times that share.")
+               "Each value of the slider is its own solve of the reaction's heat, gas and temperature. Thermodynamics "
+               "gives how far and how hot, not how fast.")
     s.head["length"] = "mm"
-    s.timeline(prog * 100, unit="%", label="reacted", seconds=9, between="interpolated")
-    lo, hi = sorted([T0, T_end])
-    hi = hi if hi - lo > 1 else lo + 1
-    rng = np.random.default_rng(11)
-    if wet:
-        R, H, fill = 40.0, 110.0, 70.0
-        glass = lathe([(R * 0.96, 2), (R, 0), (R, H), (R * 0.96, H), (R * 0.96, 2)], 40)
-        s.mesh(*glass, name="beaker", color="#cfe3f0", opacity=0.22, prop=True)
-        liq = lathe([(0, 2.5), (R * 0.95, 2.5), (R * 0.95, fill), (0, fill)], 40)
-        L = s.mesh(*liq, name="solution", color="#9cc6e0", opacity=0.55)
-        d = max(abs(rise), 0.5)
-        L.color_by("temperature", np.outer(T0 + rise * prog / max(ext, 1e-9), np.ones(len(liq[0]))), unit="K",
-                   colormap="coolwarm", range=(T0 - d, T0 + d))
-        solid = next((sp for sp in pb.get("reactants", []) if sp.get("phase") == "s"), None)
-        if solid is not None:
-            heap = lathe([(0, 2.5), (R * 0.55, 2.5), (0, 14)], 30)
-            m = s.mesh(*heap, name=solid.get("name") or solid["formula"], color="#f2f0ea")
-            m.deform(np.c_[np.zeros(len(heap[0])), np.zeros(len(heap[0])), -(heap[0][:, 2] - 2.5) * 0.95],
-                     scale=prog / max(ext, 1e-9))
-        if gas > 0:
-            k = 260
-            born = np.sort(rng.uniform(0, 1, k)) * ext            # gas comes off in step with the reaction
-            life = 0.12 * ext
-            r = R * 0.8 * np.sqrt(rng.uniform(0, 1, k))
-            a = rng.uniform(0, 2 * np.pi, k)
-            pos = np.full((n, k, 3), np.nan)
-            for f, p in enumerate(prog):
-                age = (p - born) / life
-                live = (age >= 0) & (age <= 1)
-                pos[f, live, 0] = r[live] * np.cos(a[live]) + np.sin(age[live] * 9 + a[live]) * 2
-                pos[f, live, 1] = r[live] * np.sin(a[live])
-                pos[f, live, 2] = 4 + age[live] * (fill - 6)
-            gas_name = next((sp["formula"] for sp in pb.get("products", []) if sp.get("phase") == "g"), "gas")
-            s.points(pos, color="#eef6ff", size=2.6, name=f"{gas_name} bubbles")
-            s.readout(f"{gas_name} given off", gas * prog, unit="L/mol", digits=3)
-        s.camera(target=[0, 0, H * 0.4], direction=(0.3, -1, 0.45), distance=H * 3.0)
-    else:
-        R, H = 30.0, 60.0
-        cru = lathe([(R * 1.25, H + 4), (R * 1.15, H + 4), (R * 0.95 + 2, 0), (R * 0.75, -6), (R * 0.95 + 8, -6),
-                     (R * 1.35, H + 4)], 36)
-        s.mesh(*cru, name="crucible", color="#7a6a5e", opacity=0.45, prop=True)
-        # the charge in rings, so the front can pass ring by ring
-        prof = [(0.0, 0.0)] + [(R * (0.95 + 0.35 * z / H), z) for z in np.linspace(0, H, 24)] + [(0.0, H)]
-        X, T = lathe(prof, 36)
-        front = H * (1 - prog / max(ext, 1e-9))
-        width = H * 0.06
-        burned = np.clip((X[None, :, 2] - front[:, None]) / width + 0.5, 0, 1)
-        temp = T0 + (T_end - T0) * burned
-        ch = s.mesh(X, T, name="charge", color="#8c5a3c")
-        ch.color_by("temperature", temp, unit="K", colormap="inferno", range=(lo, hi))
-        disc = s.body("cylinder", [R * 1.1, 0.6], pos=np.c_[np.zeros(n), np.zeros(n), front], color="#fff1c0",
-                      name="reaction front", opacity=0.85)
-        disc.light(np.where((prog > 0) & (prog < ext * 0.999), 1.0, 0.0))
-        disc.show(1e-6, ext * 100 * 0.999)
-        k = 120
-        pos = np.full((n, k, 3), np.nan)
-        start = rng.uniform(0, 1, k)
-        v = np.c_[rng.normal(0, 0.5, k), rng.normal(0, 0.5, k), rng.uniform(1.5, 3, k)]
-        for f, p in enumerate(prog):
-            if not 0 < p < ext * 0.999:
-                continue
-            age = (start + f * 0.13) % 1
-            pos[f] = np.c_[v[:, 0] * age * H * 0.6, v[:, 1] * age * H * 0.6,
-                           H + 3 + v[:, 2] * age * H * 0.5 - 9.8 * age ** 2 * H * 0.08]
-        s.points(pos, color="#ffc04a", size=1.2, name="sparks")
-        s.label("front {temperature at the front}", [R * 1.4, 0, 0], kind="peak", follow=disc)
-        s.readout("temperature at the front", np.where(prog > 0, T_end, T0), unit="K", digits=4)
-        s.camera(target=[0, 0, H * 0.45], direction=(0.4, -1, 0.5), distance=H * 4.2)
-    s.ground(-6 if not wet else 0, size=400, grid=20)
-    s.readout("heat given off" if dH <= 0 else "heat taken in", abs(dH) * prog, unit="kJ/mol", digits=4)
-    s.readout("temperature change", rise * prog / max(ext, 1e-9), unit="K", digits=3)
-    s.event(ext * 100, "equilibrium", f"{ext * 100:.3g}% reacted")
+    s.timeline(x, unit=inp["unit"], label=inp["name"], between="step", kind="input", design=inp["design"])
+    TK = np.array([np.nan if p.get("T_K") is None else p["T_K"] for p in pts], float)
+    if inp["what"] == "added":
+        gas = np.array([p["gas_L"] for p in pts], float)
+        r0 = 0.0
+        sol_ml = float(inp.get("solution_g") or 1000.0)
+        R = (sol_ml * 1000 / (1.8 * np.pi)) ** (1 / 3)
+        fill, H = 1.8 * R, 2.7 * R
+        s.mesh(*lathe([(R * 0.97, 2), (R, 0), (R, H), (R * 0.97, H), (R * 0.97, 2)], 48), name="beaker",
+               color="#cfe3f0", opacity=0.2, prop=True)
+        liq = lathe([(0, 2.5), (R * 0.96, 2.5), (R * 0.96, fill), (0, fill)], 48)
+        L = s.mesh(*liq, name="solution", color="#9cc6e0", opacity=0.6)
+        d = max(float(np.nanmax(np.abs(TK - T0))), 0.5)
+        L.color_by("solution temperature", np.outer(TK, np.ones(len(liq[0]))), unit="K", colormap="coolwarm",
+                   range=(T0 - d, T0 + d), limit=lim.get("T_K"), limit_label=lim.get("label", ""), digits=4)
+        # what the solution could not take, heaped on the bottom at about 2.2 g/cm3
+        left = np.array([p.get("left_g") or 0.0 for p in pts], float)
+        if left.max() > 0:
+            vmax = left.max() / 2.2 * 1000                    # mm3
+            h = (3 * vmax / (np.pi * 2.5 ** 2)) ** (1 / 3)
+            Xh, Th = lathe([(0, 2.5), (min(2.5 * h, R * 0.9), 2.5), (0, 2.5 + h)], 32)
+            k = (left / left.max()) ** (1 / 3)
+            U = np.stack([np.c_[Xh[:, 0] * (f - 1), Xh[:, 1] * (f - 1), (Xh[:, 2] - 2.5) * (f - 1)] for f in k])
+            heap = s.mesh(Xh, Th, name=f"{inp['name'].removesuffix(' added')} left undissolved", color="#f4f2ec")
+            heap.deform(U)
+        if gas.max() > 0:
+            gname = next((sp["formula"] for sp in pb.get("products", []) if sp.get("phase") == "g"), "gas")
+            rg = (3 * gas * 1e6 / (4 * np.pi)) ** (1 / 3)        # mm, the gas at 1 atm in one sphere
+            Xs, Ts = _sphere()
+            Xs, Ts = _subdivide(Xs, Ts)
+            r0 = max(float(rg.max()), 1.0)
+            c0 = np.array([0, 0, H + r0])
+            X0 = c0 + Xs * r0
+            U = np.stack([(np.array([0, 0, H + r]) + Xs * r) - X0 for r in rg])
+            ball = s.mesh(X0, Ts, name=f"{gname} gathered at 1 atm", color="#e8f3ff", opacity=0.28)
+            ball.deform(U)
+            s.label(f"{gname} " + "{" + f"{gname} given off" + "}", [0, 0, H + 2 * r0 + 10], kind="peak")
+            s.readout(f"{gname} given off", gas, unit="L", digits=3)
+        s.readout("temperature change", TK - T0, unit="K", digits=3)
+        heat = np.array([p["heat_kJ"] for p in pts], float)
+        s.readout("heat given off" if heat.max() > 0 else "heat taken in", np.abs(heat), unit="kJ", digits=3)
+        s.readout("left undissolved", left, unit="g", digits=3)
+        s.ground(0, size=max(6 * R, 4 * r0 if gas.max() > 0 else 0), grid=20)
+        top = H + (2 * r0 if gas.max() > 0 else 0)
+        s.camera(target=[0, 0, top * 0.45], direction=(0.3, -1, 0.35), distance=top * 2.4,
+                 presets=[{"name": "Beaker", "target": [0, 0, H * 0.4], "dir": (0.3, -1, 0.45), "dist": H * 3.2},
+                          {"name": "Whole", "target": [0, 0, top * 0.45], "dir": (0.3, -1, 0.35), "dist": top * 2.4},
+                          {"name": "Top", "target": [0, 0, H * 0.5], "dir": (0.01, -0.2, 1), "dist": H * 3.5}])
+        return s
+    # a charge of solids burning in a crucible
+    Rc, Hc = 30.0, 60.0
+    cru = lathe([(Rc * 1.25, Hc + 4), (Rc * 1.15, Hc + 4), (Rc * 0.95 + 2, 0), (Rc * 0.75, -6), (Rc * 0.95 + 8, -6),
+                 (Rc * 1.35, Hc + 4)], 36)
+    s.mesh(*cru, name="crucible", color="#7a6a5e", opacity=0.45, prop=True)
+    charge = np.array([p.get("charge_g") or 1.0 for p in pts], float)
+    left = np.array([sum((p.get("left") or {}).values()) for p in pts], float)
+    full = charge / charge.max() * Hc                       # the charge's height, its density taken as constant
+    burned_h = full * (1 - left / charge)
+    prof = lambda h: [(0.0, 0.0)] + [(Rc * (0.95 + 0.35 * z / Hc), z) for z in np.linspace(0, h, 12)] + [(0.0, h)]
+    Xb, Tb = lathe(prof(Hc), 36)
+
+    def squash(h):
+        z = Xb[:, 2] * h / Hc
+        r = np.hypot(Xb[:, 0], Xb[:, 1])
+        k = np.where(r > 1e-9, (Rc * (0.95 + 0.35 * z / Hc)) / np.maximum(Rc * (0.95 + 0.35 * Xb[:, 2] / Hc), 1e-9),
+                     1.0)
+        k = np.where(r > 1e-9, k, 1.0)
+        return np.c_[Xb[:, 0] * k, Xb[:, 1] * k, z] - Xb
+    ch = s.mesh(Xb, Tb, name="burned charge", color="#8c5a3c")
+    ch.deform(np.stack([squash(h) for h in burned_h]))
+    tlo = T0
+    thi = float(np.nanmax([np.nanmax(TK), lim.get("T_K") or 0]))
+    ch.color_by("products temperature", np.outer(TK, np.ones(len(Xb))), unit="K", colormap="inferno",
+                range=(tlo, thi * 1.02), limit=lim.get("T_K"), limit_label=lim.get("label", ""), digits=4)
+    ch.glow = np.clip((TK - 1000) / 2500, 0, 1)
+    if left.max() > 0:
+        Xl, Tl = lathe([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], 36)
+        th = np.maximum(full - burned_h, 1e-3)
+        r = Rc * (0.95 + 0.35 * full / Hc)
+        U = np.stack([np.c_[Xl[:, 0] * r[i], Xl[:, 1] * r[i], burned_h[i] + Xl[:, 2] * th[i]] - Xl for i in range(n)])
+        names = sorted({k for p in pts for k in (p.get("left") or {})})
+        rest = s.mesh(Xl, Tl, name=" and ".join(names) + " left over", color="#a8a8a8")
+        rest.deform(U)
+    s.label("{products temperature}", [Rc * 1.6, 0, Hc * 0.6], kind="peak")
+    s.readout("heat released", [p["heat_kJ"] for p in pts], unit="kJ", digits=4)
+    s.readout("products temperature", TK, unit="K", digits=4, limit=lim.get("T_K"))
+    s.readout("heat per kg of charge", [p.get("heat_kJ_per_kg") or 0 for p in pts], unit="kJ/kg", digits=4)
+    s.readout("charge", charge, unit="g", digits=4)
+    s.readout("left over", left, unit="g", digits=3)
+    s.ground(-6, size=400, grid=20)
+    s.camera(target=[0, 0, Hc * 0.45], direction=(0.4, -1, 0.5), distance=Hc * 4.2,
+             presets=[{"name": "Crucible", "target": [0, 0, Hc * 0.45], "dir": (0.4, -1, 0.5), "dist": Hc * 4.2},
+                      {"name": "Into it", "target": [0, 0, Hc * 0.5], "dir": (0.05, -0.3, 1), "dist": Hc * 3.5},
+                      {"name": "Side", "target": [0, 0, Hc * 0.45], "dir": (0, -1, 0.05), "dist": Hc * 4.2}])
+    return s
+
+
+def _subdivide(V, F):
+    """One more subdivision of a unit icosphere, for a large smooth sphere."""
+    V = list(V)
+    mid: dict = {}
+
+    def m(i, j):
+        k = (min(i, j), max(i, j))
+        if k not in mid:
+            p = V[i] + V[j]
+            V.append(p / np.linalg.norm(p))
+            mid[k] = len(V) - 1
+        return mid[k]
+    out = []
+    for a, b, c in F:
+        ab, bc, ca = m(a, b), m(b, c), m(c, a)
+        out += [(a, ab, ca), (b, bc, ab), (c, ca, bc), (ab, bc, ca)]
+    return np.array(V), np.array(out)
+
+
+def _reaction_by_temperature(pb: dict, o: dict):
+    """A reaction with no input to sweep but its temperature: the Gibbs energy and equilibrium constant at each
+    temperature, each its own evaluation, with the reaction going backward where the Gibbs energy turns positive."""
+    fr = pb.get("frames") or []
+    T0 = float((pb.get("conditions") or {}).get("T_K") or 298.15)
+    s = _scene(pb.get("equation") or "reaction", o, "Each temperature is its own thermochemistry evaluation.")
+    if len(fr) < 2:
+        return s
+    s.timeline([f["T_K"] for f in fr], unit="K", label="temperature", between="step", kind="input", design=T0)
+    s.readout("Gibbs energy", [f["dG_kJ"] for f in fr], unit="kJ/mol", digits=4, limit=0.0)
+    s.readout("log10 K", [f["log10K"] for f in fr], digits=4)
     return s
 
 
