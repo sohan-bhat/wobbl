@@ -9,6 +9,7 @@ named test outweighs a single word that happens to sit inside it.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 
 # a plain name, then every way people say it. Each entry is a regex, matched on word boundaries without case.
 SYNONYMS: dict[str, tuple[str, ...]] = {
@@ -76,3 +77,75 @@ def best(patterns, text: str) -> tuple[float, str, tuple[int, int]]:
             if w > top[0]:
                 top = (w, m.group(0), m.span())
     return top
+
+
+# ---------------------------------------------------------------- what the user wants back, and where
+FORMATS = (("mp4", r"(?:an?\s+)?(?:3d\s+)?(?:mp4|mpeg-?4)(?:\s+(?:video|file|clip|movie))?"),
+           ("mp4", r"(?:an?\s+)?(?:3d\s+|short\s+|quick\s+|little\s+)?(?:video|movie|video\s+clip)s?"),
+           ("gif", r"(?:an?\s+)?(?:3d\s+|animated\s+|looping\s+|little\s+)?gifs?"),
+           ("gif", r"(?:an?\s+)?(?:3d\s+)?animation"),
+           ("png", r"(?:an?\s+)?(?:3d\s+)?(?:png|picture|image|screenshot|snapshot|photo|jpe?g)s?"),
+           ("report", r"(?:an?|the|full)\s+(?:pdf\s+|html\s+)?report|pdf"))
+FOLDER = (r"(?:in|into|to|on|onto|at|under)\s+(?:my\s+|the\s+)?(downloads?|desktop|documents|pictures|videos|movies)"
+          r"(?:\s+folder)?")
+PATH = r"(?:save|put|write|export|store|drop)?\s*(?:it\s+|that\s+|them\s+)?(?:to|in|into|at|as)\s+" \
+       r"((?:~|\.{1,2}/|/|[a-z]:\\)\S*|\S+\.(?:gif|mp4|png|html))"
+FILLER = (r"\b(?:can|could|would|will)\s+you\b", r"\bplease\b",
+          r"\b(?:give|show|make|send|get|create|generate|render|produce|export|save|put)\s+(?:me|us)\b",
+          r"^\s*(?:give|show|make|send|create|generate|render|produce|export|save)\b",
+          r"\b(?:save|export|put|store)\s+(?:it|that|them)\b",
+          r"\b(?:a|an|the)\s+(?:3d\s+)?sim(?:ulation)?s?\s+(?:of|for)\b", r"^\s*simulat(?:e|ion\s+of)\b",
+          r"^\s*(?:of|showing)\s+(?=(?:a|an|the|this|that|my|how|what|will)\b)")
+
+
+@dataclass
+class Output:
+    """A request with the words about the result taken out: what is left to simulate, the file it asks for (gif,
+    mp4, png or report, or empty), where it should go (a folder named in words or a path, or empty) and the words
+    that said so."""
+    text: str
+    format: str = ""
+    out: str = ""
+    said: list[str] = field(default_factory=list)
+
+
+def read_output(text: str) -> Output:
+    """What the user asks for in the result and where it goes, as 'in downloads give me a 3d gif of ...' or
+    'give me a png on my desktop', with those words removed so they never steer the physics."""
+    t = " " + (text or "") + " "
+    said, fmt, out = [], "", ""
+
+    def cut(m, group=0):
+        nonlocal t
+        said.append(m.group(group).strip())
+        t = t[:m.start()] + " " + t[m.end():]
+
+    m = re.search(PATH, t, re.I)
+    if m and re.search(r"\.(?:gif|mp4|png|html)$|^(?:~|\.{1,2}/|/|[a-z]:\\)", m.group(1), re.I):
+        out = m.group(1)
+        cut(m)
+        if re.search(r"\.(?:gif|mp4|png|html)$", out, re.I):
+            fmt = {".gif": "gif", ".mp4": "mp4", ".png": "png", ".html": "report"}[out[out.rfind("."):].lower()]
+    hits = sorted((m.start(), m.end(), name) for name, rx in FORMATS
+                  for m in re.finditer(rf"\b(?:as\s+|into\s+)?{rx}\b", t, re.I))
+    if hits:
+        fmt = fmt or hits[0][2]
+        for s0, s1, _ in reversed(hits):
+            said.insert(0, t[s0:s1].strip())
+            t = t[:s0] + " " + t[s1:]
+    m = None if out else re.search(rf"\b{FOLDER}\b", t, re.I)
+    if m:
+        word = m.group(1).lower()
+        out = "downloads" if word.startswith("download") else "videos" if word == "movies" else word
+        cut(m)
+    if not (fmt or out):
+        return Output((text or "").strip())
+    for rx in FILLER:
+        t = re.sub(rx, " ", t, flags=re.I)
+    t = re.sub(r"\s+", " ", t)
+    t = re.sub(r"\s+([,.;:?!])", r"\1", t).strip()
+    t = re.sub(r"^(?:[,;:.]|and|then|of|for|with|about|on|in)\s+", "", t, flags=re.I)
+    tail = r"(?:,|;|:|\b(?:and|then|save|export|put|send|give|show|make|me|it|please))\s*$"
+    while re.search(tail, t, re.I):
+        t = re.sub(tail, "", t, flags=re.I).strip()
+    return Output(t, fmt, out, said)

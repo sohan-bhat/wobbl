@@ -92,7 +92,7 @@ def out_name(plan) -> str:
     return _slug(plan.thing or plan.question)
 
 
-def explicit(plan, steps) -> str:
+def explicit(plan, steps, wants=None) -> str:
     """The command that runs the same study with nothing left to guess."""
     used: dict[str, list[str]] = {}
     for s in steps:
@@ -105,7 +105,83 @@ def explicit(plan, steps) -> str:
     for k, vs in used.items():
         for v in vs:
             parts += [f"--{k}"] if v == "true" else [f"--{k}", v]
+    if wants is not None and wants.format:
+        target = wants.target or (wants.preview(plan) if wants.where else None)
+        parts += ["--export", wants.format] + (["--out", str(target)] if target else [])
     return " ".join(shlex.quote(p) for p in parts)
+
+
+class Wants:
+    """The file the user asked for and where it goes, from --export and --out or from the words, as 'a 3d gif'
+    and 'in downloads'. --out with a file suffix names the file itself; the results then go to their usual
+    folder. Words name a folder, and the file in it gets a clear name from the run."""
+
+    def __init__(self, fmt: str | None, out: str | None, said: list[str], words_out: str = ""):
+        self.format, self.said, self.where = fmt or "", said, ""
+        self.results = out
+        suffix = Path(out).suffix.lower() if out else ""
+        if suffix in (".gif", ".mp4", ".png", ".html"):
+            self.where, self.results = out, None
+            self.format = self.format or {".gif": "gif", ".mp4": "mp4", ".png": "png", ".html": "report"}[suffix]
+        elif words_out:
+            self.where = words_out
+        self.target: Path | None = None
+
+    def name(self, plan) -> str:
+        return f"wobbl-{out_name(plan)}"
+
+    def preview(self, plan) -> str:
+        """Where the file will go, said before the run, without making any folder."""
+        from ..export.save import FOLDERS, SUFFIX, known_folder
+        if not self.where:
+            return f"the results folder, as {self.name(plan)}{SUFFIX[self.format]}"
+        if self.where in FOLDERS:
+            return str(known_folder(self.where) / f"{self.name(plan)}{SUFFIX[self.format]}")
+        p = Path(self.where).expanduser()
+        return str(p if p.suffix else p / f"{self.name(plan)}{SUFFIX[self.format]}")
+
+
+def read_wants(thing: str, question: str, export: str | None, out: str | None):
+    """The thing and the question with the words about the result taken out, and what the user wants back."""
+    from ..simulate.intent import read_output
+    from ..simulate.router import _as_path
+    t = read_output(thing) if _as_path(thing) is None and thing != "-" else None
+    q = read_output(question)
+    fmt = export or (t.format if t else "") or q.format
+    words_out = (t.out if t else "") or q.out
+    said = (t.said if t else []) + q.said
+    wants = Wants(fmt, out, said, "" if out and Path(out).suffix else words_out)
+    if words_out and out and not Path(out).suffix:   # words name a folder, --out the results
+        wants.where = words_out
+    return (t.text if t else thing), q.text, wants
+
+
+def show_wants(plan, wants) -> None:
+    if not wants.format:
+        return
+    kind = {"gif": "a GIF", "mp4": "an MP4 video", "png": "a PNG picture", "report": "the report page"}[wants.format]
+    words = " and ".join(f'"{w}"' for w in wants.said)
+    why = f"the words {words} ask for {kind}" if wants.said else f"{kind}, as asked"
+    ui.say(f"{why}, saved to {wants.preview(plan)}")
+    ui.say(f"override with --export {wants.format} --out PATH", style="dim", indent=4)
+
+
+def do_export(out_dir: Path, plan, wants, quiet: bool):
+    """Write the file the user asked for from the finished run, and say where it went. A failed export never
+    loses the run."""
+    from ..export import ExportError, export
+    if wants.format == "report" and not wants.where:
+        return None
+    try:
+        with ui.progress(not quiet, start=("export", wants.format)) as cb:
+            done = export(out_dir, wants.format, wants.where or None, wants.name(plan), cb)
+    except ExportError as e:
+        ui.say(f"the {wants.format} was not written: {e}", style="red")
+        if e.hint:
+            ui.say(e.hint, style="dim")
+        return None
+    wants.target = done.path
+    return done
 
 
 def _overridable(rows) -> None:
@@ -349,7 +425,11 @@ class DomainOption(click.Option):
 @click.option("--load", "-l", "loads", multiple=True, help="Load, e.g. '200 N down @ top' (repeatable).")
 @click.option("--fix", "-f", "fixes", multiple=True, help="Support, e.g. 'bolt holes d=4.5' (repeatable).")
 @click.option("--set", "sets", multiple=True, help="Any option as key=value, e.g. --set power=12W (repeatable).")
-@click.option("--out", "-o", default=None, help="Output folder (default wobbl-out/<thing>).")
+@click.option("--out", "-o", default=None, help="Output folder (default wobbl-out/<thing>), or with --export, or a "
+                                                "name ending in .gif, .mp4 or .png, the file to write.")
+@click.option("--export", "export_as", type=click.Choice(["gif", "mp4", "png", "report"]), default=None,
+              help="Also write the run as a GIF, an MP4 (needs ffmpeg, else a GIF), a PNG or the report page. Words "
+                   "like 'a 3d gif' or 'a png on my desktop' do the same.")
 @click.option("--plan", "plan_only", is_flag=True, help="Show the route and the guesses without running.")
 @click.option("--quick", is_flag=True, help="Skip images, reports and fixes for a fast look.")
 @click.option("--list", "show_list", is_flag=True, help="List every domain, its physics and their options.")
@@ -360,8 +440,8 @@ class DomainOption(click.Option):
 @click.option("--background", is_flag=True, help="Run it as a background job on this machine, followed with wobbl jobs.")
 @click.option("--remote", default="", help="Run it as a job on a machine added with wobbl remote add.")
 @click.option("--no-images", is_flag=True, hidden=True)
-def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, plan_only, quick, show_list, no_open,
-             as_json, quiet, estimate_only, background, remote, no_images):
+def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, export_as, plan_only, quick, show_list,
+             no_open, as_json, quiet, estimate_only, background, remote, no_images):
     """Simulate anything, from a CAD part or a circuit to a mechanism, a flight, a flow, a field or a chemical.
 
     Pass the thing (a file, a name, a formula or a description) and the
@@ -375,7 +455,15 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
     if show_list:
         return show_catalog()
     thing, question, extra = split_args(args)
+    thing, question, wants = read_wants(thing, question, export_as, out)
+    out = wants.results if wants.format else out
+    if not thing and question:
+        thing, question = question, ""
     if not thing and not question:
+        if wants.format:
+            ui.fail(f"what should Wobbl simulate for the {wants.format}?",
+                    'Say the thing too, as in wobbl simulate "a rocket thrust test, give me a gif", or pass a '
+                    "result folder first.")
         return introduce("", as_json)
     try:
         plan = route(thing, question, list(physics), domain, kind)
@@ -387,6 +475,7 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
     check_options(plan, opts)
     if not as_json:
         show_plan(plan)
+        show_wants(plan, wants)
     if plan_only:
         from ..simulate.runner import preview
         steps = preview(plan, opts)
@@ -397,7 +486,9 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
                 "read": [{"physics": s.analysis.name, "option": k, "values": v} for s in steps
                          for k, v in s.job.readings()],
                 "pending": {s.analysis.name: s.error or s.hint for s in steps if s.error or s.hint},
-                "explicit": explicit(plan, steps)}, indent=1))
+                **({"export": {"format": wants.format, "to": wants.preview(plan), "said": wants.said}}
+                   if wants.format else {}),
+                "explicit": explicit(plan, steps, wants)}, indent=1))
             return
         show_readings(steps)
         show_guesses(steps, "what wobbl would assume")
@@ -405,7 +496,7 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
             if s.error or s.hint:
                 ui.say(f"{s.analysis.name}: {s.error or s.hint}", style="dim")
         ui.section("explicit form")
-        ui.line(f"  {explicit(plan, steps)}")
+        ui.line(f"  {explicit(plan, steps, wants)}")
         return
     if estimate_only:
         return show_estimate(plan, opts, as_json)
@@ -420,11 +511,13 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
     except Exception as e:  # noqa: BLE001
         ui.fail(str(e).strip("'\""), getattr(e, "hint", ""))
     page = view(out_dir)
-    cmd = explicit(plan, steps)
+    done = do_export(out_dir, plan, wants, quiet or as_json) if wants.format else None
+    cmd = explicit(plan, steps, wants)
     if as_json:
         from ..simulate import overall
         click.echo(json.dumps({"plan": plan.to_dict(), "verdict": overall(steps), "view": str(page or ""),
                                "explicit": cmd, "result_dir": str(out_dir),
+                               **({"export": done.to_dict()} if done else {}),
                                "steps": [s.summary() for s in steps]}, indent=1, default=str))
         return
     if len(steps) > 1:
@@ -439,7 +532,9 @@ def simulate(args, physics, domain, kind, material, loads, fixes, sets, out, pla
     ui.section("explicit form")
     ui.line(f"  {cmd}")
     ui.console.print()
-    ui.files([("view", page), ("results", out_dir)])
+    ui.files([("view", page), ("results", out_dir)] + ([(done.format, done.path)] if done else []))
+    if done and done.note:
+        ui.say(done.note, style="dim")
     if page and not no_open and sys.stdout.isatty():
         open_view(page)
     ui.console.print()
