@@ -101,7 +101,7 @@ export async function onPage(canvas: HTMLCanvasElement, kind: string, w: number,
       parts[row] = part;
       // the part waits a moment for its models, then goes on without; late ones are drawn in when they come
       const dressed = models.then((x) => { stage.dress(part, x); stage.compile(); if (last) stage.frame(last); });
-      await Promise.race([dressed, new Promise((ok) => setTimeout(ok, 2500))]);
+      await Promise.race([dressed, new Promise((ok) => setTimeout(ok, 1500))]);
       stage.compile();
     },
     frame: (f) => { last = f; stage.frame(f); },

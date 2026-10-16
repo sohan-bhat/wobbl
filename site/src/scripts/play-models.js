@@ -124,7 +124,7 @@ function ghostOf(p) {
   if (ghosts.has(p)) return ghosts.get(p);
   const g = p.clone();
   g.onBeforeCompile = studioShader;
-  Object.assign(g, { transparent: true, opacity: 0.2, depthWrite: false, stencilFunc: EqualStencilFunc });
+  Object.assign(g, { transparent: true, opacity: 0.14, depthWrite: false, stencilFunc: EqualStencilFunc });
   ghosts.set(p, g);
   return g;
 }

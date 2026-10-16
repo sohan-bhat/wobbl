@@ -47,7 +47,7 @@ self.onmessage = async (e) => {
         stage?.compile();
         if (latest && !queued) { queued = true; later(draw); }
       });
-      await Promise.race([dressed, new Promise((ok) => setTimeout(ok, 2500))]);
+      await Promise.race([dressed, new Promise((ok) => setTimeout(ok, 1500))]);
       stage.compile();
       self.postMessage({ type: 'part', id: m.id });
     } else if (m.type === 'frame') {
