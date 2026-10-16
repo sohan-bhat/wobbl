@@ -425,8 +425,8 @@ class DomainOption(click.Option):
 @click.option("--load", "-l", "loads", multiple=True, help="Load, e.g. '200 N down @ top' (repeatable).")
 @click.option("--fix", "-f", "fixes", multiple=True, help="Support, e.g. 'bolt holes d=4.5' (repeatable).")
 @click.option("--set", "sets", multiple=True, help="Any option as key=value, e.g. --set power=12W (repeatable).")
-@click.option("--out", "-o", default=None, help="Output folder (default wobbl-out/<thing>), or with --export, or a "
-                                                "name ending in .gif, .mp4 or .png, the file to write.")
+@click.option("--out", "-o", default=None, help="Results folder (default wobbl-out/<thing>). A name ending in .gif, "
+                                                ".mp4, .png or .html is the exported file instead.")
 @click.option("--export", "export_as", type=click.Choice(["gif", "mp4", "png", "report"]), default=None,
               help="Also write the run as a GIF, an MP4 (needs ffmpeg, else a GIF), a PNG or the report page. Words "
                    "like 'a 3d gif' or 'a png on my desktop' do the same.")
