@@ -5,9 +5,14 @@
 // changes uniforms, except a heat run's frames, which are copied in as the clock passes them.
 import {
   BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
-  LineSegments, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial, SphereGeometry, Vector3, WebGLRenderer,
+  MeshPhysicalMaterial, LineSegments, NoToneMapping, PCFSoftShadowMap, ShadowMaterial, PMREMGenerator, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial,
+  SRGBColorSpace, Vector3, WebGLRenderer,
 } from 'three';
 import { sceneParts } from './play-scene.js';
+import {
+  FINISHES, LOOK, SRGB, aimKey, decodeStudioBytes, depthMaterial, finishOf, finishShader, keyLight, loadStudio, studioEnvironment,
+  studioShader, turnStudio,
+} from './play-look.js';
 
 const TURBO = /* glsl */ `
 vec3 ramp(float x) {
@@ -185,30 +190,145 @@ void main() {
 
 const YELLOW = 0xffd400;
 
-const heatMaterial = (uniforms, defines = {}) => new ShaderMaterial({
-  vertexShader: HEAT_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms, defines: { HEAT: '', ...defines }, extensions: { derivatives: true },
-  polygonOffset: !defines.EDGE, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
-});
+// ---- the part's surface, a physically based material in the studio's light (play-look.js) --------------
+// The field's colors are the part's paint: the base color three.js's MeshPhysicalMaterial lights, so the map
+// reads on every face, while its metalness, roughness, clear coat and surface texture come from the material
+// the run names. The darkest colors of a map are lifted until they read as a lit solid, as before.
+const FIELD_COLOR = /* glsl */ `
+${SRGB}
+vec3 fieldColor(vec3 c) {
+  vec3 a = toLinear(c);
+  float y = dot(a, vec3(0.2126, 0.7152, 0.0722));
+  return a * clamp(0.06 / max(y, 1e-4), 1.0, 4.5);
+}`;
+
+const INK = 'vec3(0.0042, 0.0047, 0.0056)';
+
+function stressShader(sh) {
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', `#include <common>
+attribute float value;
+attribute vec3 disp;
+attribute float excl;
+uniform float uK;
+uniform float uExag;
+uniform float uTop;
+varying vec3 vC;
+varying float vE;
+${TURBO}`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>
+  transformed += (uExag * uK) * disp;
+  {
+    // linear elastic: at a fraction k of the run's load, every stress and displacement is k times the run's
+    float x = uK * value / uTop;
+    vC = x > 1.002 ? vec3(0.949, 0.949, 0.933) : ramp(x);
+    vE = excl;
+  }`);
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+uniform float uPx;
+varying vec3 vC;
+varying float vE;
+${FIELD_COLOR}`)
+    .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = fieldColor(vC);')
+    .replace('#include <opaque_fragment>', `
+  // the hatching over excluded zones, only on a face turned toward the viewer and faded out as it turns edge on
+  if (vE > 0.5) {
+    float facing = dot(normalize(vNormal), normalize(vViewPosition));
+    float k = mod(gl_FragCoord.x - gl_FragCoord.y, 9.0 * uPx);
+    if (facing > 0.25 && k < 2.5 * uPx) outgoingLight = mix(outgoingLight, ${INK}, 0.72 * smoothstep(0.25, 0.45, facing));
+  }
+#include <opaque_fragment>`);
+}
+
+function heatShader(sh) {
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', `#include <common>
+attribute float t0;
+attribute float t1;
+uniform float uMix;
+uniform float uK;
+uniform vec2 uScale;
+uniform float uAir;
+varying vec3 vC;
+varying vec3 vW;
+varying float vT;
+${INFERNO}`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>
+  {
+    // the temperature above the air, between two saved frames (or the steady field scaled for the warm up)
+    float rise = uK * mix(t0, t1, uMix);
+    vC = ramp((rise - uScale.x) / uScale.y);
+    vW = position;
+    vT = uAir + rise;
+  }`);
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+uniform float uIso;
+uniform vec3 uCutP;
+uniform vec3 uCutS;
+varying vec3 vC;
+varying vec3 vW;
+varying float vT;
+${FIELD_COLOR}`)
+    .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+  // the corner cut away to show the inside: nothing of the outer surface is drawn there
+  vec3 cutR = (vW - uCutP) * uCutS;
+  if (cutR.x > 0.0 && cutR.y > 0.0 && cutR.z > 0.0) discard;`)
+    .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = fieldColor(vC);')
+    .replace('#include <opaque_fragment>', `
+  // isotherms, a thin dark line at every multiple of uIso degrees, as wide on screen wherever they fall
+  if (uIso > 0.0) {
+    float f = vT / uIso, w = fwidth(f), d = abs(fract(f + 0.5) - 0.5);
+    outgoingLight = mix(outgoingLight, ${INK}, 0.55 * (1.0 - smoothstep(0.6 * w, 1.6 * w, d)));
+  }
+#include <opaque_fragment>`);
+}
+
+/** A strength or heat part's faces: its finish (play-look.js FINISHES), the field's uniforms shared with its outlines. */
+function partMaterial(kind, uniforms, finish, mm = 1) {
+  const f = FINISHES[finish] || FINISHES.painted;
+  const m = new MeshPhysicalMaterial({
+    color: 0xffffff, metalness: f.metalness, roughness: f.roughness, clearcoat: f.clearcoat, clearcoatRoughness: 0.16,
+    side: DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+  });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uniforms);
+    studioShader(sh);
+    finishShader(sh, finish, mm);
+    (kind === 'strength' ? stressShader : heatShader)(sh);
+  };
+  m.customProgramCacheKey = () => `wobbl-part-${kind}-${finish}`;
+  m.extensions = { derivatives: true };
+  return m;
+}
+
+/** The outlines of a strength or heat part: the same field, lit the old simple way and darkened. */
+function partEdgeMaterial(kind, uniforms) {
+  return new ShaderMaterial({
+    vertexShader: kind === 'strength' ? STRESS_VERT : HEAT_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms,
+    defines: kind === 'strength' ? { EDGE: '' } : { EDGE: '', HEAT: '' }, extensions: { derivatives: true },
+  });
+}
 
 /**
  * A part's crease and border edges as thin dark lines over its faces (part.js's creases): the same vertices
- * and the same shader as its faces, so they bend and color with it. The faces are pushed back a little in
- * depth so the lines win.
+ * as its faces and a material that colors them by the same field, so they bend and color with it. The faces
+ * are pushed back a little in depth so the lines win.
  */
-export function edgeLines(geo, edges, material) {
+export function edgeLines(geo, edges, material, faces) {
   if (!edges || !edges.length) return null;
   const g = new BufferGeometry();
   for (const [k, a] of Object.entries(geo.attributes)) g.setAttribute(k, a);
   g.setIndex(new BufferAttribute(edges, 1));
-  const m = material.clone();
-  m.uniforms = material.uniforms;
-  m.defines = { ...m.defines, EDGE: '' };
-  m.polygonOffset = false;
-  m.side = DoubleSide;
-  material.polygonOffset = true;
-  material.polygonOffsetFactor = Math.max(material.polygonOffsetFactor, 1);
-  material.polygonOffsetUnits = Math.max(material.polygonOffsetUnits, 1);
-  const lines = new LineSegments(g, m);
+  material.polygonOffset = false;
+  material.side = DoubleSide;
+  if (faces) {
+    faces.polygonOffset = true;
+    faces.polygonOffsetFactor = Math.max(faces.polygonOffsetFactor, 1);
+    faces.polygonOffsetUnits = Math.max(faces.polygonOffsetUnits, 1);
+  }
+  const lines = new LineSegments(g, material);
   lines.frustumCulled = false;
   return lines;
 }
@@ -239,6 +359,13 @@ export function arrow(color = YELLOW) {
 export function createStage({ canvas, w, h, px, kind }) {
   const renderer = new WebGLRenderer({ canvas, antialias: px < 2, alpha: true, powerPreference: 'default' });
   renderer.setClearColor(0x000000, 0);
+  // linear light out to sRGB; the tone mapping is PBR Neutral inside each lit material (play-look.js)
+  renderer.outputColorSpace = SRGBColorSpace;
+  renderer.toneMapping = NoToneMapping;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFSoftShadowMap;
+  let env = null;
+  const lookAt = new Vector3();
   renderer.setPixelRatio(px);
   renderer.setSize(w, h, false);
   renderer.setScissorTest(true);
@@ -274,11 +401,17 @@ export function createStage({ canvas, w, h, px, kind }) {
     if (kind === 'scene') {
       // a scene brings its own objects to the slider's position; the light, the camera and the views are these
       const sp = sceneParts({ arrays, run });
-      const part = { run, arrays, scene: sp.scene, sp, row, uniforms: { uK: { value: 0 }, uPx: { value: px } }, load: null };
+      sp.scene.environment = env && env.texture;
+      const key = keyLight(px > 1.5 ? 2048 : 1024);
+      sp.scene.add(key, key.target);
+      const part = { run, arrays, scene: sp.scene, sp, row, key, uniforms: { uK: { value: 0 }, uPx: { value: px } }, load: null };
       parts.push(part);
       return part;
     }
     const scene = new Scene();
+    scene.environment = env && env.texture;
+    // the part's finish from the material its run names (lib/playback.ts adds it from the run's study)
+    const finish = finishOf(run.material);
     const geo = new BufferGeometry();
     geo.setIndex(new BufferAttribute(arrays.index, 1));
     geo.setAttribute('position', new BufferAttribute(arrays.position, 3));
@@ -291,7 +424,7 @@ export function createStage({ canvas, w, h, px, kind }) {
       geo.setAttribute('disp', new BufferAttribute(arrays.disp, 3));
       geo.setAttribute('excl', new BufferAttribute(arrays.excl, 1, true));
       Object.assign(uniforms, { uExag: { value: run.exag }, uTop: { value: top } });
-      material = new ShaderMaterial({ vertexShader: STRESS_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+      material = partMaterial('strength', uniforms, finish);
     } else {
       geo.setAttribute('t0', new BufferAttribute(new Float32Array(arrays.frames.subarray(0, nv)), 1));
       geo.setAttribute('t1', new BufferAttribute(new Float32Array(arrays.frames.subarray(0, nv)), 1));
@@ -301,12 +434,32 @@ export function createStage({ canvas, w, h, px, kind }) {
         uCutP: { value: new Vector3(...(run.cut ? run.cut.point : [0, 0, 0])) },
         uCutS: { value: new Vector3(...(run.cut ? run.cut.sign : [0, 0, 0])) },
       });
-      material = heatMaterial(uniforms);
+      material = partMaterial('heat', uniforms, finish);
     }
     const mesh = new Mesh(geo, material);
     mesh.frustumCulled = false;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.customDepthMaterial = kind === 'strength'
+      ? depthMaterial(uniforms, { pars: 'attribute vec3 disp;\nuniform float uK;\nuniform float uExag;', main: 'transformed += (uExag * uK) * disp;' }, null, 'stress')
+      : depthMaterial(uniforms, { pars: 'varying vec3 vW;', main: 'vW = position;' },
+        { pars: 'uniform vec3 uCutP;\nuniform vec3 uCutS;\nvarying vec3 vW;', main: 'vec3 cutR = (vW - uCutP) * uCutS;\nif (cutR.x > 0.0 && cutR.y > 0.0 && cutR.z > 0.0) discard;' }, 'heat');
     scene.add(mesh);
-    const lines = edgeLines(geo, arrays.edges, material);
+    const key = keyLight(px > 1.5 ? 2048 : 1024);
+    scene.add(key, key.target);
+    // a part held at its base stands on the studio's floor: only its shadow is drawn there, as model-viewer
+    // draws a product's, so the page's own background still shows round it
+    let floor = null;
+    if (/z\s*=\s*min/.test(run.fixed || '')) {
+      const lo = run.mesh.bounds_min, hi = run.mesh.bounds_max;
+      const R = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2;
+      floor = new Mesh(new PlaneGeometry(R * 8, R * 8), new ShadowMaterial({ opacity: 0.42, depthWrite: false }));
+      floor.position.set((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2] - R * 1e-3);
+      floor.receiveShadow = true;
+      floor.renderOrder = -1;
+      scene.add(floor);
+    }
+    const lines = edgeLines(geo, arrays.edges, partEdgeMaterial(kind, uniforms), material);
     if (lines) scene.add(lines);
     // the cut faces of a part cut open at its hottest point: the same colors and isotherms, never cut themselves
     let cut = null;
@@ -318,7 +471,7 @@ export function createStage({ canvas, w, h, px, kind }) {
       const np = arrays.cutPosition.length / 3;
       g.setAttribute('t0', new BufferAttribute(new Float32Array(arrays.cutFrames.subarray(0, np)), 1));
       g.setAttribute('t1', new BufferAttribute(new Float32Array(arrays.cutFrames.subarray(0, np)), 1));
-      const m = new Mesh(g, heatMaterial({ ...uniforms, uCutS: { value: new Vector3(0, 0, 0) } }));
+      const m = new Mesh(g, partMaterial('heat', { ...uniforms, uCutS: { value: new Vector3(0, 0, 0) } }, finish));
       m.frustumCulled = false;
       scene.add(m);
       cut = { geo: g, np };
@@ -328,7 +481,7 @@ export function createStage({ canvas, w, h, px, kind }) {
       load = arrow();
       scene.add(load);
     }
-    const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, pair: [-1, -1] };
+    const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, key, pair: [-1, -1] };
     parts.push(part);
     return part;
   }
@@ -339,8 +492,10 @@ export function createStage({ canvas, w, h, px, kind }) {
     part.scene.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
   }
 
-  /** Put the camera where a frame says: { position, target, fov, aspect, near, far }. */
+  /** Put the camera where a frame says: { position, target, fov, aspect, near, far }, with the studio turned with it. */
   function look(c) {
+    turnStudio(c.position, c.target);
+    lookAt.fromArray(c.target);
     camera.position.fromArray(c.position);
     camera.lookAt(c.target[0], c.target[1], c.target[2]);
     camera.fov = c.fov;
@@ -393,9 +548,32 @@ export function createStage({ canvas, w, h, px, kind }) {
     part.pair = [i0, i1];
   }
 
+  /**
+   * Light the stage with the studio photograph at url (or its bytes), prefiltered for this renderer, or with
+   * three.js's RoomEnvironment when there is none or it cannot be had, so a still drawn offline is lit too.
+   */
+  async function light(source) {
+    let rt = null;
+    try {
+      if (source) rt = studioEnvironment(renderer, await (typeof source === 'string' ? loadStudio(source) : decodeStudioBytes(source)));
+    } catch (err) {
+      rt = null;
+    }
+    if (!rt) {
+      const { RoomEnvironment } = await import('three/examples/jsm/environments/RoomEnvironment.js');
+      const pm = new PMREMGenerator(renderer);
+      rt = pm.fromScene(new RoomEnvironment(renderer), 0.04);
+      pm.dispose();
+    }
+    env?.dispose();
+    env = rt;
+    for (const p of parts) p.scene.environment = env.texture;
+  }
+
   return {
     add,
     remove,
+    light,
     /**
      * f.camera: { position, target, fov, aspect }; f.views: one [x, y, w, h] per part; f.k: the load
      * fraction or the warm up's share of the steady rise; f.heat: { i0, i1, mix } for a run with frames;
@@ -428,6 +606,7 @@ export function createStage({ canvas, w, h, px, kind }) {
         glow.material.uniforms.uAspect.value = vw / vh;
         renderer.render(backdrop, camera);
         renderer.clearDepth();
+        aimKey(part.key, camera, lookAt);
         renderer.render(part.scene, camera);
         const ins = f.insets && f.insets[part.row];
         if (ins && part.sp) {
@@ -444,6 +623,7 @@ export function createStage({ canvas, w, h, px, kind }) {
           look(ins.camera);
           renderer.setViewport(bx, by, iw, ih);
           renderer.clearDepth();
+          aimKey(part.key, camera, lookAt);
           renderer.render(part.scene, camera);
           look(f.cameras ? f.cameras[part.row] : f.camera);
         }
@@ -466,8 +646,12 @@ export function createStage({ canvas, w, h, px, kind }) {
     },
     dispose() {
       for (const p of [...parts]) remove(p);
+      env?.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
     },
   };
 }
+
+// the studio's settings and the finishes, for a page or a tool that tunes them
+export { FINISHES, LOOK };

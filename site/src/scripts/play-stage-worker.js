@@ -5,7 +5,7 @@
 import { createStage } from './play-draw.js';
 import { decodePlay, decodeScene } from './play.js';
 
-let stage = null, latest = null, queued = false;
+let stage = null, latest = null, queued = false, lit = null;
 const parts = [];
 const later = self.requestAnimationFrame ? (fn) => self.requestAnimationFrame(fn) : (fn) => setTimeout(fn, 16);
 
@@ -31,7 +31,9 @@ self.onmessage = async (e) => {
     if (m.type === 'init') {
       stage = createStage({ canvas: m.canvas, w: m.w, h: m.h, px: m.px, kind: m.kind });
     } else if (m.type === 'part') {
-      const { arrays } = await load(m.file, m.run);
+      // the studio light comes from the site's env folder, two levels above the data the part comes from
+      lit ||= stage?.light(new URL('../../env/studio.rgbe', m.file).href);
+      const [{ arrays }] = await Promise.all([load(m.file, m.run), lit]);
       if (!stage) throw new Error('the drawing worker has no WebGL');
       if (parts[m.row]) stage.remove(parts[m.row]);
       parts[m.row] = stage.add({ run: m.run, arrays, top: m.top, row: m.row });

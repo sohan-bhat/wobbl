@@ -88,9 +88,12 @@ export async function onPage(canvas: HTMLCanvasElement, kind: string, w: number,
   const { createStage } = await import('./play-draw.js');
   const stage = createStage({ canvas, w, h, px, kind });
   const parts: any[] = [];
+  let lit: Promise<void> | null = null;
   return {
     async add(row, file, run, top) {
-      const d = await dec.decode(file, run);
+      // the studio light comes from the site's env folder, two levels above the data the part comes from
+      lit ||= stage.light(new URL('../../env/studio.rgbe', abs(file)).href);
+      const [d] = await Promise.all([dec.decode(file, run), lit]);
       if (parts[row]) stage.remove(parts[row]);
       parts[row] = stage.add({ run, arrays: d.arrays, top, row });
       stage.compile();

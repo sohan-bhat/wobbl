@@ -14,8 +14,8 @@ import {
 /** Uniforms every patched material shares: the studio's turn, its strength and the exposure. */
 export const LOOK = {
   uEnvRot: { value: new Matrix3() },
-  uEnvI: { value: 0.75 },
-  uExposure: { value: 1.15 },
+  uEnvI: { value: 0.9 },
+  uExposure: { value: 1.6 },
 };
 
 // The big octabox sits at u 0.65 of the photograph. Turned to u 0.4 it is up to the front right of the camera,
@@ -187,7 +187,7 @@ export function studioShader(shader) {
  * layerMm (layer lines along z in mm, 0 for none), sheen }
  */
 export const FINISHES = {
-  aluminum_cast: { metalness: 0.55, roughness: 0.42, clearcoat: 0, grain: 0.5, grainMm: 0.9, layerMm: 0 },
+  aluminum_cast: { metalness: 0.55, roughness: 0.42, clearcoat: 0, grain: 0.25, grainMm: 0.9, layerMm: 0 },
   aluminum_machined: { metalness: 0.22, roughness: 0.3, clearcoat: 0, grain: 0.12, grainMm: 0.08, layerMm: 0 },
   steel: { metalness: 0.24, roughness: 0.34, clearcoat: 0, grain: 0.1, grainMm: 0.1, layerMm: 0 },
   iron_cast: { metalness: 0.16, roughness: 0.66, clearcoat: 0, grain: 0.6, grainMm: 0.4, layerMm: 0 },

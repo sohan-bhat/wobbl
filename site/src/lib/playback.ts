@@ -14,11 +14,16 @@ interface Base {
   camera: { view: number[]; center: number[]; radius: number };
 }
 export interface StrengthRun extends Base {
+  /** the material the run's study names (pla, 6061-t6, custom:...,process=cast), for the part's surface finish */
+  material?: string;
+  /** the faces the run holds fixed, as its study writes them (z=min) */
+  fixed?: string;
   kind: 'strength'; governing_MPa: number; governing_xyz: number[]; governing_disp: number[]; allowable_MPa: number;
   target_sf: number; safety_factor: number; measure: string; max_disp_mm: number; loads: string[]; exag: number;
   arrow: { point: number[]; dir: number[]; pull: boolean; disp: number[] } | null;
 }
 export interface HeatRun extends Base {
+  material?: string;
   kind: 'heat'; air_C: number; limit_C: number; t_max_C: number; hot_xyz: number[]; scale_C: [number, number];
   marker?: boolean; transient: boolean; times_s?: number[]; hottest_C?: number[]; cross_s?: number | null;
   warmup?: { t_s: number[]; theta: number[]; lumped_C: number; tau_s: number };
@@ -39,6 +44,17 @@ export function playRuns(example: string): Record<string, PlayRun> | null {
     // a part the site draws elsewhere too bends by the one factor data/bending.json gives it
     const bend = (BENDING as Record<string, number | string>)[example];
     if (runs && typeof bend === 'number') for (const r of Object.values(runs)) if (r.kind === 'strength') r.exag = bend;
+    // what the part is made of and where it is held, from each run's own study, so the stage can draw its surface
+    for (const [rel, r] of Object.entries(runs ?? {})) {
+      const st = resolve(process.cwd(), '../examples', rel, 'study.json');
+      if (!existsSync(st)) continue;
+      try {
+        const study = JSON.parse(readFileSync(st, 'utf-8'));
+        if (typeof study.material === 'string') r.material = study.material;
+        const fx = study.fixtures?.[0]?.faces;
+        if (r.kind === 'strength' && typeof fx === 'string') r.fixed = fx;
+      } catch { /* a study that cannot be read leaves the default finish */ }
+    }
     cache.set(example, runs);
   }
   return cache.get(example)!;

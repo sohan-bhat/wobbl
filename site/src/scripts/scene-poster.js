@@ -12,13 +12,22 @@ async function gunzip(bytes) {
 }
 
 /** Draw a scene's opening view at w by h CSS pixels, px device pixels each, and return it as WebP data URLs. */
-globalThis.drawScenePoster = async ({ b64, run, w, h, px, sizes }) => {
+globalThis.drawScenePoster = async ({ b64, run, w, h, px, sizes, env: envB64 }) => {
   const bin = atob(b64), bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   const { arrays } = decodeScene(run, await gunzip(bytes));
   const canvas = document.createElement('canvas');
   document.body.replaceChildren(canvas);
   const stage = createStage({ canvas, w, h, px, kind: 'scene' });
+  // the studio light from its bytes when the caller passes them (env, base64), or three.js's RoomEnvironment
+  let env = null;
+  if (envB64) {
+    const e = atob(envB64);
+    env = new Uint8Array(e.length);
+    for (let i = 0; i < e.length; i++) env[i] = e.charCodeAt(i);
+    env = env.buffer;
+  }
+  await stage.light(env);
   stage.add({ run, arrays, top: 0, row: 0 });
   stage.compile();
   const { lo, hi } = run.bounds;
