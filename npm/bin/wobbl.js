@@ -643,7 +643,8 @@ async function installFailed(tool, out, deps) {
 async function installWithPipx(pipx, env, deps) {
   display.start('Installing wobbl with pipx');
   display.detail('pipx shows no progress, this takes a minute or two');
-  const r = await runInstaller(pipx, ['install', '--force', SPEC], env);
+  // pip caches PyPI's answer too, so a release from moments ago would read as missing without --no-cache-dir
+  const r = await runInstaller(pipx, ['install', '--force', '--pip-args=--no-cache-dir', SPEC], env);
   if (r.code === 0) {
     const fallback = env.PIPX_BIN_DIR || path.join(homeOf(env), '.local', 'bin');
     const bin = binDirFrom(pipx, ['environment', '--value', 'PIPX_BIN_DIR'], fallback, env);
@@ -661,7 +662,8 @@ function uvDone(tracker) {
 }
 
 async function installWithUv(uv, env, deps) {
-  const args = ['tool', 'install', '--python', PYTHON_SPEC, SPEC];
+  // uv keeps PyPI's answer for a few minutes, so without the refresh a release from moments ago reads as missing
+  const args = ['tool', 'install', '--refresh-package', 'wobbl', '--python', PYTHON_SPEC, SPEC];
   let tracker = new UvTracker(display, 'Installing wobbl');
   let r = await runInstaller(uv, args, env, (text) => tracker.feed(text));
   if (r.code !== 0 && PATTERNS.conflict.test(r.out)) {

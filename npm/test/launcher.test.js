@@ -9,7 +9,7 @@ const path = require('path');
 const { SPEC, logFile } = require('../bin/wobbl');
 const { IS_WIN, LAUNCHER, VERSION, launch, launchAsync, sandbox, writeShim } = require('./support');
 
-const UV_INSTALL = ['tool', 'install', '--python', '>=3.10', SPEC];
+const UV_INSTALL = ['tool', 'install', '--refresh-package', 'wobbl', '--python', '>=3.10', SPEC];
 const NEWER = VERSION.replace(/^(\d+)\./, (_, major) => `${Number(major) + 1}.`);
 
 function firstOnPath(call) {
@@ -80,7 +80,7 @@ test('falls back to pipx when there is no uv', (t) => {
   const r = launch(box, ['doctor']);
   assert.equal(r.status, 0, r.stderr);
   const calls = box.calls('pipx').map((c) => c.args);
-  assert.deepEqual(calls[0], ['install', '--force', SPEC]);
+  assert.deepEqual(calls[0], ['install', '--force', '--pip-args=--no-cache-dir', SPEC]);
   assert.deepEqual(box.calls('wobbl').map((c) => c.args), [['doctor']]);
   assert.match(r.stderr, /with pipx/);
   assert.match(r.stderr, /pipx ensurepath/);
@@ -202,7 +202,7 @@ test('shows one line per stage and keeps the installer output in the log', (t) =
   assert.doesNotMatch(r.stderr, /\r|\x1b\[/, 'no redrawing when stderr is not a terminal');
   const log = fs.readFileSync(logFile(box.env), 'utf8');
   assert.match(log, /Downloading numpy \(6\.5MiB\)/);
-  assert.match(log, /\$ \S*uv\S* tool install --python >=3\.10 wobbl>=/);
+  assert.match(log, /\$ \S*uv\S* tool install --refresh-package wobbl --python >=3\.10 wobbl>=/);
   assert.equal(box.calls('wobbl')[0].version, NEWER);
 });
 

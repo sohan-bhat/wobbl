@@ -200,7 +200,7 @@ test('with neither uv nor pipx, downloads uv and installs wobbl with it', { skip
   const log = fs.readFileSync(launcher.logFile(box.env), 'utf8');
   assert.ok(log.includes(`Saved uv at ${uv}`), log);
   assert.match(log, /shell profiles were not changed/);
-  assert.deepEqual(box.calls('uv')[0].args, ['tool', 'install', '--python', '>=3.10', launcher.SPEC]);
+  assert.deepEqual(box.calls('uv')[0].args, ['tool', 'install', '--refresh-package', 'wobbl', '--python', '>=3.10', launcher.SPEC]);
   assert.deepEqual(box.calls('wobbl').map((c) => c.args), [['doctor']]);
   // a later run reuses the downloaded uv instead of fetching it again
   fs.rmSync(path.join(box.toolBin, 'wobbl'));
