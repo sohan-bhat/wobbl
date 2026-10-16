@@ -391,6 +391,28 @@ export function createStage({ canvas, w, h, px, kind }) {
   const camera = new PerspectiveCamera(30, 1, 1, 10000);
   camera.up.set(0, 0, 1);
   let cssW = w, cssH = h;
+  // ---- the drawing's resolution follows the frame rate, as model-viewer scales its own: while frames come one
+  // after another (a replay, a drag) and take longer than a display frame, fewer pixels are drawn; once the view
+  // rests for a moment it is drawn again at full resolution
+  let fullPx = px, scale = 1, lastAt = 0, slow = 16.7, rest = 0, lastFrame = null;
+  function setScale(k) {
+    if (Math.abs(k - scale) < 0.02) return;
+    scale = k;
+    renderer.setPixelRatio(fullPx * scale);
+    renderer.setSize(cssW, cssH, false);
+    for (const p of parts) p.uniforms.uPx.value = fullPx * scale;
+  }
+  function pace() {
+    const now = performance.now(), dt = now - lastAt;
+    lastAt = now;
+    if (dt < 120) {
+      slow = slow * 0.8 + dt * 0.2;
+      if (slow > 24 && scale > 0.55) setScale(Math.max(0.55, scale * 0.85));
+      else if (slow < 18 && scale < 1) setScale(Math.min(1, scale * 1.08));
+    }
+    clearTimeout(rest);
+    if (scale < 1) rest = setTimeout(() => { setScale(1); slow = 16.7; if (lastFrame) draw(lastFrame); }, 350);
+  }
   const parts = [];
   // behind each view a soft pool of light, as a studio backdrop or model-viewer's floor glow gives, so dark
   // parts keep their outline and the view has depth, fading to the page's own black at the edges
@@ -606,7 +628,9 @@ export function createStage({ canvas, w, h, px, kind }) {
     }
   }
 
-  return {
+  function draw(f) { api._frame(f); }
+
+  const api = {
     add,
     remove,
     light,
@@ -617,6 +641,19 @@ export function createStage({ canvas, w, h, px, kind }) {
      * f.radius: the part's radius in mm, for the arrow.
      */
     frame(f) {
+      lastFrame = f;
+      pace();
+      draw(f);
+    },
+    size(nw, nh, npx) {
+      cssW = nw;
+      cssH = nh;
+      fullPx = npx;
+      renderer.setPixelRatio(npx * scale);
+      renderer.setSize(nw, nh, false);
+      for (const p of parts) p.uniforms.uPx.value = npx * scale;
+    },
+    _frame(f) {
       // the studio is set from the view the stage opens on and stays put as the camera orbits
       if (studioAz === null) {
         studioAz = Math.atan2(f.camera.position[1] - f.camera.target[1], f.camera.position[0] - f.camera.target[0]);
@@ -681,13 +718,6 @@ export function createStage({ canvas, w, h, px, kind }) {
         }
       });
     },
-    size(nw, nh, npx) {
-      cssW = nw;
-      cssH = nh;
-      renderer.setPixelRatio(npx);
-      renderer.setSize(nw, nh, false);
-      for (const p of parts) p.uniforms.uPx.value = npx;
-    },
     /** What the main field reads under a ray (origin and dir in the scene's units) in view row, or null. */
     probe(row, origin, dir) {
       const part = parts.find((p) => p.row === row);
@@ -697,12 +727,14 @@ export function createStage({ canvas, w, h, px, kind }) {
       for (const p of parts) renderer.compile(p.scene, camera);
     },
     dispose() {
+      clearTimeout(rest);
       for (const p of [...parts]) remove(p);
       env?.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
     },
   };
+  return api;
 }
 
 // the studio's settings and the finishes, for a page or a tool that tunes them
