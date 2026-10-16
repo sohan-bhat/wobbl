@@ -47,8 +47,8 @@
    "verdict": "ok",
    "headline": "Junction reaches about 110 C (1.51 W: 1.37 W conduction, 0.144 W switching) with 40 C/W to 50 C air; limit 150 C.",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/mosfet",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/mosfet/report.html",
+   "result_dir": "mosfet",
+   "report": "mosfet/report.html",
    "assumptions": []
   }
  ]

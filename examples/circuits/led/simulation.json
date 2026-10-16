@@ -46,8 +46,8 @@
    "verdict": "fails",
    "headline": "The LED fries: 36.9 mA through it, above its 30 mA rating (1.2x).",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/led",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/led/report.html",
+   "result_dir": "led",
+   "report": "led/report.html",
    "assumptions": []
   }
  ]

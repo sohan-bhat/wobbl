@@ -66,8 +66,8 @@
    "verdict": "ok",
    "headline": "Works and nothing is stressed: the hardest working part is C1 (capacitor) at 53% of its voltage rating.",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/kicad-board",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/kicad-board/report.html",
+   "result_dir": "kicad-board",
+   "report": "kicad-board/report.html",
    "assumptions": [
     {
      "assumed": "air temperature around the board not given, so Wobbl assumed 25 C",

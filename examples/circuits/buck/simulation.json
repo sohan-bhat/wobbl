@@ -46,8 +46,8 @@
    "verdict": "ok",
    "headline": "Output ripple 8.56 mV peak to peak on 5.07 V (within the 50 mV limit); inductor ripple 0.604 A, peak 2.33 A.",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/buck",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/buck/report.html",
+   "result_dir": "buck",
+   "report": "buck/report.html",
    "assumptions": []
   }
  ]

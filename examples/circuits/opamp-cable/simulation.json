@@ -65,8 +65,8 @@
    "verdict": "fails",
    "headline": "U1 (LM358) does not work as wired: 2 degrees of phase margin at 47133 Hz: it oscillates or rings hard.",
    "confidence": "high",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/opamp-cable",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/sweeps-a-circuits/examples/circuits/opamp-cable/report.html",
+   "result_dir": "opamp-cable",
+   "report": "opamp-cable/report.html",
    "assumptions": [
     {
      "assumed": "air temperature around the board not given, so Wobbl assumed 25 C",
