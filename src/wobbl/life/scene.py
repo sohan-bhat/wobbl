@@ -47,94 +47,248 @@ def _surface(mesh):
     return np.asarray(mesh.X[:n], float), mesh.tris
 
 
+def amplification(r, zeta: float):
+    """Steady response of one mode against its static one, driven at r times its natural frequency."""
+    r = np.asarray(r, float)
+    return 1.0 / np.sqrt((1 - r * r) ** 2 + (2 * zeta * r) ** 2)
+
+
+def speed_sweep(s, X, tris, shapes, freqs, numbers, bands, *, zeta: float, margin: float = 0.2,
+                quiet=(), n: int = 41):
+    """Fill scene s with the part's steady response as what shakes it speeds up. bands are (lo, hi, label) in Hz,
+    each excitation moving from lo to hi together, as a rotor's once per turn and blade pass do. A band labeled
+    once per turn makes the input the rotor's speed in rpm; with no bands the input is the shaking frequency from
+    half the lowest mode to past the highest. shapes are mode shapes scaled to a largest motion of one.
+
+    At each input the color is each spot's motion against its static motion, the largest amplification of any
+    mode times how much that mode moves there, and the part takes the shape of the mode driven hardest. The limit
+    is the amplification at half the margin from a resonance and the target at the margin, the run's own lines
+    for fails and marginal. Modes in quiet move little mass and are drawn but not counted as driven."""
+    freqs = np.asarray(freqs, float)
+    if not bands:
+        bands = [(0.5 * float(freqs.min()), 1.3 * float(freqs.max()), "shaking frequency")]
+    # an even spread of speeds plus each one where a mode meets an excitation, so every resonance peak is a frame
+    hits = [(f - lo) / (hi - lo) for lo, hi, _ in bands if hi > lo for f in freqs if lo <= f <= hi]
+    p = np.unique(np.r_[np.linspace(0.0, 1.0, n), hits])
+    n = len(p)
+    fe = np.array([lo + p * (hi - lo) for lo, hi, _ in bands])                        # bands x frames
+    turn = next((b for b in bands if "once per turn" in b[2]), None)
+    if turn is not None:
+        x, unit, label = np.round(60 * (turn[0] + p * (turn[1] - turn[0])), 1), "rpm", "rotor speed"
+    else:
+        x, unit, label = fe[0], "Hz", bands[0][2]
+    D = amplification(fe[:, None, :] / freqs[None, :, None], zeta).max(0)              # modes x frames
+    for i in range(len(freqs)):
+        if numbers[i] in quiet:
+            D[i] = np.minimum(D[i], 1.0)
+    phi = np.stack([np.asarray(f, float) for f in shapes])                             # modes x verts x 3
+    mag = np.linalg.norm(phi, axis=2)
+    field = (D[:, :, None] * mag[:, None, :]).max(0)                                   # frames x verts
+    lead = D.argmax(0)
+    top = float(D.max())
+    lim = float(amplification(1 + 0.5 * margin, zeta))
+    tgt = float(amplification(1 + margin, zeta))
+    worst = int(np.argmax(D.max(0)))
+    s.timeline(x, unit=unit, label=label, between="interpolated", kind="input", design=float(x[worst]))
+    span = float(np.linalg.norm(np.ptp(X, 0)))
+    a = 0.08 * span / max(top, 1.0)
+    U = np.stack([phi[lead[k]] * D[lead[k], k] * a for k in range(n)])
+    part = s.mesh(X, tris, name="part", max_vertices=8000)
+    part.color_by("amplification", field, unit="x static", colormap="turbo", range=[0, max(top, lim * 1.2)],
+                  limit=lim, limit_label="resonant", digits=3)
+    s.fields[-1]["target"] = tgt
+    part.deform(U)
+    s.readout("amplification", D.max(0), unit="x static", digits=3, limit=lim)
+    s.readout("mode driven hardest", freqs[lead], unit="Hz", digits=4)
+    for (lo, hi, lab), f in zip(bands, fe):
+        if lab != label:
+            s.readout(lab, f, unit="Hz", digits=4)
+    for i, f in enumerate(freqs):
+        for b, (lo, hi, lab) in enumerate(bands):
+            if lo <= f <= hi and hi > lo and numbers[i] not in quiet:
+                at = float(np.interp((f - lo) / (hi - lo), p, x))
+                s.event(at, f"mode {numbers[i]} meets the {lab.split(' from ')[0]}", f"at {f:.4g} Hz", "fail")
+    s.note(f"The motion is drawn as large as the amplification, up to {100 * a * top / span:.2g}% of the part, "
+           "because its real size depends on how hard the rotor shakes it. Damping is "
+           f"{100 * zeta:.3g}% of critical.")
+    return part
+
+
 def vibration(out: Path, mesh, modes, picks: list[int], labels: dict, verdict: str, headline: str, title: str,
-              question: str = "") -> Path | None:
-    """Each picked mode plays two cycles in turn. A mode shape has no size of its own, so each is drawn with its
-    largest motion at 6% of the part and colored by how much each spot moves relative to that."""
+              question: str = "", excite=(), zeta: float = 0.03, margin: float = 0.2) -> Path | None:
+    """The part's steady response as the excitation speeds up through its range (see speed_sweep), from the
+    modes that matter."""
     try:
         from ..viz import Scene
 
         X, tris = _surface(mesh)
-        span = float(np.linalg.norm(np.ptp(X, 0)))
-        F = 32
-        m = len(picks)
-        t = np.concatenate([k + np.arange(F) / F for k in range(m)])
-        s = Scene(title, domain="vibration", question=question)
-        s.timeline(t, unit="", label="mode", seconds=3.0 * m, between="interpolated",
-                   note="each mode plays two cycles, far slower than it really moves")
-        wave = np.sin(2 * np.pi * 2 * np.arange(F) / F)
-        for k, i in enumerate(picks):
+        shapes = []
+        for i in picks:
             phi = modes.shapes[i, :len(X)].astype(float)
-            phi /= max(float(np.linalg.norm(phi, axis=1).max()), 1e-30)
-            scale = np.zeros(len(t))
-            scale[k * F:(k + 1) * F] = wave
-            part = s.mesh(X, tris, name=f"mode {i + 1}", max_vertices=5000)   # one copy of the part per mode
-            part.deform(phi * 0.06 * span, scale=scale)
-            part.color_by("relative motion", np.linalg.norm(phi, axis=1), scale=np.abs(scale), colormap="viridis",
-                          range=[0, 1], digits=2)
-            part.show(k, k + 1 - 0.5 / F)
-            status = labels.get(i, "")
-            kind = {"resonant": "fail", "close": "warn"}.get(status, "info")
-            word = {"resonant": "inside or right next to an excitation", "close": "close to an excitation",
-                    "clear": "clear of every excitation", "barely excited": "near an excitation but barely driven"}
-            s.event(float(k), f"mode {i + 1}, {fmt(modes.freq[i])} Hz", word.get(status, ""), kind)
-        s.readout("natural frequency", np.repeat([float(modes.freq[i]) for i in picks], F), unit="Hz")
-        s.note("A mode shape has no size of its own, so each is drawn with its largest motion at 6% of the part")
+            shapes.append(phi / max(float(np.linalg.norm(phi, axis=1).max()), 1e-30))
+        s = Scene(title, domain="vibration", question=question)
+        bands = [(float(e.lo), float(e.hi), e.label) for e in excite]
+        speed_sweep(s, X, tris, shapes, [float(modes.freq[i]) for i in picks], [i + 1 for i in picks], bands,
+                    zeta=zeta, margin=margin, quiet=[i + 1 for i in picks if labels.get(i) == "barely excited"])
         return _finish(s, out, verdict, headline)
     except Exception:  # noqa: BLE001  a scene is a convenience, never a reason to fail
         _debug()
         return None
+
+
+def load_sweep(s, X, tris, phi, lam: float, design: float, load_N: float, e0: float, *, measure=None,
+               yield_factor: float = math.inf, target: float | None = None, n: int = 48):
+    """Fill scene s with the part under each load from none to 95% of its buckling load. The stress is the solved
+    one scaled with the load, exact for the linear model before buckling, and the first buckling shape (scaled to
+    a largest motion of one) grows from a starting crookedness e0 as e0 / (1 - P / Pcr). design is the load factor
+    the knockdown and yielding allow: the limit sits there and the target at design / target, so past the target
+    factor the part is marginal and past the allowed load it fails."""
+    top = 0.95 * lam
+    P = np.unique(np.r_[np.linspace(0.0, top, n), min(1.0, top)]) * load_N
+    f = P / load_N
+    bow = e0 / (1.0 - f / lam)
+    span = float(np.linalg.norm(np.ptp(X, 0)))
+    phi = np.asarray(phi, float)
+    phi = phi / max(float(np.linalg.norm(phi, axis=1).max()), 1e-30)
+    word = "buckling limit" if design < yield_factor else "yield"
+    s.timeline(P / 1000, unit="kN", label="load", between="interpolated", kind="input",
+               design=float(f"{min(1.0, top) * load_N / 1000:.6g}"))
+    part = s.mesh(X, tris, name="part")
+    part.deform(phi, scale=bow, exaggerate=max(1.0, 0.05 * span / max(float(bow[-1]), 1e-30)))
+    if measure is not None and np.max(measure) > 0:
+        m = np.asarray(measure[:len(X)], float)
+        peak = float(m.max())
+        part.color_by("stress", m, scale=f, unit="MPa", range=[0, peak * design], limit=peak * design,
+                      limit_label=word)
+        lim_t = peak * design / target if target else None
+        stress = peak * f
+    else:
+        b_lim = e0 / (1.0 - min(design, top) / lam)
+        part.color_by("bow", np.linalg.norm(phi, axis=1), scale=bow, unit="mm", range=[0, b_lim], limit=b_lim,
+                      limit_label=word)
+        lim_t = e0 / (1.0 - design / target / lam) if target and design / target < lam else None
+        stress = None
+    if lim_t:
+        s.fields[-1]["target"] = float(lim_t)
+    with np.errstate(divide="ignore"):
+        s.readout("factor against buckling", np.minimum(np.where(f > 0, design / np.maximum(f, 1e-30), 99), 99),
+                  digits=3)
+    s.readout("bow", bow, unit="mm", digits=3)
+    if stress is not None:
+        s.readout("peak stress", stress, unit="MPa")
+    s.readout("buckling load", np.full(len(P), lam * load_N / 1000), unit="kN", digits=4)
+    if design * load_N <= P[-1]:
+        s.event(design * load_N / 1000, "allowed load", "the buckling load with the knockdown and yielding", "fail")
+    if target and design / target * load_N <= P[-1]:
+        s.event(design / target * load_N / 1000, f"target factor of {target:g}", "", "warn")
+    s.note(f"The bow starts from {fmt(e0)} mm of crookedness and grows as 1 / (1 - P / Pcr), the classic estimate "
+           "for an imperfect part, not a collapse simulation.")
+    _end_plates(s, X)
+    return part
+
+
+def _end_plates(s, X) -> None:
+    """A steel plate square across each end of the part's longest dimension, where a strut is held and pushed."""
+    from ..viz import props as P
+
+    lo, hi = X.min(0), X.max(0)
+    ax = int(np.argmax(hi - lo))
+    L = float(hi[ax] - lo[ax])
+    for end in (lo[ax], hi[ax]):
+        c = (lo + hi) / 2
+        c[ax] = end
+        nrm = np.zeros(3)
+        nrm[ax] = 1 if end == lo[ax] else -1
+        P.slab(s, c, nrm, L * 0.12, L * 0.12, L * 0.03, color=P.STEEL, name="end plate")
 
 
 def buckling(out: Path, mesh, mode1: np.ndarray, measure: np.ndarray, lam: float, design: float,
              yield_factor: float, load_N: float, e0: float, why: str, allowable: float, verdict: str, headline: str,
-             title: str, question: str = "") -> Path | None:
-    """The load climbing to 95% of the buckling load, the stress scaled with it exactly, and the first buckling
-    shape growing from a starting crookedness e0 as e0 / (1 - P / Pcr)."""
+             title: str, question: str = "", target: float | None = None) -> Path | None:
+    """The part under each load up to 95% of its buckling load (see load_sweep)."""
     try:
         from ..viz import Scene
 
         X, tris = _surface(mesh)
-        span = float(np.linalg.norm(np.ptp(X, 0)))
-        lamf = np.linspace(0.0, 0.95 * lam, 48)
-        bow = e0 / (1.0 - lamf / lam)
-        phi = np.asarray(mode1[:len(X)], float)
-        phi /= max(float(np.linalg.norm(phi, axis=1).max()), 1e-30)
         s = Scene(title, domain="buckling", question=question)
-        s.timeline(lamf, unit="times the load", label="load factor", seconds=8.0, between="interpolated")
-        part = s.mesh(X, tris, name="part")
-        part.deform(phi, scale=bow, exaggerate=max(1.0, 0.05 * span / max(float(bow[-1]), 1e-30)))
-        part.color_by("stress", np.asarray(measure[:len(X)], float), scale=lamf, unit="MPa", limit=allowable,
-                      limit_label="strength limit")
-        s.readout("load", lamf * load_N, unit="N")
-        s.readout("load factor", lamf, digits=3)
-        s.readout("bow", bow, unit="mm", digits=3)
-        if math.isfinite(yield_factor) and yield_factor < 0.95 * lam:
-            s.event(float(yield_factor), "first yield", "the most stressed point reaches its limit", "warn")
-        if design < 0.95 * lam:
-            s.event(float(design), "design limit", "the load the knockdown and yielding allow", "info")
-        s.note(f"The bow starts from {fmt(e0)} mm of crookedness ({why}) and grows as 1 / (1 - P / Pcr), the classic "
-               "estimate for an imperfect part, not a collapse simulation")
+        load_sweep(s, X, tris, np.asarray(mode1[:len(X)], float), lam, design, load_N, e0, measure=measure,
+                   yield_factor=yield_factor, target=target)
+        s.note(f"The starting crookedness is {why}.")
         return _finish(s, out, verdict, headline)
     except Exception:  # noqa: BLE001  a scene is a convenience, never a reason to fail
         _debug()
         return None
 
 
-def fatigue(out: Path, source: str, peak: float, blocks: list, curve, model: str, repeats: float, frames: dict,
-            verdict: str, headline: str, title: str, question: str = "") -> Path | None:
-    """The part colored by the damage each spot takes as the duty runs. A spot's stresses are the judged peak's
-    scaled by its share of the peak in the strength result, with the same notch sensitivity, and its damage grows
-    over the duty in the same proportion as the peak's."""
-    try:
+def damage_table(blocks, curve, model: str, repeats: float, sf: float, single: bool = False,
+                 need: float = 1.0) -> dict:
+    """The fatigue damage over the required duty with every stress scaled, from none to twice what a crack needs,
+    the table a load slider reads. A single block's damage is the cycles needed over its life."""
+    from . import fatigue as F
+
+    top = 2.0 * max(1.5, 1.3 * sf) if math.isfinite(sf) else 3.0
+    grid = np.linspace(0.0, top, 81)[1:]
+    if single:
+        d = [need / max(F.damage(blocks, curve, model, scale=float(r))[1][0], 1e-300) for r in grid]
+    else:
+        d = [repeats * F.damage(blocks, curve, model, scale=float(r))[0] for r in grid]
+    return {"stress_scale": [round(float(r), 5) for r in grid],
+            "damage": [float(f"{min(x, 1e12):.6g}") for x in d]}
+
+
+def duty_sweep(s, X, tris, ratio, table: dict, *, sf: float, target: float | None = None, required: float = 1.0,
+               unit: str = "repeats", where=None, n: int = 41):
+    """Fill scene s with the part under every load of the duty scaled, from a fifth of it to past the load a crack
+    needs. ratio is each spot's stress over the judged peak's. The color is each spot's stress over the stress
+    that starts a crack in the required duty (one over its safety factor), and the readouts are the damage at the
+    peak by Miner's rule, read from the table, its safety factor and its life. Past the share the target factor
+    allows the part is marginal."""
+    g = np.asarray(table["stress_scale"], float)
+    logd = np.log10(np.maximum(np.asarray(table["damage"], float), 1e-30))
+
+    def dmg(x):
+        return 10 ** np.interp(x, np.r_[0.0, g], np.r_[-30.0, logd])
+
+    hi = max(1.5, 1.3 * sf) if math.isfinite(sf) else 1.5
+    L = np.unique(np.r_[np.linspace(0.2, min(hi, g[-1]), n), 1.0])
+    ratio = np.clip(np.asarray(ratio, float), 0.0, None)
+    d = dmg(L)
+    s.timeline(100 * L, unit="%", label="duty load", between="interpolated", kind="input", design=100.0)
+    part = s.mesh(X, tris, name="part")
+    if math.isfinite(sf) and sf > 0:
+        # each spot's stress over the stress that starts a crack in the duty: linear in the load, so exact
+        part.color_by("share of fatigue strength", ratio / sf, scale=L, colormap="heat", range=[0, 1], limit=1.0,
+                      limit_label="a crack starts", digits=3)
+        if target:
+            s.fields[-1]["target"] = float(1.0 / target)
+    else:
+        part.color_by("fatigue damage", np.minimum(dmg(L[:, None] * ratio[None, :]), 2.0), colormap="heat",
+                      range=[0, 1], limit=1.0, limit_label="a crack starts", digits=3)
+    s.readout("damage", d, digits=3, limit=1.0)
+    if math.isfinite(sf):
+        s.readout("safety factor", sf / L, digits=3)
+    with np.errstate(divide="ignore"):
+        s.readout("life", np.minimum(required / np.maximum(d, 1e-30), 1e12), unit=unit, digits=3)
+    if math.isfinite(sf) and L[0] < sf < L[-1]:
+        s.event(100 * sf, "a crack starts", "Miner's sum reaches one at the judged peak", "fail")
+    if target and math.isfinite(sf) and L[0] < sf / target < L[-1]:
+        s.event(100 * sf / target, f"target factor of {target:g}", "", "warn")
+    if where is not None:
+        s.label("damage {damage}", where, kind="peak")
+    s.note("Away from the judged peak each spot's stress is scaled from the strength result with the same notch "
+           "sensitivity, and lives scatter by a factor of three to ten.")
+    return part
+
+
+def source_surface(source, where=None):
+    """The part's surface from the strength run a fatigue study reads, and each vertex's stress over the judged
+    peak's: from its result.vtu when kept, else from its scene, peaked at the vertex nearest where. Returns X, tris,
+    ratio and the source scene's camera (or None), or None when neither is there."""
+    src = Path(source)
+    vtu = src / "result.vtu"
+    if vtu.exists():
         import pyvista as pv
 
-        from ..viz import Scene
-        from . import fatigue as F
-
-        vtu = Path(source) / "result.vtu"
-        if not source or not vtu.exists() or peak <= 0:
-            return None
         grid = pv.read(str(vtu))
         try:
             surf = grid.extract_surface(algorithm="dataset_surface")
@@ -142,29 +296,49 @@ def fatigue(out: Path, source: str, peak: float, blocks: list, curve, model: str
             surf = grid.extract_surface()
         ids = np.asarray(surf.point_data["vtkOriginalPointIds"])
         meas = np.asarray(grid.point_data["failure_measure_MPa"], float)[ids]
-        X = np.asarray(surf.points, float)
-        tris = surf.faces.reshape(-1, 4)[:, 1:]
-        ratio = np.clip(meas / peak, 0.0, None)
-        # damage over the whole duty at a grid of stress ratios, then per spot by interpolation in log space
-        grid_r = np.linspace(0.0, max(1.2, float(ratio.max())), 64)
-        d_grid = repeats * np.array([F.damage(blocks, curve, model, scale=r)[0] for r in grid_r])
-        logd = np.log10(np.maximum(d_grid, 1e-30))
-        d_total = 10 ** np.interp(ratio, grid_r, logd)
-        d_total[d_total < 1e-29] = 0.0
-        cyc, dmg = np.asarray(frames["cycles"], float), np.asarray(frames["damage"], float)
-        keep = np.unique(np.rint(np.linspace(0, len(cyc) - 1, min(60, len(cyc)))).astype(int))
-        share = dmg[keep] / max(float(dmg[-1]), 1e-300)
+        X, tris, cam = np.asarray(surf.points, float), surf.faces.reshape(-1, 4)[:, 1:], None
+    else:
+        from ..viz.scene import FILE, array, load
+
+        if not (src / FILE).exists():
+            return None
+        h, blob = load(src / FILE)
+        part = next((ob for ob in h["objects"] if ob["kind"] == "mesh" and ob.get("name") == "part"), None)
+        if part is None or not part.get("field"):
+            return None
+        X, tris = array(h, blob, part["pos"]), array(h, blob, part["tri"])
+        meas = np.asarray(array(h, blob, part["field"]["values"]), float)
+        if meas.ndim > 1:
+            meas = meas[-1]
+        sc = part["field"].get("scale")
+        if isinstance(sc, dict):
+            sc = array(h, blob, sc)
+        if sc is not None and np.size(sc):
+            meas = meas * float(np.ravel(sc)[-1])
+        cam = h.get("camera") or None
+    if where is not None:
+        ref = float(meas[int(np.argmin(np.linalg.norm(X - np.asarray(where, float), axis=1)))])
+    else:
+        ref = float(meas.max())
+    return X, tris, meas / max(ref, 1e-30), cam
+
+
+def fatigue(out: Path, source: str, table: dict, sf: float, target: float | None, required: float, unit: str,
+            where, verdict: str, headline: str, title: str, question: str = "") -> Path | None:
+    """The part colored by the damage each spot takes over the required duty, as the duty's loads are scaled (see
+    duty_sweep), on the strength result the study reads."""
+    try:
+        from ..viz import Scene
+
+        got = source_surface(source, where) if source else None
+        if got is None:
+            return None
+        X, tris, ratio, cam = got
         s = Scene(title, domain="fatigue", question=question)
-        s.timeline(cyc[keep], unit="cycles", label="cycles", seconds=8.0, between="interpolated")
-        part = s.mesh(X, tris, name="part")
-        part.color_by("fatigue damage", np.minimum(d_total, 2.0), scale=share, colormap="heat", range=[0, 1],
-                      limit=1.0, limit_label="a crack starts")
-        s.readout("damage at the peak", dmg[keep], digits=3, limit=1.0)
-        if dmg[-1] >= 1:
-            k = int(np.argmax(dmg >= 1))
-            s.event(float(cyc[k]), "a crack starts", "Miner's sum reaches one at the judged peak", "fail")
-        s.note("Away from the judged peak each spot's stress is scaled from the strength result with the same notch "
-               "sensitivity, and lives scatter by a factor of three to ten")
+        duty_sweep(s, X, tris, ratio, table, sf=sf, target=target, required=required, unit=unit, where=where)
+        if cam:
+            s.camera(target=cam.get("target"), direction=cam.get("dir"), distance=cam.get("dist"),
+                     fov=cam.get("fov", 30))
         return _finish(s, out, verdict, headline)
     except Exception:  # noqa: BLE001  a scene is a convenience, never a reason to fail
         _debug()

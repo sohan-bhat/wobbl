@@ -192,7 +192,7 @@ def modes_doc(mesh, modes, picks: list[int], labels: dict, values: dict) -> dict
 
 
 def buckling_doc(mesh, shape: np.ndarray, factor: float, design: float, yield_factor: float, length: float,
-                 imperfection: float, why: str) -> dict:
+                 imperfection: float, why: str, measure: np.ndarray | None = None) -> dict:
     """The first buckling shape, and its growth with the load factor lam from an initial crookedness e0 shaped like
     it: w(lam) = e0 / (1 - lam / lam1), drawn up to 95% of the buckling load."""
     pts, faces, nodes = surface(mesh)
@@ -211,7 +211,8 @@ def buckling_doc(mesh, shape: np.ndarray, factor: float, design: float, yield_fa
                        "bow_mm": [round(float(x), 5) for x in grow]},
             "buckling_factor": round(factor, 5), "design_factor": round(design, 5),
             "yield_factor": None if not np.isfinite(yield_factor) else round(float(yield_factor), 5),
-            "length_mm": round(length, 3)}
+            "length_mm": round(length, 3),
+            **({"stress_MPa": quantize(np.asarray(measure, float)[nodes], "int16")} if measure is not None else {})}
 
 
 def fatigue_doc(blocks: list, lives: list, repeats: float, single: bool, required: float, values: dict) -> dict:

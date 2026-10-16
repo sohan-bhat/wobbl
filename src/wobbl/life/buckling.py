@@ -188,7 +188,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
                       "Negative factors buckle the part only with every load reversed."]]},
         images, fixes(shape, design, target, col, mat, p.features, lam), deck.notes + p.prep.notes,
         solver=f"CalculiX {adapter.version()}", t_total=time.time() - t0)
-    if _playback(out / "playback.json", mesh, mode1, lam, design, yield_factor, col, p):
+    if _playback(out / "playback.json", mesh, mode1, lam, design, yield_factor, col, p, measure):
         o.values["playback"] = "playback.json"
     from . import scene
 
@@ -196,7 +196,7 @@ def run_buckling(study: BucklingStudy, out_dir: str | Path, progress=None, pre=N
     e0, why, _ = _crooked(col, p)
     if render and scene.buckling(out, mesh, mode1, measure, lam, design, yield_factor, load, e0, why, mat.allowable,
                                  verdict, head, base.question or f"Buckling of {Path(base.part).stem}",
-                                 base.question):
+                                 base.question, target):
         o.values["scene"] = "scene.wobbl"
     o.write(out)
     save_study(study, out)
@@ -368,14 +368,14 @@ def _crooked(col, p) -> tuple[float, str, float]:
     return 0.5 * p.features.thickness_typical, "half the typical wall", p.prep.diag
 
 
-def _playback(path: Path, mesh, mode1, lam, design, yield_factor, col, p) -> str | None:
+def _playback(path: Path, mesh, mode1, lam, design, yield_factor, col, p, measure=None) -> str | None:
     """The first buckling shape growing with load, from a column's straightness tolerance of L/1000 or, for other
     shapes, a dent half a wall deep."""
     from .playback import buckling_doc, write
 
     try:
         e0, why, length = _crooked(col, p)
-        return write(path, buckling_doc(mesh, mode1, lam, design, yield_factor, length, e0, why))
+        return write(path, buckling_doc(mesh, mode1, lam, design, yield_factor, length, e0, why, measure))
     except Exception:  # noqa: BLE001  the playback file is a convenience, never a reason to fail
         return None
 

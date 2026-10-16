@@ -148,7 +148,8 @@ def run_vibration(study: VibrationStudy, out_dir: str | Path, progress=None, pre
 
     scene.clear(out)
     if render and scene.vibration(out, mesh, modes, vc.shown_modes(modes, excite), vc.mode_labels(values), verdict,
-                                  headline, base.question or f"Vibration of {Path(base.part).stem}", base.question):
+                                  headline, base.question or f"Vibration of {Path(base.part).stem}", base.question,
+                                  excite, zeta, study.margin):
         o.values["scene"] = "scene.wobbl"
     o.write(out)
     save_study(study, out)
