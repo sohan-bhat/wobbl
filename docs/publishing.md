@@ -10,7 +10,7 @@ pushed. These are the steps for cutting a release.
    repository `sohan-bhat/wobbl` with workflow `release.yml`.
 2. Bump `version` in `pyproject.toml`, `__version__` in `src/wobbl/__init__.py` and
    `version` in `npm/package.json`. The npm tests and the release workflow check that
-   they match.
+   all three match the tag.
 3. Build and check:
 
    ```sh
@@ -34,10 +34,12 @@ After that, users install with `pipx install wobbl` or `uv tool install wobbl`.
 
 ## npm
 
-`npm/` holds a small launcher so `npx wobbl ...` works. On first run it installs
-the matching Python package for good with `uv tool install` (or `pipx install`,
-or a uv it downloads and checks into `~/.wobbl/uv`), then hands every run to the
-installed `wobbl`. Its version always equals the Python package's version.
+`npm/` holds a small launcher so `npm i -g wobbl` and `npx wobbl ...` work. Its
+postinstall, and its first run under npx, install the newest Python package that
+is at least the launcher's version for good with `uv tool install` (or
+`pipx install`, or a uv it downloads and checks into `~/.wobbl/uv`), then every
+run goes to the installed `wobbl`. The launcher's version always equals the
+Python package's version.
 
 Publish it only after the same version is live on PyPI, since that is where the
 launcher installs from.
@@ -58,9 +60,15 @@ Then turn on trusted publishing so tags publish it from CI:
 3. Save. From the next tag on, the `npm` job in `release.yml` publishes with
    provenance after the PyPI upload.
 
-Until trusted publishing is set up, that job logs a warning and skips the
-publish instead of failing the release. It also skips a version that is
-already on npm, so publishing a version by hand before tagging it is fine.
+Before anything is published, the `npm-check` job asks npm whether it will take a
+trusted publish from `release.yml` in the `npm` environment. When it will not,
+the run fails there with the settings to fix, and neither PyPI nor npm gets the
+release, so the two never drift apart. Fix the setting and run the workflow
+again. To check the setting without releasing, run the workflow by hand from
+the Actions tab (Run workflow on `main`), which runs only that check.
+
+A failed `npm publish` fails the run. The job skips a version that is already
+on npm, so publishing a version by hand before tagging it is fine.
 
 ## Solver packages
 

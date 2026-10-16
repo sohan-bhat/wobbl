@@ -2,12 +2,47 @@ name: release
 on:
   push:
     tags: ["v*"]
+  # Run by hand to check that npm trusted publishing works, without publishing anything.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  # npm only says no at the very end, after PyPI already has the release. So ask npm first
+  # whether it will take a trusted publish from this workflow, and stop before anything is
+  # published when it will not. Trading the GitHub OIDC token for a short lived npm token is
+  # the same exchange `npm publish` makes, and the token is thrown away.
+  npm-check:
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/wobbl
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check that npm accepts trusted publishing from this workflow
+        run: |
+          id_token=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org" | jq -r .value)
+          echo "::add-mask::$id_token"
+          code=$(curl -sS -o exchange.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $id_token" \
+            https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/wobbl)
+          if [ "$code" = 200 ]; then
+            echo "npm accepts trusted publishing for wobbl from release.yml in the npm environment."
+            rm -f exchange.json
+            exit 0
+          fi
+          echo "npm answered HTTP $code"
+          jq -r '.message // .error // .' exchange.json 2>/dev/null || cat exchange.json
+          rm -f exchange.json
+          echo "::error title=npm trusted publishing is not set up::npm will not take a publish of wobbl from this workflow, so nothing was published. On npmjs.com open the wobbl package, Settings, Trusted Publisher, pick GitHub Actions and enter user sohan-bhat, repository wobbl, workflow release.yml and environment npm. Then run this workflow again. docs/publishing.md has the details."
+          exit 1
+
   build:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +57,10 @@ jobs:
         run: |
           version=$(python -c "import json; print(json.load(open('npm/package.json'))['version'])")
           test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME does not match npm/package.json version $version"; exit 1; }
+      - name: Check the tag matches the version wobbl --version reports
+        run: |
+          version=$(python -c "import re; print(re.search(r'^__version__ = \"([^\"]+)\"', open('src/wobbl/__init__.py').read(), re.M)[1])")
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME does not match __version__ $version in src/wobbl/__init__.py"; exit 1; }
       - run: python -m pip install --upgrade build twine
       - run: python -m build
       - run: python -m twine check dist/*
@@ -31,7 +70,7 @@ jobs:
           path: dist/
 
   pypi:
-    needs: build
+    needs: [npm-check, build]
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -74,30 +113,28 @@ jobs:
         id: state
         run: |
           version=$(node -p "require('./package.json').version")
-          package=$(curl -s -o /dev/null -w '%{http_code}' https://registry.npmjs.org/wobbl)
           release=$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/wobbl/$version")
-          if [ "$package" = 404 ]; then
-            echo "::notice title=npm publish skipped::wobbl is not on npm yet. The first npm publish is done by hand, see docs/publishing.md."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          elif [ "$release" = 200 ]; then
+          if [ "$release" = 200 ]; then
             echo "::notice title=npm publish skipped::wobbl $version is already on npm, so there is nothing to publish."
             echo "publish=false" >> "$GITHUB_OUTPUT"
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
-      # Trusted publishing (OIDC) can only be configured on npmjs.com once the package exists,
-      # after the owner's first publish by hand. Until it is configured npm rejects this step.
-      # continue-on-error keeps that from failing a release that has already reached PyPI,
-      # and the next step says in the log what happened and what to do.
+      # A failed publish fails the run. It used to be allowed to fail quietly, which is how
+      # 0.1.1 reached PyPI and never reached npm while the run still showed green.
       - name: Publish with npm trusted publishing
-        id: publish
         if: steps.state.outputs.publish == 'true'
-        continue-on-error: true
         run: npm publish --provenance --access public
-      - name: Explain a skipped npm publish
-        if: steps.publish.outcome == 'failure'
+      - name: Check the new version is on npm
+        if: steps.state.outputs.publish == 'true'
         run: |
-          echo "::warning title=npm publish skipped::npm did not accept the publish, most likely because trusted publishing is not configured for wobbl yet. Set it up as docs/publishing.md describes, then publish this version by hand with 'cd npm && npm publish --access public'."
+          version=$(node -p "require('./package.json').version")
+          for i in 1 2 3 4 5 6; do
+            test "$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/wobbl/$version")" = 200 && exit 0
+            sleep 10
+          done
+          echo "::error title=wobbl $version is not on npm::npm publish finished but the registry does not list wobbl $version."
+          exit 1
 
   github-release:
     needs: pypi
