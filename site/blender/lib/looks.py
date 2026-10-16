@@ -277,8 +277,8 @@ def mats(unit=1.0):
     """The shared materials, with their detail textures sized for a scene in metres (unit 1) or mm (unit 1000)."""
     d = 1.0 / unit
     return {
-        'paint': lambda: material('paint', (0.03, 0.03, 0.032), 0.0, 0.42, 'peel_n.png', 0.6, (0.32, 0.5), 40 * d),
-        'paint_black': lambda: material('paint_black', (0.022, 0.022, 0.024), 0.0, 0.5, 'peel_n.png', 0.5, (0.42, 0.6), 40 * d),
+        'paint': lambda: material('paint', (0.03, 0.03, 0.032), 0.0, 0.42, 'peel_n.png', 0.25, (0.32, 0.5), 40 * d),
+        'paint_black': lambda: material('paint_black', (0.022, 0.022, 0.024), 0.0, 0.5, 'peel_n.png', 0.2, (0.42, 0.6), 40 * d),
         'steel_bare': lambda: material('steel_bare', (0.62, 0.62, 0.62), 1.0, 0.3, None, 0.4, (0.22, 0.38), 30 * d),
         'steel_zinc': lambda: material('steel_zinc', (0.74, 0.75, 0.77), 1.0, 0.34, None, 0.5, (0.26, 0.44), 60 * d),
         'steel_dark': lambda: material('steel_dark', (0.16, 0.16, 0.17), 1.0, 0.4, None, 0.5, (0.32, 0.5), 60 * d),
