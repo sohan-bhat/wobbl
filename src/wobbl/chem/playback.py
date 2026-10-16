@@ -219,7 +219,8 @@ def molecule(out: Path, name: str, formula: str, symbols, positions, bonds, mode
             period = 1e15 / (modes.freqs[k] * 2.99792458e10) if modes.freqs[k] > 0 else None
             anims.append({"kind": "vibration", "name": f"{modes.freqs[k]:.0f} cm-1{label}",
                           "frequency_cm": _r(modes.freqs[k], 5), "intensity_km_mol": _r(modes.intensities[k], 3),
-                          "period_fs": _r(period, 4) if period else None, "frames": mode_frames(pos, modes.vectors[k])})
+                          "period_fs": _r(period, 4) if period else None, "frames": mode_frames(pos, modes.vectors[k]),
+                          "vector": _pos(mode_frames(pos, modes.vectors[k], 4)[1] - pos)})
     if md_frames:
         md = (values or {}).get("md", {})
         anims.append({"kind": "dynamics", "name": f"molecular dynamics at {_r(md.get('T_target', 0), 4)} K",
@@ -238,6 +239,8 @@ def molecule(out: Path, name: str, formula: str, symbols, positions, bonds, mode
             "molecule": {"name": name, "formula": formula},
             "atoms": atoms_block(symbols), "positions": _pos(pos),
             "bonds": [[int(i), int(j), _r(o, 2)] for i, j, o in bonds], "animations": anims, "cell": None}
+    if values and values.get("charges") is not None and len(values["charges"]) == len(pos):
+        data["charges"] = [_r(c, 4) for c in values["charges"]]
     if values:
         data["properties"] = {k: _r(values[k], 5) for k in ("dipole_D", "gap_eV", "homo_eV", "lumo_eV",
                                                              "solvation_kJ_mol") if values.get(k) is not None}
@@ -262,9 +265,10 @@ def _species_3d(sp) -> dict:
     return out
 
 
-def reaction(out: Path, q, values: dict, quick: bool = False) -> str:
-    """Reactants and products in 3D with their amounts and phases, the energy levels, and how the Gibbs energy
-    and equilibrium constant change with temperature, for a viewer to show the reaction happening."""
+def reaction(out: Path, q, values: dict, quick: bool = False, sweep: dict | None = None) -> str:
+    """Reactants and products in 3D with their amounts and phases, the energy levels, how the Gibbs energy and
+    equilibrium constant change with temperature, and the result solved across the input a designer would change
+    (chem.sweep), for a viewer to show the reaction as a model the user drives."""
     from .react import thermo
     sides = {}
     for key, terms in (("reactants", q.reactants), ("products", q.products)):
@@ -276,12 +280,12 @@ def reaction(out: Path, q, values: dict, quick: bool = False) -> str:
     T = values.get("temperature_K", 298.15)
     aqueous = any(t.phase == "aq" for t in q.reactants + q.products)
     lo, hi = (275.0, 370.0) if aqueous else (250.0, max(1500.0, T * 1.5))
-    sweep = []
+    frames = []
     for x in np.linspace(lo, hi, 24):
         th = thermo(q, float(x))
-        sweep.append({"T_K": _r(x, 5), "dG_kJ": _r(th["dG"] / 1000, 5), "log10K": _r(th["log10K"], 4)})
+        frames.append({"T_K": _r(x, 5), "dG_kJ": _r(th["dG"] / 1000, 5), "log10K": _r(th["log10K"], 4)})
     ad = values.get("adiabatic") or {}
-    data = {"manifest": {"kind": "reaction", "version": VERSION, "generator": "wobbl chem", "frames": len(sweep),
+    data = {"manifest": {"kind": "reaction", "version": VERSION, "generator": "wobbl chem", "frames": len(frames),
                          "units": {"positions": "angstrom", "dH_kJ": "kJ per mole of reaction as written",
                                    "dG_kJ": "kJ per mole of reaction", "T_K": "K", "gas_L": "L per mole of reaction",
                                    "rise_K": "K"},
@@ -294,7 +298,9 @@ def reaction(out: Path, q, values: dict, quick: bool = False) -> str:
             "gas_L": _r(values.get("gas_L"), 4), "adiabatic": {k: _r(v, 5) for k, v in ad.items()
                                                                if isinstance(v, (int, float))},
             "equilibrium_extent": _r((values.get("equilibrium") or {}).get("extent"), 4),
-            "frames": sweep}
+            "frames": frames}
+    if sweep:
+        data["sweep"] = sweep
     return _write(out, data)
 
 
@@ -312,7 +318,7 @@ def mixture(out: Path, label: str, values: dict) -> str:
 
 
 def crystal(out: Path, name: str, atoms, desc: str, frames=None, volumes=None, energies=None, values=None, md=None,
-            md_fs: float = 0.0) -> str:
+            md_fs: float = 0.0, extra: dict | None = None) -> str:
     """A crystal's unit cell and atoms, with frames of the cell breathing through the equation of state (each
     volume a computed energy) or of its atoms moving in a dynamics run."""
     anims = []
@@ -322,7 +328,8 @@ def crystal(out: Path, name: str, atoms, desc: str, frames=None, volumes=None, e
                       "energies_eV_per_atom": [_r((e - e0) / len(atoms), 4) for e in energies],
                       "volumes_A3": [_r(v, 5) for v in volumes],
                       "cells": [[[round(float(x), 4) for x in row] for row in f.cell] for f in frames],
-                      "frames": [_pos(f.get_positions()) for f in frames]})
+                      "frames": [_pos(f.get_positions()) for f in frames],
+                      **{k: [_r(x, 5) for x in v] for k, v in (extra or {}).items()}})
     if md:
         anims.append({"kind": "dynamics", "name": f"atoms at {_r((values or {}).get('T_K', 0), 4)} K",
                       "frame_fs": _r(md_fs / max(len(md), 1), 4), "frames": md})
@@ -338,5 +345,6 @@ def crystal(out: Path, name: str, atoms, desc: str, frames=None, volumes=None, e
             "atoms": atoms_block(atoms.get_chemical_symbols()), "positions": _pos(atoms.get_positions()),
             "bonds": [], "animations": anims,
             "properties": {k: _r(v[k], 5) for k in ("lattice_A", "density_g_cm3", "bulk_modulus_GPa",
-                                                     "cohesive_eV_atom", "drift_meV_atom") if v.get(k) is not None}}
+                                                     "cohesive_eV_atom", "drift_meV_atom", "fusion_eV_atom",
+                                                     "melting_K") if v.get(k) is not None}}
     return _write(out, data)

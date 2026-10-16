@@ -170,7 +170,12 @@ def run_reaction(q: Query, opts, out_dir, log=None) -> GenericOutcome:
         except Exception as e:  # noqa: BLE001
             imgs["error"] = str(e)
     from . import playback
-    values["files"] = {"playback": playback.reaction(out, q, values, quick=opts.accuracy == "fast")}
+    from .sweep import reaction as sweep
+    try:
+        swept = sweep(q, values, T, P) if opts.accuracy != "fast" else None
+    except Exception:  # noqa: BLE001  a sweep that cannot be solved leaves the run's own answer standing
+        swept = None
+    values["files"] = {"playback": playback.reaction(out, q, values, quick=opts.accuracy == "fast", sweep=swept)}
     assumptions = [f"Standard states, 1 bar for gases and 1 mol/kg for species in water, with data from "
                    f"{' and '.join(sorted(sources))}.",
                    "Species in water are ideal, with activity equal to molality, which holds for dilute "
