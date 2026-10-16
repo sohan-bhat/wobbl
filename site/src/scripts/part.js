@@ -173,6 +173,37 @@ export function shade(pos, tri, n) {
 }
 
 /**
+ * The edges a CAD viewer outlines, as pairs of drawn vertices: every edge where shade split the smooth
+ * groups (the faces meet at more than its crease angle) and every border edge of an open surface. Drawn as
+ * thin lines over the faces, as three.js's LDraw viewer and most CAD viewers draw them, so flat faces and
+ * small parts read crisply. tri holds node numbers and index the drawn vertex of each corner (shade's).
+ */
+export function creases(tri, index, n) {
+  const seen = new Map(), out = [];
+  for (let t = 0; t < tri.length; t += 3) {
+    for (let k = 0; k < 3; k++) {
+      const j0 = t + k, j1 = t + ((k + 1) % 3), a = tri[j0], b = tri[j1];
+      const key = a < b ? a * n + b : b * n + a;
+      const first = seen.get(key);
+      if (first === undefined) { seen.set(key, j0 * 4 + (a < b ? 0 : 1)); continue; }
+      if (first < 0) continue;
+      // the corners of the first triangle on this edge, ordered as the nodes are
+      const f0 = (first >> 2), flip = first & 1, ft = f0 - (f0 % 3), f1 = ft + ((f0 - ft + 1) % 3);
+      const ia = flip ? index[f1] : index[f0], ib = flip ? index[f0] : index[f1];
+      const ja = a < b ? index[j0] : index[j1], jb = a < b ? index[j1] : index[j0];
+      if (ia !== ja || ib !== jb) out.push(ia, ib);
+      seen.set(key, -1);
+    }
+  }
+  for (const v of seen.values()) {
+    if (v < 0) continue;
+    const f0 = v >> 2, ft = f0 - (f0 % 3), f1 = ft + ((f0 - ft + 1) % 3);
+    out.push(index[f0], index[f1]);
+  }
+  return out;
+}
+
+/**
  * Everything the GPU needs, one entry per drawn vertex, as small integers the GPU reads back as
  * -1 to 1 (normalized). The shader multiplies each channel by its largest value, in range, and
  * combines the three unit cases for the load's size and direction, so moving the load only changes

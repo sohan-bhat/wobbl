@@ -5,7 +5,7 @@
 // changes uniforms, except a heat run's frames, which are copied in as the clock passes them.
 import {
   BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
-  PerspectiveCamera, Scene, ShaderMaterial, SphereGeometry, Vector3, WebGLRenderer,
+  LineSegments, PerspectiveCamera, Scene, ShaderMaterial, SphereGeometry, Vector3, WebGLRenderer,
 } from 'three';
 import { sceneParts } from './play-scene.js';
 
@@ -88,16 +88,44 @@ void main() {
   gl_Position = projectionMatrix * mv;
 }`;
 
-// The light every playback surface is drawn in: a key light and a fill from the viewer's side, and a small
-// highlight, so a strength run, a heat run and a scene all read the same. spec scales the highlight, which a
-// prop keeps low so it reads matte.
+// The light every playback surface is drawn in, so a strength run, a heat run and a scene all read the same.
+// It is worked out in linear light and tone mapped with Khronos PBR Neutral before it goes out as sRGB, the
+// way model-viewer draws a product, so a color map keeps its own hues on every face. The lights move with the
+// camera as ParaView's light kit does: a soft room light, brighter from above (three.js's RoomEnvironment,
+// which model-viewer uses), a key light up and to the right, a fill from the left, a little headlight, and a
+// rim on the silhouette that keeps dark parts apart from the dark page. spec scales the highlight and the rim,
+// which a prop keeps low so it reads matte.
 export const LIT = /* glsl */ `
+vec3 toLinear(vec3 c) {
+  return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
+}
+vec3 toSRGB(vec3 c) {
+  c = clamp(c, 0.0, 1.0);
+  return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
+}
+vec3 neutral(vec3 c) {
+  const float start = 0.76, desat = 0.15;
+  float x = min(c.r, min(c.g, c.b));
+  c -= x < 0.08 ? x - 6.25 * x * x : 0.04;
+  float peak = max(c.r, max(c.g, c.b));
+  if (peak < start) return c;
+  const float d = 1.0 - start;
+  float top = 1.0 - d * d / (peak + d - start);
+  c *= top / peak;
+  float g = 1.0 - 1.0 / (desat * (peak - top) + 1.0);
+  return mix(c, vec3(top), g);
+}
 vec3 lit(vec3 c, vec3 n, vec3 v, float spec) {
-  vec3 l1 = normalize(vec3(0.35, 0.55, 0.75));
-  vec3 l2 = normalize(vec3(-0.7, -0.1, 0.45));
-  float d = 0.42 + 0.6 * max(dot(n, l1), 0.0) + 0.22 * max(dot(n, l2), 0.0);
-  float s = spec * 0.16 * pow(max(dot(n, normalize(l1 + v)), 0.0), 28.0);
-  return c * d + vec3(s);
+  vec3 a = toLinear(c);
+  vec3 key = normalize(vec3(0.42, 0.62, 0.66));
+  vec3 fill = normalize(vec3(-0.78, 0.08, 0.42));
+  float nv = max(dot(n, v), 0.0);
+  float room = mix(0.30, 0.62, 0.5 + 0.5 * n.y);
+  float d = room + 0.92 * max(dot(n, key), 0.0) + 0.24 * max(dot(n, fill), 0.0) + 0.10 * nv;
+  float fres = pow(1.0 - nv, 4.0);
+  vec3 rim = (0.06 + 0.14 * spec) * fres * (0.55 + 0.45 * max(n.y, 0.0)) * (0.35 + 0.65 * sqrt(a));
+  float s = spec * (0.12 * pow(max(dot(n, normalize(key + v)), 0.0), 48.0) + 0.03 * fres);
+  return toSRGB(neutral(a * d + rim + vec3(s)));
 }`;
 
 const FRAG = /* glsl */ `
@@ -124,6 +152,9 @@ void main() {
   vec3 n = normalize(vN);
   n = faceforward(n, -v, n);
   vec3 col = lit(vC, n, v, 1.0);
+#ifdef EDGE
+  col *= 0.4;
+#endif
   if (vE > 0.5) {
     float k = mod(gl_FragCoord.x - gl_FragCoord.y, 9.0 * uPx);
     if (k < 2.5 * uPx) col = mix(col, vec3(0.055, 0.059, 0.067), 0.72);
@@ -140,9 +171,33 @@ void main() {
 
 const YELLOW = 0xffd400;
 
-const heatMaterial = (uniforms) => new ShaderMaterial({
-  vertexShader: HEAT_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms, defines: { HEAT: '' }, extensions: { derivatives: true },
+const heatMaterial = (uniforms, defines = {}) => new ShaderMaterial({
+  vertexShader: HEAT_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms, defines: { HEAT: '', ...defines }, extensions: { derivatives: true },
+  polygonOffset: !defines.EDGE, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
 });
+
+/**
+ * A part's crease and border edges as thin dark lines over its faces (part.js's creases): the same vertices
+ * and the same shader as its faces, so they bend and color with it. The faces are pushed back a little in
+ * depth so the lines win.
+ */
+export function edgeLines(geo, edges, material) {
+  if (!edges || !edges.length) return null;
+  const g = new BufferGeometry();
+  for (const [k, a] of Object.entries(geo.attributes)) g.setAttribute(k, a);
+  g.setIndex(new BufferAttribute(edges, 1));
+  const m = material.clone();
+  m.uniforms = material.uniforms;
+  m.defines = { ...m.defines, EDGE: '' };
+  m.polygonOffset = false;
+  m.side = DoubleSide;
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = Math.max(material.polygonOffsetFactor, 1);
+  material.polygonOffsetUnits = Math.max(material.polygonOffsetUnits, 1);
+  const lines = new LineSegments(g, m);
+  lines.frustumCulled = false;
+  return lines;
+}
 
 /** The load as an arrow: a solid one, and a faint copy that shows through the part when it is behind it. */
 export function arrow(color = YELLOW) {
@@ -199,7 +254,7 @@ export function createStage({ canvas, w, h, px, kind }) {
       geo.setAttribute('disp', new BufferAttribute(arrays.disp, 3));
       geo.setAttribute('excl', new BufferAttribute(arrays.excl, 1, true));
       Object.assign(uniforms, { uExag: { value: run.exag }, uTop: { value: top } });
-      material = new ShaderMaterial({ vertexShader: STRESS_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms });
+      material = new ShaderMaterial({ vertexShader: STRESS_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
     } else {
       geo.setAttribute('t0', new BufferAttribute(new Float32Array(arrays.frames.subarray(0, nv)), 1));
       geo.setAttribute('t1', new BufferAttribute(new Float32Array(arrays.frames.subarray(0, nv)), 1));
@@ -214,6 +269,8 @@ export function createStage({ canvas, w, h, px, kind }) {
     const mesh = new Mesh(geo, material);
     mesh.frustumCulled = false;
     scene.add(mesh);
+    const lines = edgeLines(geo, arrays.edges, material);
+    if (lines) scene.add(lines);
     // the cut faces of a part cut open at its hottest point: the same colors and isotherms, never cut themselves
     let cut = null;
     if (kind === 'heat' && arrays.cutIndex) {
