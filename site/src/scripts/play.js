@@ -102,11 +102,12 @@ export function decodePlay(run, buf) {
     arrays.value = new Float32Array(nv);
     arrays.disp = new Float32Array(nv * 3);
     arrays.excl = new Uint8Array(nv);
+    const whole = hatchZones(index, vNode, excl, position);
     for (let v = 0; v < nv; v++) {
       const i = vNode[v];
       arrays.value[v] = qv[i] * vs;
       for (let k = 0; k < 3; k++) arrays.disp[v * 3 + k] = qu[k * n + i] * us;
-      arrays.excl[v] = excl[i] ? 255 : 0;
+      arrays.excl[v] = excl[i] && whole[v] ? 255 : 0;
     }
   } else {
     // each saved frame is stored as its change from the one before
@@ -121,6 +122,55 @@ export function decodePlay(run, buf) {
     if (run.cut) Object.assign(arrays, section(run.cut, L, bytes, buf, F, step));
   }
   return { arrays, vertices: nv };
+}
+
+/**
+ * Where a strength run's excluded zones are hatched: 1 on each drawn vertex of a zone worth hatching. A zone is a
+ * patch of triangles wholly in the excluded set and on one smooth face (crease edges split it), and it is worth
+ * hatching when it is a patch, not a sliver: its area against its outline squared is at least what a strip a
+ * tenth as wide as it is long has. A thin band where the zone round a fixed face runs a little way up a side face
+ * would otherwise show as a comb of short dashes along the edge.
+ */
+function hatchZones(index, vNode, excl, pos) {
+  const nt = index.length / 3, inZone = new Uint8Array(nt), parent = new Int32Array(nt);
+  for (let t = 0; t < nt; t++) {
+    parent[t] = t;
+    inZone[t] = excl[vNode[index[t * 3]]] && excl[vNode[index[t * 3 + 1]]] && excl[vNode[index[t * 3 + 2]]] ? 1 : 0;
+  }
+  const find = (x) => { while (parent[x] !== x) x = parent[x] = parent[parent[x]]; return x; };
+  const edges = new Map(), nv = vNode.length;
+  for (let t = 0; t < nt; t++) {
+    if (!inZone[t]) continue;
+    for (let e = 0; e < 3; e++) {
+      const a = index[t * 3 + e], b = index[t * 3 + ((e + 1) % 3)], key = a < b ? a * nv + b : b * nv + a;
+      const o = edges.get(key);
+      if (o === undefined) edges.set(key, t);
+      else { parent[find(o)] = find(t); edges.set(key, -1); }
+    }
+  }
+  const len = (a, b) => Math.hypot(pos[a * 3] - pos[b * 3], pos[a * 3 + 1] - pos[b * 3 + 1], pos[a * 3 + 2] - pos[b * 3 + 2]);
+  const area = new Map(), edge = new Map();
+  for (let t = 0; t < nt; t++) {
+    if (!inZone[t]) continue;
+    const a = index[t * 3], b = index[t * 3 + 1], c = index[t * 3 + 2];
+    const ux = pos[b * 3] - pos[a * 3], uy = pos[b * 3 + 1] - pos[a * 3 + 1], uz = pos[b * 3 + 2] - pos[a * 3 + 2];
+    const vx = pos[c * 3] - pos[a * 3], vy = pos[c * 3 + 1] - pos[a * 3 + 1], vz = pos[c * 3 + 2] - pos[a * 3 + 2];
+    const r = find(t);
+    area.set(r, (area.get(r) || 0) + 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx));
+  }
+  for (const [key, t] of edges) {
+    if (t < 0) continue;
+    const a = Math.floor(key / nv), b = key % nv, r = find(t);
+    edge.set(r, (edge.get(r) || 0) + len(a, b));
+  }
+  const keep = new Set();
+  for (const [r, A] of area) { const P = edge.get(r) || 0; if (P > 0 && A / (P * P) >= 0.1 / 4.84) keep.add(r); }
+  const whole = new Uint8Array(nv);
+  for (let t = 0; t < nt; t++) {
+    if (!inZone[t] || !keep.has(find(t))) continue;
+    whole[index[t * 3]] = 1; whole[index[t * 3 + 1]] = 1; whole[index[t * 3 + 2]] = 1;
+  }
+  return whole;
 }
 
 /**

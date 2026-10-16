@@ -117,6 +117,10 @@ vec3 neutral(vec3 c) {
 }
 vec3 lit(vec3 c, vec3 n, vec3 v, float spec) {
   vec3 a = toLinear(c);
+  // a very dark color (the bottom of turbo, a black fin) is lifted until it reads as a lit solid with visible
+  // faces, keeping its hue: dark colors hide shading (Moreland). Props keep their darkness, as context.
+  float y = dot(a, vec3(0.2126, 0.7152, 0.0722));
+  if (spec > 0.5) a *= clamp(0.06 / max(y, 1e-4), 1.0, 4.5);
   vec3 key = normalize(vec3(0.42, 0.62, 0.66));
   vec3 fill = normalize(vec3(-0.78, 0.08, 0.42));
   float nv = max(dot(n, v), 0.0);
@@ -126,6 +130,11 @@ vec3 lit(vec3 c, vec3 n, vec3 v, float spec) {
   vec3 rim = (0.06 + 0.14 * spec) * fres * (0.55 + 0.45 * max(n.y, 0.0)) * (0.35 + 0.65 * sqrt(a));
   float s = spec * (0.12 * pow(max(dot(n, normalize(key + v)), 0.0), 48.0) + 0.03 * fres);
   return toSRGB(neutral(a * d + rim + vec3(s)));
+}
+// an outline darker than its face, or lighter where the face is too dark for a darker line to show
+vec3 edgeTone(vec3 col) {
+  float y = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  return mix(col + vec3(0.11), col * 0.4, smoothstep(0.1, 0.28, y));
 }`;
 
 const FRAG = /* glsl */ `
@@ -150,15 +159,20 @@ void main() {
 #endif
   vec3 v = normalize(vV);
   vec3 n = normalize(vN);
+  // the hatching is drawn only on a face turned toward the viewer: the hidden face behind an edge (a fixed
+  // base under a plate's side) ties with the near face along the edge itself and would show there as teeth
+  float facing = dot(n, v);
   n = faceforward(n, -v, n);
   vec3 col = lit(vC, n, v, 1.0);
 #ifdef EDGE
-  col *= 0.4;
-#endif
-  if (vE > 0.5) {
+  col = edgeTone(col);
+#else
+  // and it fades out on a face seen nearly edge on, where its stripes would only crowd into dashes
+  if (vE > 0.5 && facing > 0.25) {
     float k = mod(gl_FragCoord.x - gl_FragCoord.y, 9.0 * uPx);
-    if (k < 2.5 * uPx) col = mix(col, vec3(0.055, 0.059, 0.067), 0.72);
+    if (k < 2.5 * uPx) col = mix(col, vec3(0.055, 0.059, 0.067), 0.72 * smoothstep(0.25, 0.45, facing));
   }
+#endif
 #ifdef HEAT
   // isotherms, a thin dark line at every multiple of uIso degrees, as wide on screen wherever they fall
   if (uIso > 0.0) {

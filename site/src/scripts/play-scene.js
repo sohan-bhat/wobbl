@@ -86,7 +86,7 @@ void main() {
 #endif
   vec3 col = mix(lit(c, n, v, uSpec), uGlowC, uGlow);
 #ifdef EDGE
-  col *= 0.4;
+  col = edgeTone(col);
 #endif
   gl_FragColor = vec4(col, uAlpha);
 }`;
@@ -101,7 +101,7 @@ const bytes = (c) => colorHex(c).map((x) => Math.round(x * 255));
 // and when it is a closed shell or mostly clear, with its near side cut away so what it holds still shows. Props are drawn
 // darker and matte, so the part the run is about stays the brightest thing in the view.
 const BG = [14, 15, 17];
-const behind = (rgb, a) => rgb.map((c, i) => Math.round(BG[i] + (c - BG[i]) * Math.min(1, Math.max(a, 0.3) * 1.25)));
+const behind = (rgb, a, least = 0.3) => rgb.map((c, i) => Math.round(BG[i] + (c - BG[i]) * Math.min(1, Math.max(a, least) * 1.25)));
 const PROP = 0.62;
 
 function material(o, { prop = false, shell = false, field = null } = {}) {
@@ -174,16 +174,27 @@ export function sceneParts({ arrays, run }) {
     out[o] = f.lut[i]; out[o + 1] = f.lut[i + 1]; out[o + 2] = f.lut[i + 2];
   };
   const items = [];
+  // a view framed close on its subject (scene-view.js) leaves out lines that never come near it, such as the
+  // arc a wiper blade's tip sweeps far up the glass, which would float in the close view without their context
+  const sb = run.subject, near = sb && sb.lo.map((x, k) => [x - 0.25 * (sb.hi[k] - x), sb.hi[k] + 0.25 * (sb.hi[k] - x)]);
+  const far = (P) => {
+    for (let i = 0; i < P.length; i += 3) if (near.every(([l, u], k) => P[i + k] >= l && P[i + k] <= u)) return false;
+    return true;
+  };
   h.objects.forEach((o, oi) => {
     const d = arrays.objs[oi];
     if (!d) return;
+    if (near && o.kind === 'lines' && far(d.P)) return;
     let rgb = bytes(o.color || '#9aa0a6');
     if (o.prop && o.kind !== 'ground') {
       // a prop is darker and a little grayer, so lit in linear light it stays behind the part the run is about
       const y = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
       rgb = rgb.map((c) => Math.round((c + (y - c) * 0.3) * PROP));
     }
-    const it = { o, d, oi, mag: magnifyOf(h, oi), f: o.field ? fields[o.field.f] : null, base: (o.opacity ?? 1) < 1 ? behind(rgb, o.opacity) : rgb };
+    // a see through pane (a windshield) is a faint backdrop, fainter than a see through shell or block
+    const z = o.kind === 'body' && o.size, pane = o.prop && z && (o.shape === 'plane' || (o.shape === 'box' && Math.min(...z) < 0.05 * Math.max(...z)));
+    const a = o.opacity ?? 1;
+    const it = { o, d, oi, mag: magnifyOf(h, oi), f: o.field ? fields[o.field.f] : null, base: a < 1 ? (pane ? behind(rgb, a * 0.45, 0) : behind(rgb, a)) : rgb };
     if (o.kind === 'mesh') {
       const geo = new BufferGeometry(), nv = d.node.length;
       geo.setIndex(new BufferAttribute(d.index, 1));
