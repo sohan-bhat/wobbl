@@ -24,6 +24,7 @@ def ramp_scene(out: Path, *, title: str, domain: str, question: str, model, valu
     lam = sweep(reserve, FRAMES)
     F = model.forces if model.forces is not None else np.zeros((mesh.n_nodes, 3))
     total = float(np.linalg.norm(F.sum(0))) + sum(float(np.linalg.norm(r.force)) for r in model.rigid)
+    total = float(f"{total:.6g}")           # the asked load, without the rounding of summing node forces
     s = Scene(title, domain=domain, question=question, source=source)
     if total > 0:
         s.timeline(total * lam, unit="N", label="load", between="exact", kind="input", design=total)
