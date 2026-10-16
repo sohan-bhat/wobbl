@@ -318,22 +318,46 @@ def test_dropped_rock_rises_its_cliff_with_the_slider(tmp_path):
     assert v[tl["t"].index(300)] == pytest.approx(o["values"]["impact_speed_mps"], rel=1e-4)
 
 
-def test_antenna_wave_plays_one_cycle(tmp_path):
+def test_antenna_field_follows_the_frequency_picked(tmp_path):
     from wobbl.fields import playback as fp
     r, z = np.meshgrid(np.linspace(0, 1, 18), np.linspace(0, 1, 14))
-    for mirror_z, gain in ((True, [-30.0, 0.0, 2.1, 0.0]), (False, [-5.0, 1.0, 3.0, 1.0])):
-        fp.write(tmp_path, "antenna-wire", {"h_re, h_im": "phasor, A/m"},
-                 {"grid": {"x0": 0, "x1": 60, "y0": 0, "y1": 60, "nx": 18, "ny": 14, "mirror": True},
-                  "h_re": fp.pack(np.cos(6 * np.hypot(r, z))), "h_im": fp.pack(np.sin(6 * np.hypot(r, z))),
-                  "wire": {"radius_mm": 0.5, "height_mm": 29.0, "gap_mm": 0.5, "mirror_z": mirror_z},
-                  "pattern": {"theta_deg": [0, 45, 90, 135], "gain_dBi": gain}, "frequency_Hz": 2.44e9,
-                  "sweep": {"x": [2300, 2500], "s11_dB": [-12, -8]}})
-        outcome(tmp_path, "antenna")
-        assert build_scene(tmp_path)
-        ks, h = kinds(tmp_path)
-        assert {"mesh", "body"} <= ks and h["timeline"]["frames"] == 24
-        assert any(o.get("name") == "wire" for o in h["objects"])
-        assert {r_["name"] for r_ in h["readouts"]} >= {"S11", "peak gain"}
+    freqs = [2300.0, 2440.0, 2580.0]
+    grids = [np.exp(-3 * np.hypot(r, z)) * a for a in (0.4, 1.0, 0.6)]
+    fp.write(tmp_path, "antenna-wire", {"h_rms": "rms field per frequency, A/m"},
+             {"grid": {"x0": 0, "x1": 60, "y0": 0, "y1": 60, "nx": 18, "ny": 14, "mirror": True},
+              "h_rms": [fp.pack(g, 0.0, 1.0) for g in grids], "tx_power_W": 0.01,
+              "wire": {"radius_mm": 0.5, "height_mm": 29.0, "gap_mm": 0.5, "mirror_z": True},
+              "pattern": {"theta_deg": [0, 45, 90, 135], "gain_dBi": [-30.0, 0.0, 2.1, 0.0]},
+              "patterns": [[-30.0, 0.0, 1.8, 0.0], [-30.0, 0.0, 2.1, 0.0], [-30.0, 0.5, 2.3, 0.5]],
+              "frequency_Hz": 2.44e9,
+              "sweep": {"x": freqs, "s11_dB": [-6.0, -14.0, -8.0], "r_ohm": [40, 60, 80], "x_ohm": [-30, 0, 30]}})
+    outcome(tmp_path, "antenna")
+    assert build_scene(tmp_path)
+    ks, h = kinds(tmp_path)
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["unit"] == "MHz" and tl["design"] == 2440.0 and tl["t"] == freqs
+    assert h["readouts"][0]["name"] == "S11" and h["readouts"][0]["values"] == [-6.0, -14.0, -8.0]
+    f = h["fields"][0]
+    assert f["limit"] == pytest.approx(0.163, abs=1e-3) and f["limit_label"]
+    pat = next(o for o in h["objects"] if o.get("name") == "gain pattern")
+    assert pat["deform"]["frames"]["shape"][0] == 3
+    assert not any(o.get("flow") or o.get("drawn") for o in h["objects"])
+
+
+def test_antenna_run_with_only_its_working_phasor_shows_that_field(tmp_path):
+    from wobbl.fields import playback as fp
+    r, z = np.meshgrid(np.linspace(0, 1, 18), np.linspace(0, 1, 14))
+    fp.write(tmp_path, "antenna-wire", {"h_re, h_im": "phasor, A/m"},
+             {"grid": {"x0": 0, "x1": 60, "y0": 0, "y1": 60, "nx": 18, "ny": 14, "mirror": True},
+              "h_re": fp.pack(np.cos(6 * np.hypot(r, z))), "h_im": fp.pack(np.sin(6 * np.hypot(r, z))),
+              "wire": {"radius_mm": 0.5, "height_mm": 29.0, "gap_mm": 0.5, "mirror_z": False},
+              "pattern": {"theta_deg": [0, 45, 90, 135], "gain_dBi": [-5.0, 1.0, 3.0, 1.0]}, "frequency_Hz": 2.44e9,
+              "sweep": {"x": [2300, 2500], "s11_dB": [-12, -8]}})
+    outcome(tmp_path, "antenna")
+    assert build_scene(tmp_path)
+    ks, h = kinds(tmp_path)
+    assert {"mesh", "body"} <= ks and h["timeline"]["frames"] == 1
+    assert h["readouts"][0]["name"] == "S11" and h["fields"][0]["limit"] > 0
 
 
 def _pack_mesh():

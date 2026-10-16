@@ -224,40 +224,73 @@ def build_flow(out: Path, pb: dict) -> Path | None:
     return s.save(out)
 
 
-def build_wave(out: Path, pb: dict, frames: int = 24) -> Path | None:
-    """A field phasor solved on an axisymmetric slice (an antenna's), as the wave it is: the slice stood upright
-    through the axis, mirrored to both sides (and about z = 0 when the model is), playing Re(H e^(j w t)) over one
-    cycle so the field leaves the antenna. The wire stands on the axis and the gain pattern wraps around it."""
-    g = pb.get("grid")
-    if not g or "h_re" not in pb or "h_im" not in pb:
-        return None
-    o = read(out, "outcome.json") or {}
-    re_, im_ = unpack(pb["h_re"]), unpack(pb["h_im"])
-    wire = pb.get("wire") or {}
-    mz = bool(wire.get("mirror_z"))
-    if g.get("mirror"):                          # the other side of the axis: r runs out the other way
-        re_, im_ = (np.concatenate([a[:, :0:-1], a], axis=1) for a in (re_, im_))
+# ICNIRP 2020 reference levels for the general public, whole body: incident power density in W/m2
+def exposure_h(f_hz: float) -> float:
+    """The rms magnetic field in A/m that the ICNIRP 2020 general public reference level allows at a frequency
+    (far field, H = sqrt(S / eta0))."""
+    f_mhz = f_hz / 1e6
+    S = 2.0 if f_mhz < 400 else (f_mhz / 200.0 if f_mhz < 2000 else 10.0)
+    return float(np.sqrt(S / 376.73))
+
+
+def _mirror(a, g, mz):
+    """The slice grid mirrored about the axis (and about z = 0 for a dipole), with its extents."""
+    if g.get("mirror"):
+        a = np.concatenate([a[..., :, :0:-1], a], axis=-1)
         xa, xb = -g["x1"], g["x1"]
     else:
         xa, xb = g["x0"], g["x1"]
     if mz:
-        re_, im_ = (np.concatenate([a[:0:-1], a], axis=0) for a in (re_, im_))
+        a = np.concatenate([a[..., :0:-1, :], a], axis=-2)
         za, zb = -g["y1"], g["y1"]
     else:
         za, zb = g["y0"], g["y1"]
-    ph = np.linspace(0, 2 * np.pi, frames, endpoint=False)
-    H = np.stack([re_ * np.cos(w) - im_ * np.sin(w) for w in ph])
-    lim = float(np.nanpercentile(np.abs(H), 90)) or 1.0     # the far field shows, the wire saturates
-    f_hz = float(pb.get("frequency_Hz") or 0)
-    s = Scene(f"The {str(pb.get('antenna') or 'antenna')} radiating", domain="fields", question=o.get("question", ""),
-              length="mm", source="The field is the run's own phasor on the slice through the antenna, played over "
-                                  "one cycle. The slice is mirrored about the axis, since the model is axisymmetric.")
-    s.timeline(ph / (2 * np.pi) * (1e9 / f_hz if f_hz else 1.0), unit="ns" if f_hz else "cycle", label="time",
-               seconds=3, between="interpolated")
-    m = plane(s, xa, xb, za, zb, H, "magnetic field", "A/m", "coolwarm", frames=True)
+    return a, xa, xb, za, zb
+
+
+def build_wave(out: Path, pb: dict) -> Path | None:
+    """An axisymmetric antenna's field as a frequency sweep the user controls: the slice stood upright through the
+    axis and mirrored, colored by the rms magnetic field when a radio drives it at the picked frequency, with the
+    gain pattern of that frequency wrapped around the wire. S11, gain and the power the antenna takes in are read
+    at each frequency, and the slider opens at the working frequency. An older run that kept only the working
+    frequency's phasor shows that one field."""
+    g = pb.get("grid")
+    if not g:
+        return None
+    o = read(out, "outcome.json") or {}
+    wire = pb.get("wire") or {}
+    mz = bool(wire.get("mirror_z"))
+    f0 = float(pb.get("frequency_Hz") or 0)
+    sw = pb.get("sweep") or {}
+    if pb.get("h_rms") and sw.get("x") and len(pb["h_rms"]) == len(sw["x"]):
+        H = np.stack([unpack(d) for d in pb["h_rms"]])
+        freqs = np.asarray(sw["x"], float)
+        pats = pb.get("patterns")
+        note = (f"The field is the rms magnetic field when a 50 ohm radio with {pb.get('tx_power_W', 0.1) * 1e3:.3g} "
+                "mW available drives the antenna, solved at each frequency of the sweep and read between them.")
+    elif "h_re" in pb and "h_im" in pb:
+        H = np.hypot(unpack(pb["h_re"]), unpack(pb["h_im"]))[None] / np.sqrt(2)
+        freqs = np.array([f0 / 1e6 if f0 else 0.0])
+        pats = None
+        note = "The field is the rms magnetic field for 1 V at the feed, solved at the working frequency."
+    else:
+        return None
+    H, xa, xb, za, zb = _mirror(H, g, mz)
+    n = len(freqs)
+    s = Scene(f"The {str(pb.get('antenna') or 'antenna')} at the frequency you pick", domain="fields",
+              question=o.get("question", ""), length="mm",
+              source="The field and the pattern are the run's own solves on the slice through the antenna, mirrored "
+                     "about its axis, since the model is axisymmetric. " + note)
+    if n > 1:
+        s.timeline(freqs, unit="MHz", label="frequency", between="interpolated", kind="input",
+                   design=f0 / 1e6 if f0 else float(freqs[n // 2]))
+    lim = exposure_h(f0 or freqs[0] * 1e6)
+    m = plane(s, xa, xb, za, zb, H if n > 1 else H[0], "magnetic field", "A/m", "inferno",
+              frames=True if n > 1 else None)
     if m is not None:
         m.X = m.X[:, [0, 2, 1]]                  # stand the slice up in the x z plane
-        s.fields[m.fld[0]]["range"] = [-lim, lim]
+        f = s.fields[m.fld[0]]
+        f.update(range=[0.0, lim], limit=lim, limit_label="ICNIRP public limit")
     if wire.get("height_mm"):
         r, h, gap = float(wire.get("radius_mm", 0.5)), float(wire["height_mm"]), float(wire.get("gap_mm", 0))
         arm = (h - gap / 2) / 2
@@ -266,19 +299,31 @@ def build_wave(out: Path, pb: dict, frames: int = 24) -> Path | None:
         if mz:
             s.body("sphere", [max(r, 0.4) * 1.6], pos=[0, 0, 0], color="#2c2f34", name="feed")
     pat = pb.get("pattern") or {}
+    if n == 1 and sw.get("x") and sw.get("s11_dB") and f0:
+        s.readout("S11", [float(np.interp(f0 / 1e6, sw["x"], sw["s11_dB"]))], unit="dB", digits=3, limit=-10)
+    if n > 1 and sw.get("s11_dB"):
+        s.readout("S11", sw["s11_dB"], unit="dB", digits=3, limit=-10)
+        gam2 = 10 ** (np.asarray(sw["s11_dB"], float) / 10)
+        s.readout("power taken in", 100 * (1 - gam2), unit="%", digits=3)
     if pat.get("theta_deg") and pat.get("gain_dBi"):
         th = np.radians(np.asarray(pat["theta_deg"], float))
-        lin = 10 ** (np.maximum(np.asarray(pat["gain_dBi"], float), -30) / 10)
+        gains = np.asarray(pats, float) if pats and len(pats) == n else np.tile(pat["gain_dBi"], (n, 1))
+        lin = 10 ** (np.maximum(gains, -30) / 10)
         rad = lin / lin.max() * min(xb, zb) * 0.55
-        X, T = lathe(np.c_[rad * np.sin(th), rad * np.cos(th)], seg=36)
-        s.mesh(X, T, name="gain pattern", color="#ffd400", opacity=0.22)
-        s.readout("peak gain", np.full(frames, float(np.max(pat["gain_dBi"]))), unit="dBi", digits=3)
-    sw = pb.get("sweep") or {}
-    if sw.get("x") and sw.get("s11_dB") and f_hz:
-        s11 = float(np.interp(f_hz / 1e6, sw["x"], sw["s11_dB"]))
-        s.readout("S11", np.full(frames, s11), unit="dB", digits=3, limit=-10)
-        s.readout("frequency", np.full(frames, f_hz / 1e6), unit="MHz", digits=4)
+        shapes = [lathe(np.c_[r_ * np.sin(th), r_ * np.cos(th)], seg=36) for r_ in rad]
+        mesh_ = s.mesh(shapes[0][0], shapes[0][1], name="gain pattern", color="#ffd400", opacity=0.22)
+        if n > 1 and pats:
+            i0 = int(np.argmin(np.abs(freqs - f0 / 1e6))) if f0 else 0
+            mesh_.X = shapes[i0][0]
+            mesh_.deform(np.stack([X - shapes[i0][0] for X, _ in shapes]))
+        s.readout("peak gain", gains.max(axis=1) if n > 1 else [float(gains.max())], unit="dBi", digits=3)
+    if n > 1 and sw.get("r_ohm") and sw.get("x_ohm"):
+        s.readout("resistance", sw["r_ohm"], unit="ohm", digits=3)
+        s.readout("reactance", sw["x_ohm"], unit="ohm", digits=3)
+    res = (o.get("values") or {}).get("resonance_Hz")
+    if n > 1 and res:
+        s.event(res / 1e6, "resonance", "the reactance crosses zero")
     verdict(s, o)
     span = max(xb - xa, zb - za)
-    s.camera(target=[0, 0, 0], direction=(0.3, -1.0, 0.6), distance=span * 1.45)
+    s.camera(target=[0, 0, 0], direction=(0.3, -1.0, 0.6), distance=span * 1.05)
     return s.save(out)

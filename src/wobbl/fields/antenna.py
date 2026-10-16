@@ -186,7 +186,7 @@ def run_antenna(template: str, params: dict, out_dir: str | Path, question: str 
     sweep = []
     for i, f in enumerate(s.freqs):
         log("solve", f"{fmt(f / 1e6)} MHz ({i + 1} of {len(s.freqs)})")
-        sweep.append(_solve_f(msh, s, f, work, f"f{i}"))
+        sweep.append(_solve_f(msh, s, f, work, f"f{i}", current=True))
     Z = [mult * r["Z"] for r in sweep]
     cross = _crossing(s.freqs, Z)
     f_eval = cross[0] if cross else s.f0
@@ -317,44 +317,79 @@ def run_antenna(template: str, params: dict, out_dir: str | Path, question: str 
                                      ["pattern", "Elevation pattern"], ["range", "Received power over distance"]]},
                        images, fixes, solver=f"GetDP {solve.getdp().version()} with gmsh",
                        t_total=time.time() - t_start)
-    _wire_playback(s, dip, base, Z, s11, th, gain_db, lk if link_vals else None, out)
+    _wire_playback(s, dip, base, Z, s11, th, gain_db, lk if link_vals else None, out, sweep)
     if not keep:
         shutil.rmtree(work, ignore_errors=True)
     return o.write(out, sections)
 
 
-def _wire_playback(s: WireSpec, dip: bool, base: dict, Z, s11, th, gain_db, lk, out: Path) -> str:
-    """The field around the wire at the working frequency as a complex phasor on the r-z plane, so a viewer can
-    play the radiated wave as Re(H e^(j w t)), with the pattern, the sweep and the range."""
+def _sweep_gain(s: WireSpec, dip: bool, r: dict, f: float, z: complex) -> np.ndarray:
+    """The elevation gain in dBi of one sweep point, from the current the solve put along the wire and the copper
+    loss at that frequency."""
+    th, U, P = pattern(r["z"], r["Iz"], f, s.g, r["I"])
+    rs = math.sqrt(2 * math.pi * f * MU0 / (2 * SIGMA_CU))
+    r_loss = (2.0 if dip else 1.0) * (s.h / (2 * math.pi * s.a)) * rs * 0.5
+    eff = z.real / max(z.real + r_loss, 1e-30)
+    g = 10 * np.log10(np.maximum(4 * math.pi * U / max(P, 1e-30) * (2.0 if not dip else 1.0) * eff, 1e-6))
+    return np.where(th <= math.pi / 2, g, -60) if not dip else g
+
+
+def _wire_playback(s: WireSpec, dip: bool, base: dict, Z, s11, th, gain_db, lk, out: Path, sweep=None) -> str:
+    """The field around the wire at every frequency of the sweep, as the amplitude of the azimuthal magnetic field
+    on the r-z plane when a 50 ohm radio of the link's power drives it, with the gain pattern at each frequency, so a
+    viewer can show what the antenna does at whatever frequency is picked. Without the sweep's fields it keeps the
+    working frequency's phasor."""
     from . import playback as pb
 
     lam = C0 / s.f0
     msh = base["mesh"]
     w = min(msh.X[:, 0].max(), max(1.25 * lam, 1.4 * s.h))
     win = (0.0, w, 0.0, w)
-    n = 72
-    re = pb.grid(msh.X, msh.tris, win, (n, n), node_vals=base["h"].real)
-    im = pb.grid(msh.X, msh.tris, win, (n, n), node_vals=base["h"].imag)
-    m = float(np.nanpercentile(np.abs(np.concatenate([re.ravel(), im.ravel()])), 98))
     keep = np.arange(0, len(th), max(1, len(th) // 90))
     data = {"antenna": "dipole" if dip else "monopole", "frequency_Hz": s.f0,
             "wire": {"radius_mm": round(s.a * 1e3, 4), "height_mm": round(s.h * 1e3, 4),
                      "gap_mm": round(s.g * 1e3, 4), "mirror_z": dip},
-            "grid": {"x0": 0.0, "x1": round(w * 1e3, 3), "y0": 0.0, "y1": round(w * 1e3, 3), "nx": n, "ny": n,
-                     "mirror": True},
-            "h_re": pb.pack(re, -m, m), "h_im": pb.pack(im, -m, m),
             "pattern": {"theta_deg": [round(float(np.degrees(t)), 2) for t in th[keep]],
                         "gain_dBi": [round(float(g), 3) for g in gain_db[keep]]},
             "sweep": pb.series(np.array(s.freqs) / 1e6, {"s11_dB": s11, "r_ohm": [z.real for z in Z],
                                                          "x_ohm": [z.imag for z in Z]})}
-    manifest = {"h_re, h_im": "real and imaginary parts of the azimuthal magnetic field phasor on the grid, A/m for "
-                              "1 V at the feed, packed on one range clipped at the 98th percentile (the field "
-                              "grows without bound at the wire); play Re(H e^(j w t)) = h_re cos(w t) - h_im sin(w t)",
-                "grid": "r from x0 to x1 and z from y0 to y1 in mm; mirror about the axis, and for a dipole about "
+    manifest = {"grid": "r from x0 to x1 and z from y0 to y1 in mm; mirror about the axis, and for a dipole about "
                         "z = 0 too (wire.mirror_z)",
                 "wire": "the wire's radius and height above z = 0 (half the dipole) and the feed gap, mm",
-                "pattern": "gain in dBi against the angle from the wire's axis, degrees",
+                "pattern": "gain in dBi against the angle from the wire's axis, degrees, at the working frequency",
                 "sweep": "x is frequency in MHz, with S11 in dB and the input resistance and reactance in ohm"}
+    mult = 2.0 if dip else 1.0
+    if sweep and all("h" in r for r in sweep):
+        n = 60
+        p_av = 10 ** (value(s.link, "tx_power", 20.0, "dbm") / 10) * 1e-3 if s.link.get("tx_power") else 0.1
+        vs = math.sqrt(8 * s.z0 * p_av)                  # the open circuit volts of a 50 ohm source of that power
+        amps = []
+        for r, z in zip(sweep, Z):
+            v_half = vs * z / (z + s.z0) / mult         # the volts across the half model's gap
+            h = r["h"] * v_half
+            amps.append(pb.grid(r["mesh"].X, r["mesh"].tris, win, (n, n), node_vals=np.abs(h)) / math.sqrt(2))
+        amps = np.asarray(amps)
+        top = float(np.nanpercentile(amps, 98))
+        data.update({"tx_power_W": p_av, "grid": {"x0": 0.0, "x1": round(w * 1e3, 3), "y0": 0.0,
+                                                  "y1": round(w * 1e3, 3), "nx": n, "ny": n, "mirror": True},
+                     "h_rms": [pb.pack(a, 0.0, top) for a in amps],
+                     "patterns": [[round(float(g), 2) for g in _sweep_gain(s, dip, r, f, z)[keep]]
+                                  for r, f, z in zip(sweep, s.freqs, Z)]})
+        manifest.update({"h_rms": "for each sweep frequency, the rms azimuthal magnetic field on the grid, A/m, when "
+                                  "a 50 ohm source of tx_power_W available power drives the antenna, all packed on "
+                                  "one range clipped at the 98th percentile (the field grows without bound at the "
+                                  "wire)",
+                         "patterns": "for each sweep frequency, the gain in dBi at pattern.theta_deg"})
+    else:
+        n = 72
+        re = pb.grid(msh.X, msh.tris, win, (n, n), node_vals=base["h"].real)
+        im = pb.grid(msh.X, msh.tris, win, (n, n), node_vals=base["h"].imag)
+        m = float(np.nanpercentile(np.abs(np.concatenate([re.ravel(), im.ravel()])), 98))
+        data.update({"grid": {"x0": 0.0, "x1": round(w * 1e3, 3), "y0": 0.0, "y1": round(w * 1e3, 3), "nx": n,
+                              "ny": n, "mirror": True},
+                     "h_re": pb.pack(re, -m, m), "h_im": pb.pack(im, -m, m)})
+        manifest["h_re, h_im"] = ("real and imaginary parts of the azimuthal magnetic field phasor on the grid, A/m "
+                                  "for 1 V at the feed, packed on one range clipped at the 98th percentile")
     if lk:
         data["range"] = _range_playback(lk)
         manifest.update(RANGE_MANIFEST)

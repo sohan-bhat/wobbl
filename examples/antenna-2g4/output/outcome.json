@@ -236,7 +236,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 32.105684,
+ "t_total": 134.444093,
  "solver": "GetDP 3.5.0 with gmsh",
  "criteria": []
 }

@@ -56,7 +56,7 @@ def build_scene(out_dir: str | Path):
     if kind in ("molding", "casting", "printing", "print"):
         from . import process
         return process.build(out, pb)
-    if "grid" in pb and "h_re" in pb:
+    if "grid" in pb and ("h_re" in pb or "h_rms" in pb):
         from . import grids
         return grids.build_wave(out, pb)
     if "grid" in pb:
