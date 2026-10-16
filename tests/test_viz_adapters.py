@@ -494,6 +494,10 @@ def test_flame_on_a_burner_for_any_fuel(tmp_path):
     assert {"flame temperature", "CO", "NO"} <= {r["name"] for r in h["readouts"]}
     gas = next(o for o in h["objects"] if o.get("name") == "burned gas")
     assert "C" in gas["el"] and "N" in gas["el"]
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["design"] == 1.0 and "follow" not in h["camera"]
+    f = next(f for f in h["fields"] if f["name"] == "gas temperature")
+    assert f["limit"] == 1800 and f["limit_label"] and h["readouts"][0]["name"] == "flame temperature"
 
 
 def _species(formula, phase, el):
@@ -501,30 +505,46 @@ def _species(formula, phase, el):
             "positions": [[i * 1.2, 0, 0] for i in range(len(el))], "bonds": []}
 
 
+def _sweep(wet):
+    x = np.linspace(0, 168, 17) if wet else np.linspace(14, 40, 13)
+    if wet:
+        pts = [{"x": g, "gas_L": 24.5 * min(g / 84, 1), "heat_kJ": -31 * min(g / 84, 1), "T_K": 298 - 6 * min(g / 84, 1),
+                "left_g": max(g - 84, 0)} for g in x]
+        return {"input": {"what": "added", "name": "baking soda added", "unit": "g", "design": 84.0,
+                          "solution_g": 1200.0}, "limit": {"T_K": 373.15, "label": "water boils"}, "points": pts}
+    pts = [{"x": v, "heat_kJ": 850 * min(v / 25, 1), "T_K": 3000 - 20 * abs(v - 25), "charge_g": 200 + v,
+            "heat_kJ_per_kg": 3900, "left": {"Al": max(v - 25, 0)} if v > 25 else {"Fe2O3": 25 - v}} for v in x]
+    return {"input": {"what": "mixture", "name": "aluminum share of the charge", "unit": "% by mass", "design": 25.0},
+            "limit": {"T_K": 3139.0, "label": "Fe boils"}, "points": pts}
+
+
 @pytest.mark.parametrize("wet", [True, False])
-def test_reaction_runs_in_its_vessel(tmp_path, wet):
+def test_reaction_is_driven_by_its_input(tmp_path, wet):
     from wobbl.chem.scene import write
     if wet:
         re = [_species("HCl", "aq", "HCl"), _species("CaCO3", "s", ["Ca", "C", "O", "O", "O"])]
         pr = [_species("CO2", "g", ["C", "O", "O"]), _species("H2O", "l", ["H", "H", "O"])]
-        extra = {"gas_L": 24.0, "adiabatic": {"rise_K": 3.0}}
     else:
-        re = [_species("Mg", "s", ["Mg"]), _species("CuO", "s", ["Cu", "O"])]
-        pr = [_species("MgO", "s", ["Mg", "O"]), _species("Cu", "s", ["Cu"])]
-        extra = {"gas_L": 0.0, "adiabatic": {"T_K": 2600.0, "rise_K": 2300.0}}
+        re = [_species("Al", "s", ["Al"]), _species("Fe2O3", "s", ["Fe", "Fe", "O", "O", "O"])]
+        pr = [_species("Al2O3", "s", ["Al", "Al", "O", "O", "O"]), _species("Fe", "s", ["Fe"])]
     pb = {"manifest": {"kind": "reaction"}, "equation": "a -> b", "reactants": re, "products": pr,
           "energies": {"dH_kJ": -300.0}, "conditions": {"T_K": 298.15}, "equilibrium_extent": 1.0,
-          "frames": [{"T_K": 300, "dG_kJ": -1, "log10K": 1}], **extra}
+          "frames": [{"T_K": 300, "dG_kJ": -1, "log10K": 1}], "sweep": _sweep(wet)}
     (tmp_path / "playback.json").write_text(json.dumps(pb))
     outcome(tmp_path, "chemistry")
     assert write(tmp_path)
     h, _ = load(tmp_path / "scene.wobbl")
     names = _names(h)
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["design"] == pb["sweep"]["input"]["design"] and tl["frames"] >= 13
     if wet:
-        assert {"beaker", "solution", "CO2 bubbles"} <= names
+        assert {"beaker", "solution", "CO2 gathered at 1 atm"} <= names
+        assert h["readouts"][0]["name"] == "CO2 given off" and h["readouts"][0]["values"][-1] == 24.5
     else:
-        assert {"crucible", "charge", "reaction front", "sparks"} <= names
-    assert h["timeline"]["unit"] == "%" and h["timeline"]["frames"] > 30
+        assert {"crucible", "burned charge"} <= names and h["readouts"][0]["name"] == "heat released"
+        assert "sparks" not in names and "reaction front" not in names
+    assert all("limit" in f and f["limit_label"] for f in h["fields"])
+    assert "follow" not in h["camera"] and h["camera"]["presets"]
 
 
 def test_fatigue_sweeps_the_duty_load_on_its_strength_scene(tmp_path):
@@ -552,3 +572,67 @@ def test_fatigue_sweeps_the_duty_load_on_its_strength_scene(tmp_path):
     tl, fld, ro = h["timeline"], h["fields"][0], h["readouts"]
     assert tl["kind"] == "input" and tl["design"] == 100.0 and fld["limit"] == 1.0 and fld["target"] == 0.5
     assert ro[0]["name"] == "damage" and ro[0]["values"][tl["t"].index(100.0)] == pytest.approx(0.5, rel=0.02)
+
+
+
+@pytest.mark.skipif(not __import__("wobbl.chem.install", fromlist=["x"]).available(), reason="Cantera not installed")
+def test_reaction_sweeps_solve_each_input():
+    from wobbl.chem import react, sweep
+    from wobbl.chem.resolve import resolve
+    q = resolve("baking soda and vinegar")
+    react._phases(q, 298.15)
+    th = react.thermo(q, 298.15)
+    v = {"dH_kJ": th["dH"] / 1000, "gas_L": 24.47, "adiabatic": react._aqueous_rise(q, th, 298.15)}
+    sw = sweep.reaction(q, v, 298.15, 101325.0)
+    gas = [p["gas_L"] for p in sw["points"]]
+    assert sw["input"]["unit"] == "g" and abs(sw["input"]["design"] - 84.0) < 0.1
+    assert gas[0] == 0 and gas[-1] == gas[len(gas) // 2] == 24.47 and sw["points"][-1]["left_g"] > 80
+    q = resolve("thermite")
+    react._phases(q, 298.15)
+    th = react.thermo(q, 298.15)
+    v = {"dH_kJ": th["dH"] / 1000, "adiabatic": {"kind": "complete"}}
+    sw = sweep.reaction(q, v, 298.15, 101325.0)
+    T = {p["ratio"]: p["T_K"] for p in sw["points"]}
+    assert sw["limit"]["label"] == "Fe boils" and abs(sw["limit"]["T_K"] - 3139) < 3
+    assert T[1.0] == max(T.values()) and T[0.5] < T[1.0] - 500 and T[2.0] < T[1.0]
+
+
+def test_molecule_steps_through_its_modes_by_hand(tmp_path):
+    from wobbl.chem.scene import write
+    pos = [[0, 0, 0], [1.16, 0, 0], [-1.16, 0, 0]]
+    vib = [{"kind": "vibration", "name": f"{f} cm-1", "frequency_cm": f, "intensity_km_mol": i,
+            "vector": [[0, 0, 0], [0.25, 0, 0], [-0.25 * s, 0, 0]], "frames": [pos] * 16}
+           for f, i, s in ((667, 50, 1), (1388, 0, 1), (2349, 600, -1))]
+    pb = {"manifest": {"kind": "molecule"}, "molecule": {"name": "co2", "formula": "CO2"},
+          "atoms": [{"element": e} for e in "COO"], "positions": pos, "bonds": [[0, 1, 2], [0, 2, 2]],
+          "animations": vib, "charges": [0.6, -0.3, -0.3], "properties": {"dipole_D": 0.0}}
+    (tmp_path / "playback.json").write_text(json.dumps(pb))
+    outcome(tmp_path, "chemistry")
+    assert write(tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    tl = h["timeline"]
+    assert tl["kind"] == "input" and tl["frames"] == 27 and abs(tl["design"] - 3.4) < 1e-6
+    f = next(f for f in h["fields"] if f["name"] == "partial charge")
+    assert f["limit"] == 0.5 and f["limit_label"]
+    assert h["readouts"][0]["name"] == "frequency" and {"co2", "bonds"} <= _names(h)
+
+
+def test_crystal_strains_by_hand(tmp_path):
+    from wobbl.chem.scene import write
+    x = np.linspace(-5, 5, 11)
+    cells = [np.eye(3) * 3.6 * (1 + e / 100) for e in x]
+    base = np.array([[0, 0, 0], [0, 0.5, 0.5], [0.5, 0, 0.5], [0.5, 0.5, 0]])
+    eos = {"kind": "equation of state", "energies_eV_per_atom": list(0.005 * x ** 2), "volumes_A3": [3.6 ** 3] * 11,
+           "cells": [c.tolist() for c in cells], "frames": [(base @ c).tolist() for c in cells],
+           "strain_pct": list(x), "pressure_GPa": list(-5 * x), "bulk_GPa": list(133 - 10 * x)}
+    pb = {"manifest": {"kind": "crystal"}, "crystal": {"name": "copper"}, "cell": cells[5].tolist(),
+          "atoms": [{"element": "Cu"}] * 4, "positions": (base @ cells[5]).tolist(), "animations": [eos],
+          "properties": {"lattice_A": 3.6, "fusion_eV_atom": 0.136}}
+    (tmp_path / "playback.json").write_text(json.dumps(pb))
+    outcome(tmp_path, "chemistry")
+    assert write(tmp_path)
+    h, _ = load(tmp_path / "scene.wobbl")
+    assert h["timeline"]["kind"] == "input" and h["timeline"]["design"] == 0.0
+    assert h["readouts"][0]["name"] == "bulk modulus" and h["readouts"][0]["values"][5] == 133
+    f = next(f for f in h["fields"] if f["name"] == "strain energy")
+    assert f["limit"] == 0.136 and {"copper", "unit cell"} <= _names(h)
