@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import platform
 import sys
+from dataclasses import dataclass
 
 import click
 
@@ -103,91 +104,64 @@ def uninstall(everything, agents):
                      "'uv tool uninstall wobbl'.")
 
 
+def doctor_probes() -> list:
+    """Every check doctor runs in a child process, in the order it lists them."""
+    from ..setup import installer
+    from ..setup.probe import Probe
+    P = "wobbl.setup.probe"
+    probes = [Probe("gmsh", f"{P}:gmsh_version", timeout=45), Probe("rendering", f"{P}:rendering", timeout=90)]
+    probes += [Probe(name, f"{P}:recipe", (name,), timeout=90) for name in installer.RECIPES]
+    probes.append(Probe("motion", f"{P}:motion", timeout=45))
+    return probes
+
+
+@dataclass
+class _Row:
+    name: str
+    ok: bool | None
+    detail: str
+    pending: str = "on demand"
+    timed_out: bool = False
+
+
 @click.command()
 @click.option("--json", "as_json", is_flag=True)
 def doctor(as_json):
     """Check that every piece Wobbl needs is installed and working."""
     import json
 
-    rows, data = [], {}
-
-    def add(name, ok, detail, key=None):
-        rows.append((name, ok, detail))
-        data[key or name] = {"ok": ok, "detail": detail}
-
-    add("wobbl", True, f"{__version__} on Python {platform.python_version()} ({sys.executable})")
-    try:
-        import gmsh
-        add("gmsh", True, gmsh.__version__)
-    except Exception as e:  # noqa: BLE001
-        add("gmsh", False, f"not importable: {e}")
-    add("rendering", *_render_test())
-    from ..setup import installer
-    from ..solvers import base
-    mm = installer.micromamba_path()
-    add("micromamba", mm.exists(), str(mm) if mm.exists() else "not installed (run wobbl setup)")
-    st = installer.verify(lambda m: None)
-    for name, recipe in installer.RECIPES.items():
-        info = st["solvers"].get(name)
-        if info:
-            add(name, info["works"], f"{info['version']} at {info['path']}" + (f" ({info['error']})" if
-                                                                             info["error"] else ""))
-        elif recipe.core:
-            add(name, False, st["unavailable"].get(name, "not installed; run 'wobbl setup'"))
-        else:
-            add(name, None, f"installs the first time you run a {recipe.domains[0]} study")
-    from ..motion.tools import footprint
-    fp = footprint()
-    add("motion", True, f"scipy {fp['scipy']}, built in, nothing to download ({fp['code_bytes'] / 1000:.0f} kB of "
-                        "code)")
-    for a in base.adapters():
-        if a.name in ("Elmer",):
-            add(a.name, None, a.install_hint)
     from ..setup import agents as ag
-    for name, s in ag.status().items():
-        ok = s["mcp"] and s["skill"]
-        add(f"agent {name}", ok if (s["mcp"] or s["skill"]) else None,
-            ("MCP and skill installed" if ok else f"MCP {'yes' if s['mcp'] else 'no'}, skill "
-                                                  f"{'yes' if s['skill'] else 'no'}"))
+    from ..setup import installer
+    from ..setup import probe
+    from ..solvers import base
+
+    if not as_json:
+        ui.console.print()
+    rows = [_Row("wobbl", True, f"{__version__} on Python {platform.python_version()} ({sys.executable})")]
+    mm = installer.micromamba_path()
+    rows.append(_Row("micromamba", mm.exists(), str(mm) if mm.exists() else "not installed (run wobbl setup)"))
+    probes = doctor_probes()
+    pad = max(len(n) for n in ["agent gemini", *(p.name for p in probes), *(r.name for r in rows)])
+    if not as_json:
+        ui.checklist(rows, lambda r: r, pad=pad)
+    results = ui.checklist(probes, probe.run, show=not as_json, pad=pad)
+    rows += [_Row(p.name, r.ok, r.detail, p.pending, r.timed_out) for p, r in zip(probes, results)]
+    tail = [_Row(a.name, None, a.install_hint, "planned") for a in base.adapters() if a.name in ("Elmer",)]
+    for name, st in ag.status().items():
+        ok = st["mcp"] and st["skill"]
+        tail.append(_Row(f"agent {name}", ok if (st["mcp"] or st["skill"]) else None,
+                         "MCP and skill installed" if ok else
+                         f"MCP {'yes' if st['mcp'] else 'no'}, skill {'yes' if st['skill'] else 'no'}", "off"))
+    rows += tail
     if as_json:
-        click.echo(json.dumps(data, indent=1))
+        click.echo(json.dumps({r.name: {"ok": r.ok, "detail": r.detail} for r in rows}, indent=1))
         return
-    from rich.table import Table
-    from rich.text import Text
-
-    tb = Table(box=None, padding=(0, 2), show_header=False)
-    tb.add_column()
-    tb.add_column()
-    tb.add_column()
-    for name, ok, detail in rows:
-        if ok:
-            mark = Text("ok", style="bold green")
-        elif ok is None:
-            mark = Text("off" if name.startswith("agent") else "on demand" if name in installer.RECIPES else
-                        "planned", style="dim")
-        else:
-            mark = Text("missing", style="bold red")
-        tb.add_row(mark, name, Text(detail, style="dim"))
+    ui.checklist(tail, lambda r: r, pad=pad)
     ui.console.print()
-    ui.console.print(tb)
+    slow = [r.name for r in rows if r.timed_out]
+    if slow:
+        ui.say(f"{', '.join(slow)} gave no answer in time. Run wobbl doctor again, since a first run can be slow "
+               "while Python builds its caches, and if it stays stuck run wobbl setup --force.")
+    if not all(r.ok for r in rows if r.ok is not None and not r.name.startswith("agent")):
+        ui.say("Run wobbl setup to install what is missing.", style="bold")
     ui.console.print()
-    if not all(ok for _, ok, _ in rows if ok is not None and not _.startswith("agent")):
-        ui.console.print("  run [bold]wobbl setup[/bold] to install what is missing\n")
-
-
-def _render_test():
-    """Draw a tetrahedron with the renderer the reports use."""
-    try:
-        import tempfile
-        from pathlib import Path
-
-        import numpy as np
-
-        from ..report.render import render_scalar
-        X = np.array([[0.0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])
-        tris = np.array([[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2]])
-        with tempfile.TemporaryDirectory() as tmp:
-            render_scalar(Path(tmp) / "t.png", X, np.array([[0, 1, 2, 3]]), tris, X[:, 0], "x", "mm")
-        return True, "heatmaps draw with numpy and matplotlib, no OpenGL needed"
-    except Exception as e:  # noqa: BLE001
-        return False, f"heatmaps cannot be drawn ({str(e)[:60]})"
