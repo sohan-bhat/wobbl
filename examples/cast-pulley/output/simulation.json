@@ -45,8 +45,8 @@
    "verdict": "marginal",
    "headline": "Freezes sound in 2.2 min, fed throughout by the risers, which freeze at 2.24 min, with at most 0.466% Niyama porosity.",
    "confidence": "medium",
-   "result_dir": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a4f2acd6793533012/examples/cast-pulley/output",
-   "report": "/Users/sohanb/code/wobbl/.claude/worktrees/agent-a4f2acd6793533012/examples/cast-pulley/output/report.html",
+   "result_dir": "output",
+   "report": "output/report.html",
    "assumptions": [
     {
      "assumed": "no riser given, so Wobbl places risers over the hot spots by the modulus rule and checks them",

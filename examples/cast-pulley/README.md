@@ -21,4 +21,8 @@ places one over the hot spot by the modulus rule and checks it.
 The riser's modulus is 1.5 times the casting's, yet it freezes only just after the casting because it sits on the hub
 and feeds it heat. A wider riser or a chill under the hub would widen the margin.
 
-Open `output/simulation.html` to watch the freezing front move through the metal and the sand, played from `output/scene.wobbl`.
+Open `output/simulation.html` for the casting cut open through its last spot to freeze, with a slider over the
+riser's diameter from 12.5 to 40 mm that opens at the 25 mm Wobbl placed. The riser's freezing time scales with the
+square of its size by Chvorinov's rule, against the casting's own solved times. The view reads MARGINAL at 25 mm,
+FAILS below about 24.8 mm where the riser freezes before the hub, and the worst porosity climbs from the solve's
+0.466% to 4.3% at 12.5 mm as the hub shrinks with nothing left to feed it.
