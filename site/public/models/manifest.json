@@ -1,6 +1,16 @@
 {
 "version": 1,
 "examples": {
+  "rocket-launch": {
+    "replace": [
+      {"object": "rocket", "file": "rocket-launch/airframe.glb"},
+      {"object": "nose", "file": "rocket-launch/nose-cone.glb"},
+      {"object": "nozzle", "file": "rocket-launch/motor-tail.glb"},
+      {"object": "fins", "file": "rocket-launch/fins.glb"},
+      {"object": "launch pad", "file": "rocket-launch/launch-pad.glb"},
+      {"object": "launch rail", "file": "rocket-launch/rail.glb"}
+    ]
+  },
   "wiper-linkage": {
     "replace": [
       {"object": "crank", "file": "wiper-linkage/crank.glb", "tint": ["paint"], "anchors": {"hub": [0, 0, 0.04], "pin": [0, 0, -0.04]}},
