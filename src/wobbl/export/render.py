@@ -205,7 +205,7 @@ def _layer(cam: Camera, surfaces: list[Surface], grounds: list[Surface], w: int,
         img[many] = samples.mean(1)
     if prop.any():   # props, which only set the scene, carry the viewer's faint diagonal stripes
         on = np.nonzero(prop)[0]
-        img[on] *= np.where((jj[on] + ii[on]) % 12 < 6, 0.8, 1.0)[:, None].astype(np.float32)
+        img[on] *= np.where((jj[on] + ii[on]) % 12 < 6, 0.9, 1.0)[:, None].astype(np.float32)
     return img, cover | gcov, np.maximum(zbuf, np.where(cover, 0, gz))
 
 

@@ -77,7 +77,9 @@ def _num(v: float, digits: int = 3) -> str:
     if not math.isfinite(v):
         return "n/a"
     s = f"{v:.{max(digits, 1)}g}"
-    return s if "e" not in s else f"{v:.3g}"
+    if "e" not in s:
+        return s
+    return f"{v:.0f}" if abs(v) >= 1 else f"{v:.2e}"
 
 
 def _short(text: str, limit: int = 74) -> str:
