@@ -161,7 +161,8 @@
   ],
   "trajectory": "trajectory.csv",
   "model_file": "model.xml",
-  "playback": "playback.json"
+  "playback": "playback.json",
+  "sweep": "sweep.json"
  },
  "images": {
   "torque_speed": "images/torque_speed.png",
@@ -223,7 +224,7 @@
  "notes": [],
  "report": "report.html",
  "workdir": ".",
- "t_total": 34.453,
+ "t_total": 91.947,
  "solver": "MuJoCo 3.10.0",
  "criteria": [],
  "events": [
@@ -283,7 +284,7 @@
    "detail": ""
   }
  ],
- "runtime_s": 34.453,
+ "runtime_s": 91.947,
  "model": {
   "bodies": 5,
   "joints": 4,
