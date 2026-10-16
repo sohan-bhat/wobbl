@@ -662,6 +662,8 @@ a.ex-card { padding-bottom: 18px; text-decoration: none; }
 .scene:not(.is-live) { aspect-ratio: 4 / 3; border: 1px solid var(--line); }
 @media (min-width: 720px) { .scene:not(.is-live):not(.scene-card) { aspect-ratio: 16 / 10; } }
 .scene-card:not(.is-live), .scene-card { aspect-ratio: 4 / 3; min-height: 0; border: 0; border-bottom: 1px solid var(--line); overflow: hidden; }
+/* a live card is its part and its slider */
+.scene-card.is-live { aspect-ratio: auto; overflow: visible; }
 .scene-host { display: block; }
 .scene.is-live .scene-wait, .scene.is-live .scene-still { display: none; }
 .scene-wait { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 6px; padding: 16px; text-align: center; font: 500 13px/1.4 var(--mono); color: var(--muted); }

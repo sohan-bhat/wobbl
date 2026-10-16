@@ -1,13 +1,13 @@
-// Plays each run's scene.wobbl live in Wobbl's viewer. A scene loads when it comes near the screen and plays
-// while it is on screen. Only a few WebGL views run at once (two on a phone): the rest show a still of
-// their own first frame, and take a live view back when one frees up. A view that scrolls away keeps
+// Shows each run's scene.wobbl in Wobbl's viewer, a model to turn and a slider to drag, never playing on its own.
+// A scene loads when it comes near the screen. Only a few WebGL views run at once (two on a phone): the rest
+// show a still of their own opening view, and take a live view back when one frees up. A view that scrolls away keeps
 // running state and camera until a scene on screen needs its context.
-type View = { pause(): void; play(): void; dispose(): void; frames: number };
+type View = { dispose(): void; frames: number };
 declare global { interface Window { WobblView?: { mount(el: Element, o: Record<string, unknown>): Promise<View | null> } } }
 
 const LIMIT = matchMedia('(max-width: 719px)').matches ? 2 : 5;
-// cards keep only the moving part and the time: the page around them already says the rest
-const QUIET = `.bar,.nt,.ro,.lg,.vd,.ts,.ttl,.tag,.lb{display:none!important}.wv{border:0}.st{aspect-ratio:4/3;min-height:0;max-height:none}`;
+// cards keep only the part and its slider: the page around them already says the rest
+const QUIET = `.bar,.nt,.ro,.lg,.live,.ts,.ttl,.lb,.bd{display:none!important}.wv{border:0}.st{aspect-ratio:4/3;min-height:0;max-height:none}.pc{padding:6px 12px 4px}.ctl label{font-size:13px}.ctl output{font-size:13px}.ctl input[type=range]{margin:0}.pc:has(.trk[hidden]){display:none}`;
 
 interface Slot { el: HTMLElement; host: HTMLElement | null; view: View | null; seen: boolean; busy: boolean; bytes?: Promise<Uint8Array> }
 const slots = new Map<HTMLElement, Slot>();
@@ -34,7 +34,7 @@ function bytes(s: Slot): Promise<Uint8Array> {
   return s.bytes;
 }
 
-async function mount(s: Slot, autoplay: boolean): Promise<View | null> {
+async function mount(s: Slot): Promise<View | null> {
   await loadViewer(s.el.dataset.viewer!);
   const data = await bytes(s);
   const host = document.createElement('div');
@@ -42,7 +42,7 @@ async function mount(s: Slot, autoplay: boolean): Promise<View | null> {
   s.el.querySelector('.scene-host')?.remove();
   s.el.prepend(host);
   s.host = host;
-  const p = window.WobblView!.mount(host, { src: data, autoplay, still: true });
+  const p = window.WobblView!.mount(host, { src: data, still: true });
   if (card(s) && host.shadowRoot) { const st = document.createElement('style'); st.textContent = QUIET; host.shadowRoot.append(st); }
   return p;
 }
@@ -69,7 +69,7 @@ function release(s: Slot) {
 
 const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-/** The first frame as a still, drawn in a view that is let go straight after, one at a time. */
+/** The opening view as a still, drawn in a view that is let go straight after, one at a time. */
 let queue: Promise<void> = Promise.resolve();
 function poster(s: Slot): Promise<void> {
   s.busy = true;
@@ -78,7 +78,7 @@ function poster(s: Slot): Promise<void> {
 }
 async function drawPoster(s: Slot) {
   try {
-    const v = await mount(s, false);
+    const v = await mount(s);
     if (v) { await frame(); s.view = v; release(s); }
   } catch { /* the live attempt later says what went wrong */ }
   s.busy = false;
@@ -89,7 +89,7 @@ async function drawPoster(s: Slot) {
 async function start(s: Slot) {
   s.busy = true;
   try {
-    s.view = await mount(s, true);
+    s.view = await mount(s);
     if (s.view) s.el.classList.add('is-live');
   } catch (e) {
     s.el.classList.add('is-broken');
