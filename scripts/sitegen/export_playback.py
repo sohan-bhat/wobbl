@@ -432,7 +432,10 @@ def main() -> None:
             rel = f"{name}/{out_rel}"
             stem = f"{name}-{out_rel.replace('/', '-')}"
             folder = src / out_rel
-            if argv[1] == "thermal":
+            # a heat run by its command (wobbl thermal) or by what it ran (wobbl simulate --physics heat)
+            done = folder / "outcome.json"
+            domain = json.loads(done.read_text()).get("domain", "") if done.exists() else ""
+            if argv[1] == "thermal" or domain == "thermal":
                 run = heat_run(folder, argv, rel, a.out, stem, a.max_nodes, label)
             else:
                 # a fix is bent as much as the part it fixes, so the two compare
