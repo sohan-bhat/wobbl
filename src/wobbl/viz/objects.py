@@ -255,10 +255,15 @@ class Body(_Obj):
         self.glow = np.asarray(level, float)
         return self
 
-    def track(self, *, pos=None, quat=None, size=None, glow=None, when=None) -> "Body":
+    def track(self, *, pos=None, quat=None, size=None, glow=None, field=None, when=None) -> "Body":
         """What the body does over the scene's motion: a pose, its size (frames x the size's numbers, as a flame
-        that grows with thrust) and its glow, each with the motion's frames first."""
+        that grows with thrust), its glow and the one value it is colored by (color_by() first, as a motor's
+        torque against its limit at each moment), each with the motion's frames first."""
         t = self._track()
+        if field is not None:
+            if not self.fld:
+                raise ValueError(f"body {self.name!r}: color_by() first, so the track's value has its scale")
+            t.value = (self.fld[0], t.check(field, "field").ravel())
         if pos is not None:
             t.pos = t.check(pos, "pos").reshape(-1, 3)
             t.quat = t.check(np.tile(self.quat if self.quat.ndim == 1 else self.quat[0], (len(t.pos), 1))
@@ -346,6 +351,13 @@ class Lines(_Obj):
         self.times, self.at, self.flow, self.spacing, self.fade = times, at, flow, spacing, fade
         self.speed = self.scale = None
         self.offset = 0.0
+        self.through = False
+
+    def inside(self) -> "Lines":
+        """The lines run inside a solid (a coolant's channel through a cold plate), so a view draws what moves along
+        them over the solid that hides them, as a section would show it."""
+        self.through = True
+        return self
 
     def moving(self, speed, *, scale=None, base: float = 0.0) -> "Lines":
         """The fluid's own speed at every point of every line (a list of arrays like the paths, in scene units
@@ -382,6 +394,8 @@ class Lines(_Obj):
                 d["field"].update(scale=_fl(self.frames(self.scale, keep), 6), base=_f(self.offset))
         if self.speed is not None:
             d["speed"] = enc.floats(np.concatenate(self.speed))
+        if self.through:
+            d["inside"] = True
         if getattr(self, "trk", None) is not None:
             d["track"] = self.trk.encode(enc)
         if self.times is not None:

@@ -98,3 +98,20 @@ def test_readout_target_marks_marginal_with_or_without_a_limit():
     assert ro["stress"]["limit"] == 40.0 and ro["stress"]["target"] == 15.0
     assert ro["mass flux"]["target"] == 1.5 and "limit" not in ro["mass flux"]
     assert "target" not in ro["plain"]
+
+
+def test_a_motion_carries_its_own_readouts_a_body_value_and_a_fluid_inside():
+    s = Scene("check", domain="test")
+    s.timeline([1.0, 2.0], unit="N", label="load", kind="input", design=2.0)
+    s.motion([0.0, 0.5, 1.0], [0.0, 1.0, 2.0])
+    b = s.body("box", [1, 1, 1], pos=[0, 0, 0])
+    b.color_by("share", [0.2, 0.4], unit="%", range=(0, 1))
+    b.track(pos=np.zeros((3, 3)), field=[0.1, 0.5, 0.9])
+    s.lines([np.array([[0, 0, 0], [1, 0, 0]], float)], name="coolant").inside()
+    s.motion_readout("altitude", [0.0, 5.0, np.nan], unit="m")
+    with pytest.raises(ValueError):
+        s.motion_readout("speed", [1.0, 2.0])
+    h, _ = load(s.to_bytes())
+    assert h["motion"]["readouts"] == [{"name": "altitude", "unit": "m", "digits": 3, "values": [0.0, 5.0, None]}]
+    assert h["objects"][0]["track"]["value"] == {"f": 0, "values": [0.1, 0.5, 0.9]}
+    assert h["objects"][1]["inside"] is True

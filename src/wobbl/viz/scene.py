@@ -238,6 +238,19 @@ class Scene:
                 return self
         raise ValueError(f"no readout named {name!r}")
 
+    def motion_readout(self, name: str, values, *, unit: str = "", digits: int = 3) -> "Scene":
+        """A number at every motion frame that only the motion has, such as a rocket's altitude at each moment of
+        its flight. A view says these beside the motion while it plays, in place of the readings along the input,
+        which come back once it has played. NaN where it has no value."""
+        mv = np.asarray(values, float).ravel()
+        if not self.mo_n:
+            raise ValueError("call scene.motion(t, play) before giving it a readout")
+        if len(mv) != self.mo_n:
+            raise ValueError(f"motion readout {name!r}: {len(mv)} values for {self.mo_n} motion frames")
+        self.mo.setdefault("readouts", []).append({"name": name, "unit": unit, "digits": int(digits),
+                                                   "values": _fl(mv, 5)})
+        return self
+
     def event(self, t: float, name: str, detail: str = "", kind: str = "info") -> "Scene":
         """Something that happens at a time: burnout, first yield, impact. kind fail marks a failure."""
         self.events.append({"t": _f(t), "name": name, "detail": detail, "kind": kind})

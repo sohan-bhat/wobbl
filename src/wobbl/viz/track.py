@@ -8,6 +8,7 @@ real time and the millisecond of its impact slowed thousands of times), and per 
     s.motion(t, play, label="time", unit="s")                 # M frames of physical time and their playback seconds
     part.track(pos=P, quat=Q, field=S, deform=U)              # each M first: rigid pose, color field, elastic shape
     flame.track(pos=P, quat=Q, size=L, glow=g)                # a body grows and glows with thrust
+    motor.track(pos=P, quat=Q, field=v)                       # a body colored by one value at each moment
     path.track(drawn=tau)                                     # a line traces itself by motion time
     s.readout("peak stress", per_input, motion=per_motion_frame)
 
@@ -63,7 +64,7 @@ class Track:
 
     def __init__(self, obj):
         self.obj = obj
-        self.pos = self.quat = self.field = self.deform = self.glow = self.size = self.drawn = None
+        self.pos = self.quat = self.field = self.deform = self.glow = self.size = self.drawn = self.value = None
         self.when = None
 
     def check(self, a, name: str, inner: int | None = None) -> np.ndarray:
@@ -89,6 +90,9 @@ class Track:
         if self.field is not None:
             f, v = self.field
             d["field"] = {"f": f, **_rank_desc(enc, v, idx, 1)}
+        if self.value is not None:
+            f, v = self.value
+            d["value"] = {"f": f, "values": _fl(v, 5)}
         if self.deform is not None:
             U, ex = self.deform
             d["deform"] = {**_rank_desc(enc, U, idx, 3), "exaggerate": ex}
