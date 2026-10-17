@@ -143,6 +143,13 @@
       {"object": "rock", "file": "falling-rock/rock.glb"}
     ]
   },
+  "fan-heat-sink": {
+    "add": [
+      {"file": "fan-heat-sink/fan.glb"},
+      {"file": "fan-heat-sink/duct.glb"},
+      {"file": "fan-heat-sink/board.glb"}
+    ]
+  },
   "handheld-drop": {
     "add": [
       {"file": "handheld-drop/floor.glb"}
