@@ -187,7 +187,11 @@
   "falling-rock": {
     "replace": [
       {"object": "rock", "file": "falling-rock/rock.glb"}
-    ]
+    ],
+    "add": [
+      {"file": "falling-rock/ground.glb"}
+    ],
+    "hide": ["ground"]
   },
   "fan-heat-sink": {
     "add": [
