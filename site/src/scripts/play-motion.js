@@ -115,7 +115,8 @@ export const flowSlow = (vmax, R) => nice(vmax / (0.3 * R));
 
 /** The words for a factor of real time: shown 200 times slower, in real time, shown 5 times faster. */
 export function rateText(slow) {
-  const k = Math.round(slow >= 1 ? slow : 1 / slow);
+  // two figures past a hundred, as the clock's own rate read between its frames wavers in the last digit
+  const r = slow >= 1 ? slow : 1 / slow, k = r >= 100 ? +r.toPrecision(2) : Math.round(r);
   if (k === 1) return 'in real time';
   return `shown ${k.toLocaleString('en-US')} times ${slow >= 1 ? 'slower' : 'faster'}`;
 }

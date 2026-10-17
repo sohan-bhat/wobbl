@@ -41,7 +41,7 @@
 .lrun-status { z-index: 2; }
 /* A motion's own clock and how much slower than real time it plays, or a fluid's slowing, in the bottom right
    corner, clear of the pane names at the top left and the status and a follow view's inset at the bottom left */
-.lrun-rate { position: absolute; right: 14px; bottom: 14px; z-index: 2; margin: 0; max-width: calc(50% - 20px); text-align: right; font: 500 12px/1.4 var(--mono); letter-spacing: 0.04em; color: var(--muted); pointer-events: none; font-variant-numeric: tabular-nums; }
+.lrun-rate { position: absolute; right: 14px; bottom: 14px; z-index: 2; margin: 0; max-width: calc(100% - 28px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; font: 500 12px/1.4 var(--mono); letter-spacing: 0.04em; color: var(--muted); pointer-events: none; font-variant-numeric: tabular-nums; }
 .lrun-rate[hidden] { display: none; }
 
 /* Which fix plays beside the part */

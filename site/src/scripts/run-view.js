@@ -165,12 +165,15 @@ export function motionView(orbit, rv, rest, run, tau, vw, vh) {
   orbit.update();
   if (!Number.isFinite(tau)) return;
   const { a, b, k } = motionFrame(m, tau), A = m.box[a], B = m.box[b];
-  // what moves, with half its own size around it, so a part far from its rest framing never touches the edge
   const lo = A[0].map((x, i) => x + (B[0][i] - x) * k), hi = A[1].map((x, i) => x + (B[1][i] - x) * k);
-  const pad = 0.5 * Math.hypot(...[0, 1, 2].map((i) => hi[i] - lo[i]));
-  for (let i = 0; i < 3; i++) { lo[i] -= pad; hi[i] += pad; }
   // the rest framing's own box, as the camera frames it (scene-view.js mainOrbit)
   const box = run.subject || run.hold || run.bounds;
+  // what moves, with up to half its own size around it as it leaves the rest framing, so a part far from it never
+  // touches the view's edge, and none once it is back inside, so the camera closes in to its rest framing
+  const size = Math.hypot(...[0, 1, 2].map((i) => hi[i] - lo[i]));
+  const out = Math.max(0, ...[0, 1, 2].map((i) => Math.max(box.lo[i] - lo[i], hi[i] - box.hi[i])));
+  const pad = 0.5 * size * Math.min(1, out / (size || 1));
+  for (let i = 0; i < 3; i++) { lo[i] -= pad; hi[i] += pad; }
   const pts = [...(run.subject && run.points ? run.points : corners(box.lo, box.hi)), ...corners(lo, hi)];
   // only when the moving things leave the rest framing does the camera move
   const ulo = [0, 1, 2].map((i) => Math.min(lo[i], box.lo[i])), uhi = [0, 1, 2].map((i) => Math.max(hi[i], box.hi[i]));
