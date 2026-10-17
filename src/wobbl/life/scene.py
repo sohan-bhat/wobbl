@@ -115,7 +115,28 @@ def speed_sweep(s, X, tris, shapes, freqs, numbers, bands, *, zeta: float, margi
     s.note(f"The motion is drawn as large as the amplification, up to {100 * a * top / span:.2g}% of the part, "
            "because its real size depends on how hard the rotor shakes it. Damping is "
            f"{100 * zeta:.3g}% of critical.")
+    shake(s, part, U, field, fe, freqs, lead, x, design, zeta)
     return part
+
+
+def shake(s, part, U, field, fe, freqs, lead, x, design: float, zeta: float, cycles: int = 4) -> None:
+    """The steady response at the asked input as it happens: the part swinging through the shape it takes there,
+    back and forth at the frequency of the excitation that drives its hardest mode, as large as the slider draws
+    it, over a few cycles slowed to about one a second. The shape is the mode's (a real shape, every point in phase),
+    so the motion is that shape times the cosine of the forcing's phase, starting and ending on the drawn shape."""
+    k = int(np.argmin(np.abs(np.asarray(x, float) - design)))
+    m = int(lead[k])
+    f = float(fe[int(np.argmax(amplification(fe[:, k] / freqs[m], zeta))), k])
+    if not (f > 0):
+        return
+    slow = 10.0 ** round(math.log10(f / 1.0))
+    slow = min((c * slow / 10 for c in (1, 2, 5, 10, 20, 50)), key=lambda c: abs(math.log(c / f)))
+    tau = np.linspace(0.0, cycles / f, cycles * 32 + 1)
+    s.motion(tau, tau * slow, label="time", unit="s",
+             note=f"The part swings in the shape it takes at the asked {s.tl.get('label', 'input')}, at the "
+                  f"{f:.4g} Hz that drives it, slowed so each cycle takes about a second.")
+    c = np.cos(2 * np.pi * f * tau)
+    part.track(deform=c[:, None, None] * U[k][None], field=np.repeat(field[k][None], len(tau), 0))
 
 
 def vibration(out: Path, mesh, modes, picks: list[int], labels: dict, verdict: str, headline: str, title: str,
