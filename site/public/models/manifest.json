@@ -258,6 +258,9 @@
     "replace": [
       {"object": "burner", "file": "propane-flame/burner.glb"},
       {"object": "air inlet", "file": "propane-flame/air-inlet.glb"}
+    ],
+    "add": [
+      {"file": "propane-flame/gas-hose.glb"}
     ]
   },
   "rocket-launch": {
