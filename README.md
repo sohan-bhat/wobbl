@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://sohan-bhat.github.io/wobbl/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="site/assets/logo-dark.svg">
-      <img alt="Wobbl" src="site/assets/logo-light.svg" width="280">
+      <source media="(prefers-color-scheme: dark)" srcset="site/public/assets/logo-dark.svg">
+      <img alt="Wobbl" src="site/public/assets/logo-light.svg" width="280">
     </picture>
   </a>
 </p>
