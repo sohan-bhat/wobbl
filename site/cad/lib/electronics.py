@@ -382,7 +382,6 @@ def led_lead(hh, inward, kink=False):
 
 # ---------------------------------------------------------------- board parts
 
-looks.add('fr4', color=(0.42, 0.40, 0.22), metal=0.0, rough=0.6)
 looks.add('cap_sleeve', color=(0.012, 0.04, 0.13), metal=0.0, rough=0.3)
 looks.add('bung', color=(0.03, 0.03, 0.03), metal=0.0, rough=0.8)
 
@@ -447,32 +446,4 @@ def soic(hx, hy, hz, board_z, n=8, pitch=1.27):
             knee = Pos(x, y0 + side * 0.55, (z0 + board_z) / 2) * Box(w, t, abs(z0 - board_z) + t)
             foot = Pos(x, y0 + side * 0.85, board_z + t / 2) * Box(w, 0.7, t)
             out += [(arm, 'tin'), (knee, 'tin'), (foot, 'tin')]
-    return out
-
-
-def pcb(x0, y0, x1, y1, z0, z1, holes=(), silk=()):
-    """A bare board: an FR4 core between solder mask layers, rounded corners, plated mounting holes with their
-    rings, and silkscreen. silk is a list of ('text', s, x, y, h) and ('rect', x, y, hx, hy) in board coordinates."""
-    cx, cy, w, h, t = (x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0, z1 - z0
-    core = Pos(cx, cy, z0 + t / 2) * Box(w, h, t * 0.94)
-    core = fillet(core.edges().filter_by(Axis.Z), 1.0)
-    top = Pos(cx, cy, z1 - t * 0.03) * Box(w, h, t * 0.06)
-    top = fillet(top.edges().filter_by(Axis.Z), 1.0)
-    bot = Pos(cx, cy, z0 + t * 0.03) * Box(w, h, t * 0.06)
-    bot = fillet(bot.edges().filter_by(Axis.Z), 1.0)
-    drills = [Pos(x, y, (z0 + z1) / 2) * Cylinder(r, t * 3) for x, y, r in holes]
-    if drills:
-        core, top, bot = core - Compound(drills), top - Compound(drills), bot - Compound(drills)
-    out = [(core, 'fr4'), (top, 'solder_mask'), (bot, 'solder_mask')]
-    for x, y, r in holes:
-        ring = Pos(x, y, (z0 + z1) / 2) * (Cylinder(r * 1.7, t + 0.07) - Cylinder(r, t + 1))
-        out.append((ring, 'gold'))
-    for item in silk:
-        if item[0] == 'text':
-            _, s, x, y, hh = item
-            out.append(text(s, hh, x, y, z1, 'silkscreen', lift=0.012))
-        else:
-            _, x, y, hx, hy = item
-            frame = Pos(x, y, z1 + 0.012) * (Box(2 * hx + 0.3, 2 * hy + 0.3, 0.012) - Box(2 * hx, 2 * hy, 0.1))
-            out.append((frame, 'silkscreen'))
     return out
