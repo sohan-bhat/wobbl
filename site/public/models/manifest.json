@@ -267,6 +267,11 @@
       {"object": "actuator 3", "file": "solenoid-actuator/plunger.glb"}
     ]
   },
+  "speaker-box": {
+    "add": [
+      {"file": "speaker-box/cabinet.glb"}
+    ]
+  },
   "steel-hook": {
     "replace": [
       {"object": "bolt", "file": "steel-hook/bolt.glb"},
