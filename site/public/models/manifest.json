@@ -22,11 +22,10 @@
   },
   "cast-motor-mount": {
     "add": [
-      {"file": "cast-motor-mount/plate.glb", "covers": ["plate"]},
-      {"file": "cast-motor-mount/motor.glb", "covers": ["motor"]},
-      {"file": "cast-motor-mount/motor-flange.glb", "covers": ["motor flange"]},
-      {"file": "cast-motor-mount/motor-shaft.glb", "covers": ["motor shaft"]},
-      {"file": "cast-motor-mount/pulley.glb", "covers": ["pulley"]}
+      {"file": "cast-motor-mount/motor.glb", "covers": ["motor", "motor flange", "motor shaft"]},
+      {"file": "cast-motor-mount/pulley.glb", "covers": ["pulley"]},
+      {"file": "cast-motor-mount/bolts.glb"},
+      {"file": "cast-motor-mount/plate.glb", "covers": ["plate"]}
     ]
   },
   "cast-mount-credibility": {
@@ -176,13 +175,18 @@
   },
   "motor-mount": {
     "add": [
-      {"file": "motor-mount/bolt.glb", "covers": ["bolt"]},
-      {"file": "motor-mount/bolt-head.glb", "covers": ["bolt head"]},
-      {"file": "motor-mount/mounting-plate.glb", "covers": ["mounting plate"]},
-      {"file": "motor-mount/motor.glb", "covers": ["motor"]},
-      {"file": "motor-mount/motor-flange.glb", "covers": ["motor flange"]},
-      {"file": "motor-mount/motor-shaft.glb", "covers": ["motor shaft"]},
-      {"file": "motor-mount/pulley.glb", "covers": ["pulley"]}
+      {"file": "motor-mount/motor.glb", "covers": ["motor", "motor flange", "motor shaft"]},
+      {"file": "motor-mount/pulley.glb", "covers": ["pulley"]},
+      {"file": "motor-mount/bolts.glb", "covers": ["bolt", "bolt head"]},
+      {"file": "motor-mount/plate.glb", "covers": ["mounting plate"]}
+    ]
+  },
+  "motor-mount-fatigue": {
+    "add": [
+      {"file": "cast-motor-mount/motor.glb"},
+      {"file": "cast-motor-mount/pulley.glb"},
+      {"file": "cast-motor-mount/bolts.glb"},
+      {"file": "cast-motor-mount/plate.glb"}
     ]
   },
   "pcb-buck-ringing": {
