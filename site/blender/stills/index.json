@@ -8,11 +8,11 @@
   "file": "antenna-pcb-output.webp"
  },
  "baking-soda-vinegar/output": {
-  "key": "cc8f5a5aea2e00ed",
+  "key": "5bf147aaae2e7a26",
   "file": "baking-soda-vinegar-output.webp"
  },
  "battery-pack/output": {
-  "key": "9b6efc3c35f3899e",
+  "key": "4c8a1f1ef76e75ec",
   "file": "battery-pack-output.webp"
  },
  "bolted-flange/output": {
@@ -52,7 +52,7 @@
   "file": "cast-pulley-output.webp"
  },
  "cell-runaway/output": {
-  "key": "b85031b20d2be452",
+  "key": "cf414ce3285df0b1",
   "file": "cell-runaway-output.webp"
  },
  "circuits/buck": {
@@ -76,11 +76,11 @@
   "file": "circuits-opamp-cable.webp"
  },
  "cold-plate/output": {
-  "key": "b7695557781a9ae8",
+  "key": "b5aae3b3590ef854",
   "file": "cold-plate-output.webp"
  },
  "copper-crystal/output": {
-  "key": "f035aebcf33fa169",
+  "key": "08f61e748b7d6c5f",
   "file": "copper-crystal-output.webp"
  },
  "desktop-arm/output": {
@@ -104,7 +104,7 @@
   "file": "falling-rock-output.webp"
  },
  "fan-heat-sink/output": {
-  "key": "eb9f5bfd406828a9",
+  "key": "3e9734977499c7aa",
   "file": "fan-heat-sink-output.webp"
  },
  "handheld-drop/output": {
@@ -112,11 +112,11 @@
   "file": "handheld-drop-output.webp"
  },
  "heat-sink/output": {
-  "key": "1e1e9e4fad815f28",
+  "key": "1c226f2ac9034daa",
   "file": "heat-sink-output.webp"
  },
  "knsb-motor/output": {
-  "key": "a6264871b2adf926",
+  "key": "6a169418487b000d",
   "file": "knsb-motor-output.webp"
  },
  "motor-mount-fatigue/output": {
@@ -140,7 +140,7 @@
   "file": "printed-lid-output.webp"
  },
  "propane-flame/output": {
-  "key": "a82ac73eb9e80098",
+  "key": "7464f6a7792f4b52",
   "file": "propane-flame-output.webp"
  },
  "rocket-launch/output": {
@@ -152,11 +152,11 @@
   "file": "shelf-bracket-output.webp"
  },
  "solenoid-actuator/output": {
-  "key": "bccef2d8fa44ec30",
+  "key": "a009af0a490751f1",
   "file": "solenoid-actuator-output.webp"
  },
  "speaker-box/output": {
-  "key": "2bb5d8ea39b00359",
+  "key": "1c897c9880cd34a2",
   "file": "speaker-box-output.webp"
  },
  "steel-hook/output": {
@@ -168,11 +168,11 @@
   "file": "strut-buckling-output.webp"
  },
  "thermite/output/combustion": {
-  "key": "31800a14d4ca8ca4",
+  "key": "2f0523bdafa36d2b",
   "file": "thermite-output-combustion.webp"
  },
  "thermite/output/reaction": {
-  "key": "53ef5b58155903c5",
+  "key": "71fcc551c1f6f0e9",
   "file": "thermite-output-reaction.webp"
  },
  "wiper-linkage/output": {
