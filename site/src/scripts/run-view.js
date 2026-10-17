@@ -36,6 +36,11 @@ export function runView(kind, lead) {
   const lo = scene ? lead.bounds.lo : lead.mesh.bounds_min, hi = scene ? lead.bounds.hi : lead.mesh.bounds_max;
   const radius = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2;
   const box = corners(lo, hi);
+  if (kind === 'heat' && lead.air) {
+    // a part in still air keeps the first stretch of the plume rising off it in view, up to half its size above it
+    const up = 0.5 * Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+    box.push(...corners([lo[0], lo[1], hi[2]], [hi[0], hi[1], hi[2] + up]));
+  }
   if (kind === 'strength' && lead.arrow) {
     const a = lead.arrow, len = 0.42 * radius * (a.pull ? 1 : -1);
     box.push(a.point, a.point.map((x, i) => x + len * a.dir[i]));
@@ -151,11 +156,21 @@ export function followPoint(run, p, tau = NaN) {
  * The camera over a scene's motion: from where it stands at rest (rest: its target, distance and far plane), backed
  * off and recentred as far as it takes to hold both the rest framing and the box the moving things fill at
  * physical time tau, so a part falling from a height is seen whole with the floor it falls to, and the view closes
- * in to its rest framing as the part comes to it. A follow view (the rocket) is left to its follow. NaN tau puts
- * the camera back at rest.
+ * in to its rest framing as the part comes to it. A follow view (the rocket) keeps its follow and backs off as far
+ * as what it keeps grows past the subject alone, so a parachute opening over the rocket's nose stays in frame.
+ * NaN tau puts the camera back at rest.
  */
 export function motionView(orbit, rv, rest, run, tau, vw, vh) {
   const m = run.motion;
+  if (run.follow && m && m.followK) {
+    orbit.aspect = vw / vh;
+    let k = 1;
+    if (Number.isFinite(tau)) { const { a, b, k: s } = motionFrame(m, tau); k = m.followK[a] + (m.followK[b] - m.followK[a]) * s; }
+    orbit.dist = rest.dist * k;
+    orbit.far = Math.max(rest.far, orbit.dist * 4);
+    orbit.update();
+    return;
+  }
   if (run.follow || !m || !m.box) return;
   orbit.aspect = vw / vh;
   orbit.target = [...rest.target];

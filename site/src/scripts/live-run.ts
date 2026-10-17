@@ -137,6 +137,9 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const rateEl = fig.querySelector<HTMLElement>('.lrun-rate');
   // the fluid's tracers keep moving on the view's own clock while it is on screen (play-flow.js)
   const flowing = data.panes.some((p) => p.run.motion?.flow || p.run.air);
+  // current along wires, which is not a fluid's own speed, runs a few seconds past the replay and rests, as a bench
+  // does (bench.ts), so the view settles on its still
+  const glowsOnly = flowing && data.panes.every((p) => !p.run.motion?.flow?.slow && !p.run.air);
   let flowT = 0;
   // the frame position of an input value, read between the saved frames around it
   const posOf = (ts: number[], v: number) => {
@@ -168,8 +171,10 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       const p = data.panes[pi], r = p.run, rq = r.q, el = rowEls[row], mm = Number.isFinite(mt[row]) && r.motion?.q ? r.motion : null;
       const v = rq ? (mm ? alongMotion(mm, mm.q, mt[row]) : along(r, rq.values, pos[row])) : NaN;
       if (rq) {
+        // a reading the motion has no value for yet (a landing speed before it lands) shows empty
         put(q('[data-n]', el), sig(v, rq.digits));
-        q('[data-fill]', el).style.setProperty('--f', clamp01((v - rq.lo) / (rq.top - rq.lo)).toFixed(4));
+        q('[data-u]', el).hidden = !Number.isFinite(v);
+        q('[data-fill]', el).style.setProperty('--f', Number.isFinite(v) ? clamp01((v - rq.lo) / (rq.top - rq.lo)).toFixed(4) : '0');
       }
       const w = q('[data-word]', el);
       // the run's own verdict at the value it was asked about, else the reading against its limit
@@ -187,7 +192,19 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       }
     });
     const m0 = Number.isFinite(mt[0]) ? r0.motion : null;
-    if (alsoEl) put(alsoEl, r0.also.map((x: any, i: number) => `${i ? x.name : x.name[0].toUpperCase() + x.name.slice(1)} ${withUnit(m0 && m0.also?.[i] ? alongMotion(m0, m0.also[i], mt[0]) : along(r0, x.values, pos[0]), x.unit, x.digits)}`).join(', '));
+    // while the motion plays, what it reads at each moment (a rocket's altitude), else the readings along the input
+    const live = m0 && m0.live?.length && (!end || !r0.also.length) ? m0.live : null;
+    const liveText = (tau: number) => live.map((x: any, i: number) => `${i ? x.name : x.name[0].toUpperCase() + x.name.slice(1)} ${withUnit(alongMotion(m0, x.values, tau), x.unit, x.digits)}`).join(', ');
+    if (alsoEl && live && !alsoEl.style.minHeight) {
+      // the line holds the room its longest reading takes, so the page under it never jumps while the numbers tick
+      const was = alsoEl.textContent;
+      let tall = alsoEl.offsetHeight;
+      for (const tau of m0.t) { alsoEl.textContent = liveText(tau); tall = Math.max(tall, alsoEl.offsetHeight); }
+      alsoEl.textContent = was;
+      if (tall > 0) alsoEl.style.minHeight = `${tall}px`;
+    }
+    if (alsoEl && live) put(alsoEl, liveText(mt[0]));
+    else if (alsoEl) put(alsoEl, r0.also.map((x: any, i: number) => `${i ? x.name : x.name[0].toUpperCase() + x.name.slice(1)} ${withUnit(m0 && m0.also?.[i] ? alongMotion(m0, m0.also[i], mt[0]) : along(r0, x.values, pos[0]), x.unit, x.digits)}`).join(', '));
     if (rateEl) {
       // the motion's own clock and how much slower than real time it plays, or the fluid's slowing
       const fs = r0.motion?.flow?.slow;
@@ -395,7 +412,9 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
           const mv = mark.querySelector('[data-mark-v]');
           if (mv) put(mv, withUnit(A.v + (B.v - A.v) * kk, r.q && r.q.field ? r.q.unit : '', r.q?.digits ?? 3));
         }
-      } else if (sceneRun) {
+      } else if (sceneRun && !(Number.isFinite(mt[row]) && r.motion?.fieldMoves)) {
+        // (a motion that moves what the field colors without a peak of its own leaves the marker hidden, as the
+        // input's peak would stay behind where the part stood)
         const pk = r.peaks;
         if (pk) {
           const { a, b, k: kk } = frameAt(r, pos[row]), A = pk[a], B = pk[b] ?? A;
@@ -495,14 +514,18 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     sayEnd();
     flowLoop();
   }
-  // once a replay is over, a fluid's tracers go on moving while the view is on screen
+  // once a replay is over, a fluid's tracers go on moving while the view is on screen (current along wires a few
+  // seconds more)
   let fraf = 0, flast = 0;
   function flowLoop() {
     if (!flowing || fraf || playing || !ready || !canGo()) return;
     flast = 0;
+    let first = 0;
     const step = (ts: number) => {
       fraf = 0;
       if (playing || !canGo()) return;
+      first ||= ts;
+      if (glowsOnly && ts - first > 3000) return;
       flowT += flast ? Math.min((ts - flast) / 1000, 0.1) : 0;
       flast = ts;
       if (pending) { cancelAnimationFrame(pending); pending = 0; }

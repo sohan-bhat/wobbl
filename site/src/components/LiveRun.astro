@@ -93,7 +93,10 @@ const charts = sp ? runImages(run).map((i) => i.name).filter((n) => !/setup/.tes
 // the readings at the value the question asked about
 const qHome = sp?.q ? lerpAt(sp.q.values, inp!.home) : NaN;
 const final = sp ? (sp.q ? sig(qHome, sp.q.digits) : '') : '';
-const alsoText = sp ? sp.also.map((a, i) => `${i ? a.name : a.name[0].toUpperCase() + a.name.slice(1)} ${sceneText(lerpAt(a.values, inp!.home), a.unit, a.digits)}`).join(', ') : '';
+const named = (xs: { name: string; unit: string; digits: number }[], at: (x: any) => number) => xs.map((a, i) => `${i ? a.name : a.name[0].toUpperCase() + a.name.slice(1)} ${sceneText(at(a), a.unit, a.digits)}`).join(', ');
+// a motion that reads numbers of its own and none along the input says them as they end
+const alsoText = sp ? (sp.also.length ? named(sp.also, (a) => lerpAt(a.values, inp!.home))
+  : sp.motion?.live ? named(sp.motion.live, (a) => a.values[a.values.length - 1]) : '') : '';
 // the toggles beside the load or the input: the bending drawn larger than it is, as on the landing part, and
 // small parts of a scene drawn larger so they show
 const exag = sp ? sp.exag : kind === 'strength' ? (lead as StrengthRun).exag : 1;
