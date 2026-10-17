@@ -553,9 +553,8 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       probeEl.hidden = false;
       placeProbe(e.clientX - r.left, e.clientY - r.top, r);
     };
-    // The probe sits beside the pointer where it fits inside the view and clear of the peak's ring and value, the
-    // part names, the replay button and the inset: right of the pointer, else left, below or above it, slid in
-    // from the edges where none fits whole.
+    // The probe sits as near the pointer as it can inside the view, clear of the pointer itself, the peak's ring
+    // and value, the part names, the replay button and the inset.
     const placeProbe = (x: number, y: number, r: DOMRect) => {
       const pw = probeEl.offsetWidth, ph = probeEl.offsetHeight, W = r.width, H = r.height, M = 6;
       const boxes: number[][] = [];
@@ -566,15 +565,20 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       if (insets[0]?.rect) boxes.push(insets[0].rect);
       const over = (ax: number, ay: number, b: number[]) =>
         Math.max(0, Math.min(ax + pw, b[0] + b[2]) - Math.max(ax, b[0])) * Math.max(0, Math.min(ay + ph, b[1] + b[3]) - Math.max(ay, b[1]));
-      const tries = [[x + 14, y - ph / 2], [x - 14 - pw, y - ph / 2], [x - pw / 2, y + 18], [x - pw / 2, y - 18 - ph]];
+      // beside the pointer on each side, then off each corner of it, then in the corners of the view
+      const tries = [[x + 14, y - ph / 2], [x - 14 - pw, y - ph / 2], [x - pw / 2, y + 18], [x - pw / 2, y - 18 - ph],
+        [x + 14, y + 14], [x - 14 - pw, y + 14], [x + 14, y - 14 - ph], [x - 14 - pw, y - 14 - ph],
+        [M, M], [W - M - pw, M], [M, H - M - ph], [W - M - pw, H - M - ph]];
       let best = tries[0], cost = Infinity;
-      for (const [tx, ty] of tries) {
+      tries.forEach(([tx, ty], i) => {
         const ax = Math.min(Math.max(tx, M), Math.max(M, W - M - pw)), ay = Math.min(Math.max(ty, M), Math.max(M, H - M - ph));
-        // covering the point under the pointer hides what is read; being slid in from an edge costs a little
+        // covering the point under the pointer hides what is read and covering a label hides it, and the nearer
+        // the pointer the better
         const covers = x > ax - 6 && x < ax + pw + 6 && y > ay - 6 && y < ay + ph + 6;
-        const c = boxes.reduce((a, b) => a + over(ax, ay, b), 0) + (covers ? pw * ph : 0) + Math.abs(ax - tx) + Math.abs(ay - ty);
+        const gap = Math.hypot(Math.max(ax - x, 0, x - ax - pw), Math.max(ay - y, 0, y - ay - ph));
+        const c = 10 * boxes.reduce((a, b) => a + over(ax, ay, b), 0) + (covers ? 1e6 : 0) + gap + i * 0.1;
         if (c < cost) { cost = c; best = [ax, ay]; }
-      }
+      });
       probeEl.style.translate = `${best[0].toFixed(1)}px ${best[1].toFixed(1)}px`;
     };
     on(canvas, 'pointermove', (e: PointerEvent) => {
