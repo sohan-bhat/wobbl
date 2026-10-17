@@ -23,10 +23,13 @@
   },
   "bracket-crack": {
     "replace": [
-      {"object": "bolt", "file": "bracket-crack/bolt.glb"},
-      {"object": "bolt head", "file": "bracket-crack/bolt-head.glb"},
+      {"object": "bolt", "file": "bracket-crack/screw.glb"},
       {"object": "mounting plate", "file": "bracket-crack/mounting-plate.glb"}
-    ]
+    ],
+    "add": [
+      {"file": "bracket-crack/clevis.glb"}
+    ],
+    "hide": ["bolt head"]
   },
   "cast-motor-mount": {
     "add": [
