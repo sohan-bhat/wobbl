@@ -108,8 +108,8 @@ def _crystal(pb: dict, o: dict):
 
 
 # ------------------------------------------------------------------------------------- atoms as solid models
-def _sphere() -> tuple[np.ndarray, np.ndarray]:
-    """A unit icosphere, one subdivision, 42 points."""
+def _sphere(levels: int = 1) -> tuple[np.ndarray, np.ndarray]:
+    """A unit icosphere, 42 points at one subdivision and 162 at two."""
     t = (1 + 5 ** 0.5) / 2
     V = [(-1, t, 0), (1, t, 0), (-1, -t, 0), (1, -t, 0), (0, -1, t), (0, 1, t), (0, -1, -t), (0, 1, -t),
          (t, 0, -1), (t, 0, 1), (-t, 0, -1), (-t, 0, 1)]
@@ -126,11 +126,13 @@ def _sphere() -> tuple[np.ndarray, np.ndarray]:
             V.append(p / np.linalg.norm(p))
             mid[k] = len(V) - 1
         return mid[k]
-    out = []
-    for a, b, c in F:
-        ab, bc, ca = m(a, b), m(b, c), m(c, a)
-        out += [(a, ab, ca), (b, bc, ab), (c, ca, bc), (ab, bc, ca)]
-    return np.array(V), np.array(out)
+    for _ in range(levels):
+        out = []
+        for a, b, c in F:
+            ab, bc, ca = m(a, b), m(b, c), m(c, a)
+            out += [(a, ab, ca), (b, bc, ab), (c, ca, bc), (ab, bc, ca)]
+        F, mid = out, {}
+    return np.array(V), np.array(F)
 
 
 def _radius(sym: str) -> float:
@@ -142,11 +144,12 @@ def _radius(sym: str) -> float:
 
 
 def _balls(s, el, P, values, *, field: str, unit: str, colormap: str, vrange, limit, limit_label: str, name: str,
-           size: float = 0.3, digits: int = 3):
+           size: float = 0.3, digits: int = 3, radii=None, levels: int = 1):
     """Atoms as solid spheres at their positions in every frame (frames x atoms x 3), colored by a value per atom
-    (atoms, or frames x atoms), so the view reads each atom's value where the pointer rests."""
-    U, T = _sphere()
-    r = np.array([_radius(e) * size for e in el])
+    (atoms, or frames x atoms), so the view reads each atom's value where the pointer rests. radii, when given,
+    are the drawn radii themselves."""
+    U, T = _sphere(levels)
+    r = np.asarray(radii, float) if radii is not None else np.array([_radius(e) * size for e in el])
     nv = len(U)
     base = (P[0][:, None, :] + U[None] * r[:, None, None]).reshape(-1, 3)
     tris = np.concatenate([T + i * nv for i in range(len(el))])
@@ -253,9 +256,16 @@ def _strained(pb: dict, o: dict, el, eos: dict, name: str, reps: int = 2):
     are colored by the strain energy stored in each, against the heat that melts the crystal (or the thermal
     energy at room temperature when that is not known), past which the strained lattice has no reason to hold."""
     cells = [np.array(c, float) for c in eos["cells"]]
-    sh = np.array([(i, j, k) for i in range(reps) for j in range(reps) for k in range(reps)], float)
-    P = np.stack([np.concatenate([np.array(p) + v for v in sh @ c]) for p, c in zip(eos["frames"], cells)])
-    big = el * len(sh)
+    # a whole block of reps cells a side, its far faces included, so it reads as a piece cut from the crystal
+    # rather than a periodic cell with the atoms on its far faces left off
+    frac = np.array(eos["frames"][0], float) @ np.linalg.inv(cells[0])
+    frac = frac - np.floor(frac + 1e-6)
+    sh = np.array([(i, j, k) for i in range(reps + 1) for j in range(reps + 1) for k in range(reps + 1)], float)
+    F = np.concatenate([frac + v for v in sh])
+    keep = np.all((F > -1e-6) & (F < reps + 1e-6), axis=1)
+    F = F[keep]
+    big = [el[i % len(el)] for i in np.nonzero(keep)[0]]
+    P = np.stack([F @ c for c in cells])
     E = np.array(eos["energies_eV_per_atom"], float)
     if "strain_pct" in eos:
         x = np.array(eos["strain_pct"], float)
@@ -272,9 +282,16 @@ def _strained(pb: dict, o: dict, el, eos: dict, name: str, reps: int = 2):
                "Birch-Murnaghan fit through them.")
     s.timeline(x, unit="%", label="lattice strain", between="step", kind="input", design=0.0,
                note="Below zero the cell is squeezed, above it stretched, the same in every direction.")
+    # atoms packed as they are in the solid: each element's radius scaled together until the closest pair in
+    # the unstrained crystal just touch, since neighbors in a solid sit in contact, not apart in empty space
+    R = np.array([_radius(e) for e in big])
+    p0 = P[int(np.argmin(np.abs(x)))]
+    d = np.linalg.norm(p0[:, None] - p0[None], axis=-1)
+    np.fill_diagonal(d, np.inf)
+    scale = float(np.min(d / (R[:, None] + R[None])))
     _balls(s, big, P, np.repeat(E[:, None], len(big), axis=1), field="strain energy", unit="eV/atom",
            colormap="viridis", vrange=(0, max(float(E.max()), lim)), limit=lim, limit_label=lim_label, name=name,
-           size=0.32, digits=3)
+           digits=3, radii=R * scale * 0.985, levels=2)
     # the unit cell's edges, following the strain
     corners = np.array([(i, j, k) for i in (0, 1) for j in (0, 1) for k in (0, 1)], float)
     edges = [(a, b) for a in range(8) for b in range(a + 1, 8) if np.abs(corners[a] - corners[b]).sum() == 1]
