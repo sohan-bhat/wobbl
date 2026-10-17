@@ -99,7 +99,7 @@
 .lrun-more > summary:hover { color: var(--yellow); }
 .lrun-more .run-verdict { margin-top: 14px; }
 .lrun-more .readout { margin-top: 18px; }
-@media (min-width: 560px) { .lrun-more .readout { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 560px) { .lrun-more .readout div { flex-basis: calc(25% - 12px); } }
 .lrun-more .run-checks { margin-top: 20px; }
 .lrun-more-img { width: 100%; margin-top: 20px; border: 1px solid var(--line); background: var(--bg); }
 .lrun-more .term { margin-top: 20px; }

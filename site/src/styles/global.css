@@ -319,8 +319,11 @@ table.data td.num { font-family: var(--mono); font-size: 0.9rem; white-space: no
 }
 .load-tag { color: var(--yellow); transform: translate(16px, -150%); }
 
-.readout { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 16px; margin: 24px 0 0; }
-.readout div { margin: 0; }
+/* Each reading is at least as wide as its value, which never breaks, so a long one takes a wider cell or its own line
+   instead of running into the next */
+.readout { display: flex; flex-wrap: wrap; gap: 18px 16px; margin: 24px 0 0; }
+.readout div { margin: 0; flex: 1 1 calc(50% - 8px); min-width: min-content; max-width: 100%; }
+.readout dd { overflow-wrap: break-word; }
 .readout dt { font: 500 11px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .readout dd { margin: 6px 0 0; font: 500 1.35rem/1.1 var(--mono); color: var(--fg); font-variant-numeric: tabular-nums; }
 .control label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 0.95rem; color: var(--fg); font-weight: 500; }
@@ -610,7 +613,7 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--li
 .vword[data-verdict="holds"] { background: var(--holds); }
 .vword[data-verdict="fails"] { background: var(--fails); }
 .run-result .readout { margin-top: 20px; }
-@media (min-width: 560px) { .run-result .readout { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 560px) { .run-result .readout div { flex-basis: calc(25% - 12px); } }
 .run-summary { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 14px; }
 .run-summary > summary { cursor: pointer; width: fit-content; padding: 6px 0; font: 500 13px/1.3 var(--mono); color: var(--fg); }
 .run-summary > summary:hover { color: var(--yellow); }
