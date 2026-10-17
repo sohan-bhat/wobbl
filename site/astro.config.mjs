@@ -6,14 +6,14 @@ import { syncScenes } from './scripts/scenes.mjs';
 import { drawPosters } from './scripts/posters.mjs';
 
 // Every example's scene.wobbl and the viewer that plays it, copied into public/data/scenes before each dev or build,
-// with a poster of each for the gallery's cards.
+// with the stills of every example page's live view and a card of each scene for the gallery.
 const scenes = {
   name: 'wobbl-scenes',
   hooks: {
-    'astro:config:setup': async () => {
+    'astro:config:setup': async ({ config }) => {
       const site = fileURLToPath(new URL('.', import.meta.url));
       syncScenes(site);
-      await drawPosters(site);
+      await drawPosters(site, config.base);
     },
   },
 };

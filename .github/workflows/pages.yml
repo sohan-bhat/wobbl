@@ -37,12 +37,12 @@ jobs:
           node-version-file: site/.nvmrc
           cache: npm
           cache-dependency-path: site/package-lock.json
-      # the scenes' stills, drawn in the runner's Chrome by the pages' own playback stage and kept by the hash of
-      # each scene and the drawing code
+      # the example pages' stills, drawn in the runner's Chrome by the pages' own playback stage with the studio and
+      # the models, and kept by the hash of each view's runs, the studio, the models and the drawing code
       - uses: actions/cache@v4
         with:
           path: site/.cache/posters
-          key: posters-${{ hashFiles('examples/**/scene.wobbl', 'site/src/scripts/play*.js', 'site/src/scripts/scene-*.js', 'site/src/scripts/part.js', 'site/src/scripts/orbit.js', 'site/scripts/posters.mjs', 'site/scripts/scenes.mjs') }}
+          key: posters-${{ hashFiles('examples/**/scene.wobbl', 'site/public/data/play/**', 'site/public/env/**', 'site/public/models/**', 'site/src/scripts/play*.js', 'site/src/scripts/scene-*.js', 'site/src/scripts/run-*.js', 'site/src/scripts/part.js', 'site/src/scripts/orbit.js', 'site/src/lib/**', 'site/scripts/posters.mjs', 'site/scripts/scenes.mjs') }}
           restore-keys: posters-
       - name: Build the site and its search index
         run: |
