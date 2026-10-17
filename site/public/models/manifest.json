@@ -154,9 +154,16 @@
   },
   "drone-arm": {
     "add": [
-      {"file": "drone-arm/bolt.glb", "covers": ["bolt"]},
-      {"file": "drone-arm/bolt-head.glb", "covers": ["bolt head"]},
-      {"file": "drone-arm/mounting-plate.glb", "covers": ["mounting plate"]}
+      {"file": "drone-arm/frame-plates.glb", "covers": ["mounting plate"]},
+      {"file": "drone-arm/root-screws.glb", "covers": ["bolt", "bolt head"]},
+      {"file": "drone-arm/motor-and-prop.glb", "covers": ["load point"]}
+    ]
+  },
+  "drone-arm-resonance": {
+    "add": [
+      {"file": "drone-arm/frame-plates.glb"},
+      {"file": "drone-arm/root-screws.glb"},
+      {"file": "drone-arm/motor-and-prop.glb"}
     ]
   },
   "falling-rock": {
