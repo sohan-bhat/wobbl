@@ -3,23 +3,12 @@
 // for the landing page's part. The page sends the camera and the moment to show as they change; this
 // draws the latest of them once per display frame.
 import { createStage } from './play-draw.js';
-import { decodePlay, decodeScene } from './play.js';
+import { loadRun } from './play.js';
 import { loadModels } from './play-models.js';
 
 let stage = null, latest = null, queued = false, lit = null;
 const parts = [];
 const later = self.requestAnimationFrame ? (fn) => self.requestAnimationFrame(fn) : (fn) => setTimeout(fn, 16);
-
-async function load(file, run) {
-  const res = await fetch(file);
-  if (!res.ok) throw new Error(`playback data: HTTP ${res.status}`);
-  let buf = await res.arrayBuffer();
-  const head = new Uint8Array(buf, 0, 2);
-  if (head[0] === 0x1f && head[1] === 0x8b) {
-    buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-  }
-  return run.kind === 'scene' ? decodeScene(run, buf) : decodePlay(run, buf);
-}
 
 function draw() {
   queued = false;
@@ -37,7 +26,7 @@ self.onmessage = async (e) => {
       lit ||= stage?.light(new URL('env/studio.rgbe', root).href);
       // the Blender models, fetched alongside; the part waits a moment for them, then goes on without
       const models = loadModels(root, m.run.example).catch(() => null);
-      const [{ arrays }] = await Promise.all([load(m.file, m.run), lit]);
+      const [{ arrays }] = await Promise.all([loadRun(m.file, m.run), lit]);
       if (!stage) throw new Error('the drawing worker has no WebGL');
       if (parts[m.row]) stage.remove(parts[m.row]);
       const part = stage.add({ run: m.run, arrays, top: m.top, row: m.row });

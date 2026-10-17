@@ -452,3 +452,15 @@ export function transfers(arrays) {
   for (const d of arrays.objs || []) if (d) for (const v of Object.values(d)) if (ArrayBuffer.isView(v)) out.push(v.buffer);
   return [...new Set(out)];
 }
+
+/** Fetch a run's playback file (or its scene), gunzip it when it is gzipped, and decode it as its run says. */
+export async function loadRun(file, run) {
+  const res = await fetch(file);
+  if (!res.ok) throw new Error(`playback data: HTTP ${res.status}`);
+  let buf = await res.arrayBuffer();
+  const head = new Uint8Array(buf, 0, 2);
+  if (head[0] === 0x1f && head[1] === 0x8b) {
+    buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  }
+  return run.kind === 'scene' ? decodeScene(run, buf) : decodePlay(run, buf);
+}
