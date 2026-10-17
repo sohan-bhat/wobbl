@@ -1,5 +1,5 @@
 // Where the camera stands for a scene run, shared by the example page's live view (live-run.ts) and the stills
-// drawn at build time (scene-poster.js), so both open on the same picture. The rules come from how product and
+// drawn at build time (run-poster.js), so both open on the same picture. The rules come from how product and
 // science viewers frame a model: aim at the subject and fill the frame with it (model-viewer fits the model's
 // own extent, not the room it stands in), let props run out of the frame as context, and when the subject is
 // tiny next to the path it travels (a rocket on a 3 km flight), follow it up close at its true size and show the
