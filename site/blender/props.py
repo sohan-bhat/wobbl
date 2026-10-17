@@ -387,18 +387,11 @@ def floor(sc, center, half, z):
 STRENGTH = {'motor-mount', 'cast-motor-mount', 'cast-mount-credibility', 'shelf-bracket', 'drone-arm', 'heat-sink', 'enclosure', 'battery-pack'}
 BOLTS = {'bolt': bolt_shank, 'bolt head': hex_head}
 MOTOR = {'motor': nema_motor, 'motor flange': nema_front, 'motor shaft': d_shaft, 'pulley': gt2_pulley}
+# motor-mount, cast-motor-mount, shelf-bracket, drone-arm, bolted-flange, bracket-crack, steel-hook, strut-buckling
+# and printed-lid are built in CAD now (site/cad), and so is the desktop arm, whose desk this script still makes
 EXAMPLES = {
-    'motor-mount': ('motor-mount/output', 'mm', {**BOLTS, 'mounting plate': plate_milled, **MOTOR}),
-    'cast-motor-mount': ('cast-motor-mount/output', 'mm', {'plate': plate_steel, **MOTOR}),
     'cast-mount-credibility': ('cast-mount-credibility/output', 'mm', {'plate': plate_steel, **MOTOR}),
-    'shelf-bracket': ('shelf-bracket/output', 'mm', {**BOLTS, 'wall': wall, 'shelf': acrylic_shelf, 'load on the shelf': carton}),
-    'drone-arm': ('drone-arm/output', 'mm', {**BOLTS, 'mounting plate': plate_milled}),
     'heat-sink': ('heat-sink/output', 'mm', {'heat source': power_resistor}),
-    'bolted-flange': ('bolted-flange/output', 'mm', {'plate': plate_steel, 'M8 8.8': bolt_shank, 'M8 8.8 head': hex_head}),
-    'bracket-crack': ('bracket-crack/output/stress', 'mm', {**BOLTS, 'mounting plate': plate_milled}),
-    'steel-hook': ('steel-hook/output', 'mm', {**BOLTS, 'weight': slotted_weight}),
-    'strut-buckling': ('strut-buckling/output', 'mm', {'end plate': platen}),
-    'printed-lid': ('printed-lid/output', 'mm', {'print bed': print_bed}),
     'desktop-arm': ('desktop-arm/output', 'm', {'desk': desk}),
     'circuits/buck': ('circuits/buck', 'mm', {'bench': desk, 'breadboard': breadboard}),
     'circuits/kicad-board': ('circuits/kicad-board', 'mm', {'bench': desk, 'breadboard': breadboard}),
@@ -411,6 +404,7 @@ EXAMPLES = {
     'handheld-drop': ('handheld-drop/output', 'mm', {}),
 }
 UNITS = {'mm': 1000.0, 'm': 1.0, 'A': 1000.0}
+CAD_ENTRY = {'desktop-arm'}     # examples whose manifest entry site/cad writes, round the files made here
 
 
 def build(key):
@@ -484,7 +478,8 @@ def main():
             entry['add'] = add
         if key == 'handheld-drop':
             entry['hide'] = ['ground']
-        kit.write_manifest(key, entry)
+        if key not in CAD_ENTRY:
+            kit.write_manifest(key, entry)
 
 
 if __name__ == '__main__':
