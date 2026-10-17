@@ -24,7 +24,7 @@ export interface ScenePlay {
   subject: { lo: number[]; hi: number[] } | null; points: number[][] | null; hold: { lo: number[]; hi: number[] } | null; follow: { c: number[][]; r: number; fill: number; dir: number[] | null } | null;
   verdict: { word: string; tone: string; line: string } | null;
 }
-interface Entry { file?: string; bytes?: number; title?: string; frames?: number; broken?: string; play?: ScenePlay; poster?: string; posterW?: number; posterH?: number; card?: string }
+interface Entry { file?: string; bytes?: number; title?: string; frames?: number; broken?: string; play?: ScenePlay; card?: string }
 
 let cache: Record<string, Entry> | null = null;
 function manifest(): Record<string, Entry> {
@@ -39,9 +39,9 @@ function manifest(): Record<string, Entry> {
 export function sceneFor(rel: string) {
   const e = manifest()[rel];
   if (!e || !e.file || !e.play) return null;
-  // the posters scripts/posters.mjs drew of the view the page opens on, once its replay has run
-  const poster = e.poster ? { src: url(`data/scenes/${e.poster}`), card: url(`data/scenes/${e.card ?? e.poster}`),
-    width: e.posterW ?? 1280, height: e.posterH ?? 960 } : null;
+  // the card scripts/posters.mjs drew of the view once its replay has run, or its Cycles still, for the gallery and
+  // for the page that cannot run the 3D view
+  const poster = e.card ? { card: url(`data/scenes/${e.card}`), width: 640, height: 480 } : null;
   return { src: url(`data/scenes/${e.file}`), file: e.file, title: e.title ?? '', play: e.play, poster };
 }
 

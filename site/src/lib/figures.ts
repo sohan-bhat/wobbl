@@ -1,7 +1,10 @@
 // What each example page plays in its live views: which runs share a view and which panes each view holds. The
 // page reads it (pages/examples/[name].astro, components/LiveRun.astro) and so do the stills drawn at build time
 // (scripts/posters.mjs, through figures()), so a still is drawn of exactly the panes and runs its view opens on.
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { examples, type Example, type Run } from './examples';
+import { url } from './site';
 import { firstFix, panes as panesOf, playFor } from './playback';
 import { sceneRun, type ScenePlay } from './scenes';
 import { num } from '../scripts/scene-file.js';
@@ -30,7 +33,7 @@ export function pageItems(ex: Example): Item[] {
 
 export interface ScenePane {
   rel: string; name: string; at?: string; src: string; play: ScenePlay; home: number; asked: boolean; verdict: string;
-  poster: { src: string; card: string; width: number; height: number } | null;
+  poster: { card: string; width: number; height: number } | null;
 }
 /**
  * A scene run's panes: the run itself, or the run and the others of its example over the same input, or the
@@ -84,4 +87,21 @@ export function figures(): Figure[] {
     }
   }
   return out;
+}
+
+/**
+ * The stills scripts/posters.mjs drew of a view (by the run it opens with), one per pane in the order figures()
+ * lists them: the pane as the view first shows it on a wide screen (src, width, height) and on a narrow one, or
+ * null when it has none.
+ */
+export interface Still { src: string; width: number; height: number; narrow: { src: string; width: number; height: number } }
+let stills: Record<string, ({ wide: string; narrow: string; w: number; h: number; nw: number; nh: number } | null)[]> | null = null;
+export function stillsOf(id: string): (Still | null)[] {
+  if (!stills) {
+    const f = resolve(process.cwd(), 'public/data/stills/index.json');
+    stills = existsSync(f) ? JSON.parse(readFileSync(f, 'utf-8')) : {};
+  }
+  return (stills![id] ?? []).map((s) => s && {
+    src: url(`data/stills/${s.wide}`), width: s.w, height: s.h, narrow: { src: url(`data/stills/${s.narrow}`), width: s.nw, height: s.nh },
+  });
 }

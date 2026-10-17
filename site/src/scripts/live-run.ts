@@ -14,7 +14,8 @@ import { aimAt, followAt } from './scene-view.js';
 import { clamp01, fitView, frameAt, homeView, interp, newOrbit, paneViews, runFrame, runView, sceneFrame as sceneFrameOf } from './run-view.js';
 
 interface Ev { k: number; text: string }
-interface Poster { src: string; srcset: string; width: number; height: number; alt: string }
+/** A pane's still, the first frame of its 3D view, with the narrow screen's (narrow) and what shows where the view cannot run */
+interface Poster { src: string; srcset: string; width: number; height: number; alt: string; narrow?: string; fallback?: { src: string; srcset: string } | null }
 interface PaneData {
   rel: string; name: string; file: string; run: Record<string, any>; event: Ev | null; final: string; poster: Poster | null;
   /** a scene pane: the run's own verdict, the frame position it stands at once played and whether that is the value asked about */
@@ -234,14 +235,26 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     for (const el of qa('[data-name]', cell).concat(qa('[data-name]', rowEls[row]))) put(el, p.name);
     const at = rowEls[row].querySelector('[data-at]');
     if (at && p.at) put(at, p.at);
-    const img = cell.querySelector<HTMLImageElement>('.lrun-poster');
-    if (img && p.poster) {
-      img.srcset = p.poster.srcset;
-      img.src = p.poster.src;
-      img.alt = p.poster.alt;
-    }
+    showPoster(cell, p);
     set(q('[data-word]', rowEls[row]), 'data-verdict', verdictColor[p.run.verdict] ?? 'marginal');
     put(q('[data-word]', rowEls[row]), p.run.verdict.toUpperCase());
+  }
+
+  // a pane's still, or once the figure has fallen back, what the run ends on: Wobbl's own heatmap or a scene's card
+  let fellBack = false;
+  function showPoster(cell: HTMLElement, p: PaneData) {
+    const img = cell.querySelector<HTMLImageElement>('.lrun-poster'), source = img?.parentElement?.querySelector('source');
+    const pic = p.poster && (fellBack && p.poster.fallback ? { ...p.poster, ...p.poster.fallback, narrow: undefined } : p.poster);
+    if (!img || !pic) return;
+    if (source) source.srcset = pic.narrow ?? (pic.srcset || pic.src);
+    img.srcset = pic.srcset;
+    img.src = pic.src;
+    img.alt = pic.alt;
+  }
+  /** Where the 3D view cannot run, the figure shows what each run ends on, as its final numbers do. */
+  function fallBack() {
+    fellBack = true;
+    shown.forEach((pi, row) => showPoster(paneEls[row], data.panes[pi]));
   }
 
   // ---- the 3D view ------------------------------------------------------------------------------
@@ -525,7 +538,10 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       });
     }
   }
-  if (!live) return () => abort.abort();
+  if (!live) {
+    fallBack();
+    return () => abort.abort();
+  }
 
   on(replay, 'click', () => restart());
   on(document, 'visibilitychange', () => { if (document.hidden) pause(); else maybeStart(); });
@@ -544,6 +560,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     back = null;
     ready = false;
     view.dataset.state = 'poster';
+    fallBack();
     status.textContent = 'The 3D view did not load, so this is the heatmap Wobbl drew.';
     finalState();
   });

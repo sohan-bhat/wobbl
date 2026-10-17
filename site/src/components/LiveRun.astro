@@ -12,7 +12,7 @@ import { picture, publicSize } from '../lib/images';
 import { COLOR, metrics, runImages, type Example, type Run } from '../lib/examples';
 import { clock, finalValue, firstFix, fmt, meter, pace, panes as panesOf, playFor, type Pane, type StrengthRun } from '../lib/playback';
 import { sceneRun } from '../lib/scenes';
-import { scenePanes as panesOfScene, type ScenePane } from '../lib/figures';
+import { scenePanes as panesOfScene, stillsOf, type ScenePane } from '../lib/figures';
 import { num, sig } from '../scripts/scene-file.js';
 import { url } from '../lib/site';
 import '../styles/live-run.css';
@@ -108,8 +108,21 @@ const rows = sp ? sceneShown.map((pn) => ({ name: pn.name, at: pn.at, v: paneVal
     const q = pane.play;
     return { name: pane.name, at: undefined as string | undefined, v: q.kind === 'strength' ? q.governing_MPa : q.t_max_C, verdict: q.verdict, finalText: finalValue(q) };
   });
-const panes = sp ? sceneShown.map((pn) => ({ name: pn.name, pic: pn.poster ? { src: pn.poster.src, srcset: '', width: pn.poster.width, height: pn.poster.height } : null }))
-  : shown.map((pane) => ({ name: pane.name, pic: pane.poster ? picture(pane.poster) : null }));
+// each pane's still: the first frame its live view shows (lib/figures.ts stillsOf), on a wide and a narrow screen,
+// and what the figure shows instead where the 3D view cannot run, Wobbl's own heatmap or a scene's card once played
+const stills = stillsOf(run.rel);
+const fallbackOf = (i: number) => {
+  if (!sp) return all[i].poster ? picture(all[i].poster!) : null;
+  const c = scenePanes[i].poster;
+  return c ? { src: c.card, srcset: '', width: c.width, height: c.height } : null;
+};
+const picOf = (i: number) => {
+  const fb = fallbackOf(i), st = stills[i];
+  return st ? { src: st.src, srcset: '', width: st.width, height: st.height, narrow: st.narrow, fallback: fb && { src: fb.src, srcset: fb.srcset } }
+    : fb && { ...fb, narrow: null, fallback: null };
+};
+const panes = (sp ? sceneShown.map((pn, i) => ({ name: pn.name, i })) : shown.map((pane) => ({ name: pane.name, i: all.indexOf(pane) })))
+  .map(({ name, i }) => ({ name, pic: picOf(i) }));
 const T0 = sp ? inp!.t[0] : 0, T1 = sp ? inp!.t[inp!.t.length - 1] : 0;
 // the slider runs along the input's own value, so equal moves are equal changes even where the saved
 // frames sit closer together
@@ -121,18 +134,19 @@ const sliding = !!sp && inp!.t.length > 1 && !(sp.alts && !beside.length);
 // the choices for the right pane, as buttons, when there are more than two
 const choices = sp ? scenePanes.map((pn) => pn.name) : all.map((pane) => pane.name);
 
+const posterOf = (i: number, name: string) => {
+  const pic = picOf(i);
+  return pic && { src: pic.src, srcset: pic.srcset, width: pic.width, height: pic.height, narrow: pic.narrow?.src, fallback: pic.fallback, alt: alt(name) };
+};
 const data = JSON.stringify(sp ? {
   kind, fix: scenePanes.length > 1 ? 1 : -1, pace: p, meter: m, unit, loads: [], steady: false, total, title: sp.title.toLowerCase(),
-  panes: scenePanes.map((pn) => ({ rel: pn.rel, name: pn.name, at: pn.at, file: pn.src, run: pn.play, home: pn.home, asked: pn.asked,
+  panes: scenePanes.map((pn, i) => ({ rel: pn.rel, name: pn.name, at: pn.at, file: pn.src, run: pn.play, home: pn.home, asked: pn.asked,
     event: pn.play.event && { k: pn.play.event.at, text: pn.play.event.text }, final: pn.play.q ? sig(paneValue(pn), pn.play.q.digits) : '', verdict: pn.verdict,
-    poster: pn.poster && { src: pn.poster.src, srcset: '', width: pn.poster.width, height: pn.poster.height, alt: alt(pn.name) } })),
+    poster: posterOf(i, pn.name) })),
 } : {
   kind, fix, pace: p, meter: m, unit, loads, steady, total, title: ex.title.toLowerCase(),
-  panes: all.map((pane) => {
-    const pic = pane.poster ? picture(pane.poster) : null;
-    return { rel: pane.rel, name: pane.name, file: pane.file, run: pane.play, event: eventOf(pane), final: finalValue(pane.play),
-      poster: pic && { src: pic.src, srcset: pic.srcset, width: pic.width, height: pic.height, alt: alt(pane.name) } };
-  }),
+  panes: all.map((pane, i) => ({ rel: pane.rel, name: pane.name, file: pane.file, run: pane.play, event: eventOf(pane), final: finalValue(pane.play),
+    poster: posterOf(i, pane.name) })),
 }).replace(/</g, '\\u003c');
 ---
 <div class:list={['run', 'lrun-run', { 'lrun-wide': panes.length > 1 }]}>
@@ -146,10 +160,16 @@ const data = JSON.stringify(sp ? {
         <div class="lrun-panes">
           {panes.map((pane, i) => (
             <div class="lrun-pane" data-i={i}>
-              {pane.pic && <img class="lrun-poster" src={pane.pic.src} srcset={pane.pic.srcset || undefined}
-                                sizes={pane.pic.srcset ? (panes.length > 1 ? '(min-width: 1000px) 640px, 100vw' : '(min-width: 1000px) 46vw, 100vw') : undefined}
-                                width={pane.pic.width} height={pane.pic.height} loading={first ? undefined : 'lazy'} fetchpriority={first && i === 0 ? 'high' : undefined}
-                                decoding="async" alt={alt(pane.name)} />}
+              {pane.pic && (
+                <picture>
+                  {/* the narrow screen's still, where two panes stack (styles/live-run.css) */}
+                  {pane.pic.narrow && <source media="(max-width: 719px)" srcset={pane.pic.narrow.src} width={pane.pic.narrow.width} height={pane.pic.narrow.height} />}
+                  <img class="lrun-poster" src={pane.pic.src} srcset={pane.pic.srcset || undefined}
+                       sizes={pane.pic.srcset ? (panes.length > 1 ? '(min-width: 1000px) 640px, 100vw' : '(min-width: 1000px) 46vw, 100vw') : undefined}
+                       width={pane.pic.width} height={pane.pic.height} loading={first ? undefined : 'lazy'} fetchpriority={first && i === 0 ? 'high' : undefined}
+                       decoding="async" alt={alt(pane.name)} />
+                </picture>
+              )}
               {panes.length > 1 && <p class="lrun-name" data-name>{pane.name}</p>}
               <span class="lrun-mark" hidden aria-hidden="true"><span class="target"></span>{sp && <span class="peak-tag-v lrun-mark-v" data-mark-v></span>}</span>
             </div>
