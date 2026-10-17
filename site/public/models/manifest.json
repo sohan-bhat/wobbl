@@ -31,6 +31,12 @@
     ],
     "hide": ["bolt head"]
   },
+  "carbon-arm": {
+    "add": [
+      {"file": "carbon-arm/hub.glb"},
+      {"file": "carbon-arm/motor-mount.glb"}
+    ]
+  },
   "cast-motor-mount": {
     "add": [
       {"file": "cast-motor-mount/motor.glb", "covers": ["motor", "motor flange", "motor shaft"]},
