@@ -250,6 +250,13 @@
       {"file": "shelf-bracket/weight.glb", "covers": ["load on the shelf"]}
     ]
   },
+  "solenoid-actuator": {
+    "replace": [
+      {"object": "actuator 1", "file": "solenoid-actuator/frame.glb"},
+      {"object": "actuator 2", "file": "solenoid-actuator/coil.glb"},
+      {"object": "actuator 3", "file": "solenoid-actuator/plunger.glb"}
+    ]
+  },
   "steel-hook": {
     "replace": [
       {"object": "bolt", "file": "steel-hook/bolt.glb"},

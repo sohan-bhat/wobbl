@@ -23,15 +23,17 @@ looks.add('tc_yellow', color=(0.7, 0.55, 0.03), metal=0.0, rough=0.4)
 looks.add('wire_white', color=(0.75, 0.75, 0.73), metal=0.0, rough=0.45)
 
 
-def torus_mesh(R, r, z=0.0, seg=56, ring=10):
-    """A thin torus about z as a ready mesh: a CAD torus with a thin tube costs thousands of triangles."""
-    u = np.linspace(0, 2 * np.pi, seg, endpoint=False)
+def torus_mesh(R, r, z=0.0, seg=56, ring=10, arc=None):
+    """A thin torus about z as a ready mesh: a CAD torus with a thin tube costs thousands of triangles. arc
+    (a0, a1) in radians keeps only that sweep, open at its ends."""
+    closed = arc is None
+    u = np.linspace(0, 2 * np.pi, seg, endpoint=False) if closed else np.linspace(arc[0], arc[1], seg)
     v = np.linspace(0, 2 * np.pi, ring, endpoint=False)
     U, V = np.meshgrid(u, v, indexing='ij')
     N = np.stack([np.cos(V) * np.cos(U), np.cos(V) * np.sin(U), np.sin(V)], -1).reshape(-1, 3)
     P = np.stack([(R + r * np.cos(V)) * np.cos(U), (R + r * np.cos(V)) * np.sin(U), z + r * np.sin(V)], -1).reshape(-1, 3)
     T = []
-    for i in range(seg):
+    for i in range(seg if closed else seg - 1):
         for j in range(ring):
             a, b = i * ring + j, i * ring + (j + 1) % ring
             c, d = ((i + 1) % seg) * ring + j, ((i + 1) % seg) * ring + (j + 1) % ring
