@@ -145,7 +145,7 @@ def beaker(r_out, h, wall=1.8, volume=1000, step=50):
     out = [(glass, 'glass')]
     ri = r_out - t
     ml_per_mm = math.pi * ri * ri / 1000.0
-    ang0 = 200.0                                 # the scale faces the viewer, off to one side of the spout
+    ang0 = -100.0                                # the scale faces the page's view, off to one side of the spout
     lift = r_out + 0.08
     for v in range(step, volume, step):
         z = t + v / ml_per_mm
@@ -158,11 +158,11 @@ def beaker(r_out, h, wall=1.8, volume=1000, step=50):
         out.append((tick, 'print_white'))
         if major and v % 200 == 0:
             ax = math.radians(ang0 - 9)
-            pl = _tangent_plane(lift + 0.05, ax, z)
+            pl = _tangent_plane(lift + 0.3, ax, z)
             out.append(text(str(v), 3.2, 0, 0, 0, 'print_white', plane=pl))
     a = math.radians(ang0 + 50)
-    out.append(text(f'{volume} ml', 5.0, 0, 0, 0, 'print_white', plane=_tangent_plane(lift + 0.05, a, h * 0.75)))
-    out.append(text('BORO 3.3', 3.0, 0, 0, 0, 'print_white', plane=_tangent_plane(lift + 0.05, a, h * 0.75 - 8)))
+    out.append(text(f'{volume} ml', 5.0, 0, 0, 0, 'print_white', plane=_tangent_plane(lift + 0.4, a, h * 0.75)))
+    out.append(text('BORO 3.3', 3.0, 0, 0, 0, 'print_white', plane=_tangent_plane(lift + 0.3, a, h * 0.75 - 8)))
     return out
 
 
