@@ -369,7 +369,6 @@ export function sceneParts({ arrays, run }) {
       }
     } else if (o.kind === 'body') {
       it.mesh = new Mesh(tinted(primitive(o.shape, o.size), it.base), material(o, { ...look, shell: o.shape !== 'plane' }));
-      if (o.glow) it.mesh.material.uniforms.uGlowC.value.setRGB(...colorHex(o.color).map((v) => Math.min(1, v * 0.5 + 0.55)));
     } else if (o.kind === 'lines') {
       const geo = new BufferGeometry(), nv = d.position.length / 3;
       geo.setIndex(new BufferAttribute(d.index, 1));
@@ -446,6 +445,9 @@ export function sceneParts({ arrays, run }) {
     }
     if (!it.mesh) return;
     it.mesh.frustumCulled = false;
+    // a glowing body, or anything glowing over the motion (a flame), glows toward a light tint of its own color
+    const gc = ((o.kind === 'body' && o.glow) || d.track?.glow) && it.mesh.material?.uniforms?.uGlowC;
+    if (gc) gc.value.setRGB(...colorHex(o.color).map((v) => Math.min(1, v * 0.5 + 0.55)));
     // every solid casts and takes the key light's soft shadow; glass, glows and lines do neither
     if (['mesh', 'body', 'points', 'atoms'].includes(o.kind) && !glass && fin !== 'emissive') {
       it.mesh.castShadow = !it.d?.rv;

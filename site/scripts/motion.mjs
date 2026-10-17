@@ -82,6 +82,12 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
       }
     }
   }
+  // a field's peak under the low rank sum's own error is that error, not a reading: an unloaded part reads 0
+  const errs = solids.map(({ o }) => o.track.field && o.track.field.f === 0 ? o.track.field.err ?? 0 : 0);
+  const floor = Math.max(0, ...errs) * Math.max(0, ...fpeak.filter(Number.isFinite));
+  for (let f = 0; f < M; f++) {
+    if (fpeak[f] <= floor) { fpeak[f] = 0; peaks[f] = null; }
+  }
   if (solids.length) out.box = lo.map((l, f) => [l.map(r6), hi[f].map(r6)]);
   if (follow && centers.every(Boolean)) out.follow = centers;
   if (peaks.some(Boolean)) out.peaks = peaks;

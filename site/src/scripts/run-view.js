@@ -165,7 +165,10 @@ export function motionView(orbit, rv, rest, run, tau, vw, vh) {
   orbit.update();
   if (!Number.isFinite(tau)) return;
   const { a, b, k } = motionFrame(m, tau), A = m.box[a], B = m.box[b];
+  // what moves, with half its own size around it, so a part far from its rest framing never touches the edge
   const lo = A[0].map((x, i) => x + (B[0][i] - x) * k), hi = A[1].map((x, i) => x + (B[1][i] - x) * k);
+  const pad = 0.5 * Math.hypot(...[0, 1, 2].map((i) => hi[i] - lo[i]));
+  for (let i = 0; i < 3; i++) { lo[i] -= pad; hi[i] += pad; }
   // the rest framing's own box, as the camera frames it (scene-view.js mainOrbit)
   const box = run.subject || run.hold || run.bounds;
   const pts = [...(run.subject && run.points ? run.points : corners(box.lo, box.hi)), ...corners(lo, hi)];
