@@ -7,10 +7,11 @@
 // on screen; it pauses off screen and in a hidden tab. With reduced motion, without WebGL or before
 // the script runs, the figure keeps Wobbl's own heatmap and the final numbers. Nothing here reads or
 // writes the URL. initLiveRuns returns a function that tears everything down when the page is left.
-import { Orbit, corners, fitTo, orbitControls } from './orbit.js';
+import { Orbit, orbitControls } from './orbit.js';
 import { decoder, inWorker, offscreen, onPage, webgl, type Back } from './play-back';
 import { num, sig } from './scene-file.js';
-import { aimAt, cameraOf, followAt, insetView, mainOrbit, tubeScale } from './scene-view.js';
+import { aimAt, followAt } from './scene-view.js';
+import { clamp01, fitView, frameAt, homeView, interp, newOrbit, paneViews, runFrame, runView, sceneFrame as sceneFrameOf } from './run-view.js';
 
 interface Ev { k: number; text: string }
 interface Poster { src: string; srcset: string; width: number; height: number; alt: string }
@@ -37,15 +38,6 @@ function fmt(x: number, d = 0): string {
   return (x < 0 && Number(s) !== 0 ? '-' : '') + whole + (dot < 0 ? '' : s.slice(dot));
 }
 const clock = (s: number) => { const m = Math.floor(s / 60); return `${m}:${String(Math.floor(s - m * 60)).padStart(2, '0')}`; };
-const clamp01 = (x: number) => Math.min(Math.max(x, 0), 1);
-/** y at x on a piecewise linear curve. */
-function interp(xs: number[], ys: number[], x: number): number {
-  if (x <= xs[0]) return ys[0];
-  if (x >= xs[xs.length - 1]) return ys[ys.length - 1];
-  let lo = 0, hi = xs.length - 1;
-  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (xs[mid] <= x) lo = mid; else hi = mid; }
-  return ys[lo] + ((ys[hi] - ys[lo]) * (x - xs[lo])) / (xs[hi] - xs[lo]);
-}
 
 export function initLiveRuns(): () => void {
   const figs = [...document.querySelectorAll<HTMLElement>('figure[data-lrun]')];
@@ -107,10 +99,6 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const homeOf = (pi: number) => data.panes[pi].home ?? data.panes[pi].run.input.home;
   const pos: number[] = shown.map((pi) => (sceneRun ? homeOf(pi) : 0));
   let free = false;
-  const frameAt = (run: any, p: number) => {
-    const F = run.input.t.length, a = Math.min(Math.max(Math.floor(p), 0), F - 1), b = Math.min(a + 1, F - 1);
-    return { a, b, k: Math.min(Math.max(p - a, 0), 1) };
-  };
   // the frame position of an input value, read between the saved frames around it
   const posOf = (ts: number[], v: number) => {
     const up = ts[ts.length - 1] >= ts[0];
@@ -264,69 +252,24 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const duration = data.pace.seconds;
   const u = () => clamp01((t - LEAD) / duration);
   const lead = data.panes[0].run;
-  const lo = sceneRun ? lead.bounds.lo : lead.mesh.bounds_min, hi = sceneRun ? lead.bounds.hi : lead.mesh.bounds_max;
-  const radius = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2;
+  // what the view holds and where its camera opens, as the stills drawn at build time open (run-view.js)
+  const rv = runView(data.kind, lead), radius: number = rv.radius;
   const top = strength ? Math.max(...data.panes.map((p) => p.run.governing_MPa)) : 0;
 
   /** The rectangle of each part in CSS pixels: side by side when the view is wider than tall. */
-  const views = () => (shown.length === 1 ? [[0, 0, w, h]]
-    : w >= h ? [[0, 0, w / 2, h], [w / 2, 0, w / 2, h]] : [[0, 0, w, h / 2], [0, h / 2, w, h / 2]]);
-  // the points the view has to hold: the corners of the part's box, and the arrow's ends at full load
-  const box = corners(lo, hi);
-  if (strength && lead.arrow) {
-    const a = lead.arrow, len = 0.42 * radius * (a.pull ? 1 : -1);
-    box.push(a.point, a.point.map((x: number, i: number) => x + len * a.dir[i]));
-  }
-  /** Back the camera off until every one of those points is inside the view with a margin. */
+  const views = () => paneViews(shown.length, w, h);
+  /** Back the camera off until everything the view holds is inside it with a margin. */
   function fitCamera() {
     const [, , vw, vh] = views()[0];
-    orbit!.aspect = vw / vh;
-    if (sceneRun) {
-      // a scene frames its subject, or follows it, as its stills do (scene-view.js), from where the camera now looks
-      const { a, b, k } = frameAt(lead, pos[0]);
-      const v = [Math.cos(orbit!.el) * Math.cos(orbit!.az), Math.cos(orbit!.el) * Math.sin(orbit!.az), Math.sin(orbit!.el)];
-      const o = mainOrbit({ ...lead, camera: { ...lead.camera, view: v }, follow: lead.follow && { ...lead.follow, dir: v } }, vw, vh, a, b, k);
-      Object.assign(orbit!, { target: o.target, dist: o.dist, near: o.near, far: o.far, minDist: o.minDist, maxDist: o.maxDist });
-      orbit!.update();
-      return;
-    }
-    fitTo(orbit!, box, radius * 1.2);
+    fitView(orbit!, rv, vw, vh, pos[0]);
   }
   function homeCamera() {
-    const v = sceneRun && lead.follow?.dir ? lead.follow.dir : lead.camera.view, l = Math.hypot(v[0], v[1], v[2]) || 1;
-    orbit!.az = Math.atan2(v[1], v[0]);
-    orbit!.el = Math.asin(Math.max(-1, Math.min(1, v[2] / l)));
-    if (sceneRun && lead.subject) {
-      // the side the subject fills the frame from, as the stills open on it (scene-view.js)
-      const [, , vw, vh] = views()[0], { a, b, k } = frameAt(lead, pos[0]);
-      const o = mainOrbit(lead, vw, vh, a, b, k, { search: true });
-      orbit!.az = o.az;
-      orbit!.el = o.el;
-    }
-    fitCamera();
+    const [, , vw, vh] = views()[0];
+    homeView(orbit!, rv, vw, vh, pos[0]);
   }
   /** Each pane's camera, the inset beside a view that follows its subject, and the scene state each is drawn at. */
   function sceneFrame(f: any) {
-    const follows = !!lead.follow;
-    f.scenes = shown.map((pi, row) => {
-      const r = data.panes[pi].run, { a, b, k: kk } = frameAt(r, pos[row]), T = r.input.t;
-      return { a, b, k: kk, t: kk ? T[a] + (T[b] - T[a]) * kk : T[a], bend: look.bend, mag: follows ? false : look.mag };
-    });
-    if (!follows || !orbit) return;
-    const vs = views();
-    f.cameras = [];
-    f.insets = [];
-    insets.length = 0;
-    shown.forEach((pi, row) => {
-      const r = data.panes[pi].run, { a, b, k: kk } = frameAt(r, pos[row]), [, , vw, vh] = vs[row];
-      const ins = insetView(r, vw, vh, orbit!.az, orbit!.el);
-      aimAt(orbit!, followAt(r, a, b, kk) ?? orbit!.target, vw, vh, ins?.rect);
-      f.cameras.push(cameraOf(orbit!));
-      insets.push(ins);
-      f.scenes[row].tube = tubeScale(r, orbit!, vh);
-      if (!ins) { f.insets.push(null); return; }
-      f.insets.push({ rect: ins.rect, camera: cameraOf(ins.orbit), scene: { ...f.scenes[row], mag: look.mag, tube: 1 } });
-    });
+    sceneFrameOf(f, orbit, rv, shown.map((pi) => data.panes[pi].run), pos, views(), look, insets);
   }
   const insets: any[] = [];
 
@@ -334,26 +277,9 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     pending = 0;
     if (!ready || !back || !orbit) return;
     const k = u();
-    const f: any = {
-      camera: { position: orbit.eye, target: orbit.target, fov: orbit.fov, aspect: orbit.aspect, near: orbit.near, far: orbit.far },
-      views: views(), k, radius, bend: look.bend,
-    };
-    if (sceneRun) {
-      // each pane's scene at its own place along the input
-      sceneFrame(f);
-      f.k = 1;
-    } else if (!strength) {
-      if (lead.transient) {
-        const s = simSeconds(k), ts: number[] = lead.times_s;
-        let i = 0;
-        while (i < ts.length - 2 && ts[i + 1] <= s) i++;
-        f.heat = { i0: i, i1: i + 1, mix: clamp01((s - ts[i]) / (ts[i + 1] - ts[i])) };
-        f.k = 1;
-      } else {
-        f.heat = { i0: 0, i1: 0, mix: 0 };
-        f.k = k >= 1 ? 1 : interp(lead.warmup.t_s, lead.warmup.theta, simSeconds(k));
-      }
-    }
+    const f: any = runFrame(rv, orbit, views(), k, look.bend, data.pace.span);
+    // each pane's scene at its own place along the input
+    if (sceneRun) sceneFrame(f);
     back.frame(f);
     markers(k);
   }
@@ -494,9 +420,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     } while (ids.some((v, i) => v !== shown[i]));
     if (abort.signal.aborted) return;
     ready = true;
-    const target = [0, 1, 2].map((i) => (lo[i] + hi[i]) / 2);
-    orbit = new Orbit({ target, az: 0, el: 0, dist: radius * 4, fov: sceneRun ? lead.camera.fov : 30, aspect: 1, near: radius / 50, far: radius * 40,
-      minDist: radius * 1.1, maxDist: radius * 8 });
+    orbit = newOrbit(rv);
     homeCamera();
     on(canvas, 'dblclick', () => { homeCamera(); requestDraw(); });
     on(canvas, 'keydown', (e: KeyboardEvent) => {
