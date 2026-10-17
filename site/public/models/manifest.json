@@ -54,6 +54,11 @@
       {"file": "cast-mount-credibility/pulley.glb", "covers": ["pulley"]}
     ]
   },
+  "cast-pulley": {
+    "add": [
+      {"file": "cast-pulley/bottom-board.glb"}
+    ]
+  },
   "cell-runaway": {
     "add": [
       {"file": "cell-runaway/cell-ends.glb", "parent": "cell"},
