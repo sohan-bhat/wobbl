@@ -742,7 +742,8 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
       restless = false;
       lastDrawn = f;
       const into = k >= 0;
-      if (into) refiner.begin();
+      if (into) refiner.begin(k);
+      else refiner?.moving();
       const rect = into ? refiner.rect : (x, y, rw, rh) => { renderer.setViewport(x, y, rw, rh); renderer.setScissor(x, y, rw, rh); };
       // a page color to clear to: three.js takes a clear color into sRGB only for the canvas, so the refining
       // target (which holds sRGB values) is given it as it is
@@ -796,19 +797,33 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
         // a model between the camera and the part is veiled (play-models.js)
         if (part.sp) part.sp.veil(camera.position);
         else for (const m of part.extras) { m.veil(camera.position, part.center); m.ghosts(camera, part.bounds); }
-        if (into) {
-          // the solids first, then their occlusion, then the lines and arrows over it (play-refine.js OVERLAY)
-          refiner.jitter(camera, vw, vh, k);
+        if (into && k === 0) {
+          // a rest starts with the solids alone, for the depth the occlusion is worked out from, then the lines and
+          // arrows (play-refine.js OVERLAY); the occlusion reaches a sixteenth of the view's half height at its
+          // target, enough for crevices and contacts without greying whole faces
+          refiner.lay(0);
           camera.layers.set(0);
           renderer.render(part.scene, camera);
-          refiner.jitter(camera, vw, vh, k, -1);
-          // the occlusion reaches a tenth of the view's half height at its target
-          refiner.occlude(camera, x, by0, vw, vh, k, r * 0.08, still);
+          refiner.occlude(camera, x, by0, vw, vh, r * 0.05);
+          if (still) {
+            // a still is the same frame drawn again, its surfaces taking the occlusion whole
+            refiner.lay(1);
+            rect(x, by0, vw, vh);
+            renderer.clear();
+            renderer.render(backdrop, camera);
+            renderer.clearDepth();
+            camera.layers.enable(OVERLAY);
+            renderer.render(part.scene, camera);
+          } else {
+            camera.layers.set(OVERLAY);
+            renderer.render(part.scene, camera);
+            camera.layers.enable(0);
+          }
+        } else if (into) {
+          // then the whole frame, its surfaces taking the occlusion as it fades in, and moved by a fraction of a pixel
           refiner.jitter(camera, vw, vh, k);
-          camera.layers.set(OVERLAY);
           renderer.render(part.scene, camera);
           refiner.jitter(camera, vw, vh, k, -1);
-          camera.layers.enable(0);
         } else {
           renderer.render(part.scene, camera);
         }
@@ -826,10 +841,11 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
           part.sp.set(ins.scene);
           look(ins.camera);
           renderer.clearDepth();
-          // the inset keeps the main view's shadow, which it is too small to show
-          if (into) refiner.jitter(camera, iw, ih, k);
+          // the inset keeps the main view's shadow, which it is too small to show, and has no occlusion of its own
+          if (into) { refiner.lay(0); refiner.jitter(camera, iw, ih, k); }
           renderer.render(part.scene, camera);
           look(f.cameras ? f.cameras[part.row] : f.camera);
+          if (into) refiner.lay(Math.min(1, k / refiner.ramp));
         }
       });
       if (into) {
