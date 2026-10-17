@@ -75,11 +75,13 @@ def build_sweep(out: Path, sw: dict) -> Path:
     reach, centre, drawn, plane = draw_bodies(s, sw)
     w = words(o)
     J = joint_poses(out, sw)
-    pins(s, sw, J, reach)
+    pinned = pins(s, sw, J, reach)
     motors = drive_motors(s, sw, J, reach, drawn)
-    setting(s, out, sw, J, w, plane, reach, drawn)
+    shield = setting(s, out, sw, J, w, plane, reach, drawn)
     paths(s, sw, v, reach)
     sweep_readouts(s, sw, motors)
+    if not shield and pb:
+        run_motion(s, out, pb, drawn, pinned, motors, reach)
     for e in sw.get("events", []):
         s.event(float(e["t_s"]), e["name"], e.get("detail", ""), kind=e.get("kind", "info"))
     s.note("Each value of the slider is its own run, shown at the instant its motors are asked the most.")
@@ -131,12 +133,25 @@ def draw_bodies(s, pb):
 def pins(s, pb, J, reach):
     """A steel pin through every joint that is not driven, square to its axis."""
     driven = {k for k, j in pb.get("joints", {}).items() if "needed" in j}
+    out = {}
     for name, j in J.items():
         if name in driven or j["type"] != "hinge":
             continue
         r = reach * 0.018
-        s.body("cylinder", [r, r * 1.4], pos=j["anchor"], quat=_along(j["axis"]), color="#c3c7cd",
-               name=f"{name} pin")
+        out[name] = s.body("cylinder", [r, r * 1.4], pos=j["anchor"], quat=_along(j["axis"]), color="#c3c7cd",
+                           name=f"{name} pin")
+    return out
+
+
+def motor_pose(g: dict, reach: float):
+    """Where a driven joint's motor sits at each frame, behind the link on the joint's axis (below it when the axis
+    stands upright), and its shaft on the joint: positions and quaternions of both."""
+    ax = np.asarray(g["axis"], float)
+    side = -ax if float(np.mean(ax[:, 2])) > -0.5 else ax
+    if abs(float(np.mean(ax[:, 2]))) < 0.5:
+        side = -ax
+    h = reach * 0.05
+    return g["anchor"] + side * (h + reach * 0.012), _along(side), g["anchor"], _along(ax)
 
 
 def drive_motors(s, pb, J, reach, drawn=None) -> list[dict]:
@@ -153,22 +168,19 @@ def drive_motors(s, pb, J, reach, drawn=None) -> list[dict]:
              "joint": j, "body": None}
         g = J.get(name)
         if g is not None:
-            ax = np.asarray(g["axis"], float)
-            side = -ax if float(np.mean(ax[:, 2])) > -0.5 else ax           # behind the link, below it when upright
-            if abs(float(np.mean(ax[:, 2]))) < 0.5:
-                side = -ax
+            pos, quat, spos, squat = motor_pose(g, reach)
             r, h = reach * 0.04, reach * 0.05
-            pos = g["anchor"] + side * (h + reach * 0.012)
-            body = s.body("cylinder", [r, h], pos=pos, quat=_along(side), color="#2b2e33", name=f"{name} motor")
+            body = s.body("cylinder", [r, h], pos=pos, quat=quat, color="#2b2e33", name=f"{name} motor")
             body.color_by(LOAD, share * 100, colormap="heat", range=(0, 150), unit="%", digits=3, limit=100,
                           limit_label="motor limit")
-            s.body("cylinder", [reach * 0.012, reach * 0.014], pos=g["anchor"], quat=_along(ax), color="#c3c7cd",
-                   name=f"{name} shaft")
+            d["shaft"] = s.body("cylinder", [reach * 0.012, reach * 0.014], pos=spos, quat=squat, color="#c3c7cd",
+                                name=f"{name} shaft")
             d["body"] = body
             link = (drawn or {}).get(g.get("body"))
             if link is not None and link.fld is None:
                 link.color_by(LOAD, share * 100, colormap="heat", range=(0, 150), unit="%", digits=3, limit=100,
                               limit_label="motor limit")
+                d["link"] = link
             s.label(f"{name} {{{name} torque}}", [0, 0, reach * 0.09], follow=body, kind="note")
         out.append(d)
     out.sort(key=lambda d: -float(d["share"].max()))
@@ -206,6 +218,49 @@ def readouts(s, pb, motors):
         if name.endswith(("speed", "current", "electrical power")) or len(s.readouts) >= 9:
             continue
         s.readout(name, ser["values"], unit=ser.get("unit", ""), digits=3)
+
+
+def run_motion(s, out, pb: dict, drawn: dict, pinned: dict, motors: list[dict], reach: float) -> bool:
+    """The run's own move at the asked value as the scene's motion, in real time: every geom on its recorded pose
+    at each saved step, the pins and motors riding their joints, and each motor and the link it drives colored by
+    the torque it is asked for against what it can give at that moment. The sweep's slider shows each value at its
+    hardest instant; this is what the run itself did. False when the run kept no poses that fit the scene."""
+    t = np.asarray(pb.get("t") or [], float)
+    if len(t) < 3 or pb.get("manifest", {}).get("kind") != "mechanism" or np.any(np.diff(t) <= 0):
+        return False
+    n = len(t)
+    rec = {b["name"]: b for b in pb.get("bodies", []) if not b.get("static")}
+    poses = {}
+    for name, b in rec.items():
+        P, Q = np.asarray(b["pos"], float), np.asarray(b["quat"], float)
+        if name in drawn and P.shape == (n, 3) and Q.shape == (n, 4):
+            poses[name] = (P, Q)
+    if not poses:
+        return False
+    J = joint_poses(out, pb)
+    s.motion(t - t[0], t - t[0], label="time", unit="s",
+             note="The run's own move at the asked value, as it solved it with the real motors, in real time.")
+    for name, (P, Q) in poses.items():
+        drawn[name].track(pos=P, quat=Q)
+    for name, body in pinned.items():
+        g = J.get(name)
+        if g is not None:
+            body.track(pos=g["anchor"], quat=_along(g["axis"]))
+    joints = pb.get("joints", {})
+    for d in motors:
+        g, j = J.get(d["name"]), joints.get(d["name"], {})
+        if g is None or d["body"] is None:
+            continue
+        pos, quat, spos, squat = motor_pose(g, reach)
+        need = np.abs(np.asarray((j.get("needed") or {}).get("values", []), float))
+        lim = np.abs(np.asarray((j.get("limit") or {}).get("values", need), float))
+        share = np.asarray(j["share"], float) if "share" in j else need / np.maximum(lim, 1e-12)
+        share = share * 100 if len(share) == n else None
+        d["body"].track(pos=pos, quat=quat, field=share)
+        d["shaft"].track(pos=spos, quat=squat)
+        if d.get("link") is not None and share is not None:
+            d["link"].track(field=share)
+    return True
 
 
 def windows(v) -> list[tuple]:
@@ -276,14 +331,15 @@ def sweep_readouts(s, sw, motors):
 
 
 def setting(s, out, pb, J, w, plane, reach, drawn):
-    """What the question puts around the mechanism: a windshield for a wiper, a desk for an arm, else the floor."""
+    """What the question puts around the mechanism: a windshield for a wiper, a desk for an arm, else the floor.
+    True when it drew a windshield, whose arm and blade ride the output link at each frame."""
     driven = {k for k, j in pb.get("joints", {}).items() if "needed" in j}
     if w & {"wiper", "wipers", "windshield", "windscreen", "glass"}:
         out_j = [(k, j) for k, j in J.items() if k not in driven and j["type"] == "hinge" and
                  np.ptp(j["anchor"], 0).max() < 2e-3 * reach]
         if out_j:
             windshield(s, pb, out_j[0][0], out_j[0][1], J, reach)
-            return
+            return True
     if plane is not None:
         z = float(np.asarray(plane["pos"])[2])
         if w & {"desk", "desktop", "table", "bench", "workbench"}:
