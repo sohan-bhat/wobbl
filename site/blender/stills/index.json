@@ -56,23 +56,23 @@
   "file": "cell-runaway-output.webp"
  },
  "circuits/buck": {
-  "key": "d7920eaf24b09709",
+  "key": "7238c057878b0e5e",
   "file": "circuits-buck.webp"
  },
  "circuits/kicad-board": {
-  "key": "7cc7aec83c2f4f3f",
+  "key": "7bce372e25e265c5",
   "file": "circuits-kicad-board.webp"
  },
  "circuits/led": {
-  "key": "fa295d9ab88247b5",
+  "key": "69afe32f5bc04be2",
   "file": "circuits-led.webp"
  },
  "circuits/mosfet": {
-  "key": "7c1d5cb2ab803b5b",
+  "key": "21cfafded87a1964",
   "file": "circuits-mosfet.webp"
  },
  "circuits/opamp-cable": {
-  "key": "4f96cf42fc4231d2",
+  "key": "4fffba9a22fcc51b",
   "file": "circuits-opamp-cable.webp"
  },
  "cold-plate/output": {
@@ -128,11 +128,11 @@
   "file": "motor-mount-output.webp"
  },
  "pcb-buck-ringing/output/loose": {
-  "key": "78624f5072612124",
+  "key": "cf15e96e9839504d",
   "file": "pcb-buck-ringing-output-loose.webp"
  },
  "pcb-buck-ringing/output/tight": {
-  "key": "9f6d19d8f3d69ae6",
+  "key": "6387e30d017feaf5",
   "file": "pcb-buck-ringing-output-tight.webp"
  },
  "printed-lid/output": {
