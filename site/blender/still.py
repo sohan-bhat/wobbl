@@ -19,6 +19,7 @@ import sources  # noqa: E402
 from mathutils import Matrix, Vector  # noqa: E402
 
 BG = (14 / 255, 15 / 255, 17 / 255)
+EYE = [0.0, 0.0, 0.0]     # the camera of the view being built, for shells drawn cut open
 PLAIN = os.path.join(sources.CACHE, 'plain')
 
 
@@ -62,11 +63,37 @@ def part_material(kind, rgb=None, opacity=1.0, cut=False, glow=0.0, prop=False, 
         b.inputs['Emission Strength'].default_value = 1.0 if emissive else 2.5 * glow
     shader = b.outputs['BSDF']
     if cut:
-        # a shell drawn cut open shows only its far side, as the page draws it
+        # a shell drawn cut open shows only its far side, as the page draws it: the faces turned toward the camera
+        # let everything through, for light as well, so what the shell holds is lit and not shut in the dark
         geo = nt.nodes.new('ShaderNodeNewGeometry')
+        eye = nt.nodes.new('ShaderNodeCombineXYZ')
+        for i, k in enumerate('XYZ'):
+            eye.inputs[k].default_value = EYE[i]
+        to_eye = nt.nodes.new('ShaderNodeVectorMath')
+        to_eye.operation = 'SUBTRACT'
+        nt.links.new(eye.outputs['Vector'], to_eye.inputs[0])
+        nt.links.new(geo.outputs['Position'], to_eye.inputs[1])
+        facing = nt.nodes.new('ShaderNodeVectorMath')
+        facing.operation = 'DOT_PRODUCT'
+        nt.links.new(to_eye.outputs['Vector'], facing.inputs[0])
+        nt.links.new(geo.outputs['True Normal'], facing.inputs[1])
+        # Cycles turns the true normal toward each ray, so turn it back to the face's own side first
+        side = nt.nodes.new('ShaderNodeMath')
+        side.operation = 'MULTIPLY_ADD'
+        nt.links.new(geo.outputs['Backfacing'], side.inputs[0])
+        side.inputs[1].default_value = -2.0
+        side.inputs[2].default_value = 1.0
+        own = nt.nodes.new('ShaderNodeMath')
+        own.operation = 'MULTIPLY'
+        nt.links.new(facing.outputs['Value'], own.inputs[0])
+        nt.links.new(side.outputs['Value'], own.inputs[1])
+        away = nt.nodes.new('ShaderNodeMath')
+        away.operation = 'LESS_THAN'
+        nt.links.new(own.outputs['Value'], away.inputs[0])
+        away.inputs[1].default_value = 0.0
         tr = nt.nodes.new('ShaderNodeBsdfTransparent')
         mix = nt.nodes.new('ShaderNodeMixShader')
-        nt.links.new(geo.outputs['Backfacing'], mix.inputs['Fac'])
+        nt.links.new(away.outputs['Value'], mix.inputs['Fac'])
         nt.links.new(tr.outputs['BSDF'], mix.inputs[1])
         nt.links.new(shader, mix.inputs[2])
         shader = mix.outputs['Shader']
@@ -327,6 +354,7 @@ def camera(lay, cam, dof=True):
 def render_view(lay, view, blob, entry, out, w, h, samples, inset=False):
     kit.reset(1.0)
     _mats.clear()
+    EYE[:] = view['camera']['eye']
     build(lay, view, blob, entry)
     if not inset:
         shadow_catcher(lay, view)
@@ -336,6 +364,9 @@ def render_view(lay, view, blob, entry, out, w, h, samples, inset=False):
     camera(lay, view['camera'], dof=not inset)
     sc = bpy.context.scene
     sc.view_settings.exposure = math.log2(1.3)
+    # leave part of the machine free for whatever else runs beside the batch
+    sc.render.threads_mode = 'FIXED'
+    sc.render.threads = max(2, (os.cpu_count() or 4) * 2 // 3)
     kit.render(out, w, h, samples=samples)
 
 
@@ -347,10 +378,10 @@ def main():
     blob = open(base + '.bin', 'rb').read()
     man = json.load(open(os.path.join(kit.OUT, 'manifest.json')))
     entry = man['examples'].get(key, {})
-    W, H = lay['w'] * 2, lay['h'] * 2
+    W, H = lay['w'] * 3 // 2, lay['h'] * 3 // 2      # one and a half times the card, then scaled down
     render_view(lay, lay['main'], blob, entry, out, W, H, samples)
     if lay.get('inset'):
-        x, y, w, h = [v * 2 for v in lay['inset']['rect']]
+        x, y, w, h = [v * 3 // 2 for v in lay['inset']['rect']]
         tmp = out.replace('.png', '.inset.png')
         render_view(lay, lay['inset'], blob, entry, tmp, w, h, max(16, samples // 2), inset=True)
         a = bpy.data.images.load(out)

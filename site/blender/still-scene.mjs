@@ -12,6 +12,9 @@ import { aimAt, cameraOf, followAt, insetView, mainOrbit, tubeScale } from '../s
 
 const OVER = [242, 242, 238], NONE = [85, 88, 94];
 const bytes = (c) => colorHex(c || '#9aa0a6').map((x) => Math.round(x * 255));
+// a see through surface is drawn solid in the color it would show over the page's background, as the page does
+const BG = [14, 15, 17];
+const behind = (rgb, a) => rgb.map((c, i) => Math.round(BG[i] + (c - BG[i]) * Math.min(1, Math.max(a, 0.3) * 1.25)));
 
 function quatMat(q, p, s = 1) {
   const [w, x, y, z] = q;
@@ -72,7 +75,8 @@ export function layout(sceneBytes, run, w = 640, h = 480) {
       const d = arrays.objs[oi];
       if (!d || !shownAt(o.when, t)) return;
       if (near && o.kind === 'lines' && far(d.P)) return;
-      const base = { oi, name: o.name || '', kind: o.kind, prop: !!o.prop, opacity: o.opacity ?? 1, color: bytes(o.color), field: !!o.field };
+      const a1 = o.opacity ?? 1;
+      const base = { oi, name: o.name || '', kind: o.kind, prop: !!o.prop, opacity: a1, color: a1 < 1 ? behind(bytes(o.color), a1) : bytes(o.color), field: !!o.field };
       if (o.glow) base.glow = series(o.glow, a, b, k);
       const m = mag && magnifyOf(H, oi);
       const placed = (pose) => {
