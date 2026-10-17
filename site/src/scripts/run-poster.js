@@ -17,21 +17,28 @@ async function addPane(stage, root, pane, top, row) {
   const models = loadModels(root, pane.run.example).catch(() => null);
   const { arrays } = await loadRun(pane.file, pane.run);
   const part = stage.add({ run: pane.run, arrays, top, row });
-  if (pane.run.kind === 'heat' && evenAtStart(pane.run, arrays)) part.uniforms.uIso.value = 0;
+  if (pane.run.kind === 'heat') evenStart(part, pane.run, arrays);
   stage.dress(part, await models);
   return part;
 }
 
 /**
- * Whether a heat part is all at one temperature when its clock starts, as a part at the air's temperature is. No
- * isotherm falls on it then, and a graphics card draws none, but software WebGL draws the isotherms' test of a
- * zero width line as speckle all over it, so its still is drawn without them.
+ * A heat part all at one temperature when its clock starts, as a part at the air's temperature is, drawn as a
+ * graphics card draws it. The isotherms' test then finds a line of no width: on the card a temperature right on
+ * an isotherm darkens the whole part as a line and any other leaves it clear, while software WebGL, which reads
+ * the one temperature back a hair off across each face, would draw speckle. So the still gives the test exactly
+ * zero where the card draws the line, and no isotherms where it draws none.
  */
-function evenAtStart(run, arrays) {
-  if (!run.transient) return interp(run.warmup.t_s, run.warmup.theta, 0) === 0;
-  const n = arrays.position.length / 3, f = arrays.frames;
-  for (let i = 1; i < n; i++) if (f[i] !== f[0]) return false;
-  return true;
+function evenStart(part, run, arrays) {
+  let rise = 0;
+  if (run.transient) {
+    const n = arrays.position.length / 3, f = arrays.frames;
+    for (let i = 1; i < n; i++) if (f[i] !== f[0]) return;
+    rise = f[0];
+  } else if (interp(run.warmup.t_s, run.warmup.theta, 0) !== 0) return;
+  const u = part.uniforms, iso = u.uIso.value, at = (run.air_C + rise) / iso;
+  if (iso > 0 && Math.abs(at - Math.round(at)) < 1e-6) { u.uAir.value = -rise; u.uIso.value = 1; }
+  else u.uIso.value = 0;
 }
 
 /**

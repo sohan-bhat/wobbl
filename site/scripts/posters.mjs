@@ -22,8 +22,9 @@ const VERSION = 4;                        // bump when the stills' look changes 
 const QUALITY = 0.86;                     // WebP quality
 // the view in CSS pixels as the example pages lay it out in a 1280 and a 375 pixel wide window
 // (styles/live-run.css), one pane at 4:3 or two side by side at 2:1 and stacked at 4:5, and the device pixels to a
-// CSS pixel it is drawn at: two panes side by side a little under twice, so each stays about as large a file
-const LAYOUTS = { wide: { 1: [566, 424, 2], 2: [1182, 590, 1.6] }, narrow: { 1: [341, 255, 2], 2: [341, 427, 2] } };
+// CSS pixel it is drawn at: two panes side by side a little under twice, so each stays about as large a file, and
+// on a phone the 1.5 the live view draws at there (live-run.ts)
+const LAYOUTS = { wide: { 1: [566, 424, 2], 2: [1182, 590, 1.6] }, narrow: { 1: [341, 255, 1.5], 2: [341, 427, 1.5] } };
 const CARD = [640, 480, 2];               // a scene's card, drawn at twice that and halved
 const ORIGIN = 'https://wobbl.local';     // where the drawing page finds the site's public files
 const TYPES = { '.json': 'application/json', '.rgbe': 'application/octet-stream', '.glb': 'model/gltf-binary', '.webp': 'image/webp' };
