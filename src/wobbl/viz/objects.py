@@ -107,6 +107,12 @@ class _Obj:
             d["when"] = [None if v is None else _f(v) for v in self.when]
         return d
 
+    def _track(self):
+        if getattr(self, "trk", None) is None:
+            from .track import Track
+            self.trk = Track(self)
+        return self.trk
+
     def frames(self, a, keep, inner=1):
         """A per frame array checked against the timeline, thinned to the frames kept."""
         a = np.asarray(a, float)
@@ -152,6 +158,26 @@ class Mesh(_Obj):
         self.pose = (np.asarray(pos, float), np.asarray(quat, float))
         return self
 
+    def track(self, *, pos=None, quat=None, field=None, deform=None, glow=None, when=None) -> "Mesh":
+        """What the mesh does over the scene's motion (Scene.motion), each array with the motion's frames first:
+        a rigid pose (pos, quat), the field it is colored by at every vertex (frames x vertices, NaN where it has
+        none) and its elastic shape (frames x vertices x 3), drawn as much larger as its deform() says."""
+        t = self._track()
+        if pos is not None:
+            t.pos = t.check(pos, "pos").reshape(-1, 3)
+            t.quat = t.check((1, 0, 0, 0) * np.ones((len(t.pos), 1)) if quat is None else quat, "quat").reshape(-1, 4)
+        if field is not None:
+            if not self.fld:
+                raise ValueError(f"mesh {self.name!r}: color_by() first, so the track's field has its scale")
+            t.field = (self.fld[0], t.check(field, "field"))
+        if deform is not None:
+            t.deform = (t.check(deform, "deform"), self.dfm[2] if self.dfm else 1.0)
+        if glow is not None:
+            t.glow = t.check(glow, "glow")
+        if when is not None:
+            t.when = tuple(when)
+        return self
+
     def reveal(self, values, thresholds) -> "Mesh":
         """Draw only where a per vertex value is at most the frame's threshold, as a print rising layer by layer
         (values are heights) or a mold filling (values are fill times)."""
@@ -189,6 +215,8 @@ class Mesh(_Obj):
             d["reveal"] = {"values": enc.floats(v[idx]), "at": _fl(self.frames(th, keep))}
         if self.glow is not None:
             d["glow"] = _fl(self.frames(self.glow, keep), 3)
+        if getattr(self, "trk", None) is not None:
+            d["track"] = self.trk.encode(enc, idx)
         return d
 
 
@@ -227,6 +255,22 @@ class Body(_Obj):
         self.glow = np.asarray(level, float)
         return self
 
+    def track(self, *, pos=None, quat=None, size=None, glow=None, when=None) -> "Body":
+        """What the body does over the scene's motion: a pose, its size (frames x the size's numbers, as a flame
+        that grows with thrust) and its glow, each with the motion's frames first."""
+        t = self._track()
+        if pos is not None:
+            t.pos = t.check(pos, "pos").reshape(-1, 3)
+            t.quat = t.check(np.tile(self.quat if self.quat.ndim == 1 else self.quat[0], (len(t.pos), 1))
+                             if quat is None else quat, "quat").reshape(-1, 4)
+        if size is not None:
+            t.size = t.check(size, "size").reshape(t.obj.s.mo_n, -1)
+        if glow is not None:
+            t.glow = t.check(glow, "glow")
+        if when is not None:
+            t.when = tuple(when)
+        return self
+
     def color_by(self, field: str, values, *, unit: str = "", colormap: str = "inferno", range=None, limit=None,
                  limit_label: str = "", digits: int = 3, target=None) -> "Body":
         """Color the whole body by one value per frame, as a lumped cell temperature."""
@@ -245,6 +289,8 @@ class Body(_Obj):
             d["glow"] = _fl(self.frames(self.glow, keep), 3)
         if self.fld:
             d["field"] = {"f": self.fld[0], "values": _fl(self.frames(self.fld[1], keep), 5)}
+        if getattr(self, "trk", None) is not None:
+            d["track"] = self.trk.encode(enc)
         return d
 
 
@@ -298,6 +344,33 @@ class Lines(_Obj):
         self.paths = [np.asarray(p, float).reshape(-1, 3) for p in paths]
         self.color, self.width, self.values, self.f = _color(color), float(width), values, field
         self.times, self.at, self.flow, self.spacing, self.fade = times, at, flow, spacing, fade
+        self.speed = self.scale = None
+        self.offset = 0.0
+
+    def moving(self, speed, *, scale=None, base: float = 0.0) -> "Lines":
+        """The fluid's own speed at every point of every line (a list of arrays like the paths, in scene units
+        per second of real time), so the viewer can send tracers along each line as fast as the fluid goes there,
+        slowed by a factor it says. scale (one per timeline frame) and base make the lines' values base + scale x
+        values at each frame, as a fluid whose warming grows with the heat load."""
+        sp = [np.asarray(v, float).ravel() for v in speed]
+        if len(sp) != len(self.paths) or any(len(v) != len(p) for v, p in zip(sp, self.paths)):
+            raise ValueError(f"lines {self.name!r}: one speed per point of every line")
+        self.speed = sp
+        if scale is not None:
+            self.scale = np.asarray(scale, float).ravel()
+            self.offset = float(base)
+        return self
+
+    def track(self, *, drawn=None, when=None) -> "Lines":
+        """Each point's motion time, so the line traces itself as the motion plays (a flight path)."""
+        if when is not None:
+            self._track().when = tuple(when)
+        if drawn is not None:
+            t = self._track()
+            t.drawn = np.concatenate([np.ravel(v) for v in drawn])
+            if len(t.drawn) != sum(len(p) for p in self.paths):
+                raise ValueError(f"lines {self.name!r}: one motion time per point")
+        return self
 
     def encode(self, enc, keep, vfac):
         d = self.base()
@@ -305,6 +378,12 @@ class Lines(_Obj):
                  width=self.width)
         if self.values is not None:
             d["field"] = {"f": self.f, "values": enc.floats(np.concatenate([np.ravel(v) for v in self.values]))}
+            if self.scale is not None:
+                d["field"].update(scale=_fl(self.frames(self.scale, keep), 6), base=_f(self.offset))
+        if self.speed is not None:
+            d["speed"] = enc.floats(np.concatenate(self.speed))
+        if getattr(self, "trk", None) is not None:
+            d["track"] = self.trk.encode(enc)
         if self.times is not None:
             d["drawn"] = enc.floats(np.concatenate([np.ravel(v) for v in self.times]))
         if self.at is not None:

@@ -32,6 +32,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .track import motion_header
 from .objects import DT, Arrows, Atoms, Body, Ground, Lines, Mesh, Points, _Enc, _f, _fl, _Obj
 
 MAGIC = b"WBSC"
@@ -62,6 +63,8 @@ class Scene:
         self.cam: dict = {}
         self.result: dict | None = None
         self.mag: dict | None = None
+        self.mo: dict = {}
+        self.mo_n = 0
 
     # time
     def timeline(self, t, *, unit: str = "s", label: str = "time", seconds: float = 8.0,
@@ -86,6 +89,22 @@ class Scene:
             self.tl["design"] = float(design)
         if note:
             self.tl["note"] = note
+        return self
+
+    def motion(self, t, play, *, label: str = "time", unit: str = "s", note: str = "") -> "Scene":
+        """The physical event at the input value the question asked about (the timeline's design value), played on
+        its own clock: t holds each motion frame's physical time and play the playback second it is shown at, rising
+        from 0, so a slow motion stretch is one where play moves faster than t. Objects follow it through their
+        track() and readouts through readout(..., motion=). See track.py."""
+        t, play = np.asarray(t, float).ravel(), np.asarray(play, float).ravel()
+        if len(t) != len(play) or len(t) < 2:
+            raise ValueError("motion: t and play need the same length, at least 2")
+        if np.any(np.diff(t) <= 0) or np.any(np.diff(play) <= 0) or play[0] != 0:
+            raise ValueError("motion: t and play must rise frame to frame, and play must start at 0")
+        self.mo_n = len(t)
+        self.mo = {"t": _fl(t, 9), "play": _fl(play, 6), "label": label, "unit": unit}
+        if note:
+            self.mo["note"] = note
         return self
 
     def field(self, name: str, unit: str = "", *, colormap: str = "turbo", range=None, limit=None,
@@ -185,7 +204,8 @@ class Scene:
         self.labels.append(d)
         return self
 
-    def readout(self, name: str, values, *, unit: str = "", digits: int = 3, limit=None, target=None) -> "Scene":
+    def readout(self, name: str, values, *, unit: str = "", digits: int = 3, limit=None, target=None,
+                motion=None) -> "Scene":
         """A named number per frame that ticks with playback, such as load, peak stress or chamber pressure. Above
         limit (one number, or one per frame such as a motor's torque at its speed) it shows in red. Above target
         (0.8 of limit when not given, and it may come without a limit) the viewer calls the input marginal."""
@@ -199,8 +219,24 @@ class Scene:
             d["limit"] = _f(limit)
         if target is not None:
             d["target"] = _f(target)
+        if motion is not None:
+            mv = np.asarray(motion, float).ravel()
+            if len(mv) != self.mo_n:
+                raise ValueError(f"readout {name!r}: {len(mv)} motion values for {self.mo_n} motion frames")
+            d["mv"] = mv
         self.readouts.append(d)
         return self
+
+    def readout_motion(self, name: str, values) -> "Scene":
+        """Give a readout already made its value at every motion frame, as readout(..., motion=) would."""
+        mv = np.asarray(values, float).ravel()
+        if len(mv) != self.mo_n:
+            raise ValueError(f"readout {name!r}: {len(mv)} motion values for {self.mo_n} motion frames")
+        for r in self.readouts:
+            if r["name"] == name:
+                r["mv"] = mv
+                return self
+        raise ValueError(f"no readout named {name!r}")
 
     def event(self, t: float, name: str, detail: str = "", kind: str = "info") -> "Scene":
         """Something that happens at a time: burnout, first yield, impact. kind fail marks a failure."""
@@ -219,15 +255,18 @@ class Scene:
         self.result = {"word": word, "line": line, "tone": tone}
         return self
 
-    def magnify(self, objects, factor: float, *, label: str = "", anchor=None) -> "Scene":
+    def magnify(self, objects, factor: float, *, label: str = "", anchor=None, pivot=None) -> "Scene":
         """Draw small objects factor times larger so they show at the scene's scale, as a rocket on a flight kilometres
         long. Each object grows about its own pose, or about anchor when given, which keeps a group such as a pad
-        and its rail together. A view says so and lets the reader see them at their true size. The first call
-        names the toggle and its factor; later groups may grow by less, as a pad beside a rocket."""
+        and its rail together. While the scene's motion plays, a group with a pivot (a point in each object's own
+        frame) grows about that point instead, so a rocket grown from its nozzle stands on its pad and flies its
+        path tail first. A view says so and lets the reader see them at their true size. The first call names the
+        toggle and its factor; later groups may grow by less, as a pad beside a rocket."""
         if not self.mag:
             self.mag = {"factor": _f(factor), "label": label or "Drawn", "groups": []}
         self.mag["groups"].append({"objects": [self.objects.index(o) for o in objects], "factor": _f(factor),
-                                   "anchor": None if anchor is None else _fl(anchor)})
+                                   "anchor": None if anchor is None else _fl(anchor),
+                                   **({} if pivot is None else {"pivot": _fl(pivot)})})
         names = label or ", ".join(o.name for o in objects if o.name)[:40] or "small parts"
         self.note(f"{names[0].upper() + names[1:]} drawn {factor:g} times larger so {'it shows' if len(objects) == 1 or label else 'they show'}")
         return self
@@ -269,14 +308,17 @@ class Scene:
         h = {"format": "wobbl-scene", "version": VERSION, **self.head,
              "timeline": {"frames": int(len(keep)), "t": _fl(self.t[keep], 7), **self.tl},
              "camera": self.cam, "fields": fields, "objects": objs,
-             "readouts": [{**{k: v for k, v in r.items() if k not in ("v", "lim")}, "values": _fl(r["v"][keep], 5),
-                           **({"limits": _fl(r["lim"][keep], 5)} if "lim" in r else {})} for r in self.readouts],
+             "readouts": [{**{k: v for k, v in r.items() if k not in ("v", "lim", "mv")}, "values": _fl(r["v"][keep], 5),
+                           **({"limits": _fl(r["lim"][keep], 5)} if "lim" in r else {}),
+                           **({"motion": _fl(r["mv"], 5)} if "mv" in r else {})} for r in self.readouts],
              "events": sorted(self.events, key=lambda e: e["t"] if e["t"] is not None else 0),
              "labels": self.labels, "notes": self.notes, "buffers": enc.bufs}
         if self.result:
             h["verdict"] = self.result
         if self.mag:
             h["magnify"] = self.mag
+        if self.mo_n:
+            h["motion"] = motion_header(self)
         if any(o.prop for o in self.objects):
             h["props_note"] = "Props in gray stripes show the setup and are not part of the analysis"
         return h, enc.blob()
