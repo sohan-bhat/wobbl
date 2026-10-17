@@ -1,0 +1,4 @@
+# The CAD model kit: build123d on the OpenCASCADE kernel, numpy, and pillow for the WebP detail maps.
+build123d==0.13.0
+numpy>=2.0
+pillow>=11.0
