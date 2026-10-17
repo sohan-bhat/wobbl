@@ -192,15 +192,17 @@ def still_air(s, st: dict, X, tris, T, amb: float, F) -> dict | None:
     if h is None:
         return None
     from ...thermal.plume import plume
-    pl = plume(X, tris, T, h, amb, lines=48)
+    pl = plume(X, tris, T, h, amb, lines=96)
     if pl is None:
         return None
     rise0 = float(T.mean() - amb)
     k = np.clip((F.mean(1) - amb) / rise0, 0, None) if rise0 > 0 else np.ones(len(F))
-    # cool to warm on the air's own range, its rise above the room up to twice the asked load's
+    # cool to warm on the air's own range, from the room's air to the warmest it leaves the part at any load, so
+    # the air rising off the part at the asked load shows warm and cools as it climbs
+    top = float(pl["dT_K"] * max(float(np.max(k ** (2 / 3))), 1e-9))
     ln = s.lines(pl["paths"], color="#8fb8de", width=0.6, values=[t - amb for t in pl["temp"]], field="air warming",
-                 unit="C", colormap="coolwarm", range=(0.0, 2 * pl["dT_K"]), name="air")
-    ln.moving(pl["speed"], scale=k ** (2 / 3), base=amb)
+                 unit="C", colormap="coolwarm", range=(0.0, top), name="air")
+    ln.moving(pl["speed"], scale=k ** (2 / 3))
     s.note(f"The air is estimated, not solved. About {pl['w_mps']:.2g} m/s rising out of the top, "
            f"{pl['dT_K']:.2g} C warmer, carrying the {pl['Q_W']:.2g} W the film takes, from a chimney through "
            "the open columns and an entraining plume above (thermal/plume.py).")
@@ -308,7 +310,7 @@ def cooled(out: Path) -> Path | None:
         s.note("The flow holds too little fluid to trace streamlines, so the part shows alone.")
     if lines:
         rise = float((sc.get("fluid_rise") or {}).get("value", 0) or 0)
-        fluid_lines(s, lines, X, tris, T, inlet, rise, power, "fluid", FLUID, 1.6)
+        fluid_lines(s, lines, X, tris, T, inlet, rise, power, "fluid", FLUID, 1.6, inside=True)
         s.readout("fastest fluid", np.full(s.n, float(max(w.max() for _, w in lines))), unit="m/s", digits=3)
     verdict(s, o, _first(o))
     size = float(np.ptp(X, 0).max())
@@ -319,29 +321,35 @@ def cooled(out: Path) -> Path | None:
 AIR, FLUID = "#8fb8de", "#5aa0e0"
 
 
-def fluid_lines(s, lines, X, tris, T, inlet: float, rise: float, power: float, name: str, color: str, width: float):
+def fluid_lines(s, lines, X, tris, T, inlet: float, rise: float, power: float, name: str, color: str, width: float,
+                inside: bool = False):
     """A cooling fluid's streamlines (each a path in mm and the solved speed along it in m/s) as lines it moves
     along at that speed, colored cool to warm by how much it has warmed. The run reports the fluid's warming at the
     outlet, rise, which is its energy balance (power over mass flow times specific heat). Along the way the warming
-    is estimated as that share of the outlet rise the part has handed over upstream of the point: the part's faces
-    weighted by area and by their solved rise above the inlet, summed along the main flow direction. The warming
-    grows with the power, as everything in the run does, so each heat load scales it."""
+    is estimated along each streamline as the share of the outlet rise it has taken by then, taking heat where the
+    part beside it stands warmest above the inlet, so it only ever warms downstream. The warming
+    grows with the power, as everything in the run does, so each heat load scales it. A fluid inside the part
+    (inside, a cold plate's channel) is drawn through the part, as a section shows it, and colored from the inlet
+    to its outlet's warming at the asked load, so it shows warming downstream there."""
     paths = [np.asarray(p, float) for p, _ in lines]
     speeds = [np.asarray(w, float) * 1000.0 for _, w in lines]
     s.lines(paths, color=color, name=name, width=width)
     ln = s.objects[-1]
+    if inside:
+        ln.inside()
     if rise > 0 and len(paths):
-        ends = np.array([p[-1] - p[0] for p in paths if len(p) > 1])
-        ax = ends.sum(0)
-        ax = ax / (np.linalg.norm(ax) or 1.0)
-        t = np.asarray(tris)[:, :3]
-        a, b, c = X[t[:, 0]], X[t[:, 1]], X[t[:, 2]]
-        w = 0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1) * np.clip(T[t].mean(1) - inlet, 0, None)
-        x = ((a + b + c) / 3) @ ax
-        o = np.argsort(x)
-        cum = np.cumsum(w[o]) / max(w.sum(), 1e-30)
-        vals = [rise * np.interp(p @ ax, x[o], cum, left=0.0, right=1.0) for p in paths]
-        f = s.field(f"{name} warming", "C", colormap="coolwarm", range=(0.0, 2 * rise),
+        # along each streamline the fluid takes heat where the part beside it is warm: the part's solved rise above
+        # the inlet at its nearest point, summed along the way and scaled so the streamline leaves at the outlet's
+        # rise, so the warming only grows downstream, round a bend as along a straight run
+        from scipy.spatial import cKDTree
+        tree = cKDTree(np.asarray(X, float))
+        vals = []
+        for p in paths:
+            near = np.clip(np.asarray(T, float)[tree.query(p)[1]] - inlet, 0, None)
+            seg = np.r_[0.0, np.linalg.norm(np.diff(p, axis=0), axis=1)]
+            cum = np.cumsum(0.5 * (near + np.r_[near[:1], near[:-1]]) * seg)
+            vals.append(rise * cum / cum[-1] if cum[-1] > 0 else np.linspace(0, rise, len(p)))
+        f = s.field(f"{name} warming", "C", colormap="coolwarm", range=(0.0, rise if inside else 2 * rise),
                     data=np.concatenate(vals))
         ln.values, ln.f = vals, f
         k = s.t / power if power > 0 and s.n > 1 else np.ones(s.n)
