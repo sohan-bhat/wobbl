@@ -95,8 +95,6 @@ globalThis.drawRunStills = async ({ base, kind, panes, fix, w, h, px, at = 'star
         mts = moving.some(Boolean) ? moving.map((m) => (m ? m.t[0] : NaN)) : null;
         stage._frame(frame());
       }
-      // the still is the frame as a resting view settles on it (play-refine.js), the motion's first moment included
-      if (stage.settle) await stage.settle();
       // each pane cut out of the view, onto the page's own background, straight after the frame is drawn
       shown.forEach((pi, row) => {
         if (out[pi]) return;
