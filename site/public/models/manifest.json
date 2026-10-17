@@ -70,8 +70,17 @@
   },
   "desktop-arm": {
     "replace": [
+      {"object": "base", "file": "desktop-arm/base.glb"},
+      {"object": "base motor", "file": "desktop-arm/base-servo.glb", "tint": ["servo_case"]},
+      {"object": "turret", "file": "desktop-arm/turret.glb"},
+      {"object": "shoulder motor", "file": "desktop-arm/shoulder-servo.glb", "tint": ["servo_case"]},
+      {"object": "upper arm", "file": "desktop-arm/upper-arm.glb"},
+      {"object": "forearm", "file": "desktop-arm/forearm.glb", "tint": ["servo_case"]},
+      {"object": "hand", "file": "desktop-arm/hand.glb", "tint": ["servo_case"]},
+      {"object": "gripper", "file": "desktop-arm/gripper.glb"},
       {"object": "desk", "file": "desktop-arm/desk.glb"}
-    ]
+    ],
+    "hide": ["elbow servo", "wrist servo", "elbow motor", "wrist motor", "base shaft", "shoulder shaft", "elbow shaft", "wrist shaft"]
   },
   "drone-arm": {
     "add": [
