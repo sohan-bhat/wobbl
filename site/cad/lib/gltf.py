@@ -100,6 +100,9 @@ def export(rel, nodes, unit=1.0, tol=0.02, ang=0.2, quiet=False, pack=('-vp', '1
         groups = {}
         for shape, mname in node.parts:
             P, N, T = triangles(shape, node.tol or tol, node.ang or ang)
+            if os.environ.get('WOBBL_CAD_PARTS'):
+                lo, hi = (P.min(0), P.max(0)) if len(P) else (np.zeros(3), np.zeros(3))
+                print(f'    {node.name} {mname} {len(T)} triangles, {np.round(lo, 1)} to {np.round(hi, 1)}')
             if not len(T):
                 continue
             g = groups.setdefault(mname, [[], [], [], 0])
