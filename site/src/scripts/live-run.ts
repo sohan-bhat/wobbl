@@ -51,6 +51,34 @@ export function initLiveRuns(): () => void {
   return () => { for (const s of stops) s(); dec.dispose(); };
 }
 
+const GAP = 10; // the least room between two labels on one line
+const LINE = 15; // a line of labels, as styles/live-run.css sets their height
+
+/** Lay out one row of labels: each centered on its mark (the first starts at its mark and the slider's last ends at
+ *  its own), slid back inside the row where it would stick out, and on the first line it fits beside the ones before. */
+function fitTicks(box: HTMLElement) {
+  const spans = [...box.children] as HTMLElement[];
+  if (!spans.length || !box.offsetParent) return;
+  for (const s of spans) { s.style.translate = ''; s.style.top = ''; }
+  const row = (box.closest('.lrun-row, .lrun-slider') as HTMLElement | null) ?? box;
+  const br = box.getBoundingClientRect(), rr = row.getBoundingClientRect();
+  const lo = rr.left - br.left, hi = rr.right - br.left;
+  const placed = spans.filter((s) => s.offsetWidth > 0).map((s) => {
+    const r = s.getBoundingClientRect(), w = r.width;
+    const x = Math.min(Math.max(r.left - br.left, lo), hi - w);
+    return { s, x, w, dx: x - (r.left - br.left) };
+  }).sort((a, b) => a.x - b.x);
+  const ends: number[] = [];
+  for (const p of placed) {
+    let line = ends.findIndex((e) => p.x >= e + GAP);
+    if (line < 0) { line = ends.length; ends.push(0); }
+    ends[line] = p.x + p.w;
+    if (Math.abs(p.dx) > 0.5) p.s.style.translate = `${p.dx.toFixed(1)}px 0`;
+    if (line) p.s.style.top = `${line * LINE}px`;
+  }
+  if (ends.length > 1) box.dataset.lines = String(Math.min(ends.length, 3)); else delete box.dataset.lines;
+}
+
 function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnType<typeof decoder>): () => void {
   const data: Data = JSON.parse(fig.querySelector('[data-lrun-data]')!.textContent || '{}');
   const q = <T extends Element = HTMLElement>(s: string, r: ParentNode = fig) => r.querySelector<T>(s)!;
@@ -235,6 +263,8 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     for (const el of qa('[data-name]', cell).concat(qa('[data-name]', rowEls[row]))) put(el, p.name);
     const at = rowEls[row].querySelector('[data-at]');
     if (at && p.at) put(at, p.at);
+    // a scene pane reads in its own unit, which can differ from the one beside it
+    if (sceneRun) put(q('[data-u]', rowEls[row]), p.run.q?.unit ? NB + p.run.q.unit : '');
     showPoster(cell, p);
     set(q('[data-word]', rowEls[row]), 'data-verdict', verdictColor[p.run.verdict] ?? 'marginal');
     put(q('[data-word]', rowEls[row]), p.run.verdict.toUpperCase());
@@ -538,6 +568,17 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       });
     }
   }
+  // the labels under the meters and the slider: each kept inside its row and, where two would touch, the later one
+  // dropped to a line of its own, measured again whenever the figure changes width
+  const tickBoxes = qa('.lrun-ticks');
+  const fitAll = () => { for (const b of tickBoxes) fitTicks(b); };
+  if (tickBoxes.length) {
+    const tro = new ResizeObserver(fitAll);
+    tro.observe(fig);
+    abort.signal.addEventListener('abort', () => tro.disconnect(), { once: true });
+    document.fonts?.ready.then(() => { if (!abort.signal.aborted) fitAll(); });
+  }
+
   if (!live) {
     fallBack();
     return () => abort.abort();
