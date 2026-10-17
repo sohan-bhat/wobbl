@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import { join, relative, resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { autoMagnify, fieldPeaks, readScene, sceneBounds, sceneFraming, sig } from '../src/scripts/scene-file.js';
+import { motionPlay } from './motion.mjs';
 
 const hash = (b) => createHash('sha1').update(b).digest('hex').slice(0, 10);
 
@@ -107,6 +108,8 @@ export function scenePlay(h, arr) {
     exag: +exag.toPrecision(3), magnify: h.magnify ? { factor: h.magnify.factor, label: h.magnify.label || 'Drawn', groups: h.magnify.groups } : null,
     camera: { view: d.map((x) => x / l), fov: cam.fov || 30 }, bounds, subject, points, follow, hold,
     verdict: h.verdict ? { word: h.verdict.word, tone: h.verdict.tone, line: h.verdict.line } : null,
+    // what moves at the asked value over time, and the fluid's tracers (scripts/motion.mjs)
+    motion: motionPlay(h, arr, { q, also, tPos, bounds, follow }),
   };
 }
 

@@ -4,6 +4,7 @@
 // part.js's own.
 import { creases, integers, planes, shade } from './part.js';
 import { readScene, skipped } from './scene-file.js';
+import { decodeTrack } from './play-motion.js';
 
 /** Nodes and triangles of the surface, and a reader for the integer fields stored on its nodes. */
 function surface(run, bytes) {
@@ -120,6 +121,8 @@ export function decodePlay(run, buf) {
     }
     arrays.frames = frames;
     if (run.cut) Object.assign(arrays, section(run.cut, L, bytes, buf, F, step));
+    // the air the part warms in still air, estimated (play-flow.js heatAir): x, y, z, speed, rise per point
+    if (run.air && L.air) arrays.air = new Float32Array(buf.slice(L.air.offset, L.air.offset + run.air.points * 20));
   }
   return { arrays, vertices: nv };
 }
@@ -440,6 +443,9 @@ export function decodeScene(run, buf) {
     } else if (o.kind === 'arrows') {
       d.O = arr(o.origin); d.V = arr(o.vec);
     }
+    // what the object does over the scene's motion, and a fluid's own speed along its lines (play-motion.js)
+    decodeTrack(o, arr, d);
+    if (o.speed) d.sp = arr(o.speed);
     return d;
   });
   delete h.buffers;

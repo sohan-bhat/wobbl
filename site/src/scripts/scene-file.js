@@ -109,11 +109,12 @@ export function poseAt(pp, pq, a, b, k) {
   return { p, q };
 }
 
-/** The magnification an object is drawn at, and the point it grows about (null: its own pose). */
+/** The magnification an object is drawn at, the point it grows about (null: its own pose) and the point in its
+ * own frame it grows about while it follows the scene's motion (null: the same). */
 export function magnifyOf(h, index) {
   const m = h.magnify;
   if (!m) return null;
-  for (const g of m.groups || []) if (g.objects.includes(index)) return { factor: g.factor ?? m.factor, anchor: g.anchor ?? null };
+  for (const g of m.groups || []) if (g.objects.includes(index)) return { factor: g.factor ?? m.factor, anchor: g.anchor ?? null, pivot: g.pivot ?? null };
   return null;
 }
 
