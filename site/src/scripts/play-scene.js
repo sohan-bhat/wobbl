@@ -11,7 +11,7 @@ import {
 } from 'three';
 import { LIT, arrow, edgeLines } from './play-draw.js';
 import { FINISHES, SRGB, fieldStudioShader, finishOf, studioShader } from './play-look.js';
-import { instance, subject } from './play-models.js';
+import { instance, keepColor, subject } from './play-models.js';
 import { contactShadow } from './contact-shadow.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
 
@@ -438,6 +438,10 @@ export function sceneParts({ arrays, run }) {
       it.mesh.receiveShadow = true;
       if (it.bonds) { it.bonds.castShadow = true; it.bonds.receiveShadow = true; }
     }
+    // whatever shows a field's colors, the part itself, a line or a body colored by its value and their outlines,
+    // is kept out of the stage's occlusion, so the colors stay as the legend gives them (play-refine.js), and so is
+    // anything that glows, which lights itself
+    if ((it.f && !o.prop) || o.glow) it.mesh.traverse((x) => { if (x.material && !Array.isArray(x.material)) keepColor(x.material); });
     scene.add(it.mesh);
     items.push(it);
   });
@@ -694,6 +698,7 @@ export function sceneParts({ arrays, run }) {
         it.mesh.add(m.group);
         it.model = m;
         m.tint(it.base);
+        if ((it.f && !it.o.prop) || it.o.glow) m.keepTint();
         if (shadowCasters.has(it.mesh)) for (const x of m.meshes) shadowCasters.add(x);
       }
     }

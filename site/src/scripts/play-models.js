@@ -74,6 +74,12 @@ export async function loadModels(root, example) {
 
 // ---- materials ----
 
+// a model's textures filtered sharp at a glancing angle, as a desk's grain or a box's wood seen across the view
+let anisotropy = 1;
+/** The anisotropic filtering every model texture takes, from the stage's renderer (play-draw.js). */
+export function setAnisotropy(n) { anisotropy = Math.max(anisotropy, n || 1); }
+const MAPS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'bumpMap', 'emissiveMap', 'clearcoatNormalMap'];
+
 const ready = new WeakMap();
 /**
  * A model's material made ready for the stage: lit by the studio the way everything else is (play-look.js), and
@@ -82,6 +88,7 @@ const ready = new WeakMap();
  */
 function prepare(m) {
   if (ready.has(m)) return ready.get(m);
+  for (const k of MAPS) if (m[k] && m[k].anisotropy < anisotropy) { m[k].anisotropy = anisotropy; m[k].needsUpdate = true; }
   let out = m;
   if (m.transmission > 0) {
     out = m.clone();
@@ -116,6 +123,21 @@ function prepare(m) {
 /** Make a material mark the pixels its part covers: the part's surface, drawn before any model. */
 export function subject(m) {
   Object.assign(m, { stencilWrite: true, stencilRef: 1, stencilFunc: AlwaysStencilFunc, stencilZPass: ReplaceStencilOp });
+  return m;
+}
+
+/**
+ * Mark the pixels of something colored by a field that is not the part itself (a line or a body colored by its
+ * value, a model painted with its field's color) in the stencil's second bit, which only the stage's occlusion
+ * reads (play-refine.js): its colors are kept as the legend gives them. A material that already tests the stencil
+ * keeps its test on the first bit.
+ */
+export function keepColor(m) {
+  if (m.stencilWrite && m.stencilFunc === NotEqualStencilFunc) {
+    Object.assign(m, { stencilRef: 3, stencilFuncMask: 1, stencilWriteMask: 2, stencilZPass: ReplaceStencilOp });
+  } else if (!m.stencilWrite) {
+    Object.assign(m, { stencilWrite: true, stencilRef: 2, stencilFunc: AlwaysStencilFunc, stencilWriteMask: 2, stencilZPass: ReplaceStencilOp });
+  }
   return m;
 }
 
@@ -241,5 +263,7 @@ export function instance(gltf, entry) {
       for (const m of tinted) m.color.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, SRGBColorSpace);
       for (const m of tintedGhosts) m.color.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, SRGBColorSpace).multiplyScalar(0.8);
     },
+    /** The tinted materials carry a field's color: keep it out of the occlusion (keepColor). */
+    keepTint() { for (const m of tinted) keepColor(m); },
   };
 }

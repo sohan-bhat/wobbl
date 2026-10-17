@@ -77,6 +77,8 @@ export function contactShadow({ casters, center, size, floor, reach, opacity = 0
         if (o.visible && !casters.has(o)) { hidden.push(o); o.visible = false; }
       }
     });
+    // the stage may be drawing into a target of its own (play-refine.js), which it gets back afterwards
+    const wasTarget = renderer.getRenderTarget();
     const wasScissor = renderer.getScissorTest(), wasColor = renderer.getClearColor(new Color()), wasAlpha = renderer.getClearAlpha();
     renderer.setScissorTest(false);
     renderer.setClearColor(0x000000, 0);
@@ -93,7 +95,7 @@ export function contactShadow({ casters, center, size, floor, reach, opacity = 0
       pass(a, b, st, 0, renderer);
       pass(b, a, 0, st, renderer);
     }
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(wasTarget);
     renderer.setScissorTest(wasScissor);
     renderer.setClearColor(wasColor, wasAlpha);
   }

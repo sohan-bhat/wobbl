@@ -144,7 +144,9 @@ const COLD = 0xffd400, HOT = 0xfff07a;
  *            straight away in a worker, where a long step holds up nothing the visitor sees)
  */
 export async function createDrawer({ canvas, man, mesh: meshP, w, h, px, pause }) {
-  const renderer = new WebGLRenderer({ canvas, antialias: px < 2, alpha: true, powerPreference: 'default' });
+  // multisampled at every pixel ratio: one part costs little to draw, and on a sharp screen its silhouette, the
+  // hatching and the arrow still show steps without it
+  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'default' });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(px);
   renderer.setSize(w, h, false);
