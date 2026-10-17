@@ -199,9 +199,12 @@ def _rocket(out, o, st, inp, runs):
         airframe.append(mo["flame"])
 
     # where it lands, colored by the landing speed against the soft landing limit
-    land = np.array([[r.x[-1], 0, mark * 0.15] for r in runs])
+    # a marker the size of the whole flight's picture, drawn a fifth of the rocket's factor larger as the pad is, so
+    # the close view that follows the rocket down sees a small spot on the ground beside it, not a field of color
+    g = grow / 5
+    land = np.array([[r.x[-1], 0, mark * 0.15 / g] for r in runs])
     sink = _num(runs, "landing_speed_mps")
-    spot = s.body("cylinder", [mark * 1.6, mark * 0.15], pos=land, color=MAIN, name="landing spot")
+    spot = s.body("cylinder", [mark * 1.6 / g, mark * 0.15 / g], pos=land, color=MAIN, name="landing spot")
     spot.color_by("landing speed", sink, unit="m/s", colormap="turbo", range=[0, max(st.landing_limit * 2, 1)],
                   limit=st.landing_limit, limit_label="soft landing")
     s.label("lands {landing distance} out at {landing speed}", [0, 0, mark * 3], follow=spot, kind="peak")
@@ -226,8 +229,8 @@ def _rocket(out, o, st, inp, runs):
     s.magnify(s.objects[first:], grow / 5, label="Pad", anchor=[0, 0, 0])
     if chute is not None:
         s.magnify([chute], grow / 5, label="Parachute")
-    if mo["canopy"] is not None:
-        over, sc, at = mo["canopy"]
+    s.magnify([spot], g, label="Landing spot")
+    for over, sc, at in mo["canopy"] or []:
         s.magnify([over], sc, label="Parachute", pivot=at)
     if inp.key == "wind" and inp.values.max() > 0:
         sign = -1.0 if st.wind >= 0 else 1.0
@@ -243,7 +246,12 @@ def _rocket(out, o, st, inp, runs):
     s.label(f"grid {F.nice_step(ground, 12):g} m", [cx + ground * 0.3, -ground * 0.3, 0], kind="note")
 
     s.readout("apogee", _num(runs, "apogee_m"), unit="m", digits=4)
-    s.readout("landing speed", sink, unit="m/s", digits=3, limit=st.landing_limit)
+    # over the motion the landing speed has no value until it lands
+    landed = None
+    if s.mo_n:
+        landed = np.full(s.mo_n, np.nan)
+        landed[-1] = sink[k_design]
+    s.readout("landing speed", sink, unit="m/s", digits=3, limit=st.landing_limit, motion=landed)
     s.readout("landing distance", np.abs(_num(runs, "drift_m")), unit="m", digits=3)
     s.readout("off the rail", _num(runs, "rail_exit_speed_mps"), unit="m/s", digits=3)
     s.readout("max Mach", _num(runs, "max_mach"), digits=3)
@@ -332,17 +340,29 @@ def _rocket_motion(s, st, r, wind: float, airframe, chute, canopy, trail, L: flo
     # each leg of the asked flight traces itself as the rocket flies it
     for ln, tl in trail:
         ln.track(drawn=[tl - float(t[0])])
-    over = None
-    if chute is not None and canopy is not None and np.isfinite(tm):
-        # the slider's canopy rests where it opens; over the motion a second one hangs over the rocket's nose
-        chute.track(when=(float(tau[-1]) + 1.0, None))
-        over = s.mesh(*canopy, name="main parachute", color=MAIN, max_vertices=900)
-        top = nozzle + [0.0, 0.0, L + exit_z]
-        over.track(pos=top, quat=np.tile([1.0, 0, 0, 0], (len(tau), 1)), when=(tm - float(t[0]), None))
-        over.show(never, never)
-        # grown by a fifth of the rocket's factor about a point under it, so it opens over the grown nose
-        sc = grow / 5
-        over = (over, sc, [0.0, 0.0, (grow - 1) * (L + exit_z) / (1 - sc) if abs(1 - sc) > 1e-9 else 0.0])
+    # each parachute open over the rocket's nose from the moment it deploys until the next one takes over, at its
+    # real size, and grown by a fifth of the rocket's factor about a point under it so it opens over the grown nose
+    over = []
+    if chute is not None and np.isfinite(tm):
+        chute.track(when=(float(tau[-1]) + 1.0, None))       # the slider's canopy rests where it opens
+    opens = sorted(((c, float(r.events[f"{c.name} deploy"][0])) for c in st.chutes
+                    if f"{c.name} deploy" in r.events), key=lambda x: x[1])
+    top = nozzle + [0.0, 0.0, L + exit_z]
+    sc = grow / 5
+    at = [0.0, 0.0, (grow - 1) * (L + exit_z) / (1 - sc) if abs(1 - sc) > 1e-9 else 0.0]
+    for i, (c, t_open) in enumerate(opens):
+        shape = canopy if c.name == "main" and canopy is not None else \
+            F.canopy(c.diameter, max(c.diameter * 1.3, L * 0.5))
+        close = opens[i + 1][1] - float(t[0]) if i + 1 < len(opens) else None
+        m = s.mesh(*shape, name=f"{c.name} parachute", color=MAIN if c.name == "main" else DROGUE,
+                   max_vertices=900)
+        m.track(pos=top, quat=np.tile([1.0, 0, 0, 0], (len(tau), 1)), when=(t_open - float(t[0]), close))
+        m.show(never, never)
+        over.append((m, sc, at))
+    # what the flight reads at each moment, said beside it while it plays: its height and how fast it climbs or
+    # sinks, which at touchdown is the landing speed the meter then reads
+    s.motion_readout("altitude", z, unit="m", digits=4)
+    s.motion_readout("vertical speed", vz, unit="m/s", digits=3)
     return {"flame": flame, "pivot": pivot, "canopy": over}
 
 
@@ -369,9 +389,13 @@ def _body(out, o, st, c, inp, runs):
     vmax = max(float(r.speed.max()) for r in runs)
     s.field("speed", "m/s", colormap="viridis", range=[0, max(vt or 0, vmax)], limit=vt,
             limit_label="terminal speed" if vt else "")
-    for r, (a, b) in zip(runs, win):
-        s.lines([np.c_[r.x, np.zeros(len(r.x)), r.z + R]], values=[r.speed], field="speed", unit="m/s", width=2.4,
-                name="path").show(a, b)
+    di = int(np.argmin(np.abs(inp.values - inp.design)))
+    asked = None
+    for i, (r, (a, b)) in enumerate(zip(runs, win)):
+        ln = s.lines([np.c_[r.x, np.zeros(len(r.x)), r.z + R]], values=[r.speed], field="speed", unit="m/s",
+                     width=2.4, name="path").show(a, b)
+        if i == di:
+            asked = ln
 
     # the body where it lands, and a ghost of it where it started
     hit = np.array([[r.x[-1], 0, R] for r in runs])
@@ -417,7 +441,8 @@ def _body(out, o, st, c, inp, runs):
     s.ground(0.0, size=ground, grid=F.nice_step(ground, 14), center=(float(hit[:, 0].mean()) - ground * 0.15, 0.0))
     s.label("{impact speed}", [0, 0, R * 3], follow=rk, kind="peak")
 
-    s.readout("impact speed", _num(runs, "impact_speed_mps"), unit="m/s", digits=3)
+    landed = _body_motion(s, runs[di], rk, asked, R, dropped)
+    s.readout("impact speed", _num(runs, "impact_speed_mps"), unit="m/s", digits=3, motion=landed)
     s.readout("fall time" if dropped else "flight time", _num(runs, "flight_time_s"), unit="s", digits=3)
     if "vacuum_speed_mps" in runs[0].numbers and dropped:
         s.readout("without air", _num(runs, "vacuum_speed_mps"), unit="m/s", digits=3)
@@ -425,7 +450,6 @@ def _body(out, o, st, c, inp, runs):
     if max(abs(r.x[-1]) for r in runs) > 1:
         s.readout("distance", np.abs(_num(runs, "distance_m")), unit="m", digits=3)
     verdict(s, o)
-    di = int(np.argmin(np.abs(inp.values - inp.design)))
     mid = [float(hit[:, 0].mean()), 0, float(hs[di]) / 2]
     s.camera(target=mid, direction=(0.9, -1.0, 0.15), distance=max(float(hs[di]), span * 0.4) * 2.2, fov=34,
              presets=[{"name": "Whole drop" if dropped else "Whole flight", "target": mid,
@@ -435,3 +459,28 @@ def _body(out, o, st, c, inp, runs):
                       {"name": "Impact", "target": [float(hit[di, 0]), 0, 0], "dist": max(dia * 40, 3),
                        "dir": (0.6, -1.0, 0.35)}])
     return s.save(out)
+
+
+def _body_motion(s, r, body, path, R: float, dropped: bool):
+    """The fall or flight at the asked value as the scene's motion: the body along its solved path from release to
+    the ground, the path tracing itself behind it, and its height and speed said at each moment. A fall of a few
+    seconds plays in real time; a longer one faster by a round factor, so it plays in about five seconds. Returns
+    the impact speed at each motion frame, empty until it lands."""
+    t = np.asarray(r.t, float) - float(r.t[0])
+    if len(t) < 3 or t[-1] <= 0:
+        return None
+    tau = np.unique(np.r_[np.linspace(0, t[-1], 120), t[-1]])
+    fast = 1.0 if t[-1] <= 5.0 else min((c for c in (2.0, 5.0, 10.0, 20.0, 50.0, 100.0)),
+                                         key=lambda c: abs(np.log(t[-1] / c / 4.5)))
+    s.motion(tau, tau / fast, label="time", unit="s",
+             note=f"The body {'falls' if dropped else 'flies'} its solved path at the asked value"
+                  f"{', in real time' if fast == 1 else ''}.")
+    x, z = np.interp(tau, t, r.x), np.interp(tau, t, r.z)
+    body.track(pos=np.c_[x, np.zeros(len(tau)), z + R])
+    if path is not None:
+        path.track(drawn=[t])
+    s.motion_readout("height", z, unit="m", digits=3)
+    s.motion_readout("speed", np.interp(tau, t, r.speed), unit="m/s", digits=3)
+    landed = np.full(len(tau), np.nan)
+    landed[-1] = float(r.numbers.get("impact_speed_mps", np.nan))
+    return landed
