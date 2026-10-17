@@ -6,11 +6,11 @@
 import {
   AdditiveBlending, BackSide, Box3, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, CustomBlending, CylinderGeometry,
   DoubleSide, DataTexture, FrontSide, Group, InstancedBufferAttribute, LinearFilter, InstancedMesh, LineBasicMaterial, LineSegments,
-  Matrix4, Mesh, MeshPhysicalMaterial, OneFactor, OneMinusSrcAlphaFactor, PlaneGeometry, Quaternion, Raycaster, Scene,
+  Matrix4, Mesh, MeshBasicMaterial, MeshPhysicalMaterial, OneFactor, OneMinusSrcAlphaFactor, PlaneGeometry, Quaternion, Raycaster, Scene,
   ShaderMaterial, SphereGeometry, TorusGeometry, Vector3,
 } from 'three';
 import { LIT, arrow, edgeLines } from './play-draw.js';
-import { FINISHES, SRGB, finishOf, studioShader } from './play-look.js';
+import { FINISHES, SRGB, fieldStudioShader, finishOf, studioShader } from './play-look.js';
 import { instance, subject } from './play-models.js';
 import { contactShadow } from './contact-shadow.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
@@ -118,6 +118,26 @@ function fieldUniforms(field, uniforms) {
   uniforms.uLimit = { value: field.limit !== undefined ? (field.limit - field.lo) / (field.hi - field.lo || 1) : 1e30 };
 }
 
+/** A face material's depth alone, revealed and pushed back as the faces are. */
+function prepass(faces) {
+  // pushed back a hair further than the faces, so a face is never refused against its own depth
+  const m = new MeshBasicMaterial({
+    colorWrite: false, side: DoubleSide, polygonOffset: true,
+    polygonOffsetFactor: faces.polygonOffsetFactor + 1.5, polygonOffsetUnits: faces.polygonOffsetUnits + 4,
+  });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uCut = faces.uniforms.uCut;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float cutv;\nvarying float vR;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vR = cutv;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uCut;\nvarying float vR;')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n  if (vR > uCut) discard;');
+  };
+  m.customProgramCacheKey = () => 'wobbl-scene-prepass';
+  return m;
+}
+
 /** The flat lit material outlines are drawn in, sharing the face material's uniforms so they cut and color with it. */
 function outline(faces, field) {
   return new ShaderMaterial({
@@ -210,10 +230,10 @@ function material(o, { prop = false, shell = false, field = null, tube = false, 
   const opts = { field: !!field, tube, glass, unlit, lift: !prop };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniforms);
-    studioShader(sh);
+    (field && !prop ? fieldStudioShader : studioShader)(sh);
     sceneShader(sh, opts);
   };
-  m.customProgramCacheKey = () => `wobbl-scene-${+opts.field}${+tube}${+glass}${+unlit}${+opts.lift}`;
+  m.customProgramCacheKey = () => `wobbl-scene-${+opts.field}${+tube}${+glass}${+unlit}${+opts.lift}${+!prop}`;
   // the uniforms the stage brings to each frame, as on the shader materials before
   m.uniforms = uniforms;
   // a part the run is about, colored by its field, shows through the models in front of it (play-models.js)
@@ -336,6 +356,13 @@ export function sceneParts({ arrays, run }) {
       if (it.mesh.material.side !== BackSide && !glass) {
         const lines = edgeLines(geo, d.edges, outline(it.mesh.material, field), it.mesh.material);
         if (lines) it.mesh.add(lines);
+      }
+      // a big mesh is drawn into depth first, so its many small triangles are lit only where they are seen
+      if (nv > 20000 && it.mesh.material.side === DoubleSide && !glass && fin !== 'emissive') {
+        const pre = new Mesh(geo, prepass(it.mesh.material));
+        pre.renderOrder = -2;
+        pre.frustumCulled = false;
+        it.mesh.add(pre);
       }
     } else if (o.kind === 'body') {
       it.mesh = new Mesh(tinted(primitive(o.shape, o.size), it.base), material(o, { ...look, shell: o.shape !== 'plane' }));
@@ -648,7 +675,8 @@ export function sceneParts({ arrays, run }) {
   /** Hide an object's own shape and its outlines, keeping it for the probe and the bounds. */
   function hideShape(it) {
     it.mesh.material.visible = false;
-    for (const c of it.mesh.children) if (c.isLineSegments) c.visible = false;
+    // its outlines and its depth pass go with it
+    for (const c of it.mesh.children) c.visible = false;
   }
   /** Put the models loadModels found in place: each under its object, so it moves as the object does. */
   function dress(loaded) {
@@ -684,6 +712,11 @@ export function sceneParts({ arrays, run }) {
       (at ? at.mesh : scene).add(m.group);
       if (!at) adds.push(m);
     }
+    // a model's faint copy over the subject is drawn only when the scene has a subject colored by a field left
+    // in view (a wiper's links are all models: nothing to show through)
+    const anySubject = items.some((it) => !it.model && !it.o.prop && it.f && (it.o.kind === 'mesh' || it.o.kind === 'body'));
+    for (const it of items) it.model?.ghosts(anySubject);
+    for (const m of adds) m.ghosts(anySubject);
     // everything is brought to the frame again, so a tinted model takes its field's color
     key = '';
     shadowDirty = true;

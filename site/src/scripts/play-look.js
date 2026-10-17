@@ -14,6 +14,9 @@ import {
 /** Uniforms every patched material shares: the studio's turn, its strength and the exposure. */
 export const LOOK = {
   uEnvRot: { value: new Matrix3() },
+  // the studio's diffuse light as nine spherical harmonics, worked out once from the photograph: a part's diffuse
+  // light then costs a few multiplies instead of a second lookup in the prefiltered map on every pixel
+  uSH: { value: Array.from({ length: 9 }, () => new Vector3()) },
   uEnvI: { value: 0.9 },
   uExposure: { value: 1.3 },
 };
@@ -62,19 +65,25 @@ function decodeStudio(buf) {
       for (let x = 0; x < W; x++) { const i = y * W + x; prev = (prev + b[4 + pl * N + i]) & 255; p[pl * N + i] = prev; }
     }
   }
-  const half = new Uint16Array(N * 4), one = DataUtils.toHalfFloat(1);
+  const half = new Uint16Array(N * 4), one = DataUtils.toHalfFloat(1), sh = new Float64Array(27);
   // the photograph's first row is its top; three.js's equirectangular lookup starts at the bottom
   for (let y = 0; y < H; y++) {
+    // the direction of each pixel as three.js's equirectangular lookup reads it, and its solid angle
+    const lat = ((H - 1 - y + 0.5) / H - 0.5) * Math.PI, cl = Math.cos(lat), dw = cl * (Math.PI / H) * ((2 * Math.PI) / W);
     for (let x = 0; x < W; x++) {
       const i = y * W + x, o = ((H - 1 - y) * W + x) * 4, e = p[3 * N + i];
-      const f = e ? 2 ** (e - 136) : 0;
-      half[o] = DataUtils.toHalfFloat(p[i] * f);
-      half[o + 1] = DataUtils.toHalfFloat(p[N + i] * f);
-      half[o + 2] = DataUtils.toHalfFloat(p[2 * N + i] * f);
+      const f = e ? 2 ** (e - 136) : 0, r = p[i] * f, g = p[N + i] * f, b2 = p[2 * N + i] * f;
+      half[o] = DataUtils.toHalfFloat(r);
+      half[o + 1] = DataUtils.toHalfFloat(g);
+      half[o + 2] = DataUtils.toHalfFloat(b2);
       half[o + 3] = one;
+      const phi = ((x + 0.5) / W - 0.5) * 2 * Math.PI, dx = cl * Math.cos(phi), dy = Math.sin(lat), dz = cl * Math.sin(phi);
+      const basis = [0.282095, 0.488603 * dy, 0.488603 * dz, 0.488603 * dx, 1.092548 * dx * dy, 1.092548 * dy * dz,
+        0.315392 * (3 * dz * dz - 1), 1.092548 * dx * dz, 0.546274 * (dx * dx - dy * dy)];
+      for (let k = 0; k < 9; k++) { const w = basis[k] * dw; sh[k * 3] += r * w; sh[k * 3 + 1] += g * w; sh[k * 3 + 2] += b2 * w; }
     }
   }
-  return { W, H, half };
+  return { W, H, half, sh };
 }
 
 /** The photograph from its stored bytes, gzipped or not. */
@@ -94,6 +103,8 @@ export function loadStudio(url) {
 
 /** The studio prefiltered for a renderer, as scene.environment takes it. */
 export function studioEnvironment(renderer, data) {
+  for (let k = 0; k < 9; k++) LOOK.uSH.value[k].set(data.sh[k * 3], data.sh[k * 3 + 1], data.sh[k * 3 + 2]);
+  LOOK.uSH.ready = true;
   const tex = new DataTexture(data.half, data.W, data.H, RGBAFormat, HalfFloatType);
   tex.mapping = EquirectangularReflectionMapping;
   tex.magFilter = LinearFilter;
@@ -136,11 +147,24 @@ const IBL = /* glsl */ `
 #ifdef USE_ENVMAP
 uniform mat3 uEnvRot;
 uniform float uEnvI;
+uniform vec3 uSH[9];
+// three.js's own irradiance from nine harmonics (lights_pars_begin), here since this chunk comes before it
+vec3 shIrradiance(vec3 n) {
+  float x = n.x, y = n.y, z = n.z;
+  vec3 r = uSH[0] * 0.886227 + uSH[1] * 1.023328 * y + uSH[2] * 1.023328 * z + uSH[3] * 1.023328 * x;
+  r += uSH[4] * 0.858086 * x * y + uSH[5] * 0.858086 * y * z + uSH[6] * (0.743125 * z * z - 0.247708);
+  r += uSH[7] * 0.858086 * x * z + uSH[8] * 0.429043 * (x * x - y * y);
+  return max(r, 0.0);
+}
 vec3 getIBLIrradiance(const in vec3 normal) {
 #ifdef ENVMAP_TYPE_CUBE_UV
   vec3 worldNormal = uEnvRot * inverseTransformDirection(normal, viewMatrix);
+#ifdef WOBBL_SH
+  return shIrradiance(worldNormal) * envMapIntensity * uEnvI;
+#else
   vec4 envMapColor = textureCubeUV(envMap, worldNormal, 1.0);
   return PI * envMapColor.rgb * envMapIntensity * uEnvI;
+#endif
 #else
   return vec3(0.0);
 #endif
@@ -150,8 +174,14 @@ vec3 getIBLRadiance(const in vec3 viewDir, const in vec3 normal, const in float 
   vec3 reflectVec = reflect(-viewDir, normal);
   reflectVec = normalize(mix(reflectVec, normal, roughness * roughness));
   reflectVec = uEnvRot * inverseTransformDirection(reflectVec, viewMatrix);
+#ifdef WOBBL_SOFT_REFLECTION
+  // a part colored by a field reflects the studio as the harmonics give it, soft, which costs a few multiplies
+  // where the map would cost two lookups on each of its many small triangles; the key light keeps its highlight
+  return shIrradiance(reflectVec) * (1.0 / PI) * envMapIntensity * uEnvI;
+#else
   vec4 envMapColor = textureCubeUV(envMap, reflectVec, roughness);
   return envMapColor.rgb * envMapIntensity * uEnvI;
+#endif
 #else
   return vec3(0.0);
 #endif
@@ -170,8 +200,16 @@ vec3 getIBLAnisotropyRadiance(const in vec3 viewDir, const in vec3 normal, const
  * The studio's light and PBR Neutral on a three.js lit material's shader, in onBeforeCompile. The renderer's own
  * tone mapping stays off, so nothing else on the page (the arrows, the backdrop) is touched.
  */
+/** The studio as studioShader gives it, with soft reflections from the harmonics: for parts colored by a field. */
+export function fieldStudioShader(shader) {
+  studioShader(shader);
+  if (LOOK.uSH.ready) shader.fragmentShader = `#define WOBBL_SOFT_REFLECTION\n${shader.fragmentShader}`;
+}
+
 export function studioShader(shader) {
   Object.assign(shader.uniforms, LOOK);
+  // the harmonics stand in for the map once the photograph has been read (RoomEnvironment has none)
+  if (LOOK.uSH.ready) shader.fragmentShader = `#define WOBBL_SH\n${shader.fragmentShader}`;
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <envmap_physical_pars_fragment>', IBL)
     .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb = pbrNeutral(gl_FragColor.rgb);')
@@ -302,8 +340,8 @@ export function keyLight(size = 1024) {
   const l = new DirectionalLight(0xffffff, 1.6);
   l.castShadow = true;
   l.shadow.mapSize.set(size, size);
-  l.shadow.radius = 6;
-  l.shadow.blurSamples = 10;
+  l.shadow.radius = 4;
+  l.shadow.blurSamples = 8;
   l.matrixAutoUpdate = true;
   return l;
 }

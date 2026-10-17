@@ -9,7 +9,7 @@
 //   add: [{ file, parent?, scale?, matrix? }],     world frame, or the named object's frame
 //   hide: [object names] } } }
 import {
-  AlwaysStencilFunc, Box3, CustomBlending, Ray, Vector3, EqualStencilFunc, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
+  AlwaysStencilFunc, Box3, CustomBlending, MeshBasicMaterial, Ray, Vector3, EqualStencilFunc, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
   OneFactor, OneMinusSrcAlphaFactor, ReplaceStencilOp, SRGBColorSpace,
 } from 'three';
 import { studioShader } from './play-look.js';
@@ -122,9 +122,11 @@ export function subject(m) {
 const ghosts = new WeakMap(), veils = new WeakMap();
 function ghostOf(p) {
   if (ghosts.has(p)) return ghosts.get(p);
-  const g = p.clone();
-  g.onBeforeCompile = studioShader;
-  Object.assign(g, { transparent: true, opacity: 0.14, depthWrite: false, stencilFunc: EqualStencilFunc });
+  // flat and unlit: at this opacity only the model's outline and tone show, so no light is worked out for it
+  const g = new MeshBasicMaterial({
+    color: p.color ? p.color.clone().multiplyScalar(0.8) : 0x9aa0a6, transparent: true, opacity: 0.14, depthWrite: false,
+    stencilWrite: true, stencilRef: 1, stencilFunc: EqualStencilFunc, stencilWriteMask: 0, stencilZPass: KeepStencilOp,
+  });
   ghosts.set(p, g);
   return g;
 }
@@ -132,14 +134,22 @@ function ghostOf(p) {
 // faint all over, as a sheet of glass, so the view of the part is not a view of a wall
 function veilOf(p) {
   if (veils.has(p)) return veils.get(p);
-  const g = p.clone();
-  g.onBeforeCompile = studioShader;
-  Object.assign(g, { transparent: true, opacity: 0.07, depthWrite: false, stencilWrite: false });
+  const g = new MeshBasicMaterial({ color: p.color ? p.color.clone() : 0x9aa0a6, transparent: true, opacity: 0.07, depthWrite: false });
   veils.set(p, g);
   return g;
 }
 
-const _ray = new Ray(), _hit = new Vector3();
+const _ray = new Ray(), _hit = new Vector3(), _c = new Vector3(), _ra = [0, 0, 0, 0], _rb = [0, 0, 0, 0];
+/** The screen rectangle a box covers, in normalized device coordinates, as [x0, y0, x1, y1]. */
+function rectOf(b, camera, out) {
+  out[0] = out[1] = Infinity; out[2] = out[3] = -Infinity;
+  for (let i = 0; i < 8; i++) {
+    _c.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(camera);
+    out[0] = Math.min(out[0], _c.x); out[1] = Math.min(out[1], _c.y); out[2] = Math.max(out[2], _c.x); out[3] = Math.max(out[3], _c.y);
+  }
+  return out;
+}
+const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
 /**
  * One copy of a model, turned from glTF's y up back to the scene's z up, with its own copies of the materials the
@@ -155,14 +165,13 @@ export function instance(gltf, entry) {
     group.matrixAutoUpdate = false;
     group.matrix.fromArray(entry.matrix);
   }
-  const tinted = [], meshes = [], extra = [];
+  const tinted = [], tintedGhosts = [], meshes = [], extra = [];
   const names = new Set(entry.tint || []);
   // a tinted material's faint copy is its own, so it takes the same color
   const tintedGhost = (m) => {
     if (!tinted.includes(m)) return ghostOf(m);
     const g = ghostOf(m).clone();
-    g.onBeforeCompile = studioShader;
-    tinted.push(g);
+    tintedGhosts.push(g);
     return g;
   };
   root.traverse((o) => {
@@ -212,12 +221,25 @@ export function instance(gltf, entry) {
       veiled = on;
       for (const [o, g] of extra) { o.visible = !on; g.material = on ? g.userData.veil : g.userData.over; }
     },
+    /**
+     * Draw the faint copies only where they can matter: when the model covers some of the part on screen (camera,
+     * and the part's box in the same frame), or always (true) or never (false).
+     */
+    ghosts(camera, part) {
+      let on = camera;
+      if (typeof camera === 'object' && camera) {
+        if (!box) { group.updateWorldMatrix(true, true); box = new Box3().setFromObject(group); }
+        on = veiled || overlaps(rectOf(box, camera, _ra), rectOf(part, camera, _rb));
+      }
+      for (const [, g] of extra) g.visible = !!on;
+    },
     /** Paint the tinted materials a color given as sRGB bytes. */
     tint(rgb) {
       const key = rgb.join(',');
       if (key === last) return;
       last = key;
       for (const m of tinted) m.color.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, SRGBColorSpace);
+      for (const m of tintedGhosts) m.color.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, SRGBColorSpace).multiplyScalar(0.8);
     },
   };
 }

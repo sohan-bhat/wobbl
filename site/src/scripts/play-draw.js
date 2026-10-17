@@ -4,14 +4,14 @@
 // each in its own part of the canvas, so a part and its fix load up side by side. Every frame only
 // changes uniforms, except a heat run's frames, which are copied in as the clock passes them.
 import {
-  BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
+  Box3, BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
   MeshPhysicalMaterial, LineSegments, NoToneMapping, VSMShadowMap, ShadowMaterial, PMREMGenerator, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial,
   SRGBColorSpace, Vector3, WebGLRenderer,
 } from 'three';
 import { sceneParts } from './play-scene.js';
 import { instance, subject } from './play-models.js';
 import {
-  FINISHES, LOOK, SRGB, aimKey, decodeStudioBytes, depthMaterial, finishOf, finishShader, keyLight, loadStudio, studioEnvironment,
+  FINISHES, LOOK, SRGB, aimKey, decodeStudioBytes, depthMaterial, fieldStudioShader, finishOf, finishShader, keyLight, loadStudio, studioEnvironment,
   studioShader, turnStudio,
 } from './play-look.js';
 
@@ -174,7 +174,7 @@ void main() {
   n = faceforward(n, -v, n);
   vec3 col = lit(vC, n, v, 1.0);
 #ifdef EDGE
-  col = edgeTone(col);
+  col = mix(col, edgeTone(col), uEdgeA);
 #else
   // and it fades out on a face seen nearly edge on, where its stripes would only crowd into dashes
   if (vE > 0.5 && facing > 0.25) {
@@ -189,11 +189,7 @@ void main() {
     col = mix(col, vec3(0.055, 0.059, 0.067), 0.55 * (1.0 - smoothstep(0.6 * w, 1.6 * w, d)));
   }
 #endif
-#ifdef EDGE
-  gl_FragColor = vec4(col, uEdgeA);
-#else
   gl_FragColor = vec4(col, 1.0);
-#endif
 }`;
 
 const YELLOW = 0xffd400;
@@ -306,7 +302,7 @@ function partMaterial(kind, uniforms, finish, mm = 1) {
   });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniforms);
-    studioShader(sh);
+    fieldStudioShader(sh);
     finishShader(sh, finish, mm);
     (kind === 'strength' ? stressShader : heatShader)(sh);
   };
@@ -316,6 +312,29 @@ function partMaterial(kind, uniforms, finish, mm = 1) {
   return subject(m);
 }
 
+/** The part's depth alone, moved and cut as its faces are, with the same push back as its faces. */
+function prepassMaterial(kind, uniforms) {
+  // pushed back a hair further than the faces, so a face is never refused against its own depth
+  const m = new MeshBasicMaterial({ colorWrite: false, side: DoubleSide, polygonOffset: true, polygonOffsetFactor: 1.5, polygonOffsetUnits: 4 });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uniforms);
+    if (kind === 'strength') {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec3 disp;\nuniform float uK;\nuniform float uExag;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed += (uExag * uK) * disp;');
+    } else {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vW;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vW = position;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uCutP;\nuniform vec3 uCutS;\nvarying vec3 vW;')
+        .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n  vec3 cutR = (vW - uCutP) * uCutS;\n  if (cutR.x > 0.0 && cutR.y > 0.0 && cutR.z > 0.0) discard;');
+    }
+  };
+  m.customProgramCacheKey = () => `wobbl-prepass-${kind}`;
+  return m;
+}
+
 /** The outlines of a strength or heat part: the same field, lit the old simple way and darkened. */
 function partEdgeMaterial(kind, uniforms) {
   uniforms.uEdgeA = { value: EDGE_ALPHA.value };
@@ -323,7 +342,6 @@ function partEdgeMaterial(kind, uniforms) {
     vertexShader: kind === 'strength' ? STRESS_VERT : HEAT_VERT, fragmentShader: FRAG, side: DoubleSide, uniforms,
     defines: kind === 'strength' ? { EDGE: '' } : { EDGE: '', HEAT: '' }, extensions: { derivatives: true },
     // faint, as a real part's edges only catch a little light: enough to keep a fin apart from the next
-    transparent: true, depthWrite: false,
   });
 }
 
@@ -394,7 +412,7 @@ export function createStage({ canvas, w, h, px, kind }) {
   // ---- the drawing's resolution follows the frame rate, as model-viewer scales its own: while frames come one
   // after another (a replay, a drag) and take longer than a display frame, fewer pixels are drawn; once the view
   // rests for a moment it is drawn again at full resolution
-  let fullPx = px, scale = 1, lastAt = 0, slow = 16.7, rest = 0, lastFrame = null;
+  let fullPx = px, scale = 1, lastAt = 0, slow = 16.7, rest = 0, lastFrame = null, stepAt = 0, moving = 1;
   function setScale(k) {
     if (Math.abs(k - scale) < 0.02) return;
     scale = k;
@@ -407,11 +425,21 @@ export function createStage({ canvas, w, h, px, kind }) {
     lastAt = now;
     if (dt < 120) {
       slow = slow * 0.8 + dt * 0.2;
-      if (slow > 24 && scale > 0.55) setScale(Math.max(0.55, scale * 0.85));
-      else if (slow < 18 && scale < 1) setScale(Math.min(1, scale * 1.08));
+      // a step down at a time, never back up while moving: each change of size reallocates the canvas
+      if (slow > 19.5 && scale > 0.5 && now - stepAt > 200) {
+        setScale(scale > 0.8 ? 0.75 : scale > 0.65 ? 0.6 : 0.5);
+        moving = scale;
+        stepAt = now;
+        slow = 18;
+      }
+    } else if (moving < 1) {
+      // a new movement starts at the size the last one settled on, instead of stepping down again
+      setScale(moving);
+      slow = 22;
     }
     clearTimeout(rest);
-    if (scale < 1) rest = setTimeout(() => { setScale(1); slow = 16.7; if (lastFrame) draw(lastFrame); }, 350);
+    // once the view rests: full resolution, and the shadow brought up to date
+    if (scale < 1 || slow > 20) rest = setTimeout(() => { setScale(1); slow = 16.7; if (lastFrame) draw(lastFrame); }, 350);
   }
   const parts = [];
   // behind each view a soft pool of light, as a studio backdrop or model-viewer's floor glow gives, so dark
@@ -442,7 +470,7 @@ export function createStage({ canvas, w, h, px, kind }) {
       // a scene brings its own objects to the slider's position; the light, the camera and the views are these
       const sp = sceneParts({ arrays, run });
       sp.scene.environment = env && env.texture;
-      const key = keyLight(px > 1.5 ? 2048 : 1024);
+      const key = keyLight(1024);
       sp.scene.add(key, key.target);
       const part = { run, arrays, scene: sp.scene, sp, row, key, dirty: true, uniforms: { uK: { value: 0 }, uPx: { value: px } }, load: null };
       parts.push(part);
@@ -485,7 +513,13 @@ export function createStage({ canvas, w, h, px, kind }) {
       : depthMaterial(uniforms, { pars: 'varying vec3 vW;', main: 'vW = position;' },
         { pars: 'uniform vec3 uCutP;\nuniform vec3 uCutS;\nvarying vec3 vW;', main: 'vec3 cutR = (vW - uCutP) * uCutS;\nif (cutR.x > 0.0 && cutR.y > 0.0 && cutR.z > 0.0) discard;' }, 'heat');
     scene.add(mesh);
-    const key = keyLight(px > 1.5 ? 2048 : 1024);
+    // a depth pass first, so the part's many small triangles are lit only where they are seen: a mesh of a
+    // hundred thousand triangles lit on every hidden face as well would cost the stage most of a frame
+    const pre = new Mesh(geo, prepassMaterial(kind, uniforms));
+    pre.frustumCulled = false;
+    pre.renderOrder = -2;
+    scene.add(pre);
+    const key = keyLight(1024);
     scene.add(key, key.target);
     // a part held at its base stands on the studio's floor: only its shadow is drawn there, as model-viewer
     // draws a product's, so the page's own background still shows round it
@@ -523,7 +557,8 @@ export function createStage({ canvas, w, h, px, kind }) {
     }
     const lo = run.mesh.bounds_min, hi = run.mesh.bounds_max;
     const center = new Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2);
-    const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, key, dirty: true, pair: [-1, -1], extras: [], center };
+    const bounds = new Box3(new Vector3(...lo), new Vector3(...hi));
+    const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, key, dirty: true, pair: [-1, -1], extras: [], center, bounds };
     parts.push(part);
     return part;
   }
@@ -689,13 +724,21 @@ export function createStage({ canvas, w, h, px, kind }) {
         const r = camera.position.distanceTo(lookAt) * Math.tan((camera.fov * Math.PI) / 360) * 1.25;
         const box = aimKey(part.key, studioAz, lookAt, r);
         const state = part.sp ? JSON.stringify(f.scenes ? f.scenes[part.row] : f.scene) : `${f.k},${f.bend},${f.heat ? `${f.heat.i0},${f.heat.i1},${f.heat.mix}` : ''}`;
-        if (part.dirty || box !== part.box || state !== part.state) renderer.shadowMap.needsUpdate = true;
+        // while frames run slow (a replay on a weak graphics chip) the shadow waits, and catches up as soon as the
+        // view rests
+        part.frames = (part.frames || 0) + 1;
+        if (part.dirty || box !== part.box || state !== part.state) part.stale = true;
+        if (part.stale && slow <= 20 && scale === 1) {
+          renderer.shadowMap.needsUpdate = true;
+          part.stale = false;
+          part.drawn = part.frames;
+        }
         part.dirty = false;
         part.box = box;
         part.state = state;
         // a model between the camera and the part is veiled (play-models.js)
         if (part.sp) part.sp.veil(camera.position);
-        else for (const m of part.extras) m.veil(camera.position, part.center);
+        else for (const m of part.extras) { m.veil(camera.position, part.center); m.ghosts(camera, part.bounds); }
         renderer.render(part.scene, camera);
         const ins = f.insets && f.insets[part.row];
         if (ins && part.sp) {
