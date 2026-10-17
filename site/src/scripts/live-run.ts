@@ -377,12 +377,12 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
           if (x < 12) ly = sy - iy > 44 ? '-38px' : '14px';
         }
       } else if (lab && shows) {
-        // the value beside the ring stays inside its pane and clear of the pane's name and the replay button:
+        // the value beside the ring stays inside its pane and clear of its name, the motion clock and the replay button:
         // right of the ring, else left of it, else below or above, else slid in from the edge
         mark.hidden = false;
         const lw = lab.offsetWidth, lh = lab.offsetHeight, pr = paneEls[row].getBoundingClientRect();
         const avoid: number[][] = [];
-        for (const o of [...qa('.lrun-name', paneEls[row]), replay]) {
+        for (const o of [...qa('.lrun-name', paneEls[row]), ...qa('.lrun-rate', view), replay]) {
           if (o.hidden) continue;
           const b = o.getBoundingClientRect();
           if (b.width) avoid.push([b.left - pr.left, b.top - pr.top, b.width, b.height]);
@@ -554,11 +554,11 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       placeProbe(e.clientX - r.left, e.clientY - r.top, r);
     };
     // The probe sits as near the pointer as it can inside the view, clear of the pointer itself, the peak's ring
-    // and value, the part names, the replay button and the inset.
+    // and value, the part names, the motion clock, the replay button and the inset.
     const placeProbe = (x: number, y: number, r: DOMRect) => {
       const pw = probeEl.offsetWidth, ph = probeEl.offsetHeight, W = r.width, H = r.height, M = 6;
       const boxes: number[][] = [];
-      for (const o of qa('.lrun-mark:not([hidden]) .target, .lrun-mark:not([hidden]) .lrun-mark-v, .lrun-name, .lrun-replay:not([hidden])', view)) {
+      for (const o of qa('.lrun-mark:not([hidden]) .target, .lrun-mark:not([hidden]) .lrun-mark-v, .lrun-name, .lrun-rate, .lrun-replay:not([hidden])', view)) {
         const b = o.getBoundingClientRect();
         if (b.width && b.height) boxes.push([b.left - r.left, b.top - r.top, b.width, b.height]);
       }
