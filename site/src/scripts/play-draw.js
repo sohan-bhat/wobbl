@@ -4,16 +4,17 @@
 // each in its own part of the canvas, so a part and its fix load up side by side. Every frame only
 // changes uniforms, except a heat run's frames, which are copied in as the clock passes them.
 import {
-  Box3, BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
+  Box3, Color, LinearSRGBColorSpace, BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial,
   MeshPhysicalMaterial, LineSegments, NoToneMapping, VSMShadowMap, ShadowMaterial, PMREMGenerator, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial,
   SRGBColorSpace, Vector3, WebGLRenderer,
 } from 'three';
 import { sceneParts } from './play-scene.js';
-import { instance, subject } from './play-models.js';
+import { instance, setAnisotropy, subject } from './play-models.js';
 import {
   FINISHES, LOOK, SRGB, aimKey, decodeStudioBytes, depthMaterial, fieldStudioShader, finishOf, finishShader, keyLight, loadStudio, studioEnvironment,
   studioShader, turnStudio,
 } from './play-look.js';
+import { OVERLAY, createRefiner, overlay } from './play-refine.js';
 
 const TURBO = /* glsl */ `
 vec3 ramp(float x) {
@@ -390,7 +391,7 @@ export function arrow(color = YELLOW) {
  * top of the color scale and row the view it is drawn in. frame({ camera, views, k, heat }) draws every
  * part into its view rectangle ([x, y, w, h] in CSS pixels from the top left).
  */
-export function createStage({ canvas, w, h, px, kind }) {
+export function createStage({ canvas, w, h, px, kind, still = false }) {
   const renderer = new WebGLRenderer({ canvas, antialias: px < 2, alpha: true, stencil: true, powerPreference: 'default' });
   renderer.setClearColor(0x000000, 0);
   // linear light out to sRGB; the tone mapping is PBR Neutral inside each lit material (play-look.js)
@@ -408,7 +409,22 @@ export function createStage({ canvas, w, h, px, kind }) {
   renderer.autoClear = false;
   const camera = new PerspectiveCamera(30, 1, 1, 10000);
   camera.up.set(0, 0, 1);
+  camera.layers.enable(OVERLAY);
+  const clearColor = new Color();
   let cssW = w, cssH = h;
+  // ---- the view refined while it rests (play-refine.js): restKey is the frame last drawn, sample the next step of
+  // its rest, restless set by anything that moves the scene without changing the frame. A stage drawing stills
+  // (run-poster.js) draws every frame with its occlusion, as a rest starts.
+  const refiner = createRefiner(renderer), STEPS = refiner ? refiner.steps : 0;
+  let restKey = '', restAt = 0, sample = STEPS, restless = false, lastDrawn = null, refineAt = 0, settled = false, lastJson = '';
+  const later = globalThis.requestAnimationFrame ? (fn) => globalThis.requestAnimationFrame(fn) : (fn) => setTimeout(fn, 16);
+  const unlater = globalThis.cancelAnimationFrame ? (id) => globalThis.cancelAnimationFrame(id) : (id) => clearTimeout(id);
+  function refineLater() {
+    if (refineAt || !refiner || sample >= STEPS || !lastDrawn) return;
+    refineAt = later(() => { refineAt = 0; api._frame(lastDrawn); });
+  }
+  function stopRefine() { if (refineAt) unlater(refineAt); refineAt = 0; }
+  setAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
   // ---- the drawing's resolution follows the frame rate, as model-viewer scales its own: while frames come one
   // after another (a replay, a drag) and take longer than a display frame, fewer pixels are drawn; once the view
   // rests for a moment it is drawn again at full resolution
@@ -439,7 +455,7 @@ export function createStage({ canvas, w, h, px, kind }) {
     }
     clearTimeout(rest);
     // once the view rests: full resolution, and the shadow brought up to date
-    if (scale < 1 || slow > 20) rest = setTimeout(() => { setScale(1); slow = 16.7; if (lastFrame) draw(lastFrame); }, 350);
+    if (scale < 1 || slow > 20) rest = setTimeout(() => { setScale(1); slow = 16.7; restless = true; if (lastFrame) draw(lastFrame); }, 350);
   }
   const parts = [];
   // behind each view a soft pool of light, as a studio backdrop or model-viewer's floor glow gives, so dark
@@ -552,7 +568,7 @@ export function createStage({ canvas, w, h, px, kind }) {
     }
     let load = null;
     if (kind === 'strength' && run.arrow) {
-      load = arrow();
+      load = overlay(arrow());
       scene.add(load);
     }
     const lo = run.mesh.bounds_min, hi = run.mesh.bounds_max;
@@ -676,10 +692,16 @@ export function createStage({ canvas, w, h, px, kind }) {
      * f.radius: the part's radius in mm, for the arrow.
      */
     frame(f) {
+      // the same frame again (a replay holding its first frame) is a rest, not a movement to pace
+      const json = JSON.stringify(f), same = json === lastJson;
       lastFrame = f;
-      pace();
+      lastJson = json;
+      stopRefine();
+      if (!same) pace();
       draw(f);
     },
+    /** Something moved that the frame does not describe (a flow, a particle): the view is not resting. */
+    unsettle() { restless = true; },
     size(nw, nh, npx) {
       cssW = nw;
       cssH = nh;
@@ -694,9 +716,35 @@ export function createStage({ canvas, w, h, px, kind }) {
         studioAz = Math.atan2(f.camera.position[1] - f.camera.target[1], f.camera.position[0] - f.camera.target[0]);
         turnStudio(studioAz);
       }
+      // the same frame again at full resolution with nothing moved: the next of its refined frames, or nothing to do
+      const key = `${JSON.stringify(f)}|${scale}|${cssW}x${cssH}@${fullPx}|${parts.length}`;
+      let k = -1;
+      if (refiner && still) {
+        k = 0;
+      } else if (key === restKey && !restless && scale === 1 && !parts.some((p) => p.dirty)) {
+        // the frame on screen already, or refined as far as it goes: nothing to draw
+        if (!refiner || sample >= STEPS) return;
+        // a pause between two moves of a drag, or two frames of a replay, is not a rest: the refining waits a moment,
+        // and the canvas keeps the frame it shows meanwhile. The frame the view opens on, which fades in over its
+        // still, waits only a couple of display frames.
+        if (performance.now() - restAt < (settled ? 120 : 40)) { refineLater(); return; }
+        k = sample;
+      } else {
+        restKey = key;
+        restAt = performance.now();
+        sample = 0;
+      }
+      restless = false;
+      lastDrawn = f;
+      const into = k >= 0;
+      if (into) refiner.begin();
+      const rect = into ? refiner.rect : (x, y, rw, rh) => { renderer.setViewport(x, y, rw, rh); renderer.setScissor(x, y, rw, rh); };
+      // a page color to clear to: three.js takes a clear color into sRGB only for the canvas, so the refining
+      // target (which holds sRGB values) is given it as it is
+      const paint = (hex) => (into ? clearColor.setHex(hex, LinearSRGBColorSpace) : clearColor.setHex(hex));
+      let reshadowed = false;
       look(f.camera);
-      renderer.setScissor(0, 0, cssW, cssH);
-      renderer.setViewport(0, 0, cssW, cssH);
+      rect(0, 0, cssW, cssH);
       renderer.clear();
       parts.forEach((part) => {
         const [x, y, vw, vh] = f.views[part.row];
@@ -715,8 +763,8 @@ export function createStage({ canvas, w, h, px, kind }) {
         // a view that follows its subject has a camera of its own for each pane
         if (f.cameras) look(f.cameras[part.row]);
         // three.js counts the viewport from the bottom left
-        renderer.setViewport(x, cssH - y - vh, vw, vh);
-        renderer.setScissor(x, cssH - y - vh, vw, vh);
+        const by0 = cssH - y - vh;
+        rect(x, by0, vw, vh);
         glow.material.uniforms.uAspect.value = vw / vh;
         renderer.render(backdrop, camera);
         renderer.clearDepth();
@@ -732,6 +780,7 @@ export function createStage({ canvas, w, h, px, kind }) {
           renderer.shadowMap.needsUpdate = true;
           part.stale = false;
           part.drawn = part.frames;
+          reshadowed = true;
         }
         part.dirty = false;
         part.box = box;
@@ -739,27 +788,49 @@ export function createStage({ canvas, w, h, px, kind }) {
         // a model between the camera and the part is veiled (play-models.js)
         if (part.sp) part.sp.veil(camera.position);
         else for (const m of part.extras) { m.veil(camera.position, part.center); m.ghosts(camera, part.bounds); }
-        renderer.render(part.scene, camera);
+        if (into) {
+          // the solids first, then their occlusion, then the lines and arrows over it (play-refine.js OVERLAY)
+          refiner.jitter(camera, vw, vh, k);
+          camera.layers.set(0);
+          renderer.render(part.scene, camera);
+          refiner.jitter(camera, vw, vh, k, -1);
+          // the occlusion reaches a tenth of the view's half height at its target
+          refiner.occlude(camera, x, by0, vw, vh, k, r * 0.08, still);
+          refiner.jitter(camera, vw, vh, k);
+          camera.layers.set(OVERLAY);
+          renderer.render(part.scene, camera);
+          refiner.jitter(camera, vw, vh, k, -1);
+          camera.layers.enable(0);
+        } else {
+          renderer.render(part.scene, camera);
+        }
         const ins = f.insets && f.insets[part.row];
         if (ins && part.sp) {
           // the whole scene in a corner of the view, on a solid ground with a hairline round it
           const [ix, iy, iw, ih] = ins.rect, bx = x + ix, by = cssH - (y + iy) - ih;
-          renderer.setScissor(bx - 1, by - 1, iw + 2, ih + 2);
-          renderer.setClearColor(0x2a2d32, 1);
+          rect(bx - 1, by - 1, iw + 2, ih + 2);
+          renderer.setClearColor(paint(0x2a2d32), 1);
           renderer.clear();
-          renderer.setScissor(bx, by, iw, ih);
-          renderer.setClearColor(0x141619, 1);
+          rect(bx, by, iw, ih);
+          renderer.setClearColor(paint(0x141619), 1);
           renderer.clear();
           renderer.setClearColor(0x000000, 0);
           part.sp.set(ins.scene);
           look(ins.camera);
-          renderer.setViewport(bx, by, iw, ih);
           renderer.clearDepth();
           // the inset keeps the main view's shadow, which it is too small to show
+          if (into) refiner.jitter(camera, iw, ih, k);
           renderer.render(part.scene, camera);
           look(f.cameras ? f.cameras[part.row] : f.camera);
         }
       });
+      if (into) {
+        refiner.end(k, cssW, cssH, still);
+        // a shadow drawn again partway starts the mean again from the next frame
+        sample = still ? STEPS : reshadowed && k >= refiner.ramp ? refiner.ramp : k + 1;
+        if (sample >= STEPS) settled = true;
+      }
+      refineLater();
     },
     /** What the main field reads under a ray (origin and dir in the scene's units) in view row, or null. */
     probe(row, origin, dir) {
@@ -771,6 +842,8 @@ export function createStage({ canvas, w, h, px, kind }) {
     },
     dispose() {
       clearTimeout(rest);
+      stopRefine();
+      refiner?.dispose();
       for (const p of [...parts]) remove(p);
       env?.dispose();
       renderer.dispose();

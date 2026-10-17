@@ -13,6 +13,7 @@ import { LIT, arrow, edgeLines } from './play-draw.js';
 import { FINISHES, SRGB, fieldStudioShader, finishOf, studioShader } from './play-look.js';
 import { instance, keepColor, subject } from './play-models.js';
 import { contactShadow } from './contact-shadow.js';
+import { overlay } from './play-refine.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
 
 const VERT = /* glsl */ `
@@ -438,6 +439,8 @@ export function sceneParts({ arrays, run }) {
       it.mesh.receiveShadow = true;
       if (it.bonds) { it.bonds.castShadow = true; it.bonds.receiveShadow = true; }
     }
+    // lines and arrows are drawn over the occlusion, so they leave no smudge on the faces behind them
+    if (o.kind === 'lines' || o.kind === 'arrows') overlay(it.mesh);
     // whatever shows a field's colors, the part itself, a line or a body colored by its value and their outlines,
     // is kept out of the stage's occlusion, so the colors stay as the legend gives them (play-refine.js), and so is
     // anything that glows, which lights itself

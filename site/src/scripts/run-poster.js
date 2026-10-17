@@ -50,7 +50,9 @@ function evenStart(part, run, arrays) {
 globalThis.drawRunStills = async ({ base, kind, panes, fix, w, h, px, at = 'start', scale = 1, quality = 0.86 }) => {
   const canvas = document.createElement('canvas');
   document.body.replaceChildren(canvas);
-  const stage = createStage({ canvas, w, h, px, kind });
+  // every frame drawn as a rest starts on the live view, whole with its occlusion (play-refine.js), the plain frame the
+  // live view's refined one differs from only along its edges
+  const stage = createStage({ canvas, w, h, px, kind, still: true });
   const abs = panes.map((p) => ({ ...p, file: new URL(p.file, base).href }));
   // the studio light and the models come from the site's root, two levels above the data the part comes from
   const root = new URL('../../', abs[0].file).href;
