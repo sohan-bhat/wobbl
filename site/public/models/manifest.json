@@ -269,7 +269,11 @@
   },
   "strut-buckling": {
     "replace": [
-      {"object": "end plate", "file": "strut-buckling/end-plate.glb"}
+      {"object": "end plate", "file": "strut-buckling/base-platen.glb", "index": 1},
+      {"object": "end plate", "file": "strut-buckling/top-platen.glb", "index": 2}
+    ],
+    "add": [
+      {"file": "strut-buckling/load-frame.glb"}
     ]
   },
   "wiper-linkage": {
