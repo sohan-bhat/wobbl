@@ -13,10 +13,13 @@
   },
   "bolted-flange": {
     "replace": [
-      {"object": "plate", "file": "bolted-flange/plate.glb"},
-      {"object": "M8 8.8", "file": "bolted-flange/m8-88.glb"},
-      {"object": "M8 8.8 head", "file": "bolted-flange/m8-88-head.glb"}
-    ]
+      {"object": "M8 8.8", "file": "bolted-flange/m8-bolt.glb"},
+      {"object": "plate", "file": "bolted-flange/plate.glb"}
+    ],
+    "add": [
+      {"file": "bolted-flange/gasket-and-pipe.glb"}
+    ],
+    "hide": ["M8 8.8 head"]
   },
   "bracket-crack": {
     "replace": [

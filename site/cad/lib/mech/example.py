@@ -49,3 +49,26 @@ def index(sc):
 def at(sc, name, frame=None):
     """An object's position in millimetres at a frame."""
     return pose_mm(sc, index(sc)[name], frame)[:3, 3].copy()
+
+
+def publish(key, files, unit=1.0, extra=None):
+    """Export each model and merge the example's manifest entry. files: {slug: (nodes, entry fields)}, where the
+    fields say how the runtime hangs the file ({'object': name} to replace a scene object, {'covers': [...]} for an
+    added model). extra: more entry keys, such as 'hide'. Returns the total size in bytes."""
+    from gltf import export, write_manifest
+    replace, add, total = [], [], 0
+    for slug, (nodes, fields) in files.items():
+        rel = f'{key.replace("/", "-")}/{slug}.glb'
+        total += export(rel, nodes, unit=unit)
+        e = {**({'object': fields['object']} if 'object' in fields else {}), 'file': rel,
+             **{k: v for k, v in fields.items() if k != 'object'}}
+        (replace if 'object' in fields else add).append(e)
+    entry = {}
+    if replace:
+        entry['replace'] = replace
+    if add:
+        entry['add'] = add
+    entry.update(extra or {})
+    write_manifest(key, entry)
+    print(f'[cad] {key} {total / 1024:.0f} KB in {len(files)} files')
+    return total
