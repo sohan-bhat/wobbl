@@ -378,3 +378,101 @@ def led_lead(hh, inward, kink=False):
     pts += [(0, 0, up), (ix * 0.5, iy * 0.5, up + (hh - up) * 0.6), (ix, iy, hh + 0.3)]
     sq = cable.tube(pts, 0.23, seg=8, n=40)
     return [(sq, 'tin')]
+
+
+# ---------------------------------------------------------------- board parts
+
+looks.add('fr4', color=(0.42, 0.40, 0.22), metal=0.0, rough=0.6)
+looks.add('cap_sleeve', color=(0.012, 0.04, 0.13), metal=0.0, rough=0.3)
+looks.add('bung', color=(0.03, 0.03, 0.03), metal=0.0, rough=0.8)
+
+
+def radial_can(r, hh):
+    """A radial electrolytic's can in its heat shrunk sleeve (the scene's cylinder, radius r, half height hh): the
+    sleeve rolled over the top edge, the crimped groove that holds the bung, and the rubber bung below."""
+    can = Cylinder(r, 2 * hh)
+    can = fillet(can.edges().group_by(Axis.Z)[-1], r * 0.12)
+    can = fillet(can.edges().group_by(Axis.Z)[0], r * 0.06)
+    groove = Pos(0, 0, -hh + 2 * hh * 0.16) * Torus(r + 0.02, r * 0.06)
+    can = can - groove
+    bung = Pos(0, 0, -hh) * Cylinder(r * 0.82, 0.25, align=(Align.CENTER, Align.CENTER, Align.MAX))
+    return [(can, 'cap_sleeve'), (bung, 'bung')]
+
+
+def screw_terminal(hx, hy, hz, n, entry=1):
+    """A PCB screw terminal block of n ways along x (the scene's box): screw wells in the top, square wire entries
+    with their rising cage clamps on the +y (entry=1) or -y face, and the moulded ribs between ways."""
+    body = Box(2 * hx, 2 * hy, 2 * hz)
+    body = chamfer(body.edges().filter_by(Axis.X).group_by(Axis.Y)[-1 if entry < 0 else 0].group_by(Axis.Z)[-1], hz * 0.35)
+    pitch = 2 * hx / n
+    xs = [-hx + pitch * (k + 0.5) for k in range(n)]
+    cuts = []
+    for x in xs:
+        cuts.append(Pos(x, 0, hz) * Cylinder(pitch * 0.36, hz * 0.7))
+        cuts.append(Pos(x, entry * hy, -hz * 0.15) * Box(pitch * 0.55, hy * 1.4, hz * 0.7))
+    for k in range(1, n):
+        cuts.append(Pos(-hx + pitch * k, entry * hy, -hz * 0.15) * Box(0.12, 0.5, hz * 1.2))
+    body = body - Compound(cuts)
+    out = [(body, 'terminal_blue')]
+    for x in xs:
+        out.append((Pos(x, entry * hy * 0.55, -hz * 0.15) * Box(pitch * 0.5, hy * 0.5, hz * 0.62), 'tin'))
+    pins = [Pos(x, 0, -hz) * Box(0.5, 0.5, 0.8, align=(Align.CENTER, Align.CENTER, Align.MAX)) for x in xs]
+    return out + [(p, 'tin') for p in pins]
+
+
+def slotted_screw(r, hh):
+    """A captive slotted cheese head screw (the scene's cylinder), its slot across the head."""
+    head = Cylinder(r, 2 * hh)
+    head = chamfer(head.edges().group_by(Axis.Z)[-1], hh * 0.4)
+    head = head - Pos(0, 0, hh) * Box(2.2 * r, r * 0.28, hh * 1.4)
+    return [(head, 'steel_zinc')]
+
+
+def soic(hx, hy, hz, board_z, n=8, pitch=1.27):
+    """A SOIC package (the scene's box, half sizes, centred) with its gull wing leads down to the board at
+    board_z (in the body's frame), the pin one dimple and the moulded edge draft."""
+    body = Box(2 * hx, 2 * hy, 2 * hz)
+    body = chamfer(body.edges().group_by(Axis.Z)[-1], hz * 0.25)
+    body = body - Pos(-hx + 0.7, -hy + 0.7, hz) * Sphere(0.32)
+    out = [(body, 'epoxy_black')]
+    per = n // 2
+    t, w = 0.2, 0.42
+    for side in (-1, 1):
+        for k in range(per):
+            x = (k - (per - 1) / 2) * pitch
+            y0 = side * hy
+            z0 = 0.0
+            # out of the body's side, down the knee, and along the pad
+            arm = Pos(x, y0 + side * 0.25, z0) * Box(w, 0.5, t)
+            knee = Pos(x, y0 + side * 0.55, (z0 + board_z) / 2) * Box(w, t, abs(z0 - board_z) + t)
+            foot = Pos(x, y0 + side * 0.85, board_z + t / 2) * Box(w, 0.7, t)
+            out += [(arm, 'tin'), (knee, 'tin'), (foot, 'tin')]
+    return out
+
+
+def pcb(x0, y0, x1, y1, z0, z1, holes=(), silk=()):
+    """A bare board: an FR4 core between solder mask layers, rounded corners, plated mounting holes with their
+    rings, and silkscreen. silk is a list of ('text', s, x, y, h) and ('rect', x, y, hx, hy) in board coordinates."""
+    cx, cy, w, h, t = (x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0, z1 - z0
+    core = Pos(cx, cy, z0 + t / 2) * Box(w, h, t * 0.94)
+    core = fillet(core.edges().filter_by(Axis.Z), 1.0)
+    top = Pos(cx, cy, z1 - t * 0.03) * Box(w, h, t * 0.06)
+    top = fillet(top.edges().filter_by(Axis.Z), 1.0)
+    bot = Pos(cx, cy, z0 + t * 0.03) * Box(w, h, t * 0.06)
+    bot = fillet(bot.edges().filter_by(Axis.Z), 1.0)
+    drills = [Pos(x, y, (z0 + z1) / 2) * Cylinder(r, t * 3) for x, y, r in holes]
+    if drills:
+        core, top, bot = core - Compound(drills), top - Compound(drills), bot - Compound(drills)
+    out = [(core, 'fr4'), (top, 'solder_mask'), (bot, 'solder_mask')]
+    for x, y, r in holes:
+        ring = Pos(x, y, (z0 + z1) / 2) * (Cylinder(r * 1.7, t + 0.07) - Cylinder(r, t + 1))
+        out.append((ring, 'gold'))
+    for item in silk:
+        if item[0] == 'text':
+            _, s, x, y, hh = item
+            out.append(text(s, hh, x, y, z1, 'silkscreen', lift=0.012))
+        else:
+            _, x, y, hx, hy = item
+            frame = Pos(x, y, z1 + 0.012) * (Box(2 * hx + 0.3, 2 * hy + 0.3, 0.012) - Box(2 * hx, 2 * hy, 0.1))
+            out.append((frame, 'silkscreen'))
+    return out

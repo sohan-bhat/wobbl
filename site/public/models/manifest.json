@@ -178,6 +178,19 @@
       {"file": "motor-mount/pulley.glb", "covers": ["pulley"]}
     ]
   },
+  "pcb-buck-ringing": {
+    "replace": [
+      {"object": "J1", "file": "pcb-buck-ringing/terminal.glb"},
+      {"object": "J1 screw", "file": "pcb-buck-ringing/terminal-screw.glb"},
+      {"object": "C1", "file": "pcb-buck-ringing/can.glb"},
+      {"object": "C2", "file": "pcb-buck-ringing/can.glb"},
+      {"object": "C1 top", "file": "circuits-bench/cap-top-3.04.glb"},
+      {"object": "C2 top", "file": "circuits-bench/cap-top-3.04.glb"},
+      {"object": "S1", "file": "pcb-buck-ringing/soic8.glb"},
+      {"object": "L1", "file": "circuits-bench/toroid-core.glb"},
+      {"object": "L1 coil", "file": "pcb-buck-ringing/winding.glb"}
+    ]
+  },
   "printed-lid": {
     "replace": [
       {"object": "print bed", "file": "printed-lid/print-bed.glb"}
