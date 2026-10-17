@@ -16,7 +16,7 @@ looks.add('crucible_clay', color=(0.09, 0.085, 0.08), metal=0.0, rough=0.75, nor
           rvar=(0.65, 0.85), tiles=60)
 looks.add('crucible_glaze', color=(0.16, 0.12, 0.08), metal=0.0, rough=0.4, normal='cast_n', nstr=0.3,
           rvar=(0.32, 0.5), tiles=60)
-looks.add('sand', color=(0.25, 0.2, 0.13), metal=0.0, rough=0.92, normal='concrete_n', nstr=1.0, tiles=60)
+looks.add('sand', color=(0.25, 0.2, 0.13), metal=0.0, rough=0.92, normal='fine_n', nstr=1.6, tiles=60)
 looks.add('magnesium', color=(0.72, 0.72, 0.7), metal=1.0, rough=0.35)
 looks.add('gas_hose', color=(0.55, 0.12, 0.04), metal=0.0, rough=0.55)
 looks.add('brass_turned', color=(0.86, 0.66, 0.36), metal=1.0, rough=0.26)
