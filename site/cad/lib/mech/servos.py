@@ -139,9 +139,9 @@ def disc_horn(d=25.0, hub_d=10.0, t=2.5, hub_h=6.5, holes=((7.0, 4, 45), (10.0, 
     horn = horn - Pos(0, hub_d * 0.25, -hub_h + (hub_h - t) / 2) * Box(0.6, hub_d * 0.5 + 0.1, hub_h - t + 0.02)
     horn = horn - Pos(0, 0, -t - 1) * Solid.make_cylinder(3.2 if screw == 'M3' else 2.2, t + 1.02)
     out = [(horn, 'aluminum_machined')]
-    sc = fs.socket_cap(screw, 6 if screw == 'M3' else 4, threads=False)
+    sc = fs.socket_cap(screw, 2, threads=False, lite=True)
     out.append((Pos(0, 0, -t + 0.4) * sc, 'steel_black_oxide'))
-    cl = fs.socket_cap('M2', hub_d * 0.9, threads=False)
+    cl = fs.socket_cap('M2', hub_d * 0.9, threads=False, lite=True)
     out.append((Pos(hub_d * 0.5, hub_d * 0.25, -hub_h + (hub_h - t) / 2) * Rot(0, 90, 0) * cl, 'steel_black_oxide'))
     return out
 
@@ -160,7 +160,7 @@ def arm_horn(length=16.0, d_hub=7.0, t=1.6, hub_h=4.0, holes=5):
     return [(h, 'plastic_white')]
 
 
-def servo(model='MG996R', case_material='servo_case', horn='disc', cable=True):
+def servo(model='MG996R', case_material='servo_case', horn='disc', cable=True, horn_top=None):
     """A servo by name: {'case': ..., 'output': ..., 'horn': ...}. The horn's top face is at the datasheet's height
     with a horn fitted (47.6 mm above the bottom for an MG996R), the spline fully engaged in its hub."""
     sp = SPECS[model]
@@ -168,10 +168,10 @@ def servo(model='MG996R', case_material='servo_case', horn='disc', cable=True):
     out['output'][0] = (out['output'][0][0], case_material)
     if horn == 'disc':
         if model == 'MG996R':
-            top = 47.6 - sp['H']
-            parts = disc_horn()
+            top = horn_top or 47.6 - sp['H']
+            parts = disc_horn(hub_h=min(6.5, top - 2.9))
         else:
-            top = sp['spline_top'] + 1.6
+            top = horn_top or sp['spline_top'] + 1.6
             parts = disc_horn(d=16.0, hub_d=7.0, t=2.0, hub_h=3.6, holes=((5.0, 4, 45),), hole_d=2.0, screw='M2')
         out['horn'] = [(Pos(0, 0, top) * s, m) for s, m in parts]
     elif horn == 'arm':

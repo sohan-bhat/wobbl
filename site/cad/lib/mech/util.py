@@ -50,3 +50,23 @@ def place(parts, M):
         else:
             out.append((loc * s, m))
     return out
+
+
+# texture free twins of the hardware materials: a screw head is a few pixels across, so its roughness tile is never
+# seen, and without textures the export writes it with no uvs and fewer vertices
+HARDWARE = ('steel_black_oxide', 'steel_zinc', 'steel_bare', 'steel_chrome', 'steel_dark', 'steel_stainless', 'brass',
+            'rubber', 'aluminum_anodized', 'aluminum_machined')
+
+
+def _plain_name(m):
+    import looks
+    name = m + '_plain'
+    if name not in looks.MATERIALS:
+        d = looks.MATERIALS[m]
+        looks.add(name, color=d['color'], metal=d['metal'], rough=d['rough'])
+    return name
+
+
+def plain(parts, names=HARDWARE):
+    """[(shape, material)] with the listed materials swapped for their texture free twins (steel_zinc_plain)."""
+    return [(s, _plain_name(m) if m in names else m) for s, m in parts]

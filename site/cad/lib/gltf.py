@@ -51,8 +51,9 @@ def triangles(shape, tol, ang):
     return meshing.tessellate(shape, tol, ang)
 
 
-def export(rel, nodes, unit=1.0, tol=0.02, ang=0.2, quiet=False):
-    """Write site/public/models/<rel> from a list of Nodes and return its size in bytes."""
+def export(rel, nodes, unit=1.0, tol=0.02, ang=0.2, quiet=False, pack=('-vp', '12', '-vt', '10')):
+    """Write site/public/models/<rel> from a list of Nodes and return its size in bytes. pack: extra gltfpack flags
+    (12 bit positions and 10 bit uvs by default, finer than a pixel at any zoom the pages allow)."""
     nodes = nodes if isinstance(nodes, (list, tuple)) else [nodes]
     js = {'asset': {'version': '2.0', 'generator': 'wobbl site/cad (build123d, OpenCASCADE)'}, 'scene': 0,
           'scenes': [{'nodes': []}], 'nodes': [], 'meshes': [], 'materials': [], 'accessors': [],
@@ -110,14 +111,18 @@ def export(rel, nodes, unit=1.0, tol=0.02, ang=0.2, quiet=False):
         prims = []
         for mname, (Ps, Ns, Ts, _) in groups.items():
             P, N, T = np.concatenate(Ps), np.concatenate(Ns), np.concatenate(Ts)
-            P, N, UV, T = meshing.box_uv(P, N, T, looks.MATERIALS[mname]['tiles'] / 1000.0)
+            # a material without textures needs no uvs, and skipping them keeps vertices from splitting at seams
+            textured = any(looks.textures(mname))
+            if textured:
+                P, N, UV, T = meshing.box_uv(P, N, T, looks.MATERIALS[mname]['tiles'] / 1000.0)
             Pg = (P @ _C.T * unit).astype(np.float32)
             Ng = (N @ _C.T).astype(np.float32)
-            UV = UV.astype(np.float32)
-            UV[:, 1] = -UV[:, 1]
-            prims.append({'attributes': {'POSITION': accessor(Pg, 'VEC3', 5126, 34962, True),
-                                         'NORMAL': accessor(Ng, 'VEC3', 5126, 34962),
-                                         'TEXCOORD_0': accessor(UV, 'VEC2', 5126, 34962)},
+            attrs = {'POSITION': accessor(Pg, 'VEC3', 5126, 34962, True), 'NORMAL': accessor(Ng, 'VEC3', 5126, 34962)}
+            if textured:
+                UV = UV.astype(np.float32)
+                UV[:, 1] = -UV[:, 1]
+                attrs['TEXCOORD_0'] = accessor(UV, 'VEC2', 5126, 34962)
+            prims.append({'attributes': attrs,
                           'indices': accessor(T.astype(np.uint32).reshape(-1), 'SCALAR', 5125, 34963),
                           'material': material(mname)})
         if prims:
@@ -154,7 +159,7 @@ def export(rel, nodes, unit=1.0, tol=0.02, ang=0.2, quiet=False):
     with tempfile.TemporaryDirectory() as td:
         raw = os.path.join(td, 'raw.glb')
         open(raw, 'wb').write(glb)
-        subprocess.run([*_gltfpack(), '-i', raw, '-o', path, '-cc', '-km', '-kn', '-kv'], check=True,
+        subprocess.run([*_gltfpack(), '-i', raw, '-o', path, '-cc', '-km', '-kn', '-kv', *pack], check=True,
                        stdout=subprocess.DEVNULL)
     size = os.path.getsize(path)
     if not quiet:

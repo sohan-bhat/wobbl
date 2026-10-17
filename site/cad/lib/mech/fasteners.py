@@ -76,23 +76,27 @@ def threaded_rod(d, length, pitch, z_top=0.0, threads=True, tip_chamfer=True, pl
     return _revolve(prof)
 
 
-def _socket(across, depth, z_face):
+def _socket(across, depth, z_face, cone=True):
     """A hex socket cut into a face at z_face going down: the hexagon, then the drill point's cone."""
     hexa = extrude(Plane.XY.offset(z_face - depth) * RegularPolygon(across / math.sqrt(3), 6, major_radius=True), depth + 0.01)
+    if not cone:
+        return hexa
     cone = Solid.make_cone(across / math.sqrt(3) * 0.95, 0.0, across * 0.35, Plane.XY.offset(z_face - depth).rotated((180, 0, 0)))
     return hexa + cone
 
 
-def socket_cap(size, length, threads=None, socket=True):
-    """ISO 4762 socket head cap screw: knurl free cylindrical head with chamfered top, hex socket, threads below."""
+def socket_cap(size, length, threads=None, socket=True, lite=False):
+    """ISO 4762 socket head cap screw: knurl free cylindrical head with chamfered top, hex socket, threads below.
+    lite leaves out the fillet under the head and the socket's cone, for small screws seen from a distance."""
     dk, k, s, t = SHCS[size]
     d = dia(size)
     threads = d >= 4 if threads is None else threads
     head = Solid.make_cylinder(dk / 2, k)
     head = chamfer(head.edges().group_by(Axis.Z)[-1], dk * 0.07)
-    head = fillet(head.edges().group_by(Axis.Z)[0], min(0.2 * d, 0.4) * 0.5)
+    if not lite:
+        head = fillet(head.edges().group_by(Axis.Z)[0], min(0.2 * d, 0.4) * 0.5)
     if socket:
-        head = head - _socket(s, t, k)
+        head = head - _socket(s, t, k, cone=not lite)
     shank = threaded_rod(d, length, PITCH[size], 0.0, threads, plain=max(0.0, length - 2 * d - 6) if length > 2 * d + 6 else 0.0)
     return head + shank
 
@@ -167,17 +171,17 @@ def washer(size, outer=None, thickness=None, inner=None):
     return w
 
 
-def button_head(size, length, threads=False):
+def button_head(size, length, threads=False, lite=False):
     """ISO 7380 button head socket screw: a domed head with its hex socket."""
     dk, k, s = BUTTON[size]
     d = dia(size)
-    n = 10
+    n = 4 if lite else 10
     prof = [(0, 0), (dk / 2, 0)]
     for i in range(1, n + 1):
         a = i / n * math.pi / 2
         prof.append((dk / 2 * math.cos(a) * (1 - 0.0) if i < n else 0.0, k * math.sin(a)))
     head = _revolve(prof[:-1] + [(0, k)])
-    head = head - _socket(s, k * 0.6, k)
+    head = head - _socket(s, k * 0.6, k, cone=not lite)
     return head + threaded_rod(d, length, PITCH[size], 0.0, threads)
 
 
