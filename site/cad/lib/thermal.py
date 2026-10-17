@@ -20,7 +20,7 @@ looks.add('ihs_nickel', color=(0.7, 0.7, 0.68), metal=1.0, rough=0.22, normal='b
 looks.add('substrate', color=(0.03, 0.09, 0.04), metal=0.0, rough=0.35)
 looks.add('solder_ball', color=(0.72, 0.72, 0.7), metal=1.0, rough=0.3)
 looks.add('mlcc', color=(0.32, 0.24, 0.14), metal=0.0, rough=0.5)
-looks.add('module_grey', color=(0.16, 0.17, 0.18), metal=0.0, rough=0.55, rvar=(0.48, 0.62), tiles=40)
+looks.add('module_grey', color=(0.035, 0.037, 0.04), metal=0.0, rough=0.55, rvar=(0.48, 0.62), tiles=40)
 looks.add('copper_nickel', color=(0.72, 0.68, 0.62), metal=1.0, rough=0.3)
 looks.add('hose', color=(0.015, 0.015, 0.016), metal=0.0, rough=0.62, rvar=(0.55, 0.72), tiles=40)
 

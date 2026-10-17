@@ -12,11 +12,11 @@ import looks
 from electronics import front_plane, text
 from rocketry import lathe
 
-looks.add('crucible_clay', color=(0.09, 0.085, 0.08), metal=0.0, rough=0.75, normal='cast_n', nstr=0.6,
+looks.add('crucible_clay', color=(0.035, 0.033, 0.031), metal=0.0, rough=0.75, normal='cast_n', nstr=0.6,
           rvar=(0.65, 0.85), tiles=60)
-looks.add('crucible_glaze', color=(0.16, 0.12, 0.08), metal=0.0, rough=0.4, normal='cast_n', nstr=0.3,
+looks.add('crucible_glaze', color=(0.09, 0.06, 0.035), metal=0.0, rough=0.4, normal='cast_n', nstr=0.3,
           rvar=(0.32, 0.5), tiles=60)
-looks.add('sand', color=(0.25, 0.2, 0.13), metal=0.0, rough=0.92, normal='fine_n', nstr=1.6, tiles=60)
+looks.add('sand', color=(0.2, 0.155, 0.1), metal=0.0, rough=0.92, normal='fine_n', nstr=1.6, tiles=60)
 looks.add('magnesium', color=(0.72, 0.72, 0.7), metal=1.0, rough=0.35)
 looks.add('gas_hose', color=(0.55, 0.12, 0.04), metal=0.0, rough=0.55)
 looks.add('brass_turned', color=(0.86, 0.66, 0.36), metal=1.0, rough=0.26)
@@ -84,13 +84,35 @@ def crucible(outline, wall_top=None):
     return [(body - split, 'crucible_clay'), (body & split, 'crucible_glaze')]
 
 
-def sand_bed(r_in, r_out, z_floor, z_top):
-    """A mound of dry sand round the crucible's foot, on a steel tray."""
-    mound = lathe([(r_in, z_floor), (r_out, z_floor), (r_out * 0.8, z_floor + (z_top - z_floor) * 0.45), (r_in + 4, z_top),
-                   (r_in, z_top)])
-    tray = lathe([(0, z_floor - 2), (r_out + 12, z_floor - 2), (r_out + 12, z_floor + 10), (r_out + 10.5, z_floor + 10),
-                  (r_out + 10.5, z_floor - 0.5), (0, z_floor - 0.5)])
-    return [(mound, 'sand'), (tray, 'steel_mill')]
+def sand_bed(r_in, r_out, z_floor, z_top, seed=3):
+    """A heap of dry sand round the crucible's foot, lumpy as poured sand is, on a shallow steel tray."""
+    rng = np.random.default_rng(seed)
+    nr, nt = 18, 96
+    rr = np.linspace(r_in, r_out, nr)
+    tt = np.linspace(0, 2 * np.pi, nt, endpoint=False)
+    R, Tt = np.meshgrid(rr, tt, indexing='ij')
+    u = (R - r_in) / (r_out - r_in)
+    # a heap whose slope eases out at the foot, with lumps from a few random waves round and across it
+    z = z_floor + (z_top - z_floor) * (1 - u) ** 1.6
+    lump = sum(rng.uniform(0.3, 1.0) * np.sin(k * Tt + rng.uniform(0, 6.3)) * np.cos((k * 0.7) * u * np.pi + rng.uniform(0, 6.3))
+               for k in (3, 5, 8, 13))
+    z = z + lump * 0.9 * np.sin(np.pi * np.clip(u, 0, 1)) + rng.normal(0, 0.12, z.shape) * (u > 0.02)
+    P = np.stack([R * np.cos(Tt), R * np.sin(Tt), z], -1)
+    dr = np.gradient(P, axis=0)
+    dt = np.roll(P, -1, axis=1) - np.roll(P, 1, axis=1)
+    N = np.cross(dr, dt)
+    N /= np.linalg.norm(N, axis=-1, keepdims=True)
+    N[N[..., 2] < 0] *= -1
+    tris = []
+    for i in range(nr - 1):
+        for j in range(nt):
+            a0, a1 = i * nt + j, i * nt + (j + 1) % nt
+            b0, b1 = a0 + nt, a1 + nt
+            tris += [(a0, b0, a1), (a1, b0, b1)]
+    heap = ('mesh', P.reshape(-1, 3), N.reshape(-1, 3), np.array(tris))
+    tray = lathe([(0, z_floor - 2), (r_out + 8, z_floor - 2), (r_out + 8, z_floor + 5), (r_out + 6.5, z_floor + 5),
+                  (r_out + 6.5, z_floor - 0.5), (0, z_floor - 0.5)])
+    return [(heap, 'sand'), (tray, 'steel_dark')]
 
 
 def tongs(length=260.0, at=(0, 0, 0), angle=0.0):
