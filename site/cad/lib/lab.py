@@ -16,7 +16,7 @@ looks.add('crucible_clay', color=(0.09, 0.085, 0.08), metal=0.0, rough=0.75, nor
           rvar=(0.65, 0.85), tiles=60)
 looks.add('crucible_glaze', color=(0.16, 0.12, 0.08), metal=0.0, rough=0.4, normal='cast_n', nstr=0.3,
           rvar=(0.32, 0.5), tiles=60)
-looks.add('sand', color=(0.42, 0.36, 0.26), metal=0.0, rough=0.9, normal='concrete_n', nstr=0.8, tiles=40)
+looks.add('sand', color=(0.25, 0.2, 0.13), metal=0.0, rough=0.92, normal='concrete_n', nstr=1.0, tiles=60)
 looks.add('magnesium', color=(0.72, 0.72, 0.7), metal=1.0, rough=0.35)
 looks.add('gas_hose', color=(0.55, 0.12, 0.04), metal=0.0, rough=0.55)
 looks.add('brass_turned', color=(0.86, 0.66, 0.36), metal=1.0, rough=0.26)
@@ -79,8 +79,9 @@ def crucible(outline, wall_top=None):
     body = lathe(prof)
     lip = Pos(ro_t - 2, 0, zt - 2) * Rot(0, 30, 0) * Box(8, 16, 4)
     body = body - lip
-    rim = lathe([(ri_t + 0.3, zt - 6), (ro_t + 0.15, zt - 6), (ro_t + 0.15, zt), (ri_t + 0.3, zt)]) - lip
-    return [(body, 'crucible_clay'), (rim, 'crucible_glaze')]
+    # the glaze runs down from the rim; the body is split there rather than coated, so no two faces overlap
+    split = Pos(0, 0, zt - 7 + 50) * Box(400, 400, 100)
+    return [(body - split, 'crucible_clay'), (body & split, 'crucible_glaze')]
 
 
 def sand_bed(r_in, r_out, z_floor, z_top):
@@ -96,8 +97,9 @@ def tongs(length=260.0, at=(0, 0, 0), angle=0.0):
     """Crucible tongs lying on the ground: two forged bars crossed at a rivet, with curved bow jaws."""
     out = []
     for s in (-1, 1):
-        bar = Pos(length * 0.25, s * 3.5, 4) * Rot(0, 0, s * 3) * Box(length * 0.75, 4.0, 6.0)
-        out.append((fillet(bar.edges().filter_by(Axis.X), 1.5), 'steel_black_oxide'))
+        bar = Box(length * 0.75, 4.0, 6.0)
+        bar = fillet(bar.edges().filter_by(Axis.X), 1.5)
+        out.append((Pos(length * 0.25, s * 3.5, 4) * Rot(0, 0, s * 3) * bar, 'steel_black_oxide'))
         jaw = Pos(-length * 0.18, s * 14, 4) * (Cylinder(18, 6) - Cylinder(14, 8)) & Pos(-length * 0.18, s * 26, 4) * Box(40, 26, 8)
         out.append((jaw, 'steel_black_oxide'))
     rivet = Pos(-length * 0.12, 0, 4) * Cylinder(4.0, 9.0)

@@ -312,6 +312,14 @@
       {"file": "strut-buckling/load-frame.glb"}
     ]
   },
+  "thermite": {
+    "replace": [
+      {"object": "crucible", "file": "thermite/crucible.glb"}
+    ],
+    "add": [
+      {"file": "thermite/setup.glb"}
+    ]
+  },
   "wiper-linkage": {
     "replace": [
       {"object": "crank", "file": "wiper-linkage/crank.glb", "tint": ["paint"], "anchors": {"hub": [0, 0, 0.04], "pin": [0, 0, -0.04]}},
