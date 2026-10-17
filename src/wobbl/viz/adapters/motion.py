@@ -141,7 +141,9 @@ def _rocket(out, o, st, inp, runs):
     mark = span * 0.006
 
     # each flight: up to apogee, under the drogue, under the main, and a plumb line from apogee to the ground
-    for r, (a, b) in zip(runs, win):
+    k_design = int(np.argmin(np.abs(inp.values - inp.design)))
+    trail = []                                      # the asked flight's legs and each point's flight time
+    for i, (r, (a, b)) in enumerate(zip(runs, win)):
         ta = r.events.get("apogee", (r.t[r.z.argmax()],))[0]
         tm = r.events.get("main deploy", (np.inf,))[0]
         P3 = np.c_[r.x, np.zeros(len(r.x)), r.z]
@@ -149,7 +151,9 @@ def _rocket(out, o, st, inp, runs):
                                                                        DROGUE, 2.2),
                                     ("main descent", r.t >= tm, MAIN, 2.2)):
             if sel.sum() > 1:
-                s.lines([P3[sel]], color=color, width=w, name=name).show(a, b)
+                ln = s.lines([P3[sel]], color=color, width=w, name=name).show(a, b)
+                if i == k_design:
+                    trail.append((ln, np.asarray(r.t, float)[sel]))
         ax, az = r.events["apogee"][1:3] if "apogee" in r.events else (r.x[r.z.argmax()], r.z.max())
         s.lines([np.array([[ax, 0, 0], [ax, 0, az]])], color=PLUMB, width=1.0, name="under apogee",
                 prop=True).show(a, b).as_guide()
@@ -180,13 +184,19 @@ def _rocket(out, o, st, inp, runs):
 
     # the main parachute where it opens, at its real size
     main = st.chute("main")
+    canopy = None
     if main is not None and all("main deploy" in r.events for r in runs):
         mp = np.array([[r.events["main deploy"][1], 0, r.events["main deploy"][2]] for r in runs])
-        Xc, Tc = F.canopy(main.diameter, max(main.diameter * 1.3, L * 0.5))
-        cm = s.mesh(Xc, Tc, name="main parachute", color=MAIN, max_vertices=900)
+        canopy = F.canopy(main.diameter, max(main.diameter * 1.3, L * 0.5))
+        cm = s.mesh(*canopy, name="main parachute", color=MAIN, max_vertices=900)
         cm.move(mp, (1, 0, 0, 0))
         chute = cm
         s.label("main opens", [0, 0, main.diameter * 2], follow=cm, kind="note")
+    # the flight at the asked value as it happens: lift off with its flame, the climb, apogee and the descent
+    mo = _rocket_motion(s, st, runs[k_design], inp.study(st, runs[k_design].value).wind, airframe, chute, canopy,
+                        trail, L, cg, dia, rail_dir, grow, float(inp.values.max()) + 1.0)
+    if mo["flame"] is not None:
+        airframe.append(mo["flame"])
 
     # where it lands, colored by the landing speed against the soft landing limit
     land = np.array([[r.x[-1], 0, mark * 0.15] for r in runs])
@@ -212,10 +222,13 @@ def _rocket(out, o, st, inp, runs):
                quat=P.z_to(rail_dir), color=P.BOLT, name="launch rail", prop=True)
     # the rocket by the most; the pad, the rail and the canopy by a fifth of that, so a rail kilometres tall
     # never stands over the flight and the canopy never covers where it lands
-    s.magnify(airframe, grow, label="Rocket")
+    s.magnify(airframe, grow, label="Rocket", pivot=mo["pivot"])
     s.magnify(s.objects[first:], grow / 5, label="Pad", anchor=[0, 0, 0])
     if chute is not None:
         s.magnify([chute], grow / 5, label="Parachute")
+    if mo["canopy"] is not None:
+        over, sc, at = mo["canopy"]
+        s.magnify([over], sc, label="Parachute", pivot=at)
     if inp.key == "wind" and inp.values.max() > 0:
         sign = -1.0 if st.wind >= 0 else 1.0
         at = np.array([x1 + span * 0.1, 0, top * 0.55])
@@ -244,6 +257,93 @@ def _rocket(out, o, st, inp, runs):
                        "dir": (0.4, -1.0, 0.45)},
                       {"name": "Pad", "target": [0, 0, L], "dist": L * 9, "dir": (0.6, -1.0, 0.3)}])
     return s.save(out)
+
+
+def _rocket_motion(s, st, r, wind: float, airframe, chute, canopy, trail, L: float, cg: float, dia: float,
+                   rail_dir, grow: float, never: float):
+    """The flight at the asked value as the scene's motion (viz/track.py): the rocket on its path at every moment,
+    pointing up the rail, then into the air it meets, then hanging nose up under its parachutes; a flame out of
+    its nozzle as long as the motor's thrust at that moment against its peak; each leg of the path tracing itself
+    behind it; the main parachute open over it from the moment it deploys. The clock plays the boost in real time
+    and speeds up through the coast and the descent, so the whole flight plays in under ten seconds.
+
+    The rocket is drawn grow times larger, so while the motion plays it grows from its nozzle exit (the magnify
+    pivot), which flies the solved path: it stands on the pad, the trail leaves its tail and it lands tail first.
+    Returns the flame mesh, to grow with the airframe, the pivot, and the motion's canopy with the factor and
+    pivot it grows by, each None with no motion."""
+    t = np.asarray(r.t, float)
+    if len(t) < 4 or t[-1] <= 0:
+        return {"flame": None, "pivot": None, "canopy": None}
+    motor = st.motor
+    burn = float(motor.burn_time) if motor is not None else 0.0
+    ta = float(r.events.get("apogee", (t[np.argmax(r.z)],))[0])
+    tm = float(r.events.get("main deploy", (np.inf,))[0])
+    # frames: dense through the boost, then evenly through the coast and the descent
+    flip = min(3.0, 0.25 * (t[-1] - ta))            # s after apogee it takes to swing nose up under the drogue
+    tau = np.unique(np.r_[np.linspace(0, min(burn * 1.15, t[-1]), 60), np.linspace(0, ta, 50),
+                          np.linspace(ta, ta + flip, 16), np.linspace(ta, t[-1], 50), [t[-1]]])
+    tau = tau[(tau >= t[0]) & (tau <= t[-1])]
+    tau = tau - tau[0]
+    # the clock, set first so the tracks below have the motion's frames: the boost in real time, the coast ten
+    # times faster, the descent fifty times faster
+    from ...drop.scene import ramped_play
+    t_boost = max(min(burn * 1.2, ta * 0.5), 0.2)
+    clock = ramped_play([(t_boost, 1.0), (max(ta - t_boost, 1e-3), 0.1), (max(t[-1] - ta, 1e-3), 0.02)], ramp=0.6)
+    s.motion(tau, clock(tau), label="flight time", unit="s",
+             note="The rocket flies its solved path at the asked value. The flame grows with the motor's thrust at "
+                  "each moment. The boost plays in real time and the rest faster.")
+    x, z = np.interp(tau, t, r.x), np.interp(tau, t, r.z)
+    vx, vz = np.interp(tau, t, r.vx), np.interp(tau, t, r.vz)
+    ph = np.array([r.phase[min(int(np.searchsorted(t, v, side="right")) - 1, len(t) - 1)] for v in tau])
+    # which way it points: up the rail, then into the air it meets, then nose up under a parachute
+    d = np.c_[vx + wind, np.zeros(len(tau)), vz]
+    d[np.array([p in ("rail", "held", "pad") for p in ph])] = rail_dir
+    d[np.linalg.norm(d, axis=1) < 1e-6] = rail_dir
+    d = d / np.linalg.norm(d, axis=1, keepdims=True)
+    # after apogee it swings from the way it flew to nose up over flip seconds, as the drogue pulls it round
+    ka = min(int(np.searchsorted(tau, ta)), len(tau) - 1)
+    w = np.clip((tau - ta) / max(flip, 1e-9), 0, 1)[:, None]
+    w = w * w * (3 - 2 * w)
+    after = (tau >= ta) | np.array([p in ("drogue", "main", "fall", "landed") for p in ph])
+    swing = (1 - w) * d[max(ka - 1, 0)] + w * np.array([0.0, 0.0, 1.0])
+    d[after] = swing[after] / np.maximum(np.linalg.norm(swing[after], axis=1, keepdims=True), 1e-9)
+    q = quats_along(d)
+    # the nozzle exit flies the path, standing on the pad's top as the pad is drawn (props.pad, a fifth of grow)
+    exit_z = 0.5 * dia
+    lift = 0.12 * max(dia * 6, 0.5) * grow / 5
+    nozzle = np.c_[x, np.zeros(len(tau)), z + lift]
+    pos = nozzle + d * (cg + exit_z)
+    for m in airframe:
+        m.track(pos=pos, quat=q)
+    pivot = [0.0, 0.0, -(cg + exit_z)]
+    # the flame: a plume out of the nozzle in the rocket's own frame, its length the thrust against the peak
+    flame = None
+    if motor is not None and burn > 0:
+        peak = max(float(np.max(motor.forces)), 1e-9)
+        T = np.array([motor.thrust(v) for v in tau])
+        Xf, Tf = F.plume(dia * 0.3, 1.6 * L)
+        flame = s.mesh(Xf + pivot, Tf, name="exhaust flame", color="#ffa040", max_vertices=600)
+        # shorter with less thrust: each point drawn toward the nozzle by the share of thrust missing
+        k = np.clip(T / peak, 0, 1)
+        U = np.zeros((len(tau), len(Xf), 3))
+        U[:, :, 2] = (k[:, None] - 1.0) * Xf[None, :, 2]
+        flame.track(pos=pos, quat=q, deform=U, glow=k, when=(None, burn + 1e-3))
+        flame.show(never, never)
+    # each leg of the asked flight traces itself as the rocket flies it
+    for ln, tl in trail:
+        ln.track(drawn=[tl - float(t[0])])
+    over = None
+    if chute is not None and canopy is not None and np.isfinite(tm):
+        # the slider's canopy rests where it opens; over the motion a second one hangs over the rocket's nose
+        chute.track(when=(float(tau[-1]) + 1.0, None))
+        over = s.mesh(*canopy, name="main parachute", color=MAIN, max_vertices=900)
+        top = nozzle + [0.0, 0.0, L + exit_z]
+        over.track(pos=top, quat=np.tile([1.0, 0, 0, 0], (len(tau), 1)), when=(tm - float(t[0]), None))
+        over.show(never, never)
+        # grown by a fifth of the rocket's factor about a point under it, so it opens over the grown nose
+        sc = grow / 5
+        over = (over, sc, [0.0, 0.0, (grow - 1) * (L + exit_z) / (1 - sc) if abs(1 - sc) > 1e-9 else 0.0])
+    return {"flame": flame, "pivot": pivot, "canopy": over}
 
 
 def _body(out, o, st, c, inp, runs):
