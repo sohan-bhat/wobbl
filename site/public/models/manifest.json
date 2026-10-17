@@ -6,6 +6,11 @@
       {"object": "beaker", "file": "baking-soda-vinegar/beaker.glb"}
     ]
   },
+  "battery-pack": {
+    "add": [
+      {"file": "battery-pack/pack.glb"}
+    ]
+  },
   "bolted-flange": {
     "replace": [
       {"object": "plate", "file": "bolted-flange/plate.glb"},
@@ -35,6 +40,12 @@
       {"file": "cast-mount-credibility/motor-flange.glb", "covers": ["motor flange"]},
       {"file": "cast-mount-credibility/motor-shaft.glb", "covers": ["motor shaft"]},
       {"file": "cast-mount-credibility/pulley.glb", "covers": ["pulley"]}
+    ]
+  },
+  "cell-runaway": {
+    "add": [
+      {"file": "cell-runaway/cell-ends.glb", "parent": "cell"},
+      {"file": "cell-runaway/fixture.glb"}
     ]
   },
   "circuits/buck": {
