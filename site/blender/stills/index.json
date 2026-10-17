@@ -84,15 +84,15 @@
   "file": "copper-crystal-output.webp"
  },
  "desktop-arm/output": {
-  "key": "38309e1592fb39d3",
+  "key": "17b7095a475c3903",
   "file": "desktop-arm-output.webp"
  },
  "drone-arm-resonance/output": {
-  "key": "e45dd7fd10b966d3",
+  "key": "5e52fc0f59449fc0",
   "file": "drone-arm-resonance-output.webp"
  },
  "drone-arm/output": {
-  "key": "d321dcef37f738be",
+  "key": "4c9e3d761728e7e0",
   "file": "drone-arm-output.webp"
  },
  "enclosure/output": {
@@ -100,7 +100,7 @@
   "file": "enclosure-output.webp"
  },
  "falling-rock/output": {
-  "key": "2bb5817ad464e97e",
+  "key": "702420ec0eb82e4b",
   "file": "falling-rock-output.webp"
  },
  "fan-heat-sink/output": {
@@ -144,7 +144,7 @@
   "file": "propane-flame-output.webp"
  },
  "rocket-launch/output": {
-  "key": "dc86f850ef5e5ef5",
+  "key": "859a283d367a1f3e",
   "file": "rocket-launch-output.webp"
  },
  "shelf-bracket/output": {
@@ -164,7 +164,7 @@
   "file": "steel-hook-output.webp"
  },
  "strut-buckling/output": {
-  "key": "cba637dfb425f7df",
+  "key": "16d0e963108f9f04",
   "file": "strut-buckling-output.webp"
  },
  "thermite/output/combustion": {
@@ -176,7 +176,7 @@
   "file": "thermite-output-reaction.webp"
  },
  "wiper-linkage/output": {
-  "key": "655ea23975451228",
+  "key": "42b4ec5220d7c8aa",
   "file": "wiper-linkage-output.webp"
  }
 }
