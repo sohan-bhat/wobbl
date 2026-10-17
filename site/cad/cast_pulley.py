@@ -7,19 +7,15 @@ cope would only float overhead in that view, and are left out.
 
     python site/cad/cast_pulley.py
 """
-import math
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
-import numpy as np  # noqa: E402
-from build123d import Axis, Box, Plane, Polyline, Pos, RectangleRounded, Rot, Solid, chamfer, extrude, fillet, make_face, revolve  # noqa: E402
+from build123d import Axis, Box, Pos, chamfer  # noqa: E402
 
-import looks  # noqa: E402
 from gltf import Node  # noqa: E402
 from mech import example as ex  # noqa: E402
-from mech import fasteners as fs  # noqa: E402
 from mech.util import plain  # noqa: E402
 
 KEY = 'cast-pulley'

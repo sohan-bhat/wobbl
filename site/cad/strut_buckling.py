@@ -7,20 +7,18 @@ own frame, and the columns, bed and crosshead are added.
 
     python site/cad/strut_buckling.py
 """
-import math
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
-import numpy as np  # noqa: E402
 from build123d import Axis, Box, Plane, Polyline, Pos, Rot, Solid, chamfer, fillet, make_face, revolve  # noqa: E402
 
 import looks  # noqa: E402
 from gltf import Node  # noqa: E402
 from mech import example as ex  # noqa: E402
 from mech import fasteners as fs  # noqa: E402
-from mech.util import place, plain  # noqa: E402
+from mech.util import plain  # noqa: E402
 
 KEY = 'strut-buckling'
 L = 600.0

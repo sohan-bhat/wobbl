@@ -8,14 +8,13 @@ these are built in that frame and added as they stand.
 
     python site/cad/shelf_bracket.py
 """
-import math
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
 import numpy as np  # noqa: E402
-from build123d import Axis, Box, Plane, Pos, Rot, Solid, chamfer, fillet  # noqa: E402
+from build123d import Axis, Box, Plane, Pos, Rot, Solid, fillet  # noqa: E402
 
 import looks  # noqa: E402
 from gltf import Node, export, write_manifest  # noqa: E402

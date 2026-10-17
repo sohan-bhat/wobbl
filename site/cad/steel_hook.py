@@ -7,14 +7,13 @@ the scene's head is hidden), the shackle and load cell replace the scene's weigh
 
     python site/cad/steel_hook.py
 """
-import math
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
 import numpy as np  # noqa: E402
-from build123d import Axis, Box, Plane, Polyline, Pos, Rot, Solid, chamfer, fillet, make_face, revolve  # noqa: E402
+from build123d import Axis, Box, Plane, Pos, Rot, Solid, fillet  # noqa: E402
 
 import looks  # noqa: E402
 from gltf import Node  # noqa: E402

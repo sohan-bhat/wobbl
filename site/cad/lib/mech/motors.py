@@ -13,8 +13,7 @@ Functions return [(shape, material)] lists, a pulley's with its hub face at z = 
 """
 import math
 
-from build123d import (Axis, Box, Circle, Plane, Polyline, Pos, Rectangle, RegularPolygon, Rot, Solid, chamfer,
-                       extrude, fillet, make_face)
+from build123d import Axis, Box, Plane, Polyline, Pos, Rot, Solid, chamfer, extrude, fillet, make_face
 
 from . import fasteners as fs
 

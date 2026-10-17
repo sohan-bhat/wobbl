@@ -14,8 +14,7 @@ can tint it, for instance with how hard the servo is working.
 """
 import math
 
-from build123d import (Axis, Box, Cylinder, Plane, Polyline, Pos, Rot, Solid, Spline, Wire, Circle, Rectangle, Sketch,
-                       chamfer, extrude, fillet, make_face, revolve, sweep, Locations)
+from build123d import Axis, Box, Plane, Polyline, Pos, Rot, Solid, chamfer, extrude, fillet, make_face
 
 from . import cable as cables
 from . import fasteners as fs
@@ -155,7 +154,6 @@ def disc_horn(d=25.0, hub_d=10.0, t=2.5, hub_h=6.5, holes=((7.0, 4, 45), (10.0, 
 def arm_horn(length=16.0, d_hub=7.0, t=1.6, hub_h=4.0, holes=5):
     """A moulded plastic single arm horn with its row of holes and the hub, top face at z = 0."""
     tip = length
-    prof = Sketch() + Circle(d_hub / 2)
     arm = extrude(Plane.XY.offset(-t) * make_face(Polyline((0, d_hub / 2 * 0.95), (tip, 1.6), (tip, -1.6), (0, -d_hub / 2 * 0.95), close=True)), t)
     arm = arm + Pos(tip, 0, -t) * Solid.make_cylinder(1.6, t)
     hub = Pos(0, 0, -hub_h) * Solid.make_cylinder(d_hub / 2, hub_h)

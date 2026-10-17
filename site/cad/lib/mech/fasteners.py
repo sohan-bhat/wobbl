@@ -12,8 +12,8 @@ which read as thread at any zoom the pages allow and cost a fraction of a true h
 """
 import math
 
-from build123d import (Axis, Box, Cylinder, Locations, Plane, Polyline, Pos, RegularPolygon, Rot, Solid, Sketch, Cone,
-                       chamfer, extrude, fillet, make_face, revolve, Part)
+from build123d import (Axis, Box, Plane, Polyline, Pos, RegularPolygon, Rot, Solid, chamfer, extrude, fillet, make_face,
+                        revolve)
 
 # coarse pitch
 PITCH = {'M2': 0.4, 'M2.5': 0.45, 'M3': 0.5, 'M4': 0.7, 'M5': 0.8, 'M6': 1.0, 'M8': 1.25, 'M10': 1.5, 'M12': 1.75,

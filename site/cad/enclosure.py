@@ -6,7 +6,6 @@ Built in the part's millimetre frame (the shell's rim on z = 0, its top at z = 2
 
     python site/cad/enclosure.py
 """
-import math
 import os
 import sys
 

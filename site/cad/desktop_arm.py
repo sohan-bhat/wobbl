@@ -18,8 +18,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
 import numpy as np  # noqa: E402
-from build123d import (Axis, Box, Circle, Cylinder, Plane, Polyline, Pos, Rectangle, RectangleRounded, Rot,  # noqa: E402
-                       SlotCenterToCenter, Solid, chamfer, extrude, fillet, make_face, Sketch, Location)
+from build123d import (Axis, Box, Circle, Polyline, Pos, Rectangle, Rot, SlotCenterToCenter, Solid, chamfer, extrude,  # noqa: E402
+                        fillet, make_face)
 
 import looks  # noqa: E402
 from gltf import Node, export, write_manifest  # noqa: E402

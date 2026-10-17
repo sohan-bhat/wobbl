@@ -9,7 +9,7 @@ Each bearing stands on z = 0 with its bore on the z axis and rises to its width.
 """
 import math
 
-from build123d import Axis, Plane, Polyline, Pos, Rot, Solid, make_face, revolve
+from build123d import Axis, Plane, Polyline, Pos, Solid, make_face, revolve
 
 # bore, outer diameter, width
 SIZES = {

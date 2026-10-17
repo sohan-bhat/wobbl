@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
 import numpy as np  # noqa: E402
-from build123d import Axis, Box, Plane, Pos, RectangleRounded, Rot, Solid, chamfer, extrude, fillet  # noqa: E402
+from build123d import Axis, Box, Pos, RectangleRounded, Rot, Solid, chamfer, extrude, fillet  # noqa: E402
 
 from gltf import Node, export, write_manifest  # noqa: E402
 from mech import fasteners as fs  # noqa: E402

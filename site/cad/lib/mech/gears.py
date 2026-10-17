@@ -9,8 +9,7 @@ module * (z1 + z2) / 2 apart; rotate one by half a tooth pitch (180 / z degrees)
 """
 import math
 
-import numpy as np
-from build123d import Plane, Polyline, Pos, Solid, extrude, make_face
+from build123d import Polyline, Pos, Solid, extrude, make_face
 
 
 def _involute(rb, r):

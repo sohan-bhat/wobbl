@@ -8,14 +8,13 @@ as they stand. Both runs (with and without ribs) share the hardware.
 
     python site/cad/motor_mount.py
 """
-import math
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
 import numpy as np  # noqa: E402
-from build123d import Axis, Box, Circle, Plane, Pos, Rectangle, RectangleRounded, Rot, Solid, chamfer, extrude, fillet  # noqa: E402
+from build123d import Axis, Box, Pos, RectangleRounded, Solid, chamfer, extrude, fillet  # noqa: E402
 
 from gltf import Node, export, write_manifest  # noqa: E402
 from mech import fasteners as fs  # noqa: E402

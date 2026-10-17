@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
 import numpy as np  # noqa: E402
-from build123d import Axis, Box, Plane, Pos, RectangleRounded, Rot, SlotCenterToCenter, Solid, chamfer, extrude, fillet  # noqa: E402
+from build123d import Axis, Pos, RectangleRounded, Rot, SlotCenterToCenter, Solid, chamfer, extrude  # noqa: E402
 
 import looks  # noqa: E402
 from gltf import Node, write_manifest  # noqa: E402
@@ -94,7 +94,7 @@ def main():
         'root-screws': ([Node('root-screws', plain(root_screws()), tol=0.05, ang=0.4)], ['bolt', 'bolt head']),
         'motor-and-prop': ([Node('motor-and-prop', plain(motor_and_prop()), tol=0.06, ang=0.3)], ['load point']),
     }
-    total = ex.publish(KEY, {k: (n, {'covers': c}) for k, (n, c) in files.items()})
+    ex.publish(KEY, {k: (n, {"covers": c}) for k, (n, c) in files.items()})
     write_manifest('drone-arm-resonance', {'add': [{'file': f'{KEY}/{k}.glb'} for k in files]})
 
 

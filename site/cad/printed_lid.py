@@ -6,19 +6,17 @@ sheet's top is the plane the lid prints on (z = 0 of the run).
 
     python site/cad/printed_lid.py
 """
-import math
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
-from build123d import Axis, Box, Circle, Pos, Rectangle, RectangleRounded, Rot, SlotCenterToCenter, Solid, chamfer, extrude, fillet  # noqa: E402
+from build123d import Axis, Circle, Pos, RectangleRounded, Solid, chamfer, extrude  # noqa: E402
 
 import looks  # noqa: E402
 from gltf import Node  # noqa: E402
 from mech import cable  # noqa: E402
 from mech import example as ex  # noqa: E402
-from mech import fasteners as fs  # noqa: E402
 from mech.util import plain  # noqa: E402
 
 KEY = 'printed-lid'

@@ -17,13 +17,13 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib'))
 
 import numpy as np  # noqa: E402
-from build123d import (Axis, Box, Circle, Ellipse, Plane, Polyline, Pos, Rectangle, RectangleRounded, Rot,  # noqa: E402
-                       Solid, Sketch, chamfer, extrude, fillet, loft, make_face, revolve, Location)
+from build123d import (Axis, Box, Circle, Plane, Polyline, Pos, Rectangle, RectangleRounded, Rot, Solid, extrude, fillet,  # noqa: E402
+                        loft, make_face, revolve)
 
 from gltf import Node, export, write_manifest  # noqa: E402
 from mech import example as ex  # noqa: E402
 from mech import fasteners as fs  # noqa: E402
-from mech.util import frame, place, plain  # noqa: E402
+from mech.util import plain  # noqa: E402
 
 KEY = 'wiper-linkage'
 UNIT = 0.001
