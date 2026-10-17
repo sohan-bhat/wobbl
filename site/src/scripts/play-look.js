@@ -197,23 +197,61 @@ vec3 getIBLAnisotropyRadiance(const in vec3 viewDir, const in vec3 normal, const
 #endif`;
 
 /**
- * The studio's light and PBR Neutral on a three.js lit material's shader, in onBeforeCompile. The renderer's own
- * tone mapping stays off, so nothing else on the page (the arrows, the backdrop) is touched.
+ * The ambient occlusion a resting view works out from its own depth (play-refine.js): tSSAO holds it one texel
+ * per pixel of the stage's drawing, with the view depth it was worked out at, and uSSAO is one over the drawing's
+ * size and the strength it is laid with, zero while the view moves. It dims only the light that comes from all
+ * round, the studio's diffuse light, as three.js's own aoMap dims it: the key light, its shadow and the reflections
+ * stay as they are, so a resting view keeps the modelling, the highlights and the cast shadows the moving one has.
  */
-/** The studio as studioShader gives it, with soft reflections from the harmonics: for parts colored by a field. */
-export function fieldStudioShader(shader) {
-  studioShader(shader);
-  if (LOOK.uSH.ready) shader.fragmentShader = `#define WOBBL_SOFT_REFLECTION\n${shader.fragmentShader}`;
-}
+export const SSAO = {
+  tSSAO: { value: null },
+  uSSAO: { value: new Vector3(0, 0, 0) },
+};
 
-export function studioShader(shader) {
+// in three.js's standard and physical materials (STANDARD), the ones lit by the studio's diffuse light
+const OCCLUSION = /* glsl */ `
+#include <aomap_fragment>
+#if defined(WOBBL_AO) && defined(STANDARD)
+if (uSSAO.z > 0.0) {
+  vec2 ssao = texture2D(tSSAO, gl_FragCoord.xy * uSSAO.xy).rg;
+  // only where it was worked out on this surface (it holds the view depth, negative, beside the occlusion): an
+  // edge whose neighbour lies far behind keeps its own light
+  float ssaoK = abs(ssao.g + vViewPosition.z) < 0.03 * abs(vViewPosition.z) ? uSSAO.z : 0.0;
+  // the diffuse light alone: reflections, the key light and its shadow keep their strength, so an edge still
+  // catches its highlight and a face lit by the key light is not greyed
+  reflectedLight.indirectDiffuse *= mix(1.0, ssao.r, ssaoK);
+}
+#endif`;
+
+/**
+ * The studio's light and PBR Neutral on a three.js lit material's shader, in onBeforeCompile. The renderer's own
+ * tone mapping stays off, so nothing else on the page (the arrows, the backdrop) is touched. The surface takes
+ * the resting view's ambient occlusion (SSAO above) unless ao is false: a part colored by a field, glass and
+ * anything that glows keep their colors exactly (keepLight).
+ */
+export function studioShader(shader, ao) {
   Object.assign(shader.uniforms, LOOK);
   // the harmonics stand in for the map once the photograph has been read (RoomEnvironment has none)
   if (LOOK.uSH.ready) shader.fragmentShader = `#define WOBBL_SH\n${shader.fragmentShader}`;
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <envmap_physical_pars_fragment>', IBL)
     .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb = pbrNeutral(gl_FragColor.rgb);')
-    .replace('#include <common>', `#include <common>\n${NEUTRAL}`);
+    .replace('#include <common>', `#include <common>\n${NEUTRAL}\nuniform sampler2D tSSAO;\nuniform vec3 uSSAO;`)
+    .replace('#include <aomap_fragment>', OCCLUSION);
+  Object.assign(shader.uniforms, SSAO);
+  // three.js hands onBeforeCompile the renderer as its second argument, which counts as asking for the occlusion
+  if (ao !== false) shader.fragmentShader = `#define WOBBL_AO\n${shader.fragmentShader}`;
+}
+
+/** Leave a patched shader out of the resting view's occlusion. */
+export function keepLight(shader) {
+  shader.fragmentShader = shader.fragmentShader.replace('#define WOBBL_AO\n', '');
+}
+
+/** The studio as studioShader gives it, with soft reflections from the harmonics: for parts colored by a field. */
+export function fieldStudioShader(shader) {
+  studioShader(shader, false);
+  if (LOOK.uSH.ready) shader.fragmentShader = `#define WOBBL_SOFT_REFLECTION\n${shader.fragmentShader}`;
 }
 
 // ---- finishes ----------------------------------------------------------------------------------------

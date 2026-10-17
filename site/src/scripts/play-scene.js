@@ -233,7 +233,9 @@ function material(o, { prop = false, shell = false, field = null, tube = false, 
   const opts = { field: !!field, tube, glass, unlit, lift: !prop };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniforms);
-    (field && !prop ? fieldStudioShader : studioShader)(sh);
+    // glass and a glow show what is behind them or their own light, which the resting view's occlusion would darken
+    if (field && !prop) fieldStudioShader(sh);
+    else studioShader(sh, !glass && !unlit);
     sceneShader(sh, opts);
   };
   m.customProgramCacheKey = () => `wobbl-scene-${+opts.field}${+tube}${+glass}${+unlit}${+opts.lift}${+!prop}`;
@@ -454,7 +456,8 @@ export function sceneParts({ arrays, run }) {
       it.mesh.receiveShadow = true;
       if (it.bonds) { it.bonds.castShadow = true; it.bonds.receiveShadow = true; }
     }
-    // lines and arrows are drawn over the occlusion, so they leave no smudge on the faces behind them
+    // lines and arrows are left out of the depth the occlusion is worked out from, so they leave no smudge on the
+    // faces behind them
     if (o.kind === 'lines' || o.kind === 'arrows') overlay(it.mesh);
     // whatever shows a field's colors, the part itself, a line or a body colored by its value and their outlines,
     // is kept out of the stage's occlusion, so the colors stay as the legend gives them (play-refine.js), and so is

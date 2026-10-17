@@ -12,7 +12,7 @@ import {
   AlwaysStencilFunc, Box3, CustomBlending, MeshBasicMaterial, Ray, Vector3, EqualStencilFunc, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
   OneFactor, OneMinusSrcAlphaFactor, ReplaceStencilOp, SRGBColorSpace,
 } from 'three';
-import { studioShader } from './play-look.js';
+import { keepLight, studioShader } from './play-look.js';
 
 const manifests = new Map(), files = new Map();
 let loader = null;
@@ -98,7 +98,8 @@ function prepare(m) {
     // clear, so it is left out over the part the run is about rather than washing its colors with reflections
     Object.assign(out, { stencilWrite: true, stencilRef: 1, stencilFunc: NotEqualStencilFunc, stencilWriteMask: 0, stencilZPass: KeepStencilOp });
     out.onBeforeCompile = (sh) => {
-      studioShader(sh);
+      // glass shows what is behind it, which the occlusion worked out on that surface would darken
+      studioShader(sh, false);
       sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
   outgoingLight = totalDiffuse * ${alpha.toFixed(3)} + totalSpecular;
   diffuseColor.a = clamp(${alpha.toFixed(3)} + dot(totalSpecular, vec3(0.3333)), 0.0, 1.0);
@@ -127,17 +128,20 @@ export function subject(m) {
 }
 
 /**
- * Mark the pixels of something colored by a field that is not the part itself (a line or a body colored by its
- * value, a model painted with its field's color) in the stencil's second bit, which only the stage's occlusion
- * reads (play-refine.js): its colors are kept as the legend gives them. A material that already tests the stencil
- * keeps its test on the first bit.
+ * Keep something colored by a field that is not the part itself (a line or a body colored by its value, a model
+ * painted with its field's color) or something that glows out of the resting view's ambient occlusion
+ * (play-refine.js), so its colors stay as the legend gives them. Its shader is built again without it.
  */
 export function keepColor(m) {
-  if (m.stencilWrite && m.stencilFunc === NotEqualStencilFunc) {
-    Object.assign(m, { stencilRef: 3, stencilFuncMask: 1, stencilWriteMask: 2, stencilZPass: ReplaceStencilOp });
-  } else if (!m.stencilWrite) {
-    Object.assign(m, { stencilWrite: true, stencilRef: 2, stencilFunc: AlwaysStencilFunc, stencilWriteMask: 2, stencilZPass: ReplaceStencilOp });
-  }
+  if (m.userData.keepColor) return m;
+  m.userData.keepColor = true;
+  const was = m.onBeforeCompile, key = m.customProgramCacheKey();
+  m.onBeforeCompile = function (sh, renderer) {
+    was.call(this, sh, renderer);
+    keepLight(sh);
+  };
+  m.customProgramCacheKey = () => `${key}|keep`;
+  m.needsUpdate = true;
   return m;
 }
 
