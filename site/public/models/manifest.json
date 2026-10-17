@@ -241,11 +241,10 @@
   },
   "shelf-bracket": {
     "add": [
-      {"file": "shelf-bracket/bolt.glb", "covers": ["bolt"]},
-      {"file": "shelf-bracket/bolt-head.glb", "covers": ["bolt head"]},
       {"file": "shelf-bracket/wall.glb", "covers": ["wall"]},
+      {"file": "shelf-bracket/screws.glb", "covers": ["bolt", "bolt head"]},
       {"file": "shelf-bracket/shelf.glb", "covers": ["shelf"]},
-      {"file": "shelf-bracket/load-on-the-shelf.glb", "covers": ["load on the shelf"]}
+      {"file": "shelf-bracket/weight.glb", "covers": ["load on the shelf"]}
     ]
   },
   "steel-hook": {
