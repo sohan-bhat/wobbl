@@ -398,7 +398,13 @@ export function sceneParts({ arrays, run }) {
       it.cuts = !!(d.td || o.at);
       // a fluid's lines carry its speed: tracers ride them as fast as it goes, slowed by a factor (play-flow.js)
       if (d.sp) {
-        const fl = flowTracers({ o, d, field: it.f, R, base: it.base });
+        const fl = flowTracers({ o, d, field: it.f, R, base: it.base, through: !!o.inside });
+        flows.push(fl);
+        scene.add(overlay(fl.object));
+      } else if (o.flow) {
+        // a glow moving along each line as fast as the scene says, as current along a wire, drawn as tracers lit
+        // a little brighter than the line they ride
+        const fl = flowTracers({ o, d, R, base: it.base.map((c) => Math.round(c + (255 - c) * 0.6)), glows: o.flow, size: Math.max(R * 0.012, (o.flow.spacing || 0) * 0.18) });
         flows.push(fl);
         scene.add(overlay(fl.object));
       }
@@ -628,8 +634,11 @@ export function sceneParts({ arrays, run }) {
         const sz = tr && trackSize(tr, mf, o.size.length);
         place(it.mesh, it, (tr && trackPose(tr, mf)) || poseAt(it.d.pp, it.d.pq, a, b, k), mag, sz && sizeScale(o.shape, o.size, sz));
         if (it.f) {
+          // a body colored by one value: its value at the motion's moment while it plays (a motor's torque), else
+          // at the input's frame
           const c = [0, 0, 0];
-          colorOf(it.f, series(o.field.values, a, b, k), c, 0);
+          it.cv = tr && tr.value ? trackSeries(tr.value, mf) : series(o.field.values, a, b, k);
+          colorOf(it.f, it.cv, c, 0);
           it.model?.tint(c);
           const ta = it.mesh.geometry.getAttribute('tint');
           if (ta.array[0] !== c[0] || ta.array[1] !== c[1] || ta.array[2] !== c[2]) {
@@ -650,6 +659,7 @@ export function sceneParts({ arrays, run }) {
       } else if (o.kind === 'points' || o.kind === 'atoms') pointsFrame(it, a, b, k);
       else if (o.kind === 'arrows') arrowsFrame(it, a, b, k, tube);
     }
+    rideAll();
   }
 
   const ray = new Raycaster();
@@ -673,8 +683,7 @@ export function sceneParts({ arrays, run }) {
         if (dd < best) { best = dd; v = it.val[it.d.node[c]]; }
       }
     } else {
-      const kk = key.split(',').map(Number);
-      v = series(it.o.field.values, kk[0], kk[1], kk[2]);
+      v = it.cv;
     }
     if (!Number.isFinite(v)) return null;
     return { v, name: f.name, unit: f.unit || '', digits: f.digits ?? 3, limit: f.limit ?? null, limitLabel: f.limit_label || '', point: hit.point.toArray() };
@@ -768,7 +777,7 @@ export function sceneParts({ arrays, run }) {
       if (!g) continue;
       const m = instance(g, e), at = e.parent ? pick(e.parent)[0] : null;
       (at ? at.mesh : scene).add(m.group);
-      if (!at) adds.push(m);
+      if (!at) { adds.push(m); ride(m); }
     }
     // a model's faint copy over the subject is drawn only when the scene has a subject colored by a field left
     // in view (a wiper's links are all models: nothing to show through)
@@ -778,6 +787,41 @@ export function sceneParts({ arrays, run }) {
     // everything is brought to the frame again, so a tinted model takes its field's color
     key = '';
     shadowDirty = true;
+  }
+
+  // a model fixed on a part that bends (a motor bolted to the tip of an arm that swings) rides the part's nearest
+  // point: the part's vertex inside the model's box nearest its middle, when the model touches the part at all
+  const riders = [];
+  const rbox = new Box3(), rc = new Vector3();
+  function ride(m) {
+    const bent = items.filter((it) => it.o.kind === 'mesh' && !it.o.prop && !it.d.pp && !it.d.track?.pos && (it.d.du || it.d.track?.deform));
+    if (!bent.length) return;
+    scene.updateMatrixWorld(true);
+    rbox.setFromObject(m.group);
+    if (rbox.isEmpty()) return;
+    rbox.getCenter(rc);
+    let best = null;
+    for (const it of bent) {
+      const P = it.d.P;
+      for (let i = 0; i < P.length / 3; i++) {
+        const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2];
+        const out = Math.hypot(Math.max(rbox.min.x - x, 0, x - rbox.max.x), Math.max(rbox.min.y - y, 0, y - rbox.max.y), Math.max(rbox.min.z - z, 0, z - rbox.max.z));
+        const d = out * 1e3 + Math.hypot(x - rc.x, y - rc.y, z - rc.z);
+        if (out <= R * 0.01 && (!best || d < best.d)) best = { it, i, d };
+      }
+    }
+    const g = m.group, fixed = !g.matrixAutoUpdate;
+    if (best) riders.push({ m, it: best.it, i: best.i, fixed, at: fixed ? new Vector3().setFromMatrixPosition(g.matrix) : g.position.clone() });
+  }
+  /** Move every riding model by its point's displacement as the part is drawn now. */
+  function rideAll() {
+    for (const r of riders) {
+      const { it, i } = r, P = it.d.P, c = it.cur;
+      if (!c) continue;
+      const x = r.at.x + c[i * 3] - P[i * 3], y = r.at.y + c[i * 3 + 1] - P[i * 3 + 1], z = r.at.z + c[i * 3 + 2] - P[i * 3 + 2], g = r.m.group;
+      if (r.fixed) { g.matrix.elements[12] = x; g.matrix.elements[13] = y; g.matrix.elements[14] = z; g.matrixWorldNeedsUpdate = true; }
+      else g.position.set(x, y, z);
+    }
   }
 
   // the models added round the subject, veiled when one stands between the camera and the subject

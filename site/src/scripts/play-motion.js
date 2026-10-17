@@ -50,6 +50,7 @@ export function decodeTrack(o, arr, d) {
   if (tr.field) out.field = { coef: arr(tr.field.coef), basis: arr(tr.field.basis), r: tr.field.rank };
   if (tr.deform) out.deform = { coef: arr(tr.deform.coef), basis: arr(tr.deform.basis), r: tr.deform.rank, ex: tr.deform.exaggerate || 1 };
   if (tr.drawn) out.drawn = arr(tr.drawn);
+  if (tr.value) out.value = tr.value.values.map((v) => (v === null ? NaN : v));
   if (tr.when) out.when = tr.when;
   d.track = out;
 }
