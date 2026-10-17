@@ -141,6 +141,8 @@ def build(out: Path) -> Path | None:
                "block and colored by the solved temperature averaged over its volume.")
     s.readout("hottest" + end, F.max(1), unit="C", digits=4, limit=limit)
     s.readout("average" + end, F.mean(1), unit="C", digits=4)
+    if not cells:
+        still_air(s, st, X, tris, T, amb, F)
     if transient and H is not None and limit is not None:
         t_min = np.asarray(ht, float) / 60
         over = [t_min[-1] - c if (c := crossing(t_min, h, limit)) is not None else 0.0 for h in H]
@@ -165,6 +167,44 @@ def build(out: Path) -> Path | None:
         s.label("heat in", c - n * float(np.ptp(X, 0).max()) * 0.08, kind="note")
     verdict(s, o)
     return s.save(out)
+
+
+STILL_AIR_H = 15.0          # W/(m2 K): a film this low on every face is natural convection, still air
+
+
+def still_film(st: dict) -> float | None:
+    """The film coefficient (W/(m2 K)) of a part in still air: one film on every face at the ambient, low enough to
+    be natural convection. None otherwise (a fan, water, several films)."""
+    f = _films(st)
+    amb = float(st.get("ambient", 25.0) or 25.0)
+    if len(f) != 1 or str(f[0].get("faces", "")).strip() != "all" or abs(float(f[0].get("t_inf", amb)) - amb) > 1e-9:
+        return None
+    h = float(f[0].get("h", 0)) * 1000.0                    # the study keeps W/(mm2 K) x 1e3, as mW/(mm2 K)
+    return h if 0 < h <= STILL_AIR_H else None
+
+
+def still_air(s, st: dict, X, tris, T, amb: float, F) -> dict | None:
+    """The air a part in still air warms, estimated from its film and solved surface (thermal/plume.py), as lines
+    the air rises along with its speed and its temperature at each point. The view says it is estimated. At each
+    heat load the air's warming follows the plume's law, dT as the convected heat to the 2/3, the heat being the
+    film on that load's surface."""
+    h = still_film(st)
+    if h is None:
+        return None
+    from ...thermal.plume import plume
+    pl = plume(X, tris, T, h, amb, lines=48)
+    if pl is None:
+        return None
+    rise0 = float(T.mean() - amb)
+    k = np.clip((F.mean(1) - amb) / rise0, 0, None) if rise0 > 0 else np.ones(len(F))
+    # cool to warm on the air's own range, its rise above the room up to twice the asked load's
+    ln = s.lines(pl["paths"], color="#8fb8de", width=0.6, values=[t - amb for t in pl["temp"]], field="air warming",
+                 unit="C", colormap="coolwarm", range=(0.0, 2 * pl["dT_K"]), name="air")
+    ln.moving(pl["speed"], scale=k ** (2 / 3), base=amb)
+    s.note(f"The air is estimated, not solved. About {pl['w_mps']:.2g} m/s rising out of the top, "
+           f"{pl['dT_K']:.2g} C warmer, carrying the {pl['Q_W']:.2g} W the film takes, from a chimney through "
+           "the open columns and an entraining plume above (thermal/plume.py).")
+    return pl
 
 
 def fan_sink(out: Path) -> Path | None:
@@ -210,7 +250,8 @@ def fan_sink(out: Path) -> Path | None:
                     speeds.append(sp)
     if paths:
         top = float(max(w.max() for w in speeds))
-        s.lines(paths, color=AIR, name="air", width=1.2)
+        rise = float((sc.get("fluid_rise") or sc.get("air_rise") or {}).get("value", 0) or 0)
+        fluid_lines(s, list(zip(paths, speeds)), X, tris, T, inlet, rise, power, "air", AIR, 1.2)
         s.readout("fastest air", np.full(s.n, top), unit="m/s", digits=3)
     r = min(g["width"], height + base) * 0.45
     s.body("cylinder", [r, r * 0.12], pos=[g["width"] / 2, -r * 0.5, base + height / 2], quat=P.z_to([0, 1, 0]),
@@ -266,7 +307,8 @@ def cooled(out: Path) -> Path | None:
         m.opacity = 1.0
         s.note("The flow holds too little fluid to trace streamlines, so the part shows alone.")
     if lines:
-        s.lines([q for q, _ in lines], color=FLUID, name="fluid", width=1.6)
+        rise = float((sc.get("fluid_rise") or {}).get("value", 0) or 0)
+        fluid_lines(s, lines, X, tris, T, inlet, rise, power, "fluid", FLUID, 1.6)
         s.readout("fastest fluid", np.full(s.n, float(max(w.max() for _, w in lines))), unit="m/s", digits=3)
     verdict(s, o, _first(o))
     size = float(np.ptp(X, 0).max())
@@ -275,6 +317,40 @@ def cooled(out: Path) -> Path | None:
 
 
 AIR, FLUID = "#8fb8de", "#5aa0e0"
+
+
+def fluid_lines(s, lines, X, tris, T, inlet: float, rise: float, power: float, name: str, color: str, width: float):
+    """A cooling fluid's streamlines (each a path in mm and the solved speed along it in m/s) as lines it moves
+    along at that speed, colored cool to warm by how much it has warmed. The run reports the fluid's warming at the
+    outlet, rise, which is its energy balance (power over mass flow times specific heat). Along the way the warming
+    is estimated as that share of the outlet rise the part has handed over upstream of the point: the part's faces
+    weighted by area and by their solved rise above the inlet, summed along the main flow direction. The warming
+    grows with the power, as everything in the run does, so each heat load scales it."""
+    paths = [np.asarray(p, float) for p, _ in lines]
+    speeds = [np.asarray(w, float) * 1000.0 for _, w in lines]
+    s.lines(paths, color=color, name=name, width=width)
+    ln = s.objects[-1]
+    if rise > 0 and len(paths):
+        ends = np.array([p[-1] - p[0] for p in paths if len(p) > 1])
+        ax = ends.sum(0)
+        ax = ax / (np.linalg.norm(ax) or 1.0)
+        t = np.asarray(tris)[:, :3]
+        a, b, c = X[t[:, 0]], X[t[:, 1]], X[t[:, 2]]
+        w = 0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1) * np.clip(T[t].mean(1) - inlet, 0, None)
+        x = ((a + b + c) / 3) @ ax
+        o = np.argsort(x)
+        cum = np.cumsum(w[o]) / max(w.sum(), 1e-30)
+        vals = [rise * np.interp(p @ ax, x[o], cum, left=0.0, right=1.0) for p in paths]
+        f = s.field(f"{name} warming", "C", colormap="coolwarm", range=(0.0, 2 * rise),
+                    data=np.concatenate(vals))
+        ln.values, ln.f = vals, f
+        k = s.t / power if power > 0 and s.n > 1 else np.ones(s.n)
+        ln.moving(speeds, scale=k, base=0.0)
+        s.note(f"The {name} moves at its solved speed. Its warming along the way is an estimate, the outlet's "
+               f"{rise:.3g} C rise shared out by where the part hands its heat over.")
+    else:
+        ln.moving(speeds)
+    return ln
 
 
 def _input_power(s, m, T, inlet: float, power: float, limit, what: str) -> np.ndarray:

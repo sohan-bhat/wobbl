@@ -354,9 +354,52 @@ def heat_run(folder: Path, argv: list[str], rel: str, out: Path, stem: str, max_
         blob.field("frames", np.round((T[old] - air) / step).astype(np.int64), s, step=step, base=air)
         run.update({"transient": False, "warmup": lumped_warmup(folder, argv, X, tets, o),
                     "scale_C": [air, float(math.ceil(max(v["t_max_C"], v["limit_C"])))]})
+    air = still_air(folder, run["mesh"])
+    if air:
+        blob.add("air", air.pop("data"), count=air["points"])
+        run["air"] = air
     run["file"], run["bytes"] = blob.write(out, stem)
     run["layout"] = blob.layout
     return run
+
+
+def nice(x: float) -> float:
+    """1, 2 or 5 times a power of ten, nearest x on a log scale, as the page's play-motion.js nice."""
+    p = 10.0 ** math.floor(math.log10(x))
+    return min((m * p for m in (1, 2, 5, 10)), key=lambda c: abs(math.log(c / x)))
+
+
+def still_air(folder: Path, mesh: dict) -> dict | None:
+    """The air a heat run in still air warms, as Wobbl's scene of the run estimates it (the lines named air, from
+    wobbl/thermal/plume.py): every point's place, the air's speed there at the steady state in mm/s and its rise
+    above the air in C, as float32 x, y, z, speed, rise. The page sends tracers along the lines as the part warms
+    up: the plume's speed goes as the convected heat to the 1/3 and its warming to the 2/3, and that heat as the
+    part's rise, so both follow the warm up's share of the steady rise. slow is how many times slower than real
+    time the tracers move, the factor the page shows (play-motion.js flowSlow)."""
+    p = folder / "scene.wobbl"
+    if not p.exists():
+        return None
+    from wobbl.viz.scene import array, load
+    h, b = load(p)
+    o = next((o for o in h["objects"] if o.get("kind") == "lines" and o.get("name") == "air" and "speed" in o), None)
+    if o is None or "field" not in o:
+        return None
+    P = array(h, b, o["pos"])
+    sp = array(h, b, o["speed"]).ravel()
+    rise = array(h, b, o["field"]["values"]).ravel()
+    sc = o["field"].get("scale")
+    if sc:
+        # the scene's values are at its asked power; the steady rise the page warms toward is the same
+        design = h["timeline"].get("design")
+        t = h["timeline"]["t"]
+        k = float(np.interp(design, t, sc)) if design is not None and len(t) > 1 else 1.0
+        rise = rise * k
+    lo, hi = np.asarray(mesh["bounds_min"]), np.asarray(mesh["bounds_max"])
+    R = float(np.linalg.norm(hi - lo) / 2)
+    data = np.c_[P, sp, rise].astype("<f4").tobytes()
+    top = float(h["fields"][o["field"]["f"]]["range"][1])
+    return {"runs": o["runs"], "points": int(len(P)), "slow": nice(float(sp.max()) / (0.3 * R)), "top": top,
+            "speed_exp": 1 / 3, "rise_exp": 2 / 3, "data": data}
 
 
 def runs_of(folder: Path) -> list[tuple[str, list[str], str]]:
