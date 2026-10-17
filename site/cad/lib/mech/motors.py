@@ -186,3 +186,69 @@ def belt_strand(width, length, thickness=1.4, pitch=2.0, tooth=0.75):
     pts.append((0, -thickness))
     face = make_face(Plane.XZ * Polyline(*pts, close=True))
     return Pos(0, width / 2, 0) * extrude(face, width)
+
+
+looks.add('motor_bell', color=(0.12, 0.02, 0.02), metal=1.0, rough=0.32)
+looks.add('copper_winding', color=(0.72, 0.36, 0.18), metal=1.0, rough=0.35)
+
+
+def bldc(stator_d=22.0, stator_h=7.0, can_d=28.0, mount=16.0):
+    """An outrunner drone motor (2207 class): the base with its 16 mm M3 pattern, copper windings seen through the
+    bell's windows, the anodised bell, the 5 mm shaft with its M5 thread. Base on z = 0, shaft up +z.
+    Returns (parts, shaft top z)."""
+    out = []
+    base = Solid.make_cylinder(can_d / 2 - 0.3, 4.0)
+    base = chamfer(base.edges().group_by(Axis.Z)[0], 0.5)
+    for k in range(4):
+        a = math.radians(45 + 90 * k)
+        base = base - Pos(mount / 2 * math.sqrt(2) * math.cos(a), mount / 2 * math.sqrt(2) * math.sin(a), -1) * Solid.make_cylinder(1.6, 6)
+    for k in range(4):
+        a = math.radians(90 * k)
+        base = base - Pos(9.0 * math.cos(a), 9.0 * math.sin(a), -1) * Solid.make_cylinder(3.0, 6)
+    out.append((base, 'aluminum_anodized'))
+    wind = Pos(0, 0, 4.0) * Solid.make_cylinder(stator_d / 2, stator_h + 4.0)
+    out.append((wind, 'copper_winding'))
+    h = stator_h + 9.0
+    bell = Pos(0, 0, 4.6) * (Solid.make_cylinder(can_d / 2, h) - Solid.make_cylinder(can_d / 2 - 1.4, h - 1.6))
+    bell = chamfer(bell.edges().group_by(Axis.Z)[-1], 0.8)
+    for k in range(6):
+        a = 60 * k + 30
+        win = Box(7.0, 5.0, 3.0)
+        win = fillet(win.edges().filter_by(Axis.Z), 1.5)
+        bell = bell - Pos(0, 0, 4.6 + h - 0.8) * Rot(0, 0, a) * Pos(8.0, 0, 0) * win
+        slot = Box(3.0, 5.5, h * 0.5)
+        slot = fillet(slot.edges().filter_by(Axis.X), 1.2)
+        bell = bell - Pos(0, 0, 4.6 + h * 0.45) * Rot(0, 0, a) * Pos(can_d / 2, 0, 0) * slot
+    out.append((bell, 'motor_bell'))
+    z = 4.6 + h
+    shaft = Pos(0, 0, z - 2) * Solid.make_cylinder(2.5, 12.0)
+    shaft = chamfer(shaft.edges().group_by(Axis.Z)[-1], 0.4)
+    out.append((shaft, 'steel_bare'))
+    return out, z
+
+
+def propeller(diameter=178.0, hub_d=13.0, hub_h=7.0, pitch_deg=(24.0, 9.0), chord=(16.0, 21.0, 9.0), blades=2):
+    """A two blade propeller: the hub with its 5 mm bore, each blade lofted through twisted, tapering airfoil
+    sections from the hub to the rounded tip. Hub's base on z = 0."""
+    from build123d import Ellipse, Plane, loft
+    out = []
+    hub = Solid.make_cylinder(hub_d / 2, hub_h)
+    hub = chamfer(hub.edges(), 0.8)
+    hub = hub - Pos(0, 0, -1) * Solid.make_cylinder(2.55, hub_h + 2)
+    R = diameter / 2
+    blades_s = None
+    for b in range(blades):
+        secs = []
+        stations = [hub_d / 2 - 1.0, R * 0.25, R * 0.5, R * 0.75, R * 0.97]
+        for i, r in enumerate(stations):
+            t = (r - stations[0]) / (stations[-1] - stations[0])
+            c = chord[0] + (chord[1] - chord[0]) * min(t / 0.35, 1.0) if t < 0.35 else chord[1] + (chord[2] - chord[1]) * (t - 0.35) / 0.65
+            th = max(0.9, 3.2 * (1 - t) + 0.9 * t)
+            pitch = math.radians(pitch_deg[0] + (pitch_deg[1] - pitch_deg[0]) * t)
+            pl = Plane(origin=(0, r, hub_h / 2), x_dir=(math.cos(pitch), 0, math.sin(pitch)), z_dir=(0, 1, 0))
+            secs.append(pl * Ellipse(c / 2, th / 2))
+        bl = loft(secs)
+        bl = Rot(0, 0, 360.0 * b / blades) * bl
+        blades_s = bl if blades_s is None else blades_s + bl
+    out.append((hub + blades_s, 'plastic_black'))
+    return out
