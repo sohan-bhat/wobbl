@@ -41,31 +41,80 @@
   "circuits/buck": {
     "replace": [
       {"object": "bench", "file": "circuits-buck/bench.glb"},
-      {"object": "breadboard", "file": "circuits-buck/breadboard.glb"}
-    ]
+      {"object": "breadboard", "file": "circuits-buck/breadboard.glb"},
+      {"object": "V1", "file": "circuits-bench/supply.glb", "tint": ["paint"]},
+      {"object": "V1 panel", "file": "circuits-bench/supply-panel.glb"},
+      {"object": "V1 post", "file": "circuits-bench/binding-post.glb", "tint": ["post_plastic"]},
+      {"object": "VG", "file": "circuits-bench/supply.glb", "tint": ["paint"]},
+      {"object": "VG panel", "file": "circuits-bench/supply-panel.glb"},
+      {"object": "VG post", "file": "circuits-bench/binding-post.glb", "tint": ["post_plastic"]},
+      {"object": "C1 top", "file": "circuits-bench/cap-top-3.04.glb"},
+      {"object": "D1", "file": "circuits-bench/do41-1.91.glb"},
+      {"object": "L1", "file": "circuits-bench/toroid-core.glb"},
+      {"object": "L1 coil", "file": "circuits-bench/toroid-winding.glb"}
+    ],
+    "hide": ["channel", "rail stripe"]
   },
   "circuits/kicad-board": {
     "replace": [
       {"object": "bench", "file": "circuits-kicad-board/bench.glb"},
-      {"object": "breadboard", "file": "circuits-kicad-board/breadboard.glb"}
+      {"object": "breadboard", "file": "circuits-kicad-board/breadboard.glb"},
+      {"object": "VJ1", "file": "circuits-bench/supply.glb", "tint": ["paint"]},
+      {"object": "VJ1 panel", "file": "circuits-bench/supply-panel.glb"},
+      {"object": "VJ1 post", "file": "circuits-bench/binding-post.glb", "tint": ["post_plastic"]},
+      {"object": "C1 top", "file": "circuits-bench/cap-top-3.40.glb"},
+      {"object": "D1 lead", "index": 145, "file": "circuits-bench/led-anode.glb"},
+      {"object": "D1 lead", "index": 146, "file": "circuits-bench/led-cathode.glb"},
+      {"object": "MQ1 tab", "file": "circuits-bench/to220-tab.glb"},
+      {"object": "MQ1 lead", "file": "circuits-bench/to220-lead.glb"},
+      {"object": "XU1 tab", "file": "circuits-bench/to220-tab.glb"},
+      {"object": "XU1 lead", "file": "circuits-bench/to220-lead.glb"}
+    ],
+    "hide": ["channel", "rail stripe", "MQ1 tab hole", "XU1 tab hole", "XU2 pin"],
+    "add": [
+      {"file": "circuits-bench/dip8-leads.glb", "parent": "XU2"}
     ]
   },
   "circuits/led": {
     "replace": [
       {"object": "bench", "file": "circuits-led/bench.glb"},
-      {"object": "breadboard", "file": "circuits-led/breadboard.glb"}
-    ]
+      {"object": "breadboard", "file": "circuits-led/breadboard.glb"},
+      {"object": "V1", "file": "circuits-bench/supply.glb", "tint": ["paint"]},
+      {"object": "V1 panel", "file": "circuits-bench/supply-panel.glb"},
+      {"object": "V1 post", "file": "circuits-bench/binding-post.glb", "tint": ["post_plastic"]},
+      {"object": "D1 lead", "index": 17, "file": "circuits-bench/led-anode.glb"},
+      {"object": "D1 lead", "index": 18, "file": "circuits-bench/led-cathode.glb"}
+    ],
+    "hide": ["channel", "rail stripe"]
   },
   "circuits/mosfet": {
     "replace": [
       {"object": "bench", "file": "circuits-mosfet/bench.glb"},
-      {"object": "breadboard", "file": "circuits-mosfet/breadboard.glb"}
-    ]
+      {"object": "breadboard", "file": "circuits-mosfet/breadboard.glb"},
+      {"object": "V1", "file": "circuits-bench/supply.glb", "tint": ["paint"]},
+      {"object": "V1 panel", "file": "circuits-bench/supply-panel.glb"},
+      {"object": "V1 post", "file": "circuits-bench/binding-post.glb", "tint": ["post_plastic"]},
+      {"object": "VG", "file": "circuits-bench/supply.glb", "tint": ["paint"]},
+      {"object": "VG panel", "file": "circuits-bench/supply-panel.glb"},
+      {"object": "VG post", "file": "circuits-bench/binding-post.glb", "tint": ["post_plastic"]},
+      {"object": "VS", "file": "circuits-bench/supply.glb", "tint": ["paint"]},
+      {"object": "VS panel", "file": "circuits-bench/supply-panel.glb"},
+      {"object": "VS post", "file": "circuits-bench/binding-post.glb", "tint": ["post_plastic"]}
+    ],
+    "hide": ["channel", "rail stripe"]
   },
   "circuits/opamp-cable": {
     "replace": [
       {"object": "bench", "file": "circuits-opamp-cable/bench.glb"},
-      {"object": "breadboard", "file": "circuits-opamp-cable/breadboard.glb"}
+      {"object": "breadboard", "file": "circuits-opamp-cable/breadboard.glb"},
+      {"object": "V1", "file": "circuits-bench/supply.glb", "tint": ["paint"]},
+      {"object": "V1 panel", "file": "circuits-bench/supply-panel.glb"},
+      {"object": "V1 post", "file": "circuits-bench/binding-post.glb", "tint": ["post_plastic"]},
+      {"object": "CCABLE top", "file": "circuits-bench/cap-top-2.30.glb"}
+    ],
+    "hide": ["channel", "rail stripe", "XU1 pin"],
+    "add": [
+      {"file": "circuits-bench/dip5-leads.glb", "parent": "XU1"}
     ]
   },
   "desktop-arm": {
