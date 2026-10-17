@@ -260,9 +260,12 @@
   "steel-hook": {
     "replace": [
       {"object": "bolt", "file": "steel-hook/bolt.glb"},
-      {"object": "bolt head", "file": "steel-hook/bolt-head.glb"},
-      {"object": "weight", "file": "steel-hook/weight.glb"}
-    ]
+      {"object": "weight", "file": "steel-hook/shackle-and-load-cell.glb"}
+    ],
+    "add": [
+      {"file": "steel-hook/bracket.glb"}
+    ],
+    "hide": ["bolt head"]
   },
   "strut-buckling": {
     "replace": [
