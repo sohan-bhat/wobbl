@@ -116,6 +116,11 @@
       {"file": "circuits-bench/dip5-leads.glb", "parent": "XU1"}
     ]
   },
+  "cold-plate": {
+    "add": [
+      {"file": "cold-plate/plumbing.glb"}
+    ]
+  },
   "desktop-arm": {
     "replace": [
       {"object": "base", "file": "desktop-arm/base.glb"},

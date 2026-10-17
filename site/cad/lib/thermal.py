@@ -240,14 +240,14 @@ def igbt_module(base_w=106.0, base_d=61.4, x0=0.0, y0=0.0, z_face=0.0, down=True
     for dx in tz:
         tab = Pos(x0 + dx, y0 + hd * 0.18, face - s * 3.0 + s * 0.4) * Box(15.0, 15.0, 0.8)
         out.append((tab, 'copper_nickel'))
-        sh = fs.hex_bolt(5, 10, threads=False, marks=False)
+        sh = fs.hex_bolt('M5', 10, threads=False, marks=False)
         out.append((Pos(x0 + dx, y0 + hd * 0.18, face - s * 3.0 + s * 0.8) * (Rot(180, 0, 0) if down else Rot(0, 0, 0)) * sh, 'steel_zinc'))
     for k in range(4):
         pin = Pos(x0 - hw * 0.4 + k * 3.0, y0 - hd * 0.32, face + s * 4.0) * Box(0.8, 2.8, 8.0)
         out.append((pin, 'tin'))
     for sx in (-1, 1):
         for sy in (-1, 1):
-            sh = fs.socket_cap(6, 16, threads=False)
+            sh = fs.socket_cap('M6', 6, threads=False)
             out.append((Pos(x0 + sx * (base_w / 2 - 4.5), y0 + sy * (base_d / 2 - 7), z_face + s * 3.0) *
                         (Rot(180, 0, 0) if down else Rot(0, 0, 0)) * sh, 'steel_zinc'))
     return out
