@@ -106,6 +106,12 @@ def _case(sp, case_material, cable=True):
         wd = 0.6 if not small else 0.45
         path = [(x0 - 1.5, 0, cz), (x0 - 6.0, 0, cz - 0.8), (x0 - 9.0, 0, cz - 5.0), (x0 - 9.6, 0, cz - 12.0)]
         out += cables.ribbon(path, wd, ['wire_brown', 'wire_red', 'wire_orange'], side=(0, 1, 0))
+        # the lead ends in its three way receptacle
+        px, _, pz = path[-1]
+        cw = 3 * 2 * wd + 1.2
+        plug = Pos(px, 0, pz - 6.5) * Box(2.6 + wd, cw, 13.0)
+        plug = chamfer(plug.edges().filter_by(Axis.Z), 0.3)
+        out.append((plug, 'plastic_black'))
     return out
 
 
