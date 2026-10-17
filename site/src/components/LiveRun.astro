@@ -60,8 +60,6 @@ const paneVerdict = (pn: ScenePane) => {
 const kind = sc ? 'scene' : lead!.kind;
 const m = sp ? (sp.q ? { lo: sp.q.lo, top: sp.q.top, marks: sp.q.marks } : { lo: 0, top: 1, marks: [] }) : meter(lead!);
 const p = sp ? { tag: '', seconds: 4.5, speed: 1, span: 1 } : pace(lead!);
-const frac = (v: number) => Math.min(Math.max((v - m.lo) / (m.top - m.lo), 0), 1);
-const pct = (v: number) => `${frac(v) * 100}%`;
 const unit = sp ? sp.q?.unit ?? '' : kind === 'strength' ? 'MPa' : 'C';
 const loads = kind === 'strength' ? (lead as StrengthRun).loads : [];
 // each load as the page writes every number, 2,000 N rather than 2000 N
@@ -103,12 +101,14 @@ const toggles = [
   ...(exag > 1 ? [{ key: 'bend', text: `Bending ×${exag}`, title: 'Show the bending larger than it is' }] : []),
   ...(sp?.magnify ? [{ key: 'mag', text: `${sp.magnify.label} ×${sp.magnify.factor}`, title: `Show the ${sp.magnify.label.toLowerCase()} larger than it is` }] : []),
 ];
+// each scene pane keeps its own meter, since two panes can read different things, crack toughness beside stress
 const rows = sp ? sceneShown.map((pn) => ({ name: pn.name, at: pn.at, v: paneValue(pn), verdict: paneVerdict(pn), finalText: pn.play.q ? sig(paneValue(pn), pn.play.q.digits) : '',
-    unit: pn.play.q?.unit ?? '' }))
+    unit: pn.play.q?.unit ?? '', m: pn.play.q ? { lo: pn.play.q.lo, top: pn.play.q.top, marks: pn.play.q.marks } : m }))
   : shown.map((pane) => {
     const q = pane.play;
-    return { name: pane.name, at: undefined as string | undefined, v: q.kind === 'strength' ? q.governing_MPa : q.t_max_C, verdict: q.verdict, finalText: finalValue(q), unit };
+    return { name: pane.name, at: undefined as string | undefined, v: q.kind === 'strength' ? q.governing_MPa : q.t_max_C, verdict: q.verdict, finalText: finalValue(q), unit, m };
   });
+const rowFrac = (rm: typeof m, v: number) => Math.min(Math.max((v - rm.lo) / (rm.top - rm.lo), 0), 1);
 // the live number's box holds the widest reading any pane can show with its unit, so the number never runs into
 // the verdict beside it and never moves the layout as it counts up; a row whose number is long stacks sooner
 const widest = (texts: string[]) => Math.max(0, ...texts.map((t) => t.length));
@@ -221,16 +221,16 @@ const data = JSON.stringify(sp ? {
             {sp && sp.q && rows.length === 1 && <p class="lrun-row-name lrun-q">{sp.q.name}</p>}
             {(!sp || sp.q) && (
               <div class="lrun-meter" aria-hidden="true">
-                <span class="lrun-fill" data-fill data-level={COLOR[row.verdict] ?? 'marginal'} style={`--f: ${frac(row.v)}`}></span>
-                {m.marks.map((mk) => <span class="lrun-mk" style={`left: ${pct(mk.at)}`}></span>)}
+                <span class="lrun-fill" data-fill data-level={COLOR[row.verdict] ?? 'marginal'} style={`--f: ${rowFrac(row.m, row.v)}`}></span>
+                {row.m.marks.map((mk) => <span class="lrun-mk" style={`left: ${rowFrac(row.m, mk.at) * 100}%`}></span>)}
               </div>
             )}
             <p class="lrun-n"><span data-n>{row.finalText}</span><span data-u>{row.unit && <>&nbsp;{row.unit}</>}</span></p>
             <p class="vword lrun-verdict" data-verdict={COLOR[row.verdict] ?? 'marginal'} data-word>{word(row.verdict)}</p>
             {(!sp || sp.q) && (
               <div class="lrun-ticks" aria-hidden="true">
-                <span style="left: 0">{sp ? sig(m.lo, 3) : kind === 'strength' ? '0' : `${fmt(m.lo)} C air`}</span>
-                {m.marks.map((mk) => <span style={`left: ${pct(mk.at)}`}>{mk.text}</span>)}
+                <span style="left: 0">{sp ? sig(row.m.lo, 3) : kind === 'strength' ? '0' : `${fmt(row.m.lo)} C air`}</span>
+                {row.m.marks.map((mk) => <span style={`left: ${rowFrac(row.m, mk.at) * 100}%`}>{mk.text}</span>)}
               </div>
             )}
           </div></div>

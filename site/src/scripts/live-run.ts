@@ -152,7 +152,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       const p = data.panes[pi], r = p.run, rq = r.q, el = rowEls[row], v = rq ? along(r, rq.values, pos[row]) : NaN;
       if (rq) {
         put(q('[data-n]', el), sig(v, rq.digits));
-        q('[data-fill]', el).style.setProperty('--f', frac(v).toFixed(4));
+        q('[data-fill]', el).style.setProperty('--f', clamp01((v - rq.lo) / (rq.top - rq.lo)).toFixed(4));
       }
       const w = q('[data-word]', el);
       // the run's own verdict at the value it was asked about, else the reading against its limit
