@@ -376,6 +376,24 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
           lx = `${x.toFixed(1)}px`;
           if (x < 12) ly = sy - iy > 44 ? '-38px' : '14px';
         }
+      } else if (lab && shows) {
+        // the value beside the ring stays inside its pane and clear of the pane's name and the replay button:
+        // right of the ring, else left of it, else below or above, else slid in from the edge
+        mark.hidden = false;
+        const lw = lab.offsetWidth, lh = lab.offsetHeight, pr = paneEls[row].getBoundingClientRect();
+        const avoid: number[][] = [];
+        for (const o of [...qa('.lrun-name', paneEls[row]), replay]) {
+          if (o.hidden) continue;
+          const b = o.getBoundingClientRect();
+          if (b.width) avoid.push([b.left - pr.left, b.top - pr.top, b.width, b.height]);
+        }
+        const fits = (x: number, y: number) => x >= 4 && y >= 4 && x + lw <= vw - 4 && y + lh <= vh - 4
+          && !avoid.some((b) => x < b[0] + b[2] && x + lw > b[0] && y < b[1] + b[3] && y + lh > b[1]);
+        const tries = [[14, -11], [-14 - lw, -11], [-lw / 2, 14], [-lw / 2, -14 - lh]];
+        const pick = tries.find(([dx, dy]) => fits(sx + dx, sy + dy));
+        const [dx, dy] = pick ?? [Math.min(Math.max(14, 4 - sx), vw - 4 - lw - sx), Math.min(Math.max(-11, 4 - sy), vh - 4 - lh - sy)];
+        if (lw && dx !== 14) lx = `${dx.toFixed(1)}px`;
+        if (lw && dy !== -11) ly = `${dy.toFixed(1)}px`;
       }
       if (lab) { lab.style.left = lx; lab.style.top = ly; }
       mark.hidden = !shows;
@@ -532,10 +550,32 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       put(q('[data-probe-v]', probeEl), withUnit(hit.v, hit.unit, hit.digits + 1));
       put(q('[data-probe-k]', probeEl), hit.name);
       put(q('[data-probe-x]', probeEl), hit.limit > 0 ? `${Math.round((hit.v / hit.limit) * 100)}% of ${hit.limitLabel || 'the limit'}` : '');
-      const x = e.clientX - r.left, y = e.clientY - r.top;
-      probeEl.classList.toggle('l', x > r.width - 200);
-      probeEl.style.translate = `${x.toFixed(1)}px ${y.toFixed(1)}px`;
       probeEl.hidden = false;
+      placeProbe(e.clientX - r.left, e.clientY - r.top, r);
+    };
+    // The probe sits beside the pointer where it fits inside the view and clear of the peak's ring and value, the
+    // part names, the replay button and the inset: right of the pointer, else left, below or above it, slid in
+    // from the edges where none fits whole.
+    const placeProbe = (x: number, y: number, r: DOMRect) => {
+      const pw = probeEl.offsetWidth, ph = probeEl.offsetHeight, W = r.width, H = r.height, M = 6;
+      const boxes: number[][] = [];
+      for (const o of qa('.lrun-mark:not([hidden]) .target, .lrun-mark:not([hidden]) .lrun-mark-v, .lrun-name, .lrun-replay:not([hidden])', view)) {
+        const b = o.getBoundingClientRect();
+        if (b.width && b.height) boxes.push([b.left - r.left, b.top - r.top, b.width, b.height]);
+      }
+      if (insets[0]?.rect) boxes.push(insets[0].rect);
+      const over = (ax: number, ay: number, b: number[]) =>
+        Math.max(0, Math.min(ax + pw, b[0] + b[2]) - Math.max(ax, b[0])) * Math.max(0, Math.min(ay + ph, b[1] + b[3]) - Math.max(ay, b[1]));
+      const tries = [[x + 14, y - ph / 2], [x - 14 - pw, y - ph / 2], [x - pw / 2, y + 18], [x - pw / 2, y - 18 - ph]];
+      let best = tries[0], cost = Infinity;
+      for (const [tx, ty] of tries) {
+        const ax = Math.min(Math.max(tx, M), Math.max(M, W - M - pw)), ay = Math.min(Math.max(ty, M), Math.max(M, H - M - ph));
+        // covering the point under the pointer hides what is read; being slid in from an edge costs a little
+        const covers = x > ax - 6 && x < ax + pw + 6 && y > ay - 6 && y < ay + ph + 6;
+        const c = boxes.reduce((a, b) => a + over(ax, ay, b), 0) + (covers ? pw * ph : 0) + Math.abs(ax - tx) + Math.abs(ay - ty);
+        if (c < cost) { cost = c; best = [ax, ay]; }
+      }
+      probeEl.style.translate = `${best[0].toFixed(1)}px ${best[1].toFixed(1)}px`;
     };
     on(canvas, 'pointermove', (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || e.buttons) { hide(); return; }
