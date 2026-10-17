@@ -11,7 +11,8 @@ import { Orbit, orbitControls } from './orbit.js';
 import { decoder, inWorker, offscreen, onPage, webgl, type Back } from './play-back';
 import { num, sig } from './scene-file.js';
 import { aimAt, followAt } from './scene-view.js';
-import { clamp01, fitView, frameAt, homeView, interp, newOrbit, paneViews, runFrame, runView, sceneFrame as sceneFrameOf } from './run-view.js';
+import { clamp01, fitView, followPoint, frameAt, homeView, interp, motionView, newOrbit, paneViews, runFrame, runView, sceneFrame as sceneFrameOf } from './run-view.js';
+import { motionFrame, motionSeconds, rateText, slowAt, timeAt } from './play-motion.js';
 
 interface Ev { k: number; text: string }
 /** A pane's still, the first frame of its 3D view, with the narrow screen's (narrow) and what shows where the view cannot run */
@@ -128,6 +129,15 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const homeOf = (pi: number) => data.panes[pi].home ?? data.panes[pi].run.input.home;
   const pos: number[] = shown.map((pi) => (sceneRun ? homeOf(pi) : 0));
   let free = false;
+  // ---- a scene's motion (play-motion.js): what happens at the asked value, played on its own clock in place of
+  // the input's ramp. mt[row] is the physical time shown, or NaN when the view shows the input's frames
+  const motionOf = (pi: number) => (sceneRun && data.panes[pi].run.motion?.t ? data.panes[pi].run.motion : null);
+  const mo0 = motionOf(0);
+  const mt: number[] = shown.map(() => NaN);
+  const rateEl = fig.querySelector<HTMLElement>('.lrun-rate');
+  // the fluid's tracers keep moving on the view's own clock while it is on screen (play-flow.js)
+  const flowing = data.panes.some((p) => p.run.motion?.flow || p.run.air);
+  let flowT = 0;
   // the frame position of an input value, read between the saved frames around it
   const posOf = (ts: number[], v: number) => {
     const up = ts[ts.length - 1] >= ts[0];
@@ -140,6 +150,12 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     const { a, b, k } = frameAt(run, p), x = vs[a] ?? NaN, y = vs[b] ?? NaN;
     return k ? x + (y - x) * k : x;
   };
+  /** A value along the motion at physical time tau, read between the motion frames around it. */
+  const alongMotion = (m: any, vs: (number | null)[], tau: number) => {
+    const { a, b, k } = motionFrame(m, tau), x = vs[a] ?? NaN, y = vs[b] ?? NaN;
+    return k ? x + (y - x) * k : x;
+  };
+  let motionPlayAt = 0;
   const withUnit = (v: number, unit: string, d = 3) => `${sig(v, d)}${unit ? NB + unit : ''}`;
   const verdictWord: Record<string, string> = { holds: 'HOLDS', marginal: 'MARGINAL', fails: 'FAILS' };
 
@@ -149,14 +165,15 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     put(now, `${num(along(r0, inp.t, pos[0]))}${inp.unit ? NB + inp.unit : ''}`);
     of.hidden = free || end;
     shown.forEach((pi, row) => {
-      const p = data.panes[pi], r = p.run, rq = r.q, el = rowEls[row], v = rq ? along(r, rq.values, pos[row]) : NaN;
+      const p = data.panes[pi], r = p.run, rq = r.q, el = rowEls[row], mm = Number.isFinite(mt[row]) && r.motion?.q ? r.motion : null;
+      const v = rq ? (mm ? alongMotion(mm, mm.q, mt[row]) : along(r, rq.values, pos[row])) : NaN;
       if (rq) {
         put(q('[data-n]', el), sig(v, rq.digits));
         q('[data-fill]', el).style.setProperty('--f', clamp01((v - rq.lo) / (rq.top - rq.lo)).toFixed(4));
       }
       const w = q('[data-word]', el);
       // the run's own verdict at the value it was asked about, else the reading against its limit
-      const atHome = p.asked !== false && Math.abs(pos[row] - homeOf(pi)) < 1e-6;
+      const atHome = p.asked !== false && Math.abs(pos[row] - homeOf(pi)) < 1e-6 && !(mm && !end);
       const lv = atHome && (end || free) ? verdictColor[p.verdict ?? ''] ?? 'marginal' : level(p, v);
       if (rq) set(q('[data-fill]', el), 'data-level', lv === 'info' ? 'holds' : lv);
       if ((end || free) && (atHome || lv !== 'info')) {
@@ -169,7 +186,16 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
         w.removeAttribute('data-land');
       }
     });
-    if (alsoEl) put(alsoEl, r0.also.map((x: any, i: number) => `${i ? x.name : x.name[0].toUpperCase() + x.name.slice(1)} ${withUnit(along(r0, x.values, pos[0]), x.unit, x.digits)}`).join(', '));
+    const m0 = Number.isFinite(mt[0]) ? r0.motion : null;
+    if (alsoEl) put(alsoEl, r0.also.map((x: any, i: number) => `${i ? x.name : x.name[0].toUpperCase() + x.name.slice(1)} ${withUnit(m0 && m0.also?.[i] ? alongMotion(m0, m0.also[i], mt[0]) : along(r0, x.values, pos[0]), x.unit, x.digits)}`).join(', '));
+    if (rateEl) {
+      // the motion's own clock and how much slower than real time it plays, or the fluid's slowing
+      const fs = r0.motion?.flow?.slow;
+      const slow = m0 ? slowAt(m0, motionPlayAt) : 1, dp = Math.min(Math.max(Math.round(Math.log10(Math.max(slow, 1e-9))) + 2, 1), 6);
+      const text = m0 ? `${fmt(mt[0], dp)} ${m0.unit}, ${rateText(slow)}` : fs ? `Flow ${rateText(fs)}` : '';
+      put(rateEl, text);
+      rateEl.hidden = !text;
+    }
     if (eventEl) {
       const row = shown.findIndex((pi) => data.panes[pi].event);
       const ev = row >= 0 ? data.panes[shown[row]].event! : null;
@@ -195,10 +221,19 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   function readings(u: number) {
     const end = u >= 1;
     if (sceneRun) {
-      if (!free) shown.forEach((pi, row) => { pos[row] = homeOf(pi) * u; });
+      if (!free) {
+        shown.forEach((pi, row) => {
+          const m = motionOf(pi);
+          // a motion plays at the asked value; without one the input ramps up to it
+          if (m) { pos[row] = m.at ?? homeOf(pi); mt[row] = timeAt(m, u * duration); } else pos[row] = homeOf(pi) * u;
+        });
+        motionPlayAt = u * duration;
+      }
       sceneReadings(end);
       return;
     }
+    // a heat run's air, estimated from its convection, moves slowed by one factor (play-flow.js)
+    if (rateEl && data.panes[shown[0]].run.air) { put(rateEl, `Air estimated, ${rateText(data.panes[shown[0]].run.air.slow)}`); rateEl.hidden = false; }
     if (strength) {
       if (data.loads.length === 1) {
         const [v, unit] = data.loads[0].split(' ');
@@ -292,7 +327,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   let back: Back | null = null, ready = false, canvas: HTMLCanvasElement | null = null, orbit: Orbit | null = null;
   let t = 0, playing = false, started = false, done = false, visible = false, last = 0, raf = 0, pending = 0;
   let w = 1, h = 1, px = 1;
-  const duration = data.pace.seconds;
+  const duration = mo0 ? motionSeconds(mo0) : data.pace.seconds;
   const u = () => clamp01((t - LEAD) / duration);
   const lead = data.panes[0].run;
   // what the view holds and where its camera opens, as the stills drawn at build time open (run-view.js)
@@ -305,14 +340,23 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   function fitCamera() {
     const [, , vw, vh] = views()[0];
     fitView(orbit!, rv, vw, vh, pos[0]);
+    if (mo0) keepRest();
   }
   function homeCamera() {
     const [, , vw, vh] = views()[0];
     homeView(orbit!, rv, vw, vh, pos[0]);
+    keepRest();
   }
+  function keepRest() {
+    rest = { target: [...orbit!.target], dist: orbit!.dist, far: orbit!.far, maxDist: orbit!.maxDist };
+    motionSet = 0;
+  }
+  let motionSet = 0;
+  // where the camera stands at rest, for a motion that has to take in more than the rest framing
+  let rest: { target: number[]; dist: number; far: number; maxDist: number } | null = null;
   /** Each pane's camera, the inset beside a view that follows its subject, and the scene state each is drawn at. */
   function sceneFrame(f: any) {
-    sceneFrameOf(f, orbit, rv, shown.map((pi) => data.panes[pi].run), pos, views(), look, insets);
+    sceneFrameOf(f, orbit, rv, shown.map((pi) => data.panes[pi].run), pos, views(), look, insets, mt);
   }
   const insets: any[] = [];
 
@@ -320,7 +364,16 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     pending = 0;
     if (!ready || !back || !orbit) return;
     const k = u();
+    // a motion keeps what moves in view: the camera takes in its path and where it comes to rest (run-view.js)
+    if (mo0 && rest && Number.isFinite(mt[0])) {
+      // a zoom the reader made during the motion is kept as a share of the motion's own distance
+      const [, , vw, vh] = views()[0], zoom = motionSet ? orbit!.dist / motionSet : 1;
+      motionView(orbit, rv, rest, lead, mt[0], vw, vh);
+      motionSet = orbit!.dist;
+      if (Math.abs(zoom - 1) > 1e-6) { orbit!.dist *= zoom; orbit!.update(); }
+    }
     const f: any = runFrame(rv, orbit, views(), k, look.bend, data.pace.span);
+    f.ft = flowT;
     // each pane's scene at its own place along the input
     if (sceneRun) sceneFrame(f);
     back.frame(f);
@@ -333,7 +386,16 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     views().forEach(([, , vw, vh], row) => {
       const p = data.panes[shown[row]], r = p.run, mark = q('.lrun-mark', paneEls[row]);
       let at: number[] | null = null;
-      if (sceneRun) {
+      if (sceneRun && Number.isFinite(mt[row]) && r.motion?.peaks) {
+        // over the motion the marker rides the peak of what moves, and hides while nothing is loaded
+        const mp = r.motion.peaks, { a, b, k: kk } = motionFrame(r.motion, mt[row]), A = mp[a], B = mp[b] ?? A;
+        if (A && B && Math.max(A.v, B.v) > 0.02 * (r.q?.limit || A.v || 1)) {
+          const key = look.bend ? 'pe' : 'p0';
+          at = A[key].map((x: number, i: number) => x + (B[key][i] - x) * kk);
+          const mv = mark.querySelector('[data-mark-v]');
+          if (mv) put(mv, withUnit(A.v + (B.v - A.v) * kk, r.q && r.q.field ? r.q.unit : '', r.q?.digits ?? 3));
+        }
+      } else if (sceneRun) {
         const pk = r.peaks;
         if (pk) {
           const { a, b, k: kk } = frameAt(r, pos[row]), A = pk[a], B = pk[b] ?? A;
@@ -353,7 +415,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       if (!at || !orbit) { mark.hidden = true; return; }
       if (sceneRun && lead.follow) {
         const r = data.panes[shown[row]].run, { a, b, k: kk } = frameAt(r, pos[row]);
-        aimAt(orbit, followAt(r, a, b, kk) ?? orbit.target, vw, vh, insets[row]?.rect);
+        aimAt(orbit, followPoint(r, pos[row], mt[row]) ?? followAt(r, a, b, kk) ?? orbit.target, vw, vh, insets[row]?.rect);
       }
       const [x, y, z] = orbit.project(at);
       let sx = ((x + 1) / 2) * vw, sy = ((1 - y) / 2) * vh;
@@ -404,7 +466,9 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   function tick(ts: number) {
     raf = 0;
     if (!playing) return;
-    t += last ? Math.min((ts - last) / 1000, 0.1) : 0;
+    const dt = last ? Math.min((ts - last) / 1000, 0.1) : 0;
+    t += dt;
+    flowT += dt;
     last = ts;
     const k = u();
     readings(k);
@@ -429,11 +493,29 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     done = true;
     replay.hidden = false;
     sayEnd();
+    flowLoop();
+  }
+  // once a replay is over, a fluid's tracers go on moving while the view is on screen
+  let fraf = 0, flast = 0;
+  function flowLoop() {
+    if (!flowing || fraf || playing || !ready || !canGo()) return;
+    flast = 0;
+    const step = (ts: number) => {
+      fraf = 0;
+      if (playing || !canGo()) return;
+      flowT += flast ? Math.min((ts - flast) / 1000, 0.1) : 0;
+      flast = ts;
+      if (pending) { cancelAnimationFrame(pending); pending = 0; }
+      draw();
+      fraf = requestAnimationFrame(step);
+    };
+    fraf = requestAnimationFrame(step);
   }
   function restart() {
     pause();
     t = 0;
     free = false;
+    mt.fill(NaN);
     done = false;
     started = true;
     replay.hidden = true;
@@ -524,6 +606,8 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       // taking the slider ends the replay where it is, and the slider moves the scene from then on
       if (playing || !done) { pause(); done = true; replay.hidden = false; }
       free = true;
+      // the slider shows the input's own frames, so the motion's state and its camera give way
+      if (mt.some(Number.isFinite)) { mt.fill(NaN); if (rest) Object.assign(orbit!, { target: [...rest.target], dist: rest.dist }); orbit?.update(); }
       shown.forEach((pi, row) => { pos[row] = Math.min(Math.max(p, 0), data.panes[pi].run.input.t.length - 1); });
       readings(1);
       requestDraw();
@@ -629,7 +713,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   }
 
   on(replay, 'click', () => restart());
-  on(document, 'visibilitychange', () => { if (document.hidden) pause(); else maybeStart(); });
+  on(document, 'visibilitychange', () => { if (document.hidden) pause(); else { maybeStart(); if (done) flowLoop(); } });
   // the part loads once the figure comes near the screen, and then when the browser has a moment
   let idle = 0;
   const near = new IntersectionObserver((entries) => {
@@ -652,7 +736,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   near.observe(fig);
   const seen = new IntersectionObserver(([e]) => {
     visible = e.intersectionRatio >= 0.4;
-    if (visible) maybeStart(); else pause();
+    if (visible) { maybeStart(); if (done) flowLoop(); } else pause();
   }, { threshold: [0, 0.4] });
   seen.observe(view);
 
@@ -662,6 +746,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     seen.disconnect();
     pause();
     cancelAnimationFrame(pending);
+    cancelAnimationFrame(fraf);
     if ('cancelIdleCallback' in window) cancelIdleCallback(idle); else clearTimeout(idle);
     back?.dispose();
     back = null;

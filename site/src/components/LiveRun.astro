@@ -185,6 +185,7 @@ const data = JSON.stringify(sp ? {
           ))}
         </div>
         {sp && <div class="probe lrun-probe" hidden aria-hidden="true"><b data-probe-v></b><span data-probe-k></span><span class="x" data-probe-x></span></div>}
+        {(sp?.motion || lead?.air) && <p class="lrun-rate" hidden aria-hidden="true"></p>}
         <button type="button" class="btn-outline btn-sm lrun-replay" hidden>Replay</button>
         <p class="viewer-status lrun-status" role="status"></p>
       </div>

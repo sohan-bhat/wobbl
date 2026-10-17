@@ -8,7 +8,7 @@
 import { createStage } from './play-draw.js';
 import { loadRun } from './play.js';
 import { loadModels } from './play-models.js';
-import { homeView, interp, newOrbit, paneViews, runFrame, runView, sceneFrame } from './run-view.js';
+import { homeView, interp, motionView, newOrbit, paneViews, runFrame, runView, sceneFrame } from './run-view.js';
 
 const BG = '#0e0f11'; // the page's own background, under the view as it is under the live canvas
 
@@ -77,16 +77,26 @@ globalThis.drawRunStills = async ({ base, kind, panes, fix, w, h, px, at = 'star
       let pos = shown.map((i) => (scene ? homeOf(i) : 0));
       const orbit = newOrbit(rv);
       homeView(orbit, rv, views[0][2], views[0][3], pos[0]);
+      // a scene's motion opens at its first moment, at the asked value, with the camera taking in what moves
+      // (run-view.js motionView), as the live view holds it before the motion plays
+      const rest = { target: [...orbit.target], dist: orbit.dist, far: orbit.far, maxDist: orbit.maxDist };
+      let mts = null;
       const frame = () => {
+        if (mts && runs[0].motion) motionView(orbit, rv, rest, runs[0], mts[0], views[0][2], views[0][3]);
         // at the start of a replay the load is zero and the clock at its start, however long the clock runs
         const f = runFrame(rv, orbit, views, 0, look.bend, 1);
-        return scene ? sceneFrame(f, orbit, rv, runs, pos, views, look, []) : f;
+        f.ft = 0;
+        return scene ? sceneFrame(f, orbit, rv, runs, pos, views, look, [], mts) : f;
       };
       stage._frame(frame());
       if (at === 'start') {
-        pos = shown.map(() => 0);
+        const moving = runs.map((r) => (r.motion && r.motion.t ? r.motion : null));
+        pos = shown.map((i, row) => (moving[row] ? moving[row].at ?? homeOf(i) : 0));
+        mts = moving.some(Boolean) ? moving.map((m) => (m ? m.t[0] : NaN)) : null;
         stage._frame(frame());
       }
+      // the still is the frame as a resting view settles on it (play-refine.js), the motion's first moment included
+      if (stage.settle) await stage.settle();
       // each pane cut out of the view, onto the page's own background, straight after the frame is drawn
       shown.forEach((pi, row) => {
         if (out[pi]) return;

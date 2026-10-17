@@ -3,6 +3,7 @@
 // strength or heat part is fitted with its load arrow inside the view; a scene frames or follows its subject
 // (scene-view.js). Each frame is the description the drawing stage takes (play-draw.js frame).
 import { Orbit, corners, fitTo } from './orbit.js';
+import { motionFrame } from './play-motion.js';
 import { aimAt, cameraOf, followAt, insetView, mainOrbit, tubeScale } from './scene-view.js';
 
 export const clamp01 = (x) => Math.min(Math.max(x, 0), 1);
@@ -109,20 +110,23 @@ export function runFrame(rv, orbit, views, u, bend, span) {
  * A scene's part of a frame: each pane's run (runs) at its own frame position (pos), and, for a view that follows
  * its subject, each pane's own camera and the inset beside it. insets is filled with each pane's inset view.
  */
-export function sceneFrame(f, orbit, rv, runs, pos, views, look, insets) {
+export function sceneFrame(f, orbit, rv, runs, pos, views, look, insets, mts = null) {
   const follows = !!rv.lead.follow;
   f.scenes = runs.map((r, row) => {
     const { a, b, k } = frameAt(r, pos[row]), T = r.input.t;
-    return { a, b, k, t: k ? T[a] + (T[b] - T[a]) * k : T[a], bend: look.bend, mag: follows ? false : look.mag };
+    const s = { a, b, k, t: k ? T[a] + (T[b] - T[a]) * k : T[a], bend: look.bend, mag: follows ? false : look.mag };
+    // the motion's physical time, while the view shows the motion (play-motion.js)
+    if (mts && Number.isFinite(mts[row]) && r.motion?.t) s.m = mts[row];
+    return s;
   });
   if (!follows || !orbit) return f;
   f.cameras = [];
   f.insets = [];
   insets.length = 0;
   runs.forEach((r, row) => {
-    const { a, b, k } = frameAt(r, pos[row]), [, , vw, vh] = views[row];
+    const [, , vw, vh] = views[row];
     const ins = insetView(r, vw, vh, orbit.az, orbit.el);
-    aimAt(orbit, followAt(r, a, b, k) ?? orbit.target, vw, vh, ins?.rect);
+    aimAt(orbit, followPoint(r, pos[row], mts ? mts[row] : NaN) ?? orbit.target, vw, vh, ins?.rect);
     f.cameras.push(cameraOf(orbit));
     insets.push(ins);
     f.scenes[row].tube = tubeScale(r, orbit, vh);
@@ -130,4 +134,50 @@ export function sceneFrame(f, orbit, rv, runs, pos, views, look, insets) {
     f.insets.push({ rect: ins.rect, camera: cameraOf(ins.orbit), scene: { ...f.scenes[row], mag: look.mag, tube: 1 } });
   });
   return f;
+}
+
+/** The point a follow view keeps in the middle: along the motion while it plays, else at the input's frame. */
+export function followPoint(run, p, tau = NaN) {
+  const m = run.motion;
+  if (Number.isFinite(tau) && m && m.follow) {
+    const { a, b, k } = motionFrame(m, tau), A = m.follow[a], B = m.follow[b];
+    return A.map((x, i) => x + (B[i] - x) * k);
+  }
+  const { a, b, k } = frameAt(run, p);
+  return followAt(run, a, b, k);
+}
+
+/**
+ * The camera over a scene's motion: from where it stands at rest (rest: its target, distance and far plane), backed
+ * off and recentred as far as it takes to hold both the rest framing and the box the moving things fill at
+ * physical time tau, so a part falling from a height is seen whole with the floor it falls to, and the view closes
+ * in to its rest framing as the part comes to it. A follow view (the rocket) is left to its follow. NaN tau puts
+ * the camera back at rest.
+ */
+export function motionView(orbit, rv, rest, run, tau, vw, vh) {
+  const m = run.motion;
+  if (run.follow || !m || !m.box) return;
+  orbit.aspect = vw / vh;
+  orbit.target = [...rest.target];
+  orbit.dist = rest.dist;
+  orbit.far = rest.far;
+  orbit.maxDist = rest.maxDist;
+  orbit.update();
+  if (!Number.isFinite(tau)) return;
+  const { a, b, k } = motionFrame(m, tau), A = m.box[a], B = m.box[b];
+  const lo = A[0].map((x, i) => x + (B[0][i] - x) * k), hi = A[1].map((x, i) => x + (B[1][i] - x) * k);
+  // the rest framing's own box, as the camera frames it (scene-view.js mainOrbit)
+  const box = run.subject || run.hold || run.bounds;
+  const pts = [...(run.subject && run.points ? run.points : corners(box.lo, box.hi)), ...corners(lo, hi)];
+  // only when the moving things leave the rest framing does the camera move
+  const ulo = [0, 1, 2].map((i) => Math.min(lo[i], box.lo[i])), uhi = [0, 1, 2].map((i) => Math.max(hi[i], box.hi[i]));
+  const grow = Math.hypot(...[0, 1, 2].map((i) => uhi[i] - ulo[i])) / (Math.hypot(...[0, 1, 2].map((i) => box.hi[i] - box.lo[i])) || 1);
+  if (grow <= 1.02) return;
+  const c = [0, 1, 2].map((i) => (ulo[i] + uhi[i]) / 2), c0 = [0, 1, 2].map((i) => (box.lo[i] + box.hi[i]) / 2);
+  // the target slides from the rest framing's centre toward the union's, so the rest view's offset is kept
+  orbit.target = rest.target.map((x, i) => x + (c[i] - c0[i]));
+  orbit.maxDist = Infinity;
+  fitTo(orbit, pts, rest.dist);
+  orbit.far = Math.max(rest.far, orbit.dist * 4);
+  orbit.update();
 }

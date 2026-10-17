@@ -39,6 +39,9 @@
 .lrun-replay { position: absolute; top: 10px; right: 10px; z-index: 3; }
 .lrun-replay[hidden] { display: none; }
 .lrun-status { z-index: 2; }
+/* A motion's own clock and how much slower than real time it plays, or a fluid's slowing, in the view's corner */
+.lrun-rate { position: absolute; top: 10px; left: 12px; z-index: 2; margin: 0; font-size: 12px; letter-spacing: 0.02em; color: var(--muted); pointer-events: none; font-variant-numeric: tabular-nums; }
+.lrun-rate[hidden] { display: none; }
 
 /* Which fix plays beside the part */
 .lrun-fixes { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
