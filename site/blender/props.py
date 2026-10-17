@@ -388,23 +388,24 @@ STRENGTH = {'motor-mount', 'cast-motor-mount', 'cast-mount-credibility', 'shelf-
 BOLTS = {'bolt': bolt_shank, 'bolt head': hex_head}
 MOTOR = {'motor': nema_motor, 'motor flange': nema_front, 'motor shaft': d_shaft, 'pulley': gt2_pulley}
 # motor-mount, cast-motor-mount, shelf-bracket, drone-arm, bolted-flange, bracket-crack, steel-hook, strut-buckling
-# and printed-lid are built in CAD now (site/cad), and so is the desktop arm, whose desk this script still makes
+# and printed-lid are built in CAD now (site/cad), and so is the desktop arm, whose desk this script still makes.
+# So are the heat sink's chip, the Bunsen burner, the beaker and the circuit breadboards; this script still makes the
+# circuit benches and the falling rock, and site/cad writes those examples' manifest entries round them.
 EXAMPLES = {
     'cast-mount-credibility': ('cast-mount-credibility/output', 'mm', {'plate': plate_steel, **MOTOR}),
-    'heat-sink': ('heat-sink/output', 'mm', {'heat source': power_resistor}),
     'desktop-arm': ('desktop-arm/output', 'm', {'desk': desk}),
-    'circuits/buck': ('circuits/buck', 'mm', {'bench': desk, 'breadboard': breadboard}),
-    'circuits/kicad-board': ('circuits/kicad-board', 'mm', {'bench': desk, 'breadboard': breadboard}),
-    'circuits/led': ('circuits/led', 'mm', {'bench': desk, 'breadboard': breadboard}),
-    'circuits/mosfet': ('circuits/mosfet', 'mm', {'bench': desk, 'breadboard': breadboard}),
-    'circuits/opamp-cable': ('circuits/opamp-cable', 'mm', {'bench': desk, 'breadboard': breadboard}),
-    'propane-flame': ('propane-flame/output', 'mm', {'burner': burner, 'air inlet': hose_barb}),
-    'baking-soda-vinegar': ('baking-soda-vinegar/output', 'A', {'beaker': beaker}),
+    'circuits/buck': ('circuits/buck', 'mm', {'bench': desk}),
+    'circuits/kicad-board': ('circuits/kicad-board', 'mm', {'bench': desk}),
+    'circuits/led': ('circuits/led', 'mm', {'bench': desk}),
+    'circuits/mosfet': ('circuits/mosfet', 'mm', {'bench': desk}),
+    'circuits/opamp-cable': ('circuits/opamp-cable', 'mm', {'bench': desk}),
     'falling-rock': ('falling-rock/output', 'm', {'rock': rock}),
     'handheld-drop': ('handheld-drop/output', 'mm', {}),
 }
 UNITS = {'mm': 1000.0, 'm': 1.0, 'A': 1000.0}
-CAD_ENTRY = {'desktop-arm'}     # examples whose manifest entry site/cad writes, round the files made here
+# examples whose manifest entry site/cad writes, round the files made here
+CAD_ENTRY = {'desktop-arm', 'falling-rock', 'circuits/buck', 'circuits/kicad-board', 'circuits/led', 'circuits/mosfet',
+             'circuits/opamp-cable'}
 
 
 def build(key):

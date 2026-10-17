@@ -4,8 +4,8 @@
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 blender=${BLENDER:-blender}
-# the wiper linkage and the mechanical props are built in CAD now (site/cad/build.sh)
-for s in rocket knsb props; do
+# the wiper linkage, the rocket, the KNSB stand and most props are built in CAD now (site/cad/build.sh)
+for s in props; do
   "$blender" -b --factory-startup --python-exit-code 1 -P "$here/$s.py"
 done
 node "$here/stills.mjs"
