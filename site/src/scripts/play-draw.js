@@ -9,6 +9,8 @@ import {
   SRGBColorSpace, Vector3, WebGLRenderer,
 } from 'three';
 import { sceneParts } from './play-scene.js';
+import { heatAir, stepFlows } from './play-flow.js';
+import { lut } from './scene-file.js';
 import { instance, setAnisotropy, subject } from './play-models.js';
 import {
   FINISHES, LOOK, SRGB, aimKey, decodeStudioBytes, depthMaterial, fieldStudioShader, finishOf, finishShader, keyLight, loadStudio, studioEnvironment,
@@ -575,6 +577,9 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
     const center = new Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2);
     const bounds = new Box3(new Vector3(...lo), new Vector3(...hi));
     const part = { run, arrays, scene, geo, uniforms, load, nv, row, cut, key, dirty: true, pair: [-1, -1], extras: [], center, bounds };
+    // the air a part in still air warms, as tracers on the plume Wobbl estimated (play-flow.js)
+    const air = kind === 'heat' && heatAir(run, arrays, bounds.getSize(new Vector3()).length() / 2, lut);
+    if (air) { scene.add(overlay(air.fl.object)); part.flows = [air.fl]; part.flowRate = air.rate; }
     parts.push(part);
     return part;
   }
@@ -755,6 +760,9 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
           part.sp.set(f.scenes ? f.scenes[part.row] : f.scene);
           part.sp.shade(renderer);
         }
+        // a fluid's tracers moved on by the view's flow clock (play-flow.js): the frame is the same, but the
+        // view is not resting, so a stage that refines a resting view leaves it alone
+        if (stepFlows(part, f, vh * fullPx * scale)) api.unsettle?.();
         if (part.load) aim(part, f.k, f.radius, f.bend);
         if (f.heat) {
           frames(part, f.heat.i0, f.heat.i1);

@@ -15,6 +15,8 @@ import { instance, keepColor, subject } from './play-models.js';
 import { contactShadow } from './contact-shadow.js';
 import { overlay } from './play-refine.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
+import { motionFrame, rankSum, sizeScale, trackPose, trackSeries, trackSize } from './play-motion.js';
+import { flowTracers } from './play-flow.js';
 
 const VERT = /* glsl */ `
 attribute vec3 tint;
@@ -310,7 +312,7 @@ export function sceneParts({ arrays, run }) {
     const i = Math.min(255, Math.max(0, Math.round(((v - f.lo) / (f.hi - f.lo || 1)) * 255))) * 3;
     out[o] = f.lut[i]; out[o + 1] = f.lut[i + 1]; out[o + 2] = f.lut[i + 2];
   };
-  const items = [];
+  const items = [], flows = [];
   // a view framed close on its subject (scene-view.js) leaves out lines that never come near it, such as the
   // arc a wiper blade's tip sweeps far up the glass, which would float in the close view without their context
   const sb = run.subject, near = sb && sb.lo.map((x, k) => [x - 0.25 * (sb.hi[k] - x), sb.hi[k] + 0.25 * (sb.hi[k] - x)]);
@@ -385,9 +387,20 @@ export function sceneParts({ arrays, run }) {
         if (o.at) cut[v] = Math.max(cut[v], o.at[d.run[v]]);
       }
       geo.setAttribute('cutv', new BufferAttribute(cut, 1));
+      if (d.track && d.track.drawn) {
+        it.cutI = cut;
+        it.cutM = new Float32Array(nv);
+        for (let v = 0; v < nv; v++) it.cutM[v] = d.track.drawn[d.point[v]];
+      }
       geo.setAttribute('axis', new BufferAttribute(d.axis, 3));
       it.mesh = new Mesh(geo, material({ ...o, opacity: 1 }, { prop: !!o.prop, tube: true, finish: 'paint_gloss' }));
       it.cuts = !!(d.td || o.at);
+      // a fluid's lines carry its speed: tracers ride them as fast as it goes, slowed by a factor (play-flow.js)
+      if (d.sp) {
+        const fl = flowTracers({ o, d, field: it.f, R, base: it.base });
+        flows.push(fl);
+        scene.add(overlay(fl.object));
+      }
     } else if (o.kind === 'points' || o.kind === 'atoms') {
       const atoms = o.kind === 'atoms', sh = o.pos.shape;
       it.n = atoms ? o.el.length : sh[sh.length - 2];
@@ -449,20 +462,35 @@ export function sceneParts({ arrays, run }) {
     items.push(it);
   });
 
-  /** The object's matrix for a pose, grown about its anchor when it is magnified. */
-  function place(obj, it, pose, mag) {
+  /** The object's matrix for a pose, grown about its anchor when it is magnified, or about its own pivot point
+   * while it follows the motion (moving), as a rocket grown from its nozzle so it stands on its pad. */
+  function place(obj, it, pose, mag, sz = null, moving = false) {
     const m = mag && it.mag;
     const s = m ? m.factor : 1;
-    const p = m && m.anchor ? m.anchor.map((x, i) => x + s * (pose.p[i] - x)) : pose.p;
     tmpQ.set(pose.q[1], pose.q[2], pose.q[3], pose.q[0]);
+    let p = m && m.anchor ? m.anchor.map((x, i) => x + s * (pose.p[i] - x)) : pose.p;
+    if (m && moving && m.pivot) {
+      const v = tmpP.set(m.pivot[0], m.pivot[1], m.pivot[2]).applyQuaternion(tmpQ).multiplyScalar(1 - s);
+      p = [pose.p[0] + v.x, pose.p[1] + v.y, pose.p[2] + v.z];
+    }
     obj.matrixAutoUpdate = false;
-    obj.matrix.compose(tmpP.set(p[0], p[1], p[2]), tmpQ, tmpS.set(s, s, s));
+    obj.matrix.compose(tmpP.set(p[0], p[1], p[2]), tmpQ, sz ? tmpS.set(s * sz[0], s * sz[1], s * sz[2]) : tmpS.set(s, s, s));
     obj.matrixWorldNeedsUpdate = true;
   }
 
-  function meshFrame(it, a, b, k, bend) {
+  function meshFrame(it, a, b, k, bend, mf = null) {
     const { o, d } = it, n = it.n, nv = d.node.length, geo = it.mesh.geometry;
-    if (d.du) {
+    // over the scene's motion a tracked shape and field take the place of the input's (play-motion.js)
+    const tr = mf && d.track;
+    if (tr && tr.deform) {
+      const cur = it.cur, u = it.tu || (it.tu = new Float32Array(n * 3)), ex = bend ? tr.deform.ex : 1;
+      rankSum(tr.deform, mf, n, 3, u);
+      for (let i = 0; i < n * 3; i++) cur[i] = d.P[i] + u[i] * ex;
+      const pa = geo.getAttribute('position');
+      for (let v = 0; v < nv; v++) { const j = d.node[v] * 3; pa.array[v * 3] = cur[j]; pa.array[v * 3 + 1] = cur[j + 1]; pa.array[v * 3 + 2] = cur[j + 2]; }
+      pa.needsUpdate = true;
+      geo.boundingSphere = null;
+    } else if (d.du) {
       const ex = bend ? o.deform.exaggerate || 1 : 1, sc = o.deform.scale, cur = it.cur;
       if (sc) { const s = series(sc, a, b, k) * ex; for (let i = 0; i < n * 3; i++) cur[i] = d.P[i] + d.du[i] * s; }
       else for (let i = 0; i < n * 3; i++) cur[i] = d.P[i] + at2(d.du, n * 3, a, b, k, i) * ex;
@@ -471,7 +499,8 @@ export function sceneParts({ arrays, run }) {
       pa.needsUpdate = true;
       geo.boundingSphere = null;
     }
-    if (d.fv) {
+    if (tr && tr.field) rankSum(tr.field, mf, n, 1, it.val);
+    else if (d.fv) {
       const sc = o.field.scale;
       if (sc) { const s = series(sc, a, b, k); for (let i = 0; i < n; i++) it.val[i] = d.fv[i] * s; }
       else if (o.field.frames) for (let i = 0; i < n; i++) it.val[i] = at2(d.fv, n, a, b, k, i);
@@ -568,23 +597,31 @@ export function sceneParts({ arrays, run }) {
   function set(f) {
     const { a, b, k, t, bend = true, mag = true, tube = 1 } = f;
     for (const it of items) if (it.o.kind === 'lines') it.mesh.material.uniforms.uTube.value = tube;
-    const next = `${a},${b},${k.toFixed(5)},${t},${bend},${mag},${tube}`;
+    // the motion's physical time when it plays (play-motion.js), else the input's frames alone
+    const mo = h.motion, mf = mo && Number.isFinite(f.m) ? motionFrame(mo, f.m) : null;
+    for (const fl of flows) fl.at(a, b, k);
+    const next = `${a},${b},${k.toFixed(5)},${t},${bend},${mag},${tube},${mf ? f.m : ''}`;
     if (next === key) return;
     key = next;
     shadowDirty = true;
     for (const it of items) {
       const o = it.o;
-      it.mesh.visible = !it.hidden && shownAt(o.when, t);
+      // over the motion an object with a window of its own shows only inside it (a parachute once it opens)
+      const tw = mf && it.d.track && it.d.track.when;
+      it.mesh.visible = !it.hidden && (tw ? shownAt(tw, f.m) : shownAt(o.when, t));
       if (it.bonds) it.bonds.visible = it.mesh.visible;
       if (!it.mesh.visible) continue;
       const uni = it.mesh.material?.uniforms;
-      if (uni && o.glow) uni.uGlow.value = series(o.glow, a, b, k) * 0.85;
+      const tr = mf && it.d.track;
+      if (uni && tr && tr.glow) uni.uGlow.value = trackSeries(tr.glow, mf) * 0.85;
+      else if (uni && o.glow) uni.uGlow.value = series(o.glow, a, b, k) * 0.85;
       if (o.kind === 'mesh') {
-        meshFrame(it, a, b, k, bend);
-        const pose = poseAt(it.d.pp, it.d.pq, a, b, k);
+        meshFrame(it, a, b, k, bend, mf);
+        const pose = (tr && trackPose(tr, mf)) || poseAt(it.d.pp, it.d.pq, a, b, k);
         if (pose) place(it.mesh, it, pose, mag);
       } else if (o.kind === 'body') {
-        place(it.mesh, it, poseAt(it.d.pp, it.d.pq, a, b, k), mag);
+        const sz = tr && trackSize(tr, mf, o.size.length);
+        place(it.mesh, it, (tr && trackPose(tr, mf)) || poseAt(it.d.pp, it.d.pq, a, b, k), mag, sz && sizeScale(o.shape, o.size, sz));
         if (it.f) {
           const c = [0, 0, 0];
           colorOf(it.f, series(o.field.values, a, b, k), c, 0);
@@ -596,7 +633,15 @@ export function sceneParts({ arrays, run }) {
           }
         }
       } else if (o.kind === 'lines') {
-        if (it.cuts) uni.uCut.value = t;
+        // a path traced by the motion's time while it plays, by the input's otherwise
+        const ca = it.mesh.geometry.getAttribute('cutv');
+        if (it.cutM) {
+          const want = mf ? it.cutM : it.cutI;
+          if (ca.array !== want) { ca.array = want; ca.needsUpdate = true; }
+        }
+        if (mf && it.cutM) uni.uCut.value = f.m;
+        else if (it.cuts) uni.uCut.value = t;
+        else if (it.cutM) uni.uCut.value = 1e30;
       } else if (o.kind === 'points' || o.kind === 'atoms') pointsFrame(it, a, b, k);
       else if (o.kind === 'arrows') arrowsFrame(it, a, b, k, tube);
     }
@@ -737,5 +782,11 @@ export function sceneParts({ arrays, run }) {
     for (const m of adds) m.veil(from, middle);
   }
 
-  return { scene, set, probe, shade, dispose, dress, veil };
+  /** Move every tracer on by dt seconds of the page's clock; true while any are moving. */
+  function advance(dt) {
+    for (const fl of flows) fl.advance(dt);
+    return flows.length > 0;
+  }
+
+  return { scene, set, probe, shade, dispose, dress, veil, advance, flows };
 }
