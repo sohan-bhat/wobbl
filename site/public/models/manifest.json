@@ -166,6 +166,13 @@
       {"file": "drone-arm/motor-and-prop.glb"}
     ]
   },
+  "enclosure": {
+    "add": [
+      {"file": "enclosure/base-half.glb"},
+      {"file": "enclosure/fixture.glb"},
+      {"file": "enclosure/thumb-press.glb"}
+    ]
+  },
   "falling-rock": {
     "replace": [
       {"object": "rock", "file": "falling-rock/rock.glb"}
