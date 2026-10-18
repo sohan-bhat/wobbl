@@ -256,6 +256,31 @@ def test_a_resonance_run_turns_its_rotor_and_swings_at_the_slider_speed(tmp_path
     assert drive[0] == pytest.approx(blade[0], rel=1e-4)      # at hover the blades passing drive it
 
 
+def test_a_wiper_turns_at_its_motor_speed_for_each_drag(tmp_path):
+    import shutil
+    from wobbl.viz.scene import array
+    d = tmp_path / "wiper"
+    shutil.copytree(EX / "wiper-linkage" / "output", d, ignore=shutil.ignore_patterns("*.png", "*.html", "scene.wobbl"))
+    assert build_scene(d)
+    h, blob = load(d / "scene.wobbl")
+    sw = json.loads((d / "sweep.json").read_text())
+    assert h["steady"]["slow"] == [1.0]
+    obj = {o.get("name"): o for o in h["objects"]}
+    rpm = np.asarray(sw["series"]["crank speed"]["values"])
+    for name in ("crank", "coupler", "rocker", "coupler pin", "wiper arm", "wiper blade"):
+        st = obj[name]["steady"]
+        assert st["rate"] == pytest.approx(rpm / 60, rel=1e-4), name
+        assert st["cycle"]["pos"]["shape"] == [72, 3], name
+    # the turn starts where the asked drag's motor is asked the most, as the slider shows it
+    k = sw["t"].index(sw["manifest"]["input"]["design"])
+    q0 = array(h, blob, obj["rocker"]["steady"]["cycle"]["quat"])[0]
+    assert abs(float(np.dot(q0, sw["bodies"][2]["quat"][k]))) > 0.99
+    # the crank goes once round over the cycle
+    Q = array(h, blob, obj["crank"]["steady"]["cycle"]["quat"])
+    turn = np.degrees(np.unwrap(2 * np.arctan2(Q[:, 3], Q[:, 0])))
+    assert abs(abs(turn[-1] - turn[0]) - 355) < 6
+
+
 def _names(h):
     return {o.get("name") for o in h["objects"]}
 
@@ -665,6 +690,11 @@ def test_molecule_steps_through_its_modes_by_hand(tmp_path):
     f = next(f for f in h["fields"] if f["name"] == "partial charge")
     assert f["limit"] == 0.5 and f["limit_label"]
     assert h["readouts"][0]["name"] == "frequency" and {"co2", "bonds"} <= _names(h)
+    # it keeps vibrating through the swing the slider sets at each mode's own frequency, on one clock
+    hz = np.repeat([667, 1388, 2349], 9) * 2.99792458e10
+    moving = [o for o in h["objects"] if o.get("steady")]
+    assert {o["name"] for o in moving} == {"co2", "bonds"} and h["steady"]["slow"] == [5e13]
+    assert all(o["steady"]["swing"] and o["steady"]["rate"] == pytest.approx(hz, rel=1e-5) for o in moving)
 
 
 def test_crystal_strains_by_hand(tmp_path):

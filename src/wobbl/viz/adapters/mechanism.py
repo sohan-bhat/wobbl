@@ -20,7 +20,7 @@ import numpy as np
 from .. import props as P
 from ..scene import Scene
 from .common import join, lathe, plain, read, verdict, words
-from .mech_joints import joints as joint_poses, masses, rotate
+from .mech_joints import conj, joints as joint_poses, masses, qmul, rotate
 
 FAIL_WORDS = ("limit", "stall", "slip", "tip", "bind", "collide", "hits", "lift off", "separat", "touches")
 LOAD = "torque against limit"
@@ -82,6 +82,8 @@ def build_sweep(out: Path, sw: dict) -> Path:
     sweep_readouts(s, sw, motors)
     if not shield and pb:
         run_motion(s, out, pb, drawn, pinned, motors, reach)
+    elif pb:
+        run_cycle(s, out, pb, sw, drawn, pinned, motors, shield, reach)
     for e in sw.get("events", []):
         s.event(float(e["t_s"]), e["name"], e.get("detail", ""), kind=e.get("kind", "info"))
     s.note("Each value of the slider is its own run, shown at the instant its motors are asked the most.")
@@ -263,6 +265,91 @@ def run_motion(s, out, pb: dict, drawn: dict, pinned: dict, motors: list[dict], 
     return True
 
 
+CYCLE = 72           # poses a turn of a motor that goes round and round is drawn from
+
+
+def run_cycle(s, out, pb: dict, sw: dict, drawn: dict, pinned: dict, motors: list[dict], shield, reach: float) -> bool:
+    """A mechanism whose motor turns round and round, as a wiper's crank, turning on at the speed its motor makes at
+    the slider's value, in real time: the sweep solved each value's own average speed. Every link takes the pose
+    the run with the real motor solved at each crank angle through a turn, which a rigid linkage takes at any
+    speed, starting from where the asked value's motor is asked the most, so the view opens as the slider shows
+    it. False when no driven joint turns a full turn or the sweep kept no speed for it."""
+    t = np.asarray(pb.get("t") or [], float)
+    n = len(t)
+    joints = pb.get("joints", {})
+    series = sw.get("series", {})
+    pick = None
+    for d in motors:
+        a = np.asarray((joints.get(d["name"], {}).get("angle") or {}).get("values", []), float)
+        sp = (series.get(f"{d['name']} speed") or {}).get("values")
+        if len(a) == n and n > 3 and sp and np.ptp(a) > 2 * np.pi and np.all(np.asarray(sp, float) > 0):
+            pick = (d, np.sign(a[-1] - a[0]) * a, np.asarray(sp, float))
+            break
+    if pick is None or np.any(np.diff(t) <= 0):
+        return False
+    d, a, rpm = pick
+    # the run's last full turn, where it has come up to speed, read as time against crank angle
+    end = float(a[-1])
+    keep = np.nonzero(a >= end - 2 * np.pi - 1e-9)[0]
+    keep = np.r_[max(keep[0] - 1, 0), keep] if keep[0] > 0 else keep
+    if np.any(np.diff(a[keep]) <= 0):
+        return False
+    v = np.asarray(sw["t"], float)
+    k = int(np.argmin(np.abs(v - float(sw["manifest"]["input"].get("design", v[0])))))
+    hard = (sw.get("hardest_s") or [t[0]] * len(v))[k]
+    th0 = float(np.interp(hard, t, a))
+    th = th0 + 2 * np.pi * np.arange(CYCLE) / CYCLE
+    th = end - 2 * np.pi + np.mod(th - (end - 2 * np.pi), 2 * np.pi)
+    fi = np.interp(np.interp(th, a[keep], t[keep]), t, np.arange(n))
+    lo = np.floor(fi).astype(int).clip(0, n - 1)
+    hi = (lo + 1).clip(0, n - 1)
+    w = (fi - lo)[:, None]
+
+    def at(X):
+        X = np.asarray(X, float)
+        return X if X.ndim == 1 else X[lo] * (1 - w) + X[hi] * w
+
+    def at_q(Q):
+        Q = np.asarray(Q, float)
+        if Q.ndim == 1:
+            return np.tile(Q, (CYCLE, 1))
+        B = np.where((np.sum(Q[lo] * Q[hi], axis=1) < 0)[:, None], -Q[hi], Q[hi])
+        out_q = Q[lo] * (1 - w) + B * w
+        return out_q / np.linalg.norm(out_q, axis=1, keepdims=True)
+
+    rate = rpm / 60.0
+    rec = {b["name"]: b for b in pb.get("bodies", []) if not b.get("static")}
+    for name, body in drawn.items():
+        b = rec.get(name)
+        if b is not None and np.shape(b["pos"]) == (n, 3):
+            body.cycle(at(b["pos"]), at_q(b["quat"]), rate)
+    J = joint_poses(out, pb)
+    for name, body in pinned.items():
+        g = J.get(name)
+        if g is not None and np.ptp(g["anchor"], 0).max() > 1e-9:
+            body.cycle(at(g["anchor"]), _along(at(g["axis"])), rate)
+    for m in motors:
+        g = J.get(m["name"])
+        if g is None or m["body"] is None:
+            continue
+        pos, quat, spos, squat = motor_pose({"anchor": at(g["anchor"]), "axis": at(g["axis"])}, reach)
+        m["body"].cycle(pos, quat, rate)
+        # the shaft turns with the link it drives, held on it as it stands at the start of the turn
+        link = rec.get(g.get("body"))
+        if link is not None and np.shape(link["quat"]) == (n, 4):
+            lq = at_q(link["quat"])
+            squat = qmul(lq, np.broadcast_to(qmul(conj(lq[0]), squat[0]), lq.shape))
+        m["shaft"].cycle(spos, squat, rate)
+    if isinstance(shield, dict) and shield["link"] in rec:
+        (ap, aq), (bp, bq) = shield["frames"](at_q(rec[shield["link"]]["quat"]))
+        shield["arm"].cycle(ap, aq, rate)
+        shield["blade"].cycle(bp, bq, rate)
+    name = d["name"]
+    s.steady(1.0, note=f"The {name} turns at the average speed its motor makes at each value of the slider, as the "
+                      "sweep solved it, and every link takes the pose the run solved at each angle through the turn.")
+    return True
+
+
 def windows(v) -> list[tuple]:
     """The stretch of the input each saved value stands for, halfway to its neighbours, open at either end."""
     v = np.asarray(v, float)
@@ -332,14 +419,13 @@ def sweep_readouts(s, sw, motors):
 
 def setting(s, out, pb, J, w, plane, reach, drawn):
     """What the question puts around the mechanism: a windshield for a wiper, a desk for an arm, else the floor.
-    True when it drew a windshield, whose arm and blade ride the output link at each frame."""
+    When it drew a windshield, whose arm and blade ride the output link at each frame, what windshield returns."""
     driven = {k for k, j in pb.get("joints", {}).items() if "needed" in j}
     if w & {"wiper", "wipers", "windshield", "windscreen", "glass"}:
         out_j = [(k, j) for k, j in J.items() if k not in driven and j["type"] == "hinge" and
                  np.ptp(j["anchor"], 0).max() < 2e-3 * reach]
         if out_j:
-            windshield(s, pb, out_j[0][0], out_j[0][1], J, reach)
-            return True
+            return windshield(s, pb, out_j[0][0], out_j[0][1], J, reach) or True
     if plane is not None:
         z = float(np.asarray(plane["pos"])[2])
         if w & {"desk", "desktop", "table", "bench", "workbench"}:
@@ -385,7 +471,8 @@ def wiper_blade(blade: float, reach: float):
 
 def windshield(s, pb, name, j, J, reach):
     """Glass over the linkage, its normal along the output joint's axis, and a wiper arm and blade fixed on the
-    output link's angle, sweeping the glass. The arm and blade are drawn, not simulated."""
+    output link's angle, sweeping the glass. The arm and blade are drawn, not simulated. Returns the arm and blade
+    meshes, the output link's name and frames(q), their poses for the link's quaternions q."""
     ax = np.asarray(j["axis"], float)
     n = P.unit(ax.mean(0))
     if n[2] < 0:
@@ -394,22 +481,30 @@ def windshield(s, pb, name, j, J, reach):
     body = next((b for b in pb["bodies"] if b["name"] == J[name]["body"] or b["name"] == name), None)
     if body is None or body.get("static"):
         return
-    q = np.asarray(body["quat"], float)
-    d = -rotate(q, [0, 0, 1])                          # along the link, from the pivot outward
-    d = d - np.outer(d @ n, n)
-    d /= np.maximum(np.linalg.norm(d, axis=1, keepdims=True), 1e-12)
     arm, blade = 1.5 * reach, 1.6 * reach
     lift = reach * 0.12
     base = piv + n * lift
-    side = np.cross(n, d)
-    quats = np.array([P.quat(a, b, n) for a, b in zip(d, side)])
+
+    def along(q):
+        """Along the link from the pivot outward, in the glass, for each of the link's quaternions q."""
+        d = -rotate(np.asarray(q, float), [0, 0, 1])
+        d = d - np.outer(d @ n, n)
+        return d / np.maximum(np.linalg.norm(d, axis=1, keepdims=True), 1e-12)
+
+    def frames(q):
+        """The arm's pose and the blade's, for each of the link's quaternions q."""
+        d = along(q)
+        qs = np.array([P.quat(a, b, n) for a, b in zip(d, np.cross(n, d))])
+        return (np.broadcast_to(base, d.shape), qs), (base + n * reach * 0.002 + d * arm * 0.98, qs)
+
+    d = along(body["quat"])
+    (_, quats), (blade_at, _) = frames(body["quat"])
     s.body("cylinder", [reach * 0.02, lift / 2], pos=piv + n * lift / 2, quat=P.z_to(n), color="#2b2e33",
            name="wiper spindle", prop=True)
     Xa, Ta = wiper_arm(arm, reach)
-    s.mesh(Xa, Ta, name="wiper arm", color="#7a7f86", prop=True, max_vertices=4000).move(base, quats)
+    arm_m = s.mesh(Xa, Ta, name="wiper arm", color="#7a7f86", prop=True, max_vertices=4000).move(base, quats)
     Xb, Tb = wiper_blade(blade, reach)
-    s.mesh(Xb, Tb, name="wiper blade", color="#55595f", prop=True, max_vertices=4000).move(
-        base + n * reach * 0.002 + d * arm * 0.98, quats)
+    blade_m = s.mesh(Xb, Tb, name="wiper blade", color="#55595f", prop=True, max_vertices=4000).move(blade_at, quats)
     t = np.asarray(pb["t"], float)
     tip, root = base + d * (arm * 0.98 + blade / 2), base + d * (arm * 0.98 - blade / 2)
     swing = (pb.get("swing") or {}).get(body["name"])
@@ -434,6 +529,7 @@ def windshield(s, pb, name, j, J, reach):
     s.label("windshield glass", base + (c - base) - n * ((c - base) @ n) + u * hu * 0.7, kind="note")
     s.note("The windshield, wiper arm and blade are drawn on the output link's solved angle.")
     s.camera(target=c - n * reach * 0.1, direction=n * 0.7 - v * 0.8 + u * 0.2, distance=max(hu, hv) * 3.2)
+    return {"arm": arm_m, "blade": blade_m, "link": body["name"], "frames": frames}
 
 
 def desk(s, out, pb, z, reach, drawn):
