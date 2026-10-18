@@ -169,6 +169,8 @@ export function fieldPeaks(h, arr) {
             return {
               p0: placeAt(h, oi, o, pose, base.map((x, k) => x + u[k]), false),
               pe: placeAt(h, oi, o, pose, base.map((x, k) => x + u[k] * ex), true),
+              // a part swinging through its shape on the steady clock passes its rest point too (play-motion.js)
+              ...(o.steady && o.steady.swing ? { pr: placeAt(h, oi, o, pose, base, true) } : {}),
             };
           });
         }
@@ -185,7 +187,8 @@ export function fieldPeaks(h, arr) {
         }
       }
     });
-    out.push(best ? { v: +best.v.toPrecision(6), p0: best.p0.map((x) => +x.toPrecision(6)), pe: best.pe.map((x) => +x.toPrecision(6)) } : null);
+    out.push(best ? { v: +best.v.toPrecision(6), p0: best.p0.map((x) => +x.toPrecision(6)), pe: best.pe.map((x) => +x.toPrecision(6)),
+      ...(best.pr ? { pr: best.pr.map((x) => +x.toPrecision(6)) } : {}) } : null);
   }
   return out;
 }

@@ -144,6 +144,21 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const glowsOnly = flowing && data.panes.every((p, pi) => !p.run.motion?.flow?.slow && !p.run.air && !steadyOf(pi));
   // the clock holds still for the first LEAD seconds the view shows, on the frame its still was drawn at
   let flowT = 0, hold = 0, glowFrom = 0;
+  // the phase of each pane's swinging part, turned on as the drawing turns it (play-scene.js steadyStep), so the peak's
+  // marker swings with the part
+  const swingPh: number[] = [];
+  let swingFt = 0;
+  function swingOn() {
+    const dt = flowT > swingFt ? Math.min(flowT - swingFt, 0.25) : 0;
+    swingFt = flowT;
+    shown.forEach((pi, row) => {
+      const st = steadyOf(pi), r = data.panes[pi].run;
+      if (!st || !st.swing) { delete swingPh[row]; return; }
+      if (flowT === 0) { swingPh[row] = 0; return; }
+      const val = (v: number[]) => (v.length > 1 ? along(r, v, pos[row]) : v[0]);
+      swingPh[row] = ((swingPh[row] ?? 0) + (val(st.swing) * dt) / val(st.slow)) % 1e6;
+    });
+  }
   // the frame position of an input value, read between the saved frames around it
   const posOf = (ts: number[], v: number) => {
     const up = ts[ts.length - 1] >= ts[0];
@@ -396,6 +411,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     }
     const f: any = runFrame(rv, orbit, views(), k, look.bend, data.pace.span);
     f.ft = flowT;
+    swingOn();
     // each pane's scene at its own place along the input
     if (sceneRun) sceneFrame(f);
     back.frame(f);
@@ -426,6 +442,11 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
           if (A && B) {
             const key = look.bend ? 'pe' : 'p0';
             at = A[key].map((x: number, i: number) => x + (B[key][i] - x) * kk);
+            // a part swinging through its shape on the steady clock carries its peak with it, through its rest point
+            if (A.pr && B.pr && swingPh[row] !== undefined) {
+              const c = Math.cos(2 * Math.PI * swingPh[row]);
+              at = at.map((x: number, i: number) => { const rp = A.pr[i] + (B.pr[i] - A.pr[i]) * kk; return rp + (x - rp) * c; });
+            }
             const mv = mark.querySelector('[data-mark-v]');
             if (mv) put(mv, withUnit(A.v + (B.v - A.v) * kk, r.q && r.q.field ? r.q.unit : '', r.q?.digits ?? 3));
           }

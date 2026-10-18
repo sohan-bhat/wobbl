@@ -39,6 +39,9 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
   // what keeps moving at the slider's value on the scene's steady clock (play-motion.js), and how much slower than
   // real time that clock runs at each input frame
   const steady = h.steady && h.objects.some((o) => o.steady && !skipped(o)) ? { slow: h.steady.slow, note: h.steady.note || '' } : null;
+  // the rate the part colored by the main field swings at, so the peak's marker swings with it on the page
+  const sw = steady && h.objects.find((o) => o.steady && o.steady.swing && o.field && o.field.f === 0 && !skipped(o));
+  if (sw) steady.swing = sw.steady.rate;
   if (!mo) {
     const out = slow ? { flow: { slow } } : glows ? { flow: { glows: true } } : null;
     return steady ? { ...out, steady } : out;
