@@ -729,13 +729,14 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
       }
       restless = false;
       lastDrawn = f;
-      const into = k >= 0;
+      const into = k >= 0, moved = !into && !!refiner;
+      // a moving frame is drawn into the refining target too and shown smoothed by FXAA, as it never reaches the mean
       if (into) refiner.begin(k);
-      else refiner?.moving();
-      const rect = into ? refiner.rect : (x, y, rw, rh) => { renderer.setViewport(x, y, rw, rh); renderer.setScissor(x, y, rw, rh); };
+      else if (moved) refiner.move();
+      const rect = into || moved ? refiner.rect : (x, y, rw, rh) => { renderer.setViewport(x, y, rw, rh); renderer.setScissor(x, y, rw, rh); };
       // a page color to clear to: three.js takes a clear color into sRGB only for the canvas, so the refining
       // target (which holds sRGB values) is given it as it is
-      const paint = (hex) => (into ? clearColor.setHex(hex, LinearSRGBColorSpace) : clearColor.setHex(hex));
+      const paint = (hex) => (into || moved ? clearColor.setHex(hex, LinearSRGBColorSpace) : clearColor.setHex(hex));
       let reshadowed = false;
       look(f.camera);
       rect(0, 0, cssW, cssH);
@@ -832,6 +833,7 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
           if (into) refiner.lay(Math.min(1, k / refiner.ramp));
         }
       });
+      if (moved) refiner.flow(cssW, cssH);
       if (into) {
         refiner.end(k, cssW, cssH, still);
         // a shadow drawn again partway starts the mean again from the next frame

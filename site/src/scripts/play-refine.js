@@ -3,8 +3,9 @@
 // occlusion from the depth it left (scalable ambient obscurance, one texel per pixel, smoothed by depth), which the
 // surfaces then take in over a few display frames; then it draws the frame again and again with the camera moved
 // by a fraction of a pixel (a Halton sequence) and shows the mean, sixteen frames for clean edges, outlines and
-// hatching. Anything that moves starts it again, and while the view moves nothing here runs, so orbiting and
-// dragging the slider cost what they did.
+// hatching. Anything that moves starts it again. A frame drawn while the view moves (an orbit, the slider, a rotor
+// that never stops) is drawn into the same target and shown through one FXAA pass, so its edges are smooth too at
+// the cost of a single full screen pass.
 //
 // The occlusion is not laid over the finished frame: each surface reads it while it is lit (play-look.js SSAO) and
 // dims only the light that comes from all round, the studio's diffuse light and reflections, as three.js's own
@@ -15,7 +16,7 @@
 // (run-poster.js) is the plain frame with the same occlusion, which the mean of the jittered frames differs from
 // only along its edges, so the view the page holds settles on its still.
 import {
-  DepthStencilFormat, DepthTexture, HalfFloatType, Mesh, NearestFilter, NoBlending, OrthographicCamera, PlaneGeometry, RGBAFormat, RGFormat,
+  DepthStencilFormat, DepthTexture, HalfFloatType, LinearFilter, Mesh, NearestFilter, NoBlending, OrthographicCamera, PlaneGeometry, RGBAFormat, RGFormat,
   SRGBColorSpace, Scene, ShaderMaterial, UnsignedInt248Type, Vector2, WebGLRenderTarget,
 } from 'three';
 import { SSAO } from './play-look.js';
@@ -123,6 +124,28 @@ uniform sampler2D tMap;
 uniform vec2 uTexel;
 void main() { gl_FragColor = texture2D(tMap, gl_FragCoord.xy * uTexel); }`;
 
+// FXAA (Lottes), the light console version: a frame drawn while the view moves never reaches the jittered mean
+// above, so its edges are smoothed along the direction luma changes across them, in one pass over the frame
+const FXAA_FRAG = /* glsl */ `
+uniform sampler2D tMap;
+uniform vec2 uTexel;
+float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+void main() {
+  vec2 uv = gl_FragCoord.xy * uTexel;
+  vec4 m = texture2D(tMap, uv);
+  float nw = luma(texture2D(tMap, uv + vec2(-1.0, -1.0) * uTexel).rgb), ne = luma(texture2D(tMap, uv + vec2(1.0, -1.0) * uTexel).rgb);
+  float sw = luma(texture2D(tMap, uv + vec2(-1.0, 1.0) * uTexel).rgb), se = luma(texture2D(tMap, uv + vec2(1.0, 1.0) * uTexel).rgb);
+  float lm = luma(m.rgb), lo = min(lm, min(min(nw, ne), min(sw, se))), hi = max(lm, max(max(nw, ne), max(sw, se)));
+  if (hi - lo < max(0.0312, hi * 0.125)) { gl_FragColor = m; return; }
+  vec2 dir = vec2(-((nw + ne) - (sw + se)), (nw + sw) - (ne + se));
+  float reduce = max((nw + ne + sw + se) * (0.25 / 8.0), 1.0 / 128.0);
+  dir = clamp(dir / (min(abs(dir.x), abs(dir.y)) + reduce), -8.0, 8.0) * uTexel;
+  vec3 a = 0.5 * (texture2D(tMap, uv - dir / 6.0).rgb + texture2D(tMap, uv + dir / 6.0).rgb);
+  vec3 b = 0.5 * a + 0.25 * (texture2D(tMap, uv - dir * 0.5).rgb + texture2D(tMap, uv + dir * 0.5).rgb);
+  float lb = luma(b);
+  gl_FragColor = vec4(lb < lo || lb > hi ? a : b, m.a);
+}`;
+
 function pass(frag, uniforms) {
   return new ShaderMaterial({ vertexShader: QUAD_VERT, fragmentShader: frag, uniforms, depthTest: false, depthWrite: false, blending: NoBlending });
 }
@@ -139,8 +162,8 @@ function devicePx(x, y, w, h, p) {
  * renderer.setViewport and setScissor would; jitter(camera, w, h, k) moves the camera by the step's fraction of a
  * pixel and jitter(..., -1) puts it back; at step 0, occlude() works the occlusion out for one pane from what has
  * been drawn there; end() shows the frame, or the mean of the jittered ones. lay(s) has the surfaces drawn next
- * take s of the occlusion (a still's second drawing takes it whole, an inset none), and moving() takes it away
- * from them for a frame drawn straight to the canvas.
+ * take s of the occlusion (a still's second drawing takes it whole, an inset none). A frame drawn while the view
+ * moves goes into the same target without the occlusion (move()) and flow() shows it smoothed by FXAA.
  */
 export function createRefiner(renderer) {
   const gl = renderer.getContext();
@@ -163,6 +186,7 @@ export function createRefiner(renderer) {
   const meanM = pass(MEAN_FRAG, meanU);
   const copyU = { tMap: { value: null }, uTexel: texel };
   const copyM = pass(COPY_FRAG, copyU);
+  const fxaaM = pass(FXAA_FRAG, copyU);
 
   const target = (opts = {}) => {
     const t = new WebGLRenderTarget(w, h, { type: HalfFloatType, depthBuffer: false, magFilter: NearestFilter, minFilter: NearestFilter, ...opts });
@@ -180,6 +204,9 @@ export function createRefiner(renderer) {
     depth.format = DepthStencilFormat;
     frame = target({ depthBuffer: true, stencilBuffer: true, depthTexture: depth });
     frame.texture.colorSpace = SRGBColorSpace;
+    // read between its pixels by the smoothing of a moving frame; the passes at rest read pixel centres alone
+    frame.texture.magFilter = LinearFilter;
+    frame.texture.minFilter = LinearFilter;
     // three.js writes sRGB, as to the canvas, only into a target it takes for a headset's: the frame stands in for the canvas
     frame.isXRRenderTarget = true;
     frame.scissorTest = true;
@@ -202,12 +229,12 @@ export function createRefiner(renderer) {
     renderer.setViewport(x, y, vw, vh);
     renderer.setScissor(x, y, vw, vh);
   }
-  function show(t, cw, ch) {
+  function show(t, cw, ch, material = copyM) {
     copyU.tMap.value = t.texture;
     renderer.setRenderTarget(null);
     renderer.setViewport(0, 0, cw, ch);
     renderer.setScissor(0, 0, cw, ch);
-    draw(copyM, null);
+    draw(material, null);
   }
   function lay(strength) {
     SSAO.tSSAO.value = strength > 0 ? ao.texture : null;
@@ -223,7 +250,15 @@ export function createRefiner(renderer) {
       renderer.setRenderTarget(frame);
     },
     lay,
-    moving() { SSAO.tSSAO.value = null; SSAO.uSSAO.value.set(0, 0, 0); },
+    /** Point a frame drawn while the view moves at the frame's target, without the occlusion; flow() shows it smoothed. */
+    move() {
+      fit();
+      SSAO.tSSAO.value = null;
+      SSAO.uSSAO.value.set(0, 0, 0);
+      renderer.setRenderTarget(frame);
+    },
+    /** Show a moving frame on the canvas, cw by ch CSS pixels, its edges smoothed by FXAA. */
+    flow(cw, ch) { show(frame, cw, ch, fxaaM); },
     rect,
     jitter(camera, vw, vh, k, sign = 1) {
       if (k < RAMP) return;
@@ -259,7 +294,7 @@ export function createRefiner(renderer) {
     },
     dispose() {
       disposeTargets();
-      for (const m of [aoM, blurM, meanM, copyM]) m.dispose();
+      for (const m of [aoM, blurM, meanM, copyM, fxaaM]) m.dispose();
       quad.geometry.dispose();
     },
   };
