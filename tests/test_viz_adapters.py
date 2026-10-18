@@ -233,6 +233,29 @@ def test_examples_with_playback(tmp_path):
         assert h["verdict"]["word"] and h["timeline"]["frames"] > 1, name
 
 
+def test_a_resonance_run_turns_its_rotor_and_swings_at_the_slider_speed(tmp_path):
+    import shutil
+    d = tmp_path / "arm"
+    shutil.copytree(EX / "drone-arm-resonance" / "output", d, ignore=shutil.ignore_patterns("*.png", "*.html",
+                                                                                          "scene.wobbl"))
+    assert build_scene(d)
+    h, _ = load(d / "scene.wobbl")
+    tl, ro = h["timeline"], {r["name"]: r for r in h["readouts"]}
+    assert "motion" not in h and h["steady"]["slow"] == [200.0]
+    part, rotor = h["objects"][0], next(o for o in h["objects"] if o.get("name") == "rotor")
+    # the rotor sits at the motor's mass, turns once per turn at each speed and rides the arm
+    assert rotor["pos"] == [150.0, 0.0, 32.0] and rotor["ride"] == 0 and rotor["prop"]
+    assert rotor["steady"]["rate"] == pytest.approx(np.asarray(tl["t"]) / 60, rel=1e-4)
+    # the arm swings at whichever of once per turn and blade pass drives its hardest mode there
+    drive = part["steady"]["rate"]
+    turn, blade = ro["once per turn"]["values"], ro["blade pass (2 blades)"]["values"]
+    assert all(v == pytest.approx(a, rel=1e-4) or v == pytest.approx(b, rel=1e-4)
+               for v, a, b in zip(drive, turn, blade))
+    k = tl["t"].index(min(tl["t"], key=lambda x: abs(x - tl["design"])))
+    assert drive[k] == pytest.approx(turn[k], rel=1e-4)       # at the asked speed it resonates once per turn
+    assert drive[0] == pytest.approx(blade[0], rel=1e-4)      # at hover the blades passing drive it
+
+
 def _names(h):
     return {o.get("name") for o in h["objects"]}
 

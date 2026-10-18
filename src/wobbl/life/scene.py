@@ -42,6 +42,16 @@ def _finish(s, out: Path, verdict: str, headline: str) -> Path:
     return s.save(out)
 
 
+def rotor_of(masses, blades: int = 2) -> dict | None:
+    """Where a rotor sits for a run whose input is its speed: at the heaviest attached mass with a point, which is
+    the motor and its propeller on a drone arm. None when no mass has a point."""
+    pts = [m for m in masses if getattr(m, "point", None) is not None]
+    if not pts:
+        return None
+    m = max(pts, key=lambda m: m.mass)
+    return {"at": [float(v) for v in m.point], "blades": int(blades or 2)}
+
+
 def _surface(mesh):
     n = mesh.n_nodes if hasattr(mesh, "n_nodes") else len(mesh.X)
     return np.asarray(mesh.X[:n], float), mesh.tris
@@ -54,7 +64,7 @@ def amplification(r, zeta: float):
 
 
 def speed_sweep(s, X, tris, shapes, freqs, numbers, bands, *, zeta: float, margin: float = 0.2,
-                quiet=(), n: int = 41):
+                quiet=(), n: int = 41, rotor: dict | None = None):
     """Fill scene s with the part's steady response as what shakes it speeds up. bands are (lo, hi, label) in Hz,
     each excitation moving from lo to hi together, as a rotor's once per turn and blade pass do. A band labeled
     once per turn makes the input the rotor's speed in rpm; with no bands the input is the shaking frequency from
@@ -63,7 +73,10 @@ def speed_sweep(s, X, tris, shapes, freqs, numbers, bands, *, zeta: float, margi
     At each input the color is each spot's motion against its static motion, the largest amplification of any
     mode times how much that mode moves there, and the part takes the shape of the mode driven hardest. The limit
     is the amplification at half the margin from a resonance and the target at the margin, the run's own lines
-    for fails and marginal. Modes in quiet move little mass and are drawn but not counted as driven."""
+    for fails and marginal. Modes in quiet move little mass and are drawn but not counted as driven.
+
+    The part keeps swinging through that shape at whatever input the slider stands at, and a rotor whose point the
+    run knows (rotor, {"at": xyz, "blades": n}) turns at its speed beside it (keep_moving)."""
     freqs = np.asarray(freqs, float)
     if not bands:
         bands = [(0.5 * float(freqs.min()), 1.3 * float(freqs.max()), "shaking frequency")]
@@ -115,34 +128,46 @@ def speed_sweep(s, X, tris, shapes, freqs, numbers, bands, *, zeta: float, margi
     s.note(f"The motion is drawn as large as the amplification, up to {100 * a * top / span:.2g}% of the part, "
            "because its real size depends on how hard the rotor shakes it. Damping is "
            f"{100 * zeta:.3g}% of critical.")
-    shake(s, part, U, field, fe, freqs, lead, x, design, zeta)
+    keep_moving(s, part, fe, freqs, lead, x, design, zeta, None if turn is None else bands.index(turn), rotor, span)
     return part
 
 
-def shake(s, part, U, field, fe, freqs, lead, x, design: float, zeta: float, cycles: int = 4) -> None:
-    """The steady response at the asked input as it happens: the part swinging through the shape it takes there,
-    back and forth at the frequency of the excitation that drives its hardest mode, as large as the slider draws
-    it, over a few cycles slowed to about one a second. The shape is the mode's (a real shape, every point in phase),
-    so the motion is that shape times the cosine of the forcing's phase, starting and ending on the drawn shape."""
-    k = int(np.argmin(np.abs(np.asarray(x, float) - design)))
-    m = int(lead[k])
-    f = float(fe[int(np.argmax(amplification(fe[:, k] / freqs[m], zeta))), k])
-    if not (f > 0):
+def keep_moving(s, part, fe, freqs, lead, x, design: float, zeta: float, turn: int | None, rotor=None,
+                span: float = 1.0) -> None:
+    """What keeps moving at whatever speed the slider sets, on one steady clock: the part swinging through the shape
+    it takes there, back and forth at the frequency of the excitation that drives its hardest mode, and, when the
+    input is a rotor's speed and the run knows where the rotor sits (rotor: its point and blade count), the rotor
+    turning at that speed. The clock is slowed by one round factor that brings the asked speed's drive to about a
+    cycle a second, so the blades passing and the shaking keep step as they do on the real thing."""
+    n = len(x)
+    drive = np.array([fe[int(np.argmax(amplification(fe[:, k] / freqs[int(lead[k])], zeta))), k] for k in range(n)])
+    k0 = int(np.argmin(np.abs(np.asarray(x, float) - design)))
+    f = float(drive[k0])
+    if not (f > 0) or not (drive > 0).all():
         return
-    slow = 10.0 ** round(math.log10(f / 1.0))
-    slow = min((c * slow / 10 for c in (1, 2, 5, 10, 20, 50)), key=lambda c: abs(math.log(c / f)))
-    tau = np.linspace(0.0, cycles / f, cycles * 32 + 1)
-    s.motion(tau, tau * slow, label="time", unit="s",
-             note=f"The part swings in the shape it takes at the asked {s.tl.get('label', 'input')}, at the "
-                  f"{f:.4g} Hz that drives it, slowed so each cycle takes about a second.")
-    c = np.cos(2 * np.pi * f * tau)
-    part.track(deform=c[:, None, None] * U[k][None], field=np.repeat(field[k][None], len(tau), 0))
+    slow = min((c * 10.0 ** e for e in range(-3, 16) for c in (1, 2, 5)), key=lambda c: abs(math.log(c / f)))
+    what = s.tl.get("label", "input")
+    part.swing(drive)
+    words = f"The part swings in the shape it takes at each {what}, at the frequency that drives it there"
+    if turn is not None and rotor is not None:
+        at = np.asarray(rotor["at"], float)
+        blades = int(rotor.get("blades") or 2)
+        r = s.body("box" if blades == 2 else "cylinder", [0.18 * span, 0.012 * span, 0.004 * span] if blades == 2
+                   else [0.18 * span, 0.004 * span], pos=at, color="#2b2e33", name="rotor", prop=True)
+        r.spin(fe[turn], axis=(0, 0, 1)).ride(part)
+        words += ", and the rotor turns at the speed the slider sets, both"
+    s.steady(slow, note=f"{words} {_slower(slow)}.")
+
+
+def _slower(slow: float) -> str:
+    return f"shown {slow:,.0f} times slower" if slow >= 1 else f"shown {1 / slow:,.0f} times faster"
 
 
 def vibration(out: Path, mesh, modes, picks: list[int], labels: dict, verdict: str, headline: str, title: str,
-              question: str = "", excite=(), zeta: float = 0.03, margin: float = 0.2) -> Path | None:
+              question: str = "", excite=(), zeta: float = 0.03, margin: float = 0.2,
+              rotor: dict | None = None) -> Path | None:
     """The part's steady response as the excitation speeds up through its range (see speed_sweep), from the
-    modes that matter."""
+    modes that matter, with the rotor turning beside it when the run says where it sits."""
     try:
         from ..viz import Scene
 
@@ -154,7 +179,8 @@ def vibration(out: Path, mesh, modes, picks: list[int], labels: dict, verdict: s
         s = Scene(title, domain="vibration", question=question)
         bands = [(float(e.lo), float(e.hi), e.label) for e in excite]
         speed_sweep(s, X, tris, shapes, [float(modes.freq[i]) for i in picks], [i + 1 for i in picks], bands,
-                    zeta=zeta, margin=margin, quiet=[i + 1 for i in picks if labels.get(i) == "barely excited"])
+                    zeta=zeta, margin=margin, quiet=[i + 1 for i in picks if labels.get(i) == "barely excited"],
+                    rotor=rotor)
         return _finish(s, out, verdict, headline)
     except Exception:  # noqa: BLE001  a scene is a convenience, never a reason to fail
         _debug()

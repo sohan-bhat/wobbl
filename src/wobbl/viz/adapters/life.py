@@ -39,7 +39,8 @@ def build(out: Path, pb: dict) -> Path | None:
 def vibration(out, pb, o):
     """The steady response as the excitation speeds up through its range, from the stored modes (see
     wobbl.life.scene.speed_sweep)."""
-    from ...life.scene import speed_sweep
+    from ...life.scene import rotor_of, speed_sweep
+    from ...life.vibspec import parse_mass
 
     X, T = mesh_of(pb)
     modes = pb.get("modes", [])
@@ -49,10 +50,15 @@ def vibration(out, pb, o):
     bands = [(float(b["lo_Hz"]), float(b["hi_Hz"]), b.get("label", "excitation")) for b in pb.get("excitations", [])]
     s = Scene(o.get("question") or "Vibration", domain="vibration", question=o.get("question", ""),
               source="The run's mode shapes, each driven at the excitation's frequency with its damping.")
+    st = read(out, "study.json") or {}
+    try:
+        rotor = rotor_of([parse_mass(m) for m in st.get("masses", [])], st.get("blades", 2))
+    except Exception:  # noqa: BLE001  a mass this build cannot read leaves the rotor out
+        rotor = None
     speed_sweep(s, X, T, [arr(m["shape"]) for m in modes], [m["frequency_Hz"] for m in modes],
                 [m["mode"] for m in modes], bands, zeta=float(v.get("damping") or 0.03),
                 margin=float(v.get("margin") or 0.2),
-                quiet=[m["mode"] for m in modes if m.get("status") == "barely excited"])
+                quiet=[m["mode"] for m in modes if m.get("status") == "barely excited"], rotor=rotor)
     verdict(s, o)
     return s.save(out)
 
