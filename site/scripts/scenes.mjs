@@ -103,7 +103,10 @@ export function scenePlay(h, arr) {
   const bounds = sceneBounds(h, arr), { subject, points, follow, hold } = sceneFraming(h, arr, bounds, Math.round(home));
   return {
     kind: 'scene', title: h.title || '', domain: h.domain || '',
-    input: { label: cap(tl.label || 'frame'), unit: tl.unit || '', t: t.map(r6), between: tl.between, kind: tl.kind || 'time', home: r6(home), design: tl.design ?? null },
+    input: { label: cap(tl.label || 'frame'), unit: tl.unit || '', t: t.map(r6), between: tl.between, kind: tl.kind || 'time', home: r6(home), design: tl.design ?? null,
+      // each value shown as the part stands at the end of a run of its own (a pack after 60 min), not settled, as
+      // its notes say, so a replay through the values says so
+      ...(() => { const m = (h.notes || []).map((n) => /at the end of its ([\d.]+ \w+) run/.exec(n)).find(Boolean); return m ? { after: m[1] } : {}; })() },
     q, peaks: peaks && peaks.map((p) => p && { v: p.v, p0: p.p0, pe: p.pe }), event, also, alts,
     exag: +exag.toPrecision(3), magnify: h.magnify ? { factor: h.magnify.factor, label: h.magnify.label || 'Drawn', groups: h.magnify.groups } : null,
     camera: { view: d.map((x) => x / l), fov: cam.fov || 30 }, bounds, subject, points, follow, hold,

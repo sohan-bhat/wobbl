@@ -621,11 +621,15 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       }).filter((w, i, all) => all.indexOf(w) === i);
       text = `Replay at ${words.join(' and ')}`;
     } else if (ramp === 'load') text = `Load to ${valueWords(pi, p)}`;
-    else if (ramp === 'heat') text = `Steady states to ${valueWords(pi, p)}`;
+    else if (ramp === 'heat') {
+      const after = data.panes[pi].run.input.after;
+      text = after ? `States after ${after} to ${valueWords(pi, p)}` : `Steady states to ${valueWords(pi, p)}`;
+    }
     put(replay, text);
     replay.title = mo0 ? 'Plays the run at this value from its start' : ramp === 'load'
       ? 'Loads the part from nothing to this value, through the solved state at each load'
-      : 'Steps through the steady temperature the part settles at for each heat load up to this one, not a warm up in time';
+      : data.panes[pi].run.input.after ? `Steps through the temperature each heat load reaches at the end of its own ${data.panes[pi].run.input.after} run, up to this one, not a warm up in time`
+        : 'Steps through the steady temperature the part settles at for each heat load up to this one, not a warm up in time';
   }
   /** Each pane's motion for a replay from where the slider stands: the one a sweep kept nearest it, fetched once. */
   async function pickMotions(ps: number[] = pos): Promise<boolean> {
