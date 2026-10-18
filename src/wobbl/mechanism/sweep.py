@@ -8,7 +8,9 @@ asks of it, from a run with no motor limits, against what its torque speed line 
 running open loop is judged on the torque it draws against its stall torque. Each value keeps the mechanism at its
 hardest instant, every driven joint's torque and limit there, the path its point masses take in a run with the
 real motors, and a few numbers. sweep.json holds them in the shape of playback.json with the input in place of
-time, so the same viewer code draws either.
+time, so the same viewer code draws either. Beside them, under runs, each value keeps its own run with the real
+motors as it happened, the moving geoms' poses and each driven joint's share of its motor at evenly spaced
+instants, so a view can replay the mechanism at whichever value its slider stands at.
 """
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ import numpy as np
 
 POSES = 400              # recorded poses per run, so the hardest instant has a pose close to it
 PATH_POINTS = 100        # points kept along each path
+RUN_POSES = 120          # poses kept of each value's own run, for a view to replay the run at that value
 START_SHARE = 1.0        # a motor run open loop has started once it first reaches its usual (median) speed
 GLASS = {"wiper", "wipers", "windshield", "windscreen", "glass"}
 
@@ -177,6 +180,12 @@ def solve(kind: str, params: dict, inp: Input, v: float) -> dict:
     frame["swing"] = {g["name"]: np.round(Pr["quat"][idx, n], 4).tolist()
                       for n, g in enumerate(real.model_info["geoms"]) if g["name"] in grounded}
     frame["geoms"] = asked.model_info["geoms"]
+    # the run with the real motors at this value as it happened, thinned, for a view to replay at this value
+    idx = _thin(np.arange(len(Pr["t"])), RUN_POSES)
+    poses = [_geom_pose(Pr, real.model_info["geoms"], int(i)) for i in idx]
+    tr = np.asarray(Pr["t"], float)[idx]
+    frame["run"] = {"t": tr, "pos": np.array([p for p, _ in poses]), "quat": np.array([q for _, q in poses]),
+                    "share": {j: np.interp(tr, t, x["share"]) for j, x in joints.items()}}
     return frame
 
 
@@ -234,6 +243,11 @@ def run(kind: str, params: dict, question: str = "", say=None) -> dict | None:
     series = {k: {"values": r([f["numbers"][k] for f in frames], 4)} for k in frames[0]["numbers"]}
     paths = {k: [f["paths"][k] for f in frames] for k in frames[0]["paths"]}
     swing = {k: [f["swing"][k] for f in frames] for k in frames[0]["swing"]}
+    moving = [g for g, b in enumerate(bodies) if not b["static"]]
+    runs = [{"t": r(f["run"]["t"], 4),
+             "bodies": {geoms[g]["name"]: {"pos": r(f["run"]["pos"][:, g]), "quat": r(f["run"]["quat"][:, g], 4)}
+                        for g in moving},
+             "share": {j: r(v, 4) for j, v in f["run"]["share"].items()}} for f in frames]
     events = [{"t_s": float(v), "name": name, "detail": ""} for v, name in inp.marks]
     for j, x in joints.items():           # where each joint first runs short of its motor
         s = np.asarray(x["peak_share"])
@@ -248,7 +262,8 @@ def run(kind: str, params: dict, question: str = "", say=None) -> dict | None:
                          "source": "Each value of the input is a full MuJoCo run. The mechanism stands at its "
                                    "hardest instant for that value, where a driven joint asks the most of its motor."},
             "t": [float(v) for v in inp.values], "bodies": bodies, "joints": joints, "series": series,
-            "paths": paths, "swing": swing, "hardest_s": [f["t_s"] for f in frames], "events": events}
+            "paths": paths, "swing": swing, "hardest_s": [f["t_s"] for f in frames], "events": events,
+            "runs": runs}
 
 
 def write(out: str | Path, kind: str, params: dict, question: str = "", say=None) -> Path | None:
