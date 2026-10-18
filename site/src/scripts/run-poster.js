@@ -72,7 +72,7 @@ globalThis.drawRunStills = async ({ base, kind, panes, fix, w, h, px, at = 'star
       stage._frame(frame());
       if (at === 'start') {
         const moving = runs.map((r) => (r.motion && r.motion.t ? r.motion : null));
-        pos = shown.map((i, row) => (moving[row] ? moving[row].at ?? homeOf(i) : homeOf(i)));
+        pos = shown.map((i, row) => (moving[row] ? moving[row].at ?? homeOf(i) : scene ? homeOf(i) : 0));
         mts = moving.some(Boolean) ? moving.map((m) => (m ? m.t[0] : NaN)) : null;
         stage._frame(frame());
       }
