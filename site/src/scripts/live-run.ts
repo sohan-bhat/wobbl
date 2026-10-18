@@ -139,8 +139,11 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   // asked speed, play-motion.js) move on the view's own clock while it is on screen, and follow the slider at once
   const steadyOf = (pi: number) => (sceneRun ? data.panes[pi].run.motion?.steady ?? null : null);
   const flowing = data.panes.some((p, pi) => p.run.motion?.flow || p.run.air || steadyOf(pi));
+  // current along wires alone, which is not a fluid's own speed, runs a few seconds after the view opens and after
+  // each move of the slider, then rests, as a bench does (bench.ts), so the view settles on its refined still
+  const glowsOnly = flowing && data.panes.every((p, pi) => !p.run.motion?.flow?.slow && !p.run.air && !steadyOf(pi));
   // the clock holds still for the first LEAD seconds the view shows, on the frame its still was drawn at
-  let flowT = 0, hold = 0;
+  let flowT = 0, hold = 0, glowFrom = 0;
   // the frame position of an input value, read between the saved frames around it
   const posOf = (ts: number[], v: number) => {
     const up = ts[ts.length - 1] >= ts[0];
@@ -522,9 +525,12 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   function flowLoop() {
     if (!flowing || fraf || playing || !ready || !canGo()) return;
     flast = 0;
+    glowFrom = 0;
     const step = (ts: number) => {
       fraf = 0;
       if (playing || !canGo()) return;
+      glowFrom ||= ts;
+      if (glowsOnly && ts - glowFrom > 3000) return;
       const dt = flast ? Math.min((ts - flast) / 1000, 0.1) : 0;
       if (hold > 0) hold = Math.max(0, hold - dt);
       else flowT += dt;
@@ -653,7 +659,8 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       shown.forEach((pi, row) => { pos[row] = Math.min(Math.max(p, 0), data.panes[pi].run.input.t.length - 1); });
       readings(1);
       requestDraw();
-      // what keeps moving goes on at the value the slider now gives
+      // what keeps moving goes on at the value the slider now gives, and current along wires runs again a while
+      glowFrom = 0;
       flowLoop();
     };
     if (slider) {
