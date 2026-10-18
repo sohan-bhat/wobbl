@@ -9,7 +9,7 @@
 //   add: [{ file, parent?, scale?, matrix? }],     world frame, or the named object's frame
 //   hide: [object names] } } }
 import {
-  AlwaysStencilFunc, Box3, CustomBlending, MeshBasicMaterial, Vector3, EqualStencilFunc, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
+  AlwaysStencilFunc, CustomBlending, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
   OneFactor, OneMinusSrcAlphaFactor, ReplaceStencilOp, SRGBColorSpace,
 } from 'three';
 import { keepLight, studioShader } from './play-look.js';
@@ -113,18 +113,15 @@ function prepare(m) {
     out.customProgramCacheKey = () => `wobbl-model-glass-${alpha.toFixed(3)}`;
   } else {
     out.onBeforeCompile = studioShader;
-    // drawn whole only where the part the run is about is not behind it (see subject below)
-    Object.assign(out, { stencilWrite: true, stencilRef: 1, stencilFunc: NotEqualStencilFunc, stencilWriteMask: 0, stencilZPass: KeepStencilOp });
   }
   ready.set(m, out);
   return out;
 }
 
-// ---- the part stays in sight ----
-// A model in front of the part a run is about (a motor on its mount, a heater on a heat sink, a box on a shelf
-// bracket) is drawn faint where it covers the part, so the stress or the temperature still reads through it, as
-// an X-ray view in an engineering program does. The part marks the pixels it covers in the stencil buffer;
-// every model is drawn whole outside them and as a faint copy over them.
+// ---- the part under glass ----
+// A model is drawn whole, as the Cycles stills draw it: a motor in front of its mount hides the mount there, and the
+// view turns to show what it hides. Glass is the one exception: it is left out over the part the run is about, which
+// marks the pixels it covers in the stencil buffer, so its reflections never wash the field's colors.
 
 /** Make a material mark the pixels its part covers: the part's surface, drawn before any model. */
 export function subject(m) {
@@ -150,29 +147,6 @@ export function keepColor(m) {
   return m;
 }
 
-const ghosts = new WeakMap();
-function ghostOf(p) {
-  if (ghosts.has(p)) return ghosts.get(p);
-  // flat and unlit: at this opacity only the model's outline and tone show, so no light is worked out for it
-  const g = new MeshBasicMaterial({
-    color: p.color ? p.color.clone().multiplyScalar(0.8) : 0x9aa0a6, transparent: true, opacity: 0.14, depthWrite: false,
-    stencilWrite: true, stencilRef: 1, stencilFunc: EqualStencilFunc, stencilWriteMask: 0, stencilZPass: KeepStencilOp,
-  });
-  ghosts.set(p, g);
-  return g;
-}
-const _c = new Vector3(), _ra = [0, 0, 0, 0], _rb = [0, 0, 0, 0];
-/** The screen rectangle a box covers, in normalized device coordinates, as [x0, y0, x1, y1]. */
-function rectOf(b, camera, out) {
-  out[0] = out[1] = Infinity; out[2] = out[3] = -Infinity;
-  for (let i = 0; i < 8; i++) {
-    _c.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(camera);
-    out[0] = Math.min(out[0], _c.x); out[1] = Math.min(out[1], _c.y); out[2] = Math.max(out[2], _c.x); out[3] = Math.max(out[3], _c.y);
-  }
-  return out;
-}
-const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
-
 /**
  * One copy of a model, turned from glTF's y up back to the scene's z up, with its own copies of the materials the
  * entry tints. Returns { group, meshes, tint(rgb bytes) }.
@@ -187,15 +161,8 @@ export function instance(gltf, entry) {
     group.matrixAutoUpdate = false;
     group.matrix.fromArray(entry.matrix);
   }
-  const tinted = [], tintedGhosts = [], meshes = [], extra = [];
+  const tinted = [], meshes = [];
   const names = new Set(entry.tint || []);
-  // a tinted material's faint copy is its own, so it takes the same color
-  const tintedGhost = (m) => {
-    if (!tinted.includes(m)) return ghostOf(m);
-    const g = ghostOf(m).clone();
-    tintedGhosts.push(g);
-    return g;
-  };
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.castShadow = true;
@@ -214,38 +181,16 @@ export function instance(gltf, entry) {
     };
     o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
     o.renderOrder = 1;
-    // the faint copy over the part, sharing the mesh's geometry and its place
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    if (mats.every((m) => m.transparent)) return;
-    const ghost = o.clone();
-    ghost.material = Array.isArray(o.material) ? mats.map((m) => (m.transparent ? m : tintedGhost(m))) : tintedGhost(o.material);
-    Object.assign(ghost, { castShadow: false, receiveShadow: false, renderOrder: 2 });
-    ghost.children.length = 0;
-    extra.push([o, ghost]);
   });
-  for (const [o, ghost] of extra) o.parent.add(ghost);
-  let last = '', box = null;
+  let last = '';
   return {
     group, meshes,
-    /**
-     * Draw the faint copies only where they can matter: when the model covers some of the part on screen (camera,
-     * and the part's box in the same frame), or always (true) or never (false).
-     */
-    ghosts(camera, part) {
-      let on = camera;
-      if (typeof camera === 'object' && camera) {
-        if (!box) { group.updateWorldMatrix(true, true); box = new Box3().setFromObject(group); }
-        on = overlaps(rectOf(box, camera, _ra), rectOf(part, camera, _rb));
-      }
-      for (const [, g] of extra) g.visible = !!on;
-    },
     /** Paint the tinted materials a color given as sRGB bytes. */
     tint(rgb) {
       const key = rgb.join(',');
       if (key === last) return;
       last = key;
       for (const m of tinted) m.color.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, SRGBColorSpace);
-      for (const m of tintedGhosts) m.color.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, SRGBColorSpace).multiplyScalar(0.8);
     },
     /** The tinted materials carry a field's color: keep it out of the occlusion (keepColor). */
     keepTint() { for (const m of tinted) keepColor(m); },

@@ -241,7 +241,7 @@ function material(o, { prop = false, shell = false, field = null, tube = false, 
   m.customProgramCacheKey = () => `wobbl-scene-${+opts.field}${+tube}${+glass}${+unlit}${+opts.lift}${+!prop}`;
   // the uniforms the stage brings to each frame, as on the shader materials before
   m.uniforms = uniforms;
-  // a part the run is about, colored by its field, shows through the models in front of it (play-models.js)
+  // glass in a model is left out over a part the run is about, colored by its field (play-models.js)
   return field && !prop && !glass ? subject(m) : m;
 }
 
@@ -783,11 +783,6 @@ export function sceneParts({ arrays, run }) {
       (at ? at.mesh : scene).add(m.group);
       if (!at) { adds.push(m); ride(m); }
     }
-    // a model's faint copy over the subject is drawn only when the scene has a subject colored by a field left
-    // in view (a wiper's links are all models: nothing to show through)
-    const anySubject = items.some((it) => !it.model && !it.o.prop && it.f && (it.o.kind === 'mesh' || it.o.kind === 'body'));
-    for (const it of items) it.model?.ghosts(anySubject);
-    for (const m of adds) m.ghosts(anySubject);
     // everything is brought to the frame again, so a tinted model takes its field's color
     key = '';
     shadowDirty = true;
