@@ -18,7 +18,7 @@ import numpy as np  # noqa: E402
 from build123d import Axis, Pos, RectangleRounded, Rot, SlotCenterToCenter, Solid, chamfer, extrude  # noqa: E402
 
 import looks  # noqa: E402
-from gltf import Node, write_manifest  # noqa: E402
+from gltf import Node, export, write_manifest  # noqa: E402
 from mech import cable  # noqa: E402
 from mech import example as ex  # noqa: E402
 from mech import fasteners as fs  # noqa: E402
@@ -29,6 +29,7 @@ KEY = 'drone-arm'
 ROOT_BOLTS = [(-14.0, 0.0), (-6.0, 0.0)]
 ROOT_TOP = 20.0
 PAD = np.array([150.0, 0.0, 15.0])
+ROTOR = np.array([150.0, 0.0, 32.0])        # the motor and prop's mass in examples/drone-arm-resonance/run.sh
 looks.add('carbon_fibre', color=(0.018, 0.018, 0.02), metal=0.0, rough=0.28, normal='fine_n', nstr=0.5, tiles=80)
 looks.add('wire_black', color=(0.02, 0.02, 0.02), metal=0.0, rough=0.45)
 looks.add('wire_yellow', color=(0.7, 0.55, 0.05), metal=0.0, rough=0.45)
@@ -70,22 +71,30 @@ def root_screws():
 
 def motor_and_prop():
     """The motor on the pad, its screws from under the pad, the leads back along the arm, the prop and its nut."""
+    stator, rotor = motor_parts()
+    return stator + rotor
+
+
+def motor_parts():
+    """The motor in two: what stands on the pad (the base and windings, its screws from under the pad and the leads
+    back along the arm), and what turns (the bell, the shaft, the prop and its nut)."""
     parts, ztop = motors.bldc()
-    out = place(parts, Pos(*PAD))
+    parts = place(parts, Pos(*PAD))
+    out, turns = parts[:2], parts[2:]
     for k in range(4):
         a = math.radians(45 + 90 * k)
         x, y = PAD[0] + 8 * math.sqrt(2) * math.cos(a), PAD[1] + 8 * math.sqrt(2) * math.sin(a)
         out.append((Pos(x, y, 0) * Rot(180, 0, 0) * fs.socket_cap('M3', 18, threads=False, lite=True), 'steel_black_oxide'))
     zp = PAD[2] + ztop
-    out += place(motors.propeller(), Pos(PAD[0], PAD[1], zp - 0.6) * Rot(0, 0, 30))
+    turns += place(motors.propeller(), Pos(PAD[0], PAD[1], zp - 0.6) * Rot(0, 0, 30))
     nut = Pos(PAD[0], PAD[1], zp + 7.0 - 0.6) * fs.hex_nut('M5', nylock=True)
-    out.append((nut, 'steel_zinc'))
+    turns.append((nut, 'steel_zinc'))
     # the three phase leads down the side of the arm to the frame
     path = [(PAD[0] - 13.0, 0.0, PAD[2] + 2.0), (PAD[0] - 18.0, 0.0, 14.2), (100.0, 0.0, 15.8), (40.0, 0.0, 18.4), (6.0, 0.0, 20.2),
             (-10.0, 0.0, 21.0)]
     path = [(x, y, z + 0.9) for x, y, z in path]
     out += cable.ribbon(path, 0.8, ['wire_black', 'wire_yellow', 'wire_red'], side=(0, 1, 0))
-    return out
+    return out, turns
 
 
 def main():
@@ -95,7 +104,16 @@ def main():
         'motor-and-prop': ([Node('motor-and-prop', plain(motor_and_prop()), tol=0.06, ang=0.3)], ['load point']),
     }
     ex.publish(KEY, {k: (n, {"covers": c}) for k, (n, c) in files.items()})
-    write_manifest('drone-arm-resonance', {'add': [{'file': f'{KEY}/{k}.glb'} for k in files]})
+    # the resonance run turns its rotor at the rotor speed it is asked about: the rotor is the scene's own body at the
+    # motor's mass (ROTOR, as the run gives it), so its model is made in that body's frame and hangs under it, and the
+    # rest of the motor stands on the pad and rides the arm
+    stator, turns = motor_parts()
+    rotor = place(turns, Pos(*(-ROTOR)))
+    export(f'{KEY}/motor.glb', [Node('motor', plain(stator), tol=0.06, ang=0.3)])
+    export(f'{KEY}/rotor.glb', [Node('rotor', plain(rotor), tol=0.06, ang=0.3)])
+    write_manifest('drone-arm-resonance', {
+        'replace': [{'object': 'rotor', 'file': f'{KEY}/rotor.glb'}],
+        'add': [{'file': f'{KEY}/{k}.glb'} for k in ('frame-plates', 'root-screws', 'motor')]})
 
 
 if __name__ == '__main__':

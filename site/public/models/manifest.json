@@ -171,10 +171,13 @@
     ]
   },
   "drone-arm-resonance": {
+    "replace": [
+      {"object": "rotor", "file": "drone-arm/rotor.glb"}
+    ],
     "add": [
       {"file": "drone-arm/frame-plates.glb"},
       {"file": "drone-arm/root-screws.glb"},
-      {"file": "drone-arm/motor-and-prop.glb"}
+      {"file": "drone-arm/motor.glb"}
     ]
   },
   "enclosure": {
