@@ -120,6 +120,13 @@ class Scene:
         self.mi = len(self.mos) - 1
         return self
 
+    def select_motion(self, i: int) -> "Scene":
+        """Make motion i (in the order the motions were given) the one tracks and motion readouts go to, as when a
+        readout made after every motion takes its values along each."""
+        m = self.mos[i]
+        self.mi, self.mo, self.mo_n = i, m["mo"], m["n"]
+        return self
+
     def design_motion(self) -> int:
         """Which motion is the asked one: the one at the design value, else the one given without at, else the
         nearest the design value, else the first."""

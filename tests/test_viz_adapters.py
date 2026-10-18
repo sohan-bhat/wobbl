@@ -314,6 +314,14 @@ def test_rocket_flies_its_own_airframe(tmp_path):
     o = json.loads((tmp_path / "outcome.json").read_text())
     i = tl["t"].index(3.0)
     assert h["readouts"][0]["values"][i] == pytest.approx(o["values"]["apogee_m"], rel=1e-4)
+    # every wind on the slider keeps its own flight as a motion, the asked one named, so a replay flies that wind's
+    mo = h["motion"]
+    assert [v["at"] for v in mo["variants"]] == pytest.approx(sorted(tl["t"], key=lambda w: w != 3.0))
+    assert mo["variants"][mo["asked"]]["at"] == 3.0 and len(rocket["tracks"]) == len(mo["variants"])
+    alt = [v["readouts"][0] for v in mo["variants"]]
+    assert all(a["name"] == "altitude" for a in alt)
+    landing = next(r for r in h["readouts"] if r["name"] == "landing speed")
+    assert len(landing["motions"]) == len(mo["variants"]) and landing["motions"][0][-1] is not None
 
 
 def test_sweep_inputs_follow_the_question():
