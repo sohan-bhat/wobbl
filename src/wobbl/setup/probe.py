@@ -80,8 +80,11 @@ def _kill(proc: subprocess.Popen, posix: bool) -> None:
         if posix:
             os.killpg(proc.pid, signal.SIGKILL)
         else:
+            # proc.kill stops only the check itself, and a program it started keeps the pipes open
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=10)
             proc.kill()
-    except (ProcessLookupError, PermissionError, OSError):
+    except (ProcessLookupError, PermissionError, OSError, subprocess.TimeoutExpired):
         pass
     try:
         proc.wait(timeout=5)
