@@ -14,7 +14,7 @@ import { lut } from './scene-file.js';
 import { instance, setAnisotropy, subject } from './play-models.js';
 import {
   FINISHES, LOOK, SRGB, aimKey, decodeStudioBytes, depthMaterial, fieldStudioShader, finishOf, finishShader, keyLight, loadStudio, studioEnvironment,
-  studioShader, turnStudio,
+  studioShader, toned, turnStudio,
 } from './play-look.js';
 import { OVERLAY, createRefiner, overlay } from './play-refine.js';
 
@@ -403,7 +403,7 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
   renderer.shadowMap.type = VSMShadowMap;
   // the key light's shadow is drawn only when the part moves or the light does, not as the camera orbits
   renderer.shadowMap.autoUpdate = false;
-  let env = null, studioAz = null;
+  let env = null, studioAz = null, studioZ = null;
   const lookAt = new Vector3();
   renderer.setPixelRatio(px);
   renderer.setSize(w, h, false);
@@ -460,25 +460,14 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
     if (scale < 1 || slow > 20) rest = setTimeout(() => { setScale(1); slow = 16.7; restless = true; if (lastFrame) draw(lastFrame); }, 350);
   }
   const parts = [];
-  // behind each view a soft pool of light, as a studio backdrop or model-viewer's floor glow gives, so dark
-  // parts keep their outline and the view has depth, fading to the page's own black at the edges
+  // behind each view the page's own color as the studio's camera sees it, exposed and tone mapped as the Cycles
+  // stills give it, so the view and its card stand on the same ground
+  const ground = toned([14, 15, 17]).map((c) => (c / 255).toFixed(4)).join(', ');
   const backdrop = new Scene();
   const glow = new Mesh(new PlaneGeometry(2, 2), new ShaderMaterial({
     depthTest: false, depthWrite: false,
-    uniforms: { uAspect: { value: 1 } },
-    vertexShader: 'varying vec2 vP; void main() { vP = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-    fragmentShader: /* glsl */ `
-      uniform float uAspect;
-      varying vec2 vP;
-      void main() {
-        vec2 q = vec2(vP.x * max(uAspect, 1.0), vP.y * max(1.0 / uAspect, 1.0));
-        float r = length(q * vec2(0.82, 1.0) - vec2(0.0, 0.1));
-        float k = 1.0 - smoothstep(0.05, 1.25, r);
-        vec3 c = mix(vec3(0.055, 0.063, 0.067), vec3(0.106, 0.118, 0.133), k * k);
-        // a little noise against banding in so dark a gradient
-        float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
-        gl_FragColor = vec4(c + (n - 0.5) / 255.0, 1.0);
-      }`,
+    vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: `void main() { gl_FragColor = vec4(${ground}, 1.0); }`,
   }));
   glow.frustumCulled = false;
   backdrop.add(glow);
@@ -720,6 +709,8 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
       if (studioAz === null) {
         studioAz = Math.atan2(f.camera.position[1] - f.camera.target[1], f.camera.position[0] - f.camera.target[0]);
         turnStudio(studioAz);
+        const v = f.camera.position.map((x, i) => x - f.camera.target[i]), vl = Math.hypot(...v) || 1;
+        studioZ = v.map((x) => x / vl);
       }
       // the same frame again at full resolution with nothing moved: the next of its refined frames, or nothing to do
       const key = `${JSON.stringify(f)}|${scale}|${cssW}x${cssH}@${fullPx}|${parts.length}`;
@@ -774,12 +765,11 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
         // three.js counts the viewport from the bottom left
         const by0 = cssH - y - vh;
         rect(x, by0, vw, vh);
-        glow.material.uniforms.uAspect.value = vw / vh;
         renderer.render(backdrop, camera);
         renderer.clearDepth();
         // the shadow box covers what the camera sees round its target; drawn again only when something moved
         const r = camera.position.distanceTo(lookAt) * Math.tan((camera.fov * Math.PI) / 360) * 1.25;
-        const box = aimKey(part.key, studioAz, lookAt, r);
+        const box = aimKey(part.key, studioZ, lookAt, r, f.radius || r);
         const state = part.sp ? JSON.stringify(f.scenes ? f.scenes[part.row] : f.scene) : `${f.k},${f.bend},${f.heat ? `${f.heat.i0},${f.heat.i1},${f.heat.mix}` : ''}`;
         // while frames run slow (a replay on a weak graphics chip) the shadow waits, and catches up as soon as the
         // view rests

@@ -2,13 +2,13 @@
 // photographed studio (Poly Haven's Studio Small 08, CC0, see public/env/README.md) as image based light,
 // prefiltered with three.js's PMREM so a rough cast face and a polished pin each reflect it as they would,
 // on three.js's own physically based materials (MeshStandardMaterial and MeshPhysicalMaterial), tone mapped
-// with Khronos PBR Neutral so a stress map keeps its hues. The studio turns with the camera, so the big
-// softbox always lights the part from the front right, as a light kit that moves with the camera does.
-// Every material here is patched in the same three ways (onBeforeCompile): the light turned with the
-// camera, PBR Neutral, and a surface finish worked out from the run's material.
+// with Khronos PBR Neutral so a stress map keeps its hues. The studio and a key light stand where the gallery's
+// Cycles stills put theirs for the view the part opens on (blender/still.py), so the live view lights a part as
+// its card does. Every material here is patched in the same ways (onBeforeCompile): the turned studio, the key
+// light's fall off, PBR Neutral, and a surface finish worked out from the run's material.
 import {
   DataTexture, DataUtils, DirectionalLight, EquirectangularReflectionMapping, HalfFloatType, LinearFilter, Matrix3,
-  MeshDepthMaterial, PMREMGenerator, RGBADepthPacking, RGBAFormat, Vector3,
+  MeshDepthMaterial, PMREMGenerator, RGBADepthPacking, RGBAFormat, ShaderChunk, Vector3, Vector4,
 } from 'three';
 
 /** Uniforms every patched material shares: the studio's turn, its strength and the exposure. */
@@ -19,11 +19,25 @@ export const LOOK = {
   uSH: { value: Array.from({ length: 9 }, () => new Vector3()) },
   uEnvI: { value: 0.9 },
   uExposure: { value: 1.3 },
+  // the key light as the Cycles stills place it (blender/still.py light): where it stands in the world and the
+  // square of its distance to the view's target, and the way it faces, so it falls off with distance and off its
+  // axis as their disc light does while its shadow comes from the stage's directional light
+  uKey: { value: new Vector4(0, 0, 0, 0) },
+  uKeyAxis: { value: new Vector3(0, 0, -1) },
 };
 
-// The big octabox sits at u 0.65 of the photograph. Turned to u 0.4 it is up to the front right of the camera,
-// with the second box behind the camera on the left as a fill (u 0.25 is the camera's right, 0.5 behind it).
-const KEY_U = 0.65, KEY_AT = 0.4;
+/** A page color as the studio's view gives it: exposed and tone mapped with PBR Neutral, as sRGB bytes. */
+export function toned(rgb) {
+  const lin = rgb.map((c) => { const x = c / 255; return (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4) * LOOK.uExposure.value; });
+  const x = Math.min(...lin), off = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  // dark colors only: the highlight roll off never reaches them
+  return lin.map((c) => { const y = Math.max(c - off, 0); return Math.round(255 * (y <= 0.0031308 ? y * 12.92 : 1.055 * y ** (1 / 2.4) - 0.055)); });
+}
+
+// The big octabox, the photograph's brightest pixel, sits at u 0.646. Turned to u 0.361 it stands 50 degrees round
+// from the camera toward its right, where the Cycles stills turn it (blender/still.py hdri_rotation), with the
+// second box behind the camera on the left as a fill.
+const KEY_U = 0.646, KEY_AT = 0.361;
 
 /**
  * Set the studio for a view from azimuth az (about z, the camera's side of the part): z is up in every scene
@@ -196,6 +210,21 @@ vec3 getIBLAnisotropyRadiance(const in vec3 viewDir, const in vec3 normal, const
 #endif
 #endif`;
 
+// the key light falls off as a disc light at its place does: with the square of the distance and with the cosine
+// off its axis, from where it is toward each point, at the strength the stage gives it at the view's target
+const KEY = /* glsl */ `
+uniform vec4 uKey;
+uniform vec3 uKeyAxis;
+void keyAt(inout IncidentLight l, const in vec3 p) {
+  if (uKey.w <= 0.0) return;
+  vec3 d = (viewMatrix * vec4(uKey.xyz, 1.0)).xyz - p;
+  float d2 = max(dot(d, d), 1e-12);
+  l.direction = d * inversesqrt(d2);
+  l.color *= uKey.w / d2 * max(dot(-l.direction, normalize((viewMatrix * vec4(uKeyAxis, 0.0)).xyz)), 0.0);
+}`;
+const LIGHTS = ShaderChunk.lights_fragment_begin.replace('getDirectionalLightInfo( directionalLight, directLight );',
+  'getDirectionalLightInfo( directionalLight, directLight );\n\t\tkeyAt( directLight, geometryPosition );');
+
 /**
  * The ambient occlusion a resting view works out from its own depth (play-refine.js): tSSAO holds it one texel
  * per pixel of the stage's drawing, with the view depth it was worked out at, and uSSAO is one over the drawing's
@@ -237,6 +266,8 @@ export function studioShader(shader, ao) {
     .replace('#include <envmap_physical_pars_fragment>', IBL)
     .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb = pbrNeutral(gl_FragColor.rgb);')
     .replace('#include <common>', `#include <common>\n${NEUTRAL}\nuniform sampler2D tSSAO;\nuniform vec3 uSSAO;`)
+    .replace('#include <lights_pars_begin>', `#include <lights_pars_begin>\n${KEY}`)
+    .replace('#include <lights_fragment_begin>', LIGHTS)
     .replace('#include <aomap_fragment>', OCCLUSION);
   Object.assign(shader.uniforms, SSAO);
   // three.js hands onBeforeCompile the renderer as its second argument, which counts as asking for the occlusion
@@ -368,14 +399,17 @@ export function finishShader(shader, finish, mm) {
 
 
 // ---- the key light and its soft shadow ------------------------------------------------------------------
-// One accent light on top of the studio, where its big softbox is (front right, up), as Sketchfab advises: it
-// gives the part's own soft shadows, a rib across its base and a pin across its link, which image light alone
-// cannot. It moves with the camera like the studio, and its shadow covers what the camera sees.
+// One accent light on top of the studio, where the Cycles stills put theirs (blender/still.py light): up, to the
+// right of the camera and toward it, five times the scene's radius from the view's target, as bright there as
+// their disc light. It gives the part's own soft shadows, a rib across its base and a pin across its link, which
+// image light alone cannot. It stays where the view opened, as the studio does, and its shadow covers what the
+// camera sees.
 
 const _d = new Vector3();
+const KEY_I = 3;
 
 export function keyLight(size = 1024) {
-  const l = new DirectionalLight(0xffffff, 1.6);
+  const l = new DirectionalLight(0xffffff, KEY_I);
   l.castShadow = true;
   l.shadow.mapSize.set(size, size);
   l.shadow.radius = 4;
@@ -385,13 +419,17 @@ export function keyLight(size = 1024) {
 }
 
 /**
- * Put the key light up to the front right of a camera at azimuth az, where the studio's softbox is, its shadow
- * box r round target. Returns a key that changes only when the shadow has to be drawn again.
+ * Put the key light where the Cycles stills put theirs for a camera looking along -z (z the unit vector from the
+ * view's target to the camera the view opened on), R the scene's radius, its shadow box r round target. Returns a
+ * key that changes only when the shadow has to be drawn again.
  */
-export function aimKey(l, az, target, r) {
-  const s = Math.sin(az), c = Math.cos(az);
-  // half the camera's right (-sin, cos), more toward the camera (cos, sin), and up
-  _d.set(-0.5 * s + 0.6 * c, 0.5 * c + 0.6 * s, 0.62).normalize();
+export function aimKey(l, z, target, r, R) {
+  // still.py: (0.8 z + 0.9 x + 0.9 up) with x the camera's right, up cross z
+  const xl = Math.hypot(z[0], z[1]) || 1, x0 = -z[1] / xl, x1 = z[0] / xl;
+  _d.set(0.8 * z[0] + 0.9 * x0, 0.8 * z[1] + 0.9 * x1, 0.8 * z[2] + 0.9).normalize();
+  const D = 5 * R;
+  LOOK.uKey.value.set(target.x + _d.x * D, target.y + _d.y * D, target.z + _d.z * D, D * D);
+  LOOK.uKeyAxis.value.copy(_d).negate();
   l.position.copy(target).addScaledVector(_d, r * 3);
   l.target.position.copy(target);
   l.target.updateMatrixWorld();
@@ -402,7 +440,7 @@ export function aimKey(l, az, target, r) {
   l.shadow.bias = -0.0004;
   l.shadow.normalBias = r * 0.004;
   l.updateMatrixWorld();
-  return `${target.x.toPrecision(5)},${target.y.toPrecision(5)},${target.z.toPrecision(5)},${r.toPrecision(5)},${az}`;
+  return `${target.x.toPrecision(5)},${target.y.toPrecision(5)},${target.z.toPrecision(5)},${r.toPrecision(5)},${_d.x.toFixed(4)},${_d.y.toFixed(4)},${_d.z.toFixed(4)}`;
 }
 
 /**
