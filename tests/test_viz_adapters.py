@@ -279,6 +279,13 @@ def test_a_wiper_turns_at_its_motor_speed_for_each_drag(tmp_path):
     Q = array(h, blob, obj["crank"]["steady"]["cycle"]["quat"])
     turn = np.degrees(np.unwrap(2 * np.arctan2(Q[:, 3], Q[:, 0])))
     assert abs(abs(turn[-1] - turn[0]) - 355) < 6
+    # each drag's own run with the real motor is a motion, the asked drag's named, so a replay plays that drag's run
+    mo = h["motion"]
+    assert [v["at"] for v in mo["variants"]] == pytest.approx(sorted(sw["t"], key=lambda v: v != sw["t"][k]))
+    assert mo["variants"][mo["asked"]]["t"][-1] == pytest.approx(sw["runs"][k]["t"][-1] - sw["runs"][k]["t"][0])
+    for name in ("crank", "rocker", "wiper arm", "crank motor"):
+        assert len(obj[name]["tracks"]) == len(sw["t"]), name
+    assert obj["crank motor"]["track"]["value"]["values"][-1] is not None
 
 
 def _names(h):

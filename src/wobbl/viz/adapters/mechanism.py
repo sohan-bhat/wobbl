@@ -80,9 +80,9 @@ def build_sweep(out: Path, sw: dict) -> Path:
     shield = setting(s, out, sw, J, w, plane, reach, drawn)
     paths(s, sw, v, reach)
     sweep_readouts(s, sw, motors)
-    if not shield and pb:
+    if not sweep_motions(s, out, sw, drawn, pinned, motors, shield, reach) and not shield and pb:
         run_motion(s, out, pb, drawn, pinned, motors, reach)
-    elif pb:
+    if shield and pb:
         run_cycle(s, out, pb, sw, drawn, pinned, motors, shield, reach)
     for e in sw.get("events", []):
         s.event(float(e["t_s"]), e["name"], e.get("detail", ""), kind=e.get("kind", "info"))
@@ -348,6 +348,54 @@ def run_cycle(s, out, pb: dict, sw: dict, drawn: dict, pinned: dict, motors: lis
     s.steady(1.0, note=f"The {name} turns at the average speed its motor makes at each value of the slider, as the "
                       "sweep solved it, and every link takes the pose the run solved at each angle through the turn.")
     return True
+
+
+def sweep_motions(s, out, sw: dict, drawn: dict, pinned: dict, motors: list[dict], shield, reach: float) -> bool:
+    """Each value's own run with the real motors as it happened (sweep.json runs) as a motion of the scene, the
+    asked value's first, in real time: every geom on its recorded pose, the pins and motors riding their joints and
+    each motor and the link it drives colored by its share of what the motor can give at each moment, and a wiper's
+    arm and blade on the output link. A view replays whichever value its slider stands at. False when the sweep
+    kept no runs."""
+    runs = sw.get("runs") or []
+    v = np.asarray(sw["t"], float)
+    if len(runs) != len(v) or not len(v):
+        return False
+    k = int(np.argmin(np.abs(v - float(sw["manifest"]["input"].get("design", v[0])))))
+    fixed = [b for b in sw.get("bodies", []) if b.get("static")]
+    made = False
+    for i in [k] + [j for j in range(len(v)) if j != k]:
+        r = runs[i]
+        t = np.asarray(r.get("t") or [], float)
+        n = len(t)
+        if n < 3 or np.any(np.diff(t) <= 0):
+            continue
+        s.motion(t - t[0], t - t[0], label="time", unit="s", at=float(v[i]),
+                 note="The run with the real motors at this value, as it solved it, in real time.")
+        made = True
+        for name, b in r["bodies"].items():
+            if name in drawn and np.shape(b["pos"]) == (n, 3):
+                drawn[name].track(pos=b["pos"], quat=b["quat"])
+        J = joint_poses(out, {"t": list(t), "bodies": fixed + [{"name": nm, **b} for nm, b in r["bodies"].items()]})
+        for name, body in pinned.items():
+            g = J.get(name)
+            if g is not None:
+                body.track(pos=g["anchor"], quat=_along(g["axis"]))
+        for d in motors:
+            g = J.get(d["name"])
+            if g is None or d["body"] is None:
+                continue
+            pos, quat, spos, squat = motor_pose(g, reach)
+            share = np.asarray(r.get("share", {}).get(d["name"], []), float)
+            share = share * 100 if len(share) == n else None
+            d["body"].track(pos=pos, quat=quat, field=share)
+            d["shaft"].track(pos=spos, quat=squat)
+            if d.get("link") is not None and share is not None:
+                d["link"].track(field=share)
+        if isinstance(shield, dict) and shield["link"] in r["bodies"]:
+            (ap, aq), (bp, bq) = shield["frames"](r["bodies"][shield["link"]]["quat"])
+            shield["arm"].track(pos=ap, quat=aq)
+            shield["blade"].track(pos=bp, quat=bq)
+    return made
 
 
 def windows(v) -> list[tuple]:

@@ -412,12 +412,10 @@ def _body(out, o, st, c, inp, runs):
     s.field("speed", "m/s", colormap="viridis", range=[0, max(vt or 0, vmax)], limit=vt,
             limit_label="terminal speed" if vt else "")
     di = int(np.argmin(np.abs(inp.values - inp.design)))
-    asked = None
+    paths = []
     for i, (r, (a, b)) in enumerate(zip(runs, win)):
-        ln = s.lines([np.c_[r.x, np.zeros(len(r.x)), r.z + R]], values=[r.speed], field="speed", unit="m/s",
-                     width=2.4, name="path").show(a, b)
-        if i == di:
-            asked = ln
+        paths.append(s.lines([np.c_[r.x, np.zeros(len(r.x)), r.z + R]], values=[r.speed], field="speed", unit="m/s",
+                             width=2.4, name="path").show(a, b))
 
     # the body where it lands, and a ghost of it where it started
     hit = np.array([[r.x[-1], 0, R] for r in runs])
@@ -463,8 +461,14 @@ def _body(out, o, st, c, inp, runs):
     s.ground(0.0, size=ground, grid=F.nice_step(ground, 14), center=(float(hit[:, 0].mean()) - ground * 0.15, 0.0))
     s.label("{impact speed}", [0, 0, R * 3], follow=rk, kind="peak")
 
-    landed = _body_motion(s, runs[di], rk, asked, R, dropped)
-    s.readout("impact speed", _num(runs, "impact_speed_mps"), unit="m/s", digits=3, motion=landed)
+    # the fall at every value as its own motion, the asked one first, so a replay drops it from the slider's height
+    landed = [(j, _body_motion(s, runs[j], rk, paths[j], R, dropped, at=float(inp.values[j])))
+              for j in [di] + [j for j in range(n) if j != di]]
+    landed = [x for x in landed if x[1] is not None]
+    s.readout("impact speed", _num(runs, "impact_speed_mps"), unit="m/s", digits=3)
+    for k, (_, v) in enumerate(landed):
+        s.select_motion(k)
+        s.readout_motion("impact speed", v)
     s.readout("fall time" if dropped else "flight time", _num(runs, "flight_time_s"), unit="s", digits=3)
     if "vacuum_speed_mps" in runs[0].numbers and dropped:
         s.readout("without air", _num(runs, "vacuum_speed_mps"), unit="m/s", digits=3)
@@ -483,7 +487,7 @@ def _body(out, o, st, c, inp, runs):
     return s.save(out)
 
 
-def _body_motion(s, r, body, path, R: float, dropped: bool):
+def _body_motion(s, r, body, path, R: float, dropped: bool, at: float | None = None):
     """The fall or flight at the asked value as the scene's motion: the body along its solved path from release to
     the ground, the path tracing itself behind it, and its height and speed said at each moment. A fall of a few
     seconds plays in real time; a longer one faster by a round factor, so it plays in about five seconds. Returns
@@ -494,8 +498,8 @@ def _body_motion(s, r, body, path, R: float, dropped: bool):
     tau = np.unique(np.r_[np.linspace(0, t[-1], 120), t[-1]])
     fast = 1.0 if t[-1] <= 5.0 else min((c for c in (2.0, 5.0, 10.0, 20.0, 50.0, 100.0)),
                                          key=lambda c: abs(np.log(t[-1] / c / 4.5)))
-    s.motion(tau, tau / fast, label="time", unit="s",
-             note=f"The body {'falls' if dropped else 'flies'} its solved path at the asked value"
+    s.motion(tau, tau / fast, label="time", unit="s", at=at,
+             note=f"The body {'falls' if dropped else 'flies'} its solved path at the value it was flown at"
                   f"{', in real time' if fast == 1 else ''}.")
     x, z = np.interp(tau, t, r.x), np.interp(tau, t, r.z)
     body.track(pos=np.c_[x, np.zeros(len(tau)), z + R])
