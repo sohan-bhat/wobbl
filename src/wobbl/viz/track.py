@@ -163,4 +163,26 @@ def motion_header(s) -> dict | None:
     return m
 
 
-__all__ = ["Steady", "Track", "lowrank", "motion_header", "steady_header"]
+__all__ = ["Steady", "Track", "lowrank", "motion_header", "round_slow", "slower", "steady_header"]
+
+
+def slower(slow: float) -> str:
+    """The words for a clock slow times slower than real time, as the view says them: in real time, shown 200 times
+    slower, shown 10 trillion times slower, shown 5 times faster."""
+    r = slow if slow >= 1 else 1 / slow
+    if abs(r - 1) < 1e-9:
+        return "in real time"
+    for big, word in ((1e15, "quadrillion"), (1e12, "trillion"), (1e9, "billion"), (1e6, "million")):
+        if r >= big:
+            n = f"{r / big:.3g} {word}"
+            break
+    else:
+        n = f"{float(f'{r:.2g}') if r >= 100 else round(r):,.0f}"
+    return f"shown {n} times {'slower' if slow >= 1 else 'faster'}"
+
+
+def round_slow(x: float) -> float:
+    """The round factor, 1, 2 or 5 times a power of ten, nearest x on a log scale, as the view's own nice()."""
+    import math
+    e = math.floor(math.log10(x))
+    return min((c * 10.0 ** k for k in (e - 1, e, e + 1) for c in (1, 2, 5)), key=lambda c: abs(math.log(c / x)))

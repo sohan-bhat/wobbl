@@ -197,7 +197,8 @@ def _modes(pb: dict, o: dict, el, pos, vib, name):
     """A molecule to drive by hand: the slider steps through its vibration modes, and within each one swings it
     from one turning point through its rest shape to the other. Atoms are colored by their partial charge, so
     the view reads each atom's charge under the pointer, and the readouts give the mode's frequency and IR
-    strength. Nothing moves until the slider does."""
+    strength. At whatever swing the slider sets, the molecule keeps vibrating through it at the mode's own
+    frequency, on one clock slowed so the modes in the middle of its range swing about once a second."""
     from .sweep import mode_inputs, swings
     vib = sorted(vib, key=lambda v: v.get("frequency_cm") or 0)
     amps = swings()
@@ -218,18 +219,21 @@ def _modes(pb: dict, o: dict, el, pos, vib, name):
                design=best + 1 + 0.4 * amps[-1],
                note="Whole numbers are the modes in order of frequency. Either side of one is its swing.")
     q = pb.get("charges")
+    moving = []
     if q is not None and len(q) == len(el):
         q = np.array(q, float)
         span = max(float(np.abs(q).max()), 0.05)
-        _balls(s, el, P, q, field="partial charge", unit="e", colormap="coolwarm", vrange=(-span, span),
-               limit=0.5, limit_label="an ionic charge", name=name, digits=3)
+        moving.append(_balls(s, el, P, q, field="partial charge", unit="e", colormap="coolwarm",
+                             vrange=(-span, span), limit=0.5, limit_label="an ionic charge", name=name, digits=3))
         s.note("Atoms are colored by partial charge, red positive and blue negative.")
     else:
         s.atoms(el, P, bonds=_bonds(pb), name=name)
     b = _bonds(pb)
     if q is not None and b is not None:
-        _sticks(s, P, b, name="bonds")
+        moving.append(_sticks(s, P, b, name="bonds"))
     nf = len(amps)
+    vibrate(s, [m for m in moving if m is not None and m.dfm],
+            np.repeat([abs(v.get("frequency_cm") or 0) for v in vib], nf))
     s.readout("frequency", np.repeat([v.get("frequency_cm") or 0 for v in vib], nf), unit="cm-1", digits=4)
     s.readout("IR strength", np.repeat([v.get("intensity_km_mol") or 0 for v in vib], nf), unit="km/mol",
               digits=3)
@@ -248,6 +252,26 @@ def _modes(pb: dict, o: dict, el, pos, vib, name):
                       {"name": "Top", "target": c, "dir": (0.01, -0.05, 1), "dist": size * 2.4},
                       {"name": "Side", "target": c, "dir": (1, 0, 0.1), "dist": size * 2.4}])
     return s
+
+
+C_CM = 2.99792458e10          # the speed of light in cm/s, which takes a wavenumber to a frequency
+
+
+def vibrate(s, meshes, wavenumber) -> None:
+    """Keep each mesh swinging through the shape the slider draws at the frequency of the mode there (wavenumber,
+    cm-1, per timeline frame), on one clock slowed by a round factor that swings the modes in the middle of the
+    range, by geometric mean, about once a second, so a slow twist and a fast stretch show their own pace."""
+    f = np.asarray(wavenumber, float) * C_CM
+    if not meshes or not (f > 0).any():
+        return
+    f = np.where(f > 0, f, f[f > 0].min())
+    mid = float(np.exp(np.mean(np.log(np.unique(f)))))
+    from ..viz.track import round_slow, slower
+    slow = round_slow(mid)
+    for m in meshes:
+        m.swing(f)
+    s.steady(slow, note="The molecule vibrates through the swing the slider sets at the frequency of its mode, "
+                        f"every mode on one clock {slower(slow)}.")
 
 
 def _strained(pb: dict, o: dict, el, eos: dict, name: str, reps: int = 2):

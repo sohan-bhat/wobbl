@@ -122,6 +122,9 @@ export function rateText(slow) {
   // two figures past a hundred, as the clock's own rate read between its frames wavers in the last digit
   const r = slow >= 1 ? slow : 1 / slow, k = r >= 100 ? +r.toPrecision(2) : Math.round(r);
   if (k === 1) return 'in real time';
+  // a molecule's clock, trillions of times slower, in words
+  const big = [[1e15, 'quadrillion'], [1e12, 'trillion'], [1e9, 'billion'], [1e6, 'million']].find(([b]) => r >= b);
+  if (big) return `shown ${+(r / big[0]).toPrecision(3)} ${big[1]} times ${slow >= 1 ? 'slower' : 'faster'}`;
   return `shown ${k.toLocaleString('en-US')} times ${slow >= 1 ? 'slower' : 'faster'}`;
 }
 

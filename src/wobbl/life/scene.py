@@ -145,7 +145,8 @@ def keep_moving(s, part, fe, freqs, lead, x, design: float, zeta: float, turn: i
     f = float(drive[k0])
     if not (f > 0) or not (drive > 0).all():
         return
-    slow = min((c * 10.0 ** e for e in range(-3, 16) for c in (1, 2, 5)), key=lambda c: abs(math.log(c / f)))
+    from ..viz.track import round_slow, slower
+    slow = round_slow(f)
     what = s.tl.get("label", "input")
     part.swing(drive)
     words = f"The part swings in the shape it takes at each {what}, at the frequency that drives it there"
@@ -156,11 +157,7 @@ def keep_moving(s, part, fe, freqs, lead, x, design: float, zeta: float, turn: i
                    else [0.18 * span, 0.004 * span], pos=at, color="#2b2e33", name="rotor", prop=True)
         r.spin(fe[turn], axis=(0, 0, 1)).ride(part)
         words += ", and the rotor turns at the speed the slider sets, both"
-    s.steady(slow, note=f"{words} {_slower(slow)}.")
-
-
-def _slower(slow: float) -> str:
-    return f"shown {slow:,.0f} times slower" if slow >= 1 else f"shown {1 / slow:,.0f} times faster"
+    s.steady(slow, note=f"{words} {slower(slow)}.")
 
 
 def vibration(out: Path, mesh, modes, picks: list[int], labels: dict, verdict: str, headline: str, title: str,
