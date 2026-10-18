@@ -2,9 +2,9 @@
 // load ramps from zero to the run's load and, since the models are linear elastic, every stress and
 // displacement grows in step with it, so each frame is exact. A heat run plays its saved temperature
 // fields on a sped up clock. A scene run's input ramps from its first value to the value its question
-// asked about, once, and then the slider under the view moves it, with a probe under the mouse. The part
-// loads once the figure comes near the screen and plays once it is
-// on screen; it pauses off screen and in a hidden tab. With reduced motion, without WebGL or before
+// asked about, and the slider under the view moves it, with a probe under the mouse. Each view opens on the
+// case its question asked about and Replay plays the run up to it. The part loads once the figure comes near
+// the screen and starts once it is on screen; it pauses off screen and in a hidden tab. With reduced motion, without WebGL or before
 // the script runs, the figure keeps Wobbl's own heatmap and the final numbers. Nothing here reads or
 // writes the URL. initLiveRuns returns a function that tears everything down when the page is left.
 import { Orbit, orbitControls } from './orbit.js';
@@ -29,7 +29,7 @@ interface Data {
   panes: PaneData[];
 }
 
-const LEAD = 0.6; // seconds the part sits unloaded, or at the start of the clock, before the run plays
+const LEAD = 0.6; // seconds a replay holds the part unloaded, or at the start of the clock, before the run plays
 const NB = ' ';
 
 /** 1234.5 as "1,234.5", without Intl, as reading.ts does. */
@@ -547,6 +547,23 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     requestDraw();
     if (visible && !document.hidden) play();
   }
+  // the view opens on the case its question asked about, as its still and the gallery's card show it: a scene at
+  // the asked value, a strength part under its full load, a heat part at the end of its clock. Replay plays the run
+  // up to it from the start. A scene's motion, which plays at the asked value, opens on its first moment and plays.
+  const opensAsked = () => !shown.some((pi) => motionOf(pi));
+  function openAsked() {
+    pause();
+    t = LEAD + duration;
+    free = false;
+    mt.fill(NaN);
+    started = true;
+    done = true;
+    replay.hidden = false;
+    finalState();
+    sayEnd();
+    requestDraw();
+    flowLoop();
+  }
   const canGo = () => visible && !document.hidden;
   function maybeStart() {
     if (!ready || !canGo()) return;
@@ -557,7 +574,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       setTimeout(() => { if (ready) view.dataset.state = 'live'; }, 320);
       if (tag) tag.hidden = false;
       status.textContent = '';
-      restart();
+      if (opensAsked()) openAsked(); else restart();
     } else if (!done) {
       play();
     }
@@ -715,7 +732,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
         if (abort.signal.aborted || b.getAttribute('aria-pressed') !== 'true') return;
         showPane(1, pi);
         if (sceneRun) pos[1] = homeOf(pi);
-        restart();
+        if (opensAsked()) openAsked(); else restart();
       });
     }
   }

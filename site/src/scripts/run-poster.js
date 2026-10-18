@@ -1,9 +1,9 @@
 // The stills of a run's view on its example page, drawn at build time by scripts/posters.mjs in headless Chrome
 // with what the live view draws with: the stage (play-draw.js), lit by the studio and dressed with the Blender
 // models as play-back.ts does it, and the camera and frames of run-view.js. A page's still is the first frame its
-// live view shows, the frame the view sits on before its replay runs: a strength part unloaded, a heat part at the
-// start of its clock, a scene at the start of its input, all from the camera the view opens on. A scene's card is
-// the same view at the value its question asked about, for the gallery and a page that has no 3D view.
+// live view shows, the case its question asked about: a strength part under its full load, a heat part at the end
+// of its clock, a scene at the asked value or a scene's motion at its first moment, all from the camera the view
+// opens on. A scene's card is the same view at the asked value, for the gallery and a page that has no 3D view.
 // scripts/posters.mjs bundles this file on its own; the pages never load it.
 import { createStage } from './play-draw.js';
 import { loadRun } from './play.js';
@@ -17,35 +17,15 @@ async function addPane(stage, root, pane, top, row) {
   const models = loadModels(root, pane.run.example).catch(() => null);
   const { arrays } = await loadRun(pane.file, pane.run);
   const part = stage.add({ run: pane.run, arrays, top, row });
-  if (pane.run.kind === 'heat') evenStart(part, pane.run, arrays);
   stage.dress(part, await models);
   return part;
-}
-
-/**
- * A heat part all at one temperature when its clock starts, as a part at the air's temperature is, drawn as a
- * graphics card draws it. The isotherms' test then finds a line of no width: on the card a temperature right on
- * an isotherm darkens the whole part as a line and any other leaves it clear, while software WebGL, which reads
- * the one temperature back a hair off across each face, would draw speckle. So the still gives the test exactly
- * zero where the card draws the line, and no isotherms where it draws none.
- */
-function evenStart(part, run, arrays) {
-  let rise = 0;
-  if (run.transient) {
-    const n = arrays.position.length / 3, f = arrays.frames;
-    for (let i = 1; i < n; i++) if (f[i] !== f[0]) return;
-    rise = f[0];
-  } else if (interp(run.warmup.t_s, run.warmup.theta, 0) !== 0) return;
-  const u = part.uniforms, iso = u.uIso.value, at = (run.air_C + rise) / iso;
-  if (iso > 0 && Math.abs(at - Math.round(at)) < 1e-6) { u.uAir.value = -rise; u.uIso.value = 1; }
-  else u.uIso.value = 0;
 }
 
 /**
  * Draw a view w by h CSS pixels, px device pixels each, with the panes the page can show in it: the first pane,
  * and beside it the one at fix (or each of the others in turn, as the page's buttons choose them). Returns a WebP
  * data URL of every pane in its own place in the view, scaled by scale. at is 'start' for the page's still, the
- * view before its replay runs, or 'home' for a scene's card, the view once it has run.
+ * view as the page opens it, or 'home' for a scene's card, the view at the asked value without its motion.
  */
 globalThis.drawRunStills = async ({ base, kind, panes, fix, w, h, px, at = 'start', scale = 1, quality = 0.86 }) => {
   const canvas = document.createElement('canvas');
@@ -72,8 +52,8 @@ globalThis.drawRunStills = async ({ base, kind, panes, fix, w, h, px, at = 'star
       second = c > 0 ? await addPane(stage, root, abs[c], top, 1) : null;
       stage.compile();
       const views = paneViews(shown.length, w, h), runs = shown.map((i) => panes[i].run);
-      // the live view builds at the value each pane stands at once played, and draws that once before its replay
-      // starts, which sets where the studio stands (play-draw.js), then the replay starts it from the beginning
+      // the live view builds at the value each pane stands at once played and draws that, which sets where the studio
+      // stands (play-draw.js)
       let pos = shown.map((i) => (scene ? homeOf(i) : 0));
       const orbit = newOrbit(rv);
       homeView(orbit, rv, views[0][2], views[0][3], pos[0]);
@@ -81,17 +61,18 @@ globalThis.drawRunStills = async ({ base, kind, panes, fix, w, h, px, at = 'star
       // (run-view.js motionView), as the live view holds it before the motion plays
       const rest = { target: [...orbit.target], dist: orbit.dist, far: orbit.far, maxDist: orbit.maxDist };
       let mts = null;
+      // the page opens a strength or heat part on the end of its run, under the full load or at the end of its clock
+      const lead = rv.lead, span = lead.times_s ? lead.times_s[lead.times_s.length - 1] : lead.warmup ? lead.warmup.t_s[lead.warmup.t_s.length - 1] : 1;
       const frame = () => {
         if (mts && runs[0].motion) motionView(orbit, rv, rest, runs[0], mts[0], views[0][2], views[0][3]);
-        // at the start of a replay the load is zero and the clock at its start, however long the clock runs
-        const f = runFrame(rv, orbit, views, 0, look.bend, 1);
+        const f = runFrame(rv, orbit, views, 1, look.bend, span);
         f.ft = 0;
         return scene ? sceneFrame(f, orbit, rv, runs, pos, views, look, [], mts) : f;
       };
       stage._frame(frame());
       if (at === 'start') {
         const moving = runs.map((r) => (r.motion && r.motion.t ? r.motion : null));
-        pos = shown.map((i, row) => (moving[row] ? moving[row].at ?? homeOf(i) : 0));
+        pos = shown.map((i, row) => (moving[row] ? moving[row].at ?? homeOf(i) : homeOf(i)));
         mts = moving.some(Boolean) ? moving.map((m) => (m ? m.t[0] : NaN)) : null;
         stage._frame(frame());
       }
