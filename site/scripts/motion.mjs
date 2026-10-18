@@ -69,7 +69,7 @@ function variantPlay(h, arr, vi, { q, also, tPos, follow }) {
     at: r6(mo.at !== undefined ? tPos(mo.at) : design !== undefined ? tPos(design) : h.timeline.frames - 1),
   };
   // every tracked solid the run is about, at each motion frame: its points where they are and its field's peak
-  const solids = h.objects.map((o, oi) => ({ o, oi })).filter(({ o }) => trk(o) && !skipped(o) && (o.kind === 'mesh' || o.kind === 'body'));
+  const solids = h.objects.map((o, oi) => ({ o, oi })).filter(({ o }) => trk(o) && !skipped(o) && !o.prop && (o.kind === 'mesh' || o.kind === 'body'));
   const lo = Array.from({ length: M }, () => [Infinity, Infinity, Infinity]), hi = Array.from({ length: M }, () => [-Infinity, -Infinity, -Infinity]);
   const peaks = new Array(M).fill(null), fpeak = new Array(M).fill(NaN);
   // what a follow view keeps in frame at each motion frame: the followed group and anything with a window of its own

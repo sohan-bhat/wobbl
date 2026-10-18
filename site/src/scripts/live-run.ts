@@ -561,6 +561,15 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     pause();
     done = true;
     replay.hidden = !replays;
+    // what keeps moving on the steady clock (a linkage turning with its motor) takes over from the replay's last
+    // moment, so the view goes back to the input's frames and its rest framing
+    if (sceneRun && mo0 && shown.some((pi) => steadyOf(pi))) {
+      free = true;
+      mt.fill(NaN);
+      if (rest) { Object.assign(orbit!, { target: [...rest.target], dist: rest.dist }); orbit?.update(); }
+      readings(1);
+      requestDraw();
+    }
     sayEnd();
     flowLoop();
   }
@@ -605,8 +614,12 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     const pi = shown[0], p = pos[0];
     let text = 'Replay';
     if (mo0) {
-      const v = nearestVariant(pi, p), at = v ? v.at : asked0[pi]?.at ?? homeOf(pi);
-      text = `Replay at ${valueWords(pi, at)}`;
+      // each pane's own value, as dry and wet glass side by side each replay their own run
+      const words = shown.map((pj, row) => {
+        const v = nearestVariant(pj, pos[row]), at = v ? v.at : asked0[pj]?.at ?? homeOf(pj);
+        return valueWords(pj, at);
+      }).filter((w, i, all) => all.indexOf(w) === i);
+      text = `Replay at ${words.join(' and ')}`;
     } else if (ramp === 'load') text = `Load to ${valueWords(pi, p)}`;
     else if (ramp === 'heat') text = `Steady states to ${valueWords(pi, p)}`;
     put(replay, text);
@@ -615,10 +628,10 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       : 'Steps through the steady temperature the part settles at for each heat load up to this one, not a warm up in time';
   }
   /** Each pane's motion for a replay from where the slider stands: the one a sweep kept nearest it, fetched once. */
-  async function pickMotions(): Promise<boolean> {
+  async function pickMotions(ps: number[] = pos): Promise<boolean> {
     let ok = true;
     for (const [row, pi] of shown.entries()) {
-      const v = nearestVariant(pi, pos[row]), run = data.panes[pi].run;
+      const v = nearestVariant(pi, ps[row]), run = data.panes[pi].run;
       if (!v || v.asked) { run.motion = asked0[pi]; continue; }
       if (!variantFiles.has(pi)) {
         variantFiles.set(pi, fetch(new URL(`${data.panes[pi].file}.motions.json`, location.href).href)
@@ -635,7 +648,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   async function replayHere() {
     if (sceneRun && mo0) {
       await pickMotions();
-      duration = motionSeconds(data.panes[shown[0]].run.motion);
+      duration = Math.max(...shown.map((pi) => motionSeconds(data.panes[pi].run.motion)));
     } else if (sceneRun) shown.forEach((pi, row) => { goal[row] = pos[row]; });
     // the camera starts the motion from where it stands at rest, with no zoom of the last motion carried over
     if (sceneRun && mo0 && rest) { Object.assign(orbit!, { target: [...rest.target], dist: rest.dist }); motionSet = 0; }
@@ -682,7 +695,16 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       setTimeout(() => { if (ready) view.dataset.state = 'live'; }, 320);
       if (tag) tag.hidden = false;
       status.textContent = '';
-      if (opensAsked()) openAsked(); else restart();
+      if (opensAsked()) openAsked(); else {
+        restart();
+        // panes that stand at other values than the asked one (dry and wet glass side by side) each play the motion
+        // kept at their own value, which every run starts the same way, so the frame the view opens on is the same
+        if (shown.some((pi) => Math.abs((asked0[pi]?.at ?? homeOf(pi)) - homeOf(pi)) > 1e-6)) {
+          pickMotions(shown.map(homeOf)).then(() => {
+            duration = Math.max(...shown.map((pi) => motionSeconds(data.panes[pi].run.motion)));
+          }).catch(() => {});
+        }
+      }
     } else if (!done) {
       play();
     }

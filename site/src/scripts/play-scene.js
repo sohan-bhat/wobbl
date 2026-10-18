@@ -635,6 +635,22 @@ export function sceneParts({ arrays, run }) {
     }
     return steadyItems.map((it) => it.ph.toFixed(5)).join(',');
   }
+  // the pose each link last took over a motion, for alignCycles
+  let wasMf = false;
+  const qdot = (Q, j, q) => Math.abs(Q[j * 4] * q[0] + Q[j * 4 + 1] * q[1] + Q[j * 4 + 2] * q[2] + Q[j * 4 + 3] * q[3]);
+  /** Set the phase of every link on a cycle to where the motion that just ended left them: the cycle's pose nearest
+   * the last pose of the link whose cycle turns furthest (a crank, which takes each pose once a turn). */
+  function alignCycles() {
+    const cyc = steadyItems.filter((it) => it.d.cycle && it.lastTrack);
+    if (!cyc.length) return;
+    const turn = (cy) => { let m = 1; for (let j = 0; j < cy.n; j++) m = Math.min(m, qdot(cy.quat, j, [cy.quat[0], cy.quat[1], cy.quat[2], cy.quat[3]])); return 1 - m; };
+    const lead = cyc.reduce((x, y) => (turn(y.d.cycle) > turn(x.d.cycle) ? y : x));
+    const cy = lead.d.cycle, q = lead.lastTrack.q;
+    let best = 0;
+    for (let j = 1; j < cy.n; j++) if (qdot(cy.quat, j, q) > qdot(cy.quat, best, q)) best = j;
+    const rate = JSON.stringify(lead.o.steady.rate);
+    for (const it of steadyItems) if (it.d.cycle && JSON.stringify(it.o.steady.rate) === rate) it.ph = best / cy.n;
+  }
 
   let key = '';
   function set(f) {
@@ -644,6 +660,9 @@ export function sceneParts({ arrays, run }) {
     // (a sweep that kept the event at several values plays the one at f.mv)
     const mo = motionOf(h, f.mv), mf = mo && Number.isFinite(f.m) ? motionFrame(mo, f.m) : null;
     for (const fl of flows) fl.at(a, b, k);
+    // a linkage that turned through a replay goes on turning from where the replay left it
+    if (wasMf && !mf) alignCycles();
+    wasMf = !!mf;
     // the steady clock: each object's phase turned on by its rate at the slider's value over the clock's slowed time
     const ph = steadyStep(f, a, b, k);
     const next = `${a},${b},${k.toFixed(5)},${t},${bend},${mag},${tube},${mf ? `${f.m},${f.mv}` : ''},${ph}`;
@@ -663,11 +682,15 @@ export function sceneParts({ arrays, run }) {
       else if (uni && o.glow) uni.uGlow.value = series(o.glow, a, b, k) * 0.85;
       if (o.kind === 'mesh') {
         meshFrame(it, a, b, k, bend, mf, tr);
-        const pose = (tr && trackPose(tr, mf)) || (it.d.cycle && cyclePose(it.d.cycle, it.ph)) || poseAt(it.d.pp, it.d.pq, a, b, k);
+        const tp = tr && trackPose(tr, mf);
+        if (tp) it.lastTrack = tp;
+        const pose = tp || (it.d.cycle && cyclePose(it.d.cycle, it.ph)) || poseAt(it.d.pp, it.d.pq, a, b, k);
         if (pose) place(it.mesh, it, pose, mag);
       } else if (o.kind === 'body') {
         const sz = tr && trackSize(tr, mf, o.size.length);
-        place(it.mesh, it, (tr && trackPose(tr, mf)) || (it.d.cycle && cyclePose(it.d.cycle, it.ph)) || poseAt(it.d.pp, it.d.pq, a, b, k), mag, sz && sizeScale(o.shape, o.size, sz));
+        const tp = tr && trackPose(tr, mf);
+        if (tp) it.lastTrack = tp;
+        place(it.mesh, it, tp || (it.d.cycle && cyclePose(it.d.cycle, it.ph)) || poseAt(it.d.pp, it.d.pq, a, b, k), mag, sz && sizeScale(o.shape, o.size, sz));
         if (it.f) {
           // a body colored by one value: its value at the motion's moment while it plays (a motor's torque), else
           // at the input's frame
