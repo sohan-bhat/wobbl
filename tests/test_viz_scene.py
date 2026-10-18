@@ -148,3 +148,30 @@ def test_steady_motions_keep_a_rate_per_input_frame_on_one_clock():
     assert cy["rate"] == [0.75] and np.abs(array(h, blob, cy["cycle"]["pos"])[:, 0] - np.cos(ang)).max() < 1e-4
     Q = array(h, blob, cy["cycle"]["quat"])
     assert (np.sum(Q[1:] * Q[:-1], axis=1) > 0).all()
+
+
+def test_a_sweep_keeps_the_event_at_each_value_it_solved():
+    s = Scene("drops", domain="test")
+    s.timeline([0.5, 1.0, 2.0], unit="m", label="drop height", kind="input", design=1.0)
+    s.readout("impact speed", [3.1, 4.4, 6.3], unit="m/s")
+    b = s.body("sphere", [0.1], name="ball")
+    for h in (0.5, 1.0, 2.0):
+        tf = np.sqrt(2 * h / 9.81)
+        t = np.linspace(0, tf, 5)
+        s.motion(t, t, at=h)
+        b.track(pos=np.c_[0 * t, 0 * t, h - 0.5 * 9.81 * t * t])
+        s.readout_motion("impact speed", 9.81 * t)
+        s.motion_readout("height", h - 0.5 * 9.81 * t * t, unit="m")
+    with pytest.raises(ValueError):
+        s.motion([0.0, 1.0], [0.0, 1.0], at=2.0)         # one motion a value
+    h, blob = load(s.to_bytes())
+    mo = h["motion"]
+    assert [v["at"] for v in mo["variants"]] == [0.5, 1.0, 2.0] and mo["asked"] == 1 and mo["at"] == 1.0
+    assert mo["t"][-1] == pytest.approx(np.sqrt(2 / 9.81), rel=1e-6)
+    o = h["objects"][0]
+    assert len(o["tracks"]) == 3 and o["track"] == o["tracks"][1]
+    top = [array(h, blob, tr["pos"])[0, 2] for tr in o["tracks"]]
+    assert top == pytest.approx([0.5, 1.0, 2.0], abs=1e-4)
+    r = h["readouts"][0]
+    assert len(r["motions"]) == 3 and r["motion"] == r["motions"][1]
+    assert [v["readouts"][0]["values"][0] for v in mo["variants"]] == [0.5, 1.0, 2.0]

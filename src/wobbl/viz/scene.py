@@ -65,6 +65,8 @@ class Scene:
         self.mag: dict | None = None
         self.mo: dict = {}
         self.mo_n = 0
+        self.mos: list[dict] = []      # every motion: its header, frame count and the input value it plays at
+        self.mi = -1                   # the motion tracks and motion readouts go to now
         self.st: dict = {}
 
     # time
@@ -92,21 +94,45 @@ class Scene:
             self.tl["note"] = note
         return self
 
-    def motion(self, t, play, *, label: str = "time", unit: str = "s", note: str = "") -> "Scene":
+    def motion(self, t, play, *, label: str = "time", unit: str = "s", note: str = "", at=None) -> "Scene":
         """The physical event at the input value the question asked about (the timeline's design value), played on
         its own clock: t holds each motion frame's physical time and play the playback second it is shown at, rising
         from 0, so a slow motion stretch is one where play moves faster than t. Objects follow it through their
-        track() and readouts through readout(..., motion=). See track.py."""
+        track() and readouts through readout(..., motion=). See track.py.
+
+        A sweep that solved the event at other values too gives each its own motion: call motion again with at, the
+        input value it plays at, and give the tracks and motion readouts that follow it, so a view can play the
+        event at whichever value its slider stands at. The motion at the design value (or the first without at) is
+        the asked one."""
         t, play = np.asarray(t, float).ravel(), np.asarray(play, float).ravel()
         if len(t) != len(play) or len(t) < 2:
             raise ValueError("motion: t and play need the same length, at least 2")
         if np.any(np.diff(t) <= 0) or np.any(np.diff(play) <= 0) or play[0] != 0:
             raise ValueError("motion: t and play must rise frame to frame, and play must start at 0")
+        if at is not None and any(m["at"] is not None and abs(m["at"] - float(at)) <= 1e-12 * max(1.0, abs(float(at)))
+                                  for m in self.mos):
+            raise ValueError(f"motion: there is a motion at {at} already")
         self.mo_n = len(t)
         self.mo = {"t": _fl(t, 9), "play": _fl(play, 6), "label": label, "unit": unit}
         if note:
             self.mo["note"] = note
+        self.mos.append({"mo": self.mo, "n": self.mo_n, "at": None if at is None else float(at)})
+        self.mi = len(self.mos) - 1
         return self
+
+    def design_motion(self) -> int:
+        """Which motion is the asked one: the one at the design value, else the one given without at, else the
+        nearest the design value, else the first."""
+        if not self.mos:
+            return -1
+        d = self.tl.get("design")
+        free = [i for i, m in enumerate(self.mos) if m["at"] is None]
+        if d is not None:
+            near = min((i for i, m in enumerate(self.mos) if m["at"] is not None), default=None,
+                       key=lambda i: abs(self.mos[i]["at"] - d))
+            if near is not None and (not free or abs(self.mos[near]["at"] - d) <= 1e-9 * max(1.0, abs(d))):
+                return near
+        return free[0] if free else 0
 
     def steady(self, slow, *, note: str = "") -> "Scene":
         """The scene's steady clock: what keeps moving at the slider's value, such as a rotor turning at the asked
@@ -238,7 +264,7 @@ class Scene:
             mv = np.asarray(motion, float).ravel()
             if len(mv) != self.mo_n:
                 raise ValueError(f"readout {name!r}: {len(mv)} motion values for {self.mo_n} motion frames")
-            d["mv"] = mv
+            d["mv"] = {self.mi: mv}
         self.readouts.append(d)
         return self
 
@@ -249,7 +275,7 @@ class Scene:
             raise ValueError(f"readout {name!r}: {len(mv)} motion values for {self.mo_n} motion frames")
         for r in self.readouts:
             if r["name"] == name:
-                r["mv"] = mv
+                r.setdefault("mv", {})[self.mi] = mv
                 return self
         raise ValueError(f"no readout named {name!r}")
 
@@ -338,20 +364,31 @@ class Scene:
              "camera": self.cam, "fields": fields, "objects": objs,
              "readouts": [{**{k: v for k, v in r.items() if k not in ("v", "lim", "mv")}, "values": _fl(r["v"][keep], 5),
                            **({"limits": _fl(r["lim"][keep], 5)} if "lim" in r else {}),
-                           **({"motion": _fl(r["mv"], 5)} if "mv" in r else {})} for r in self.readouts],
+                           **self._readout_motions(r)} for r in self.readouts],
              "events": sorted(self.events, key=lambda e: e["t"] if e["t"] is not None else 0),
              "labels": self.labels, "notes": self.notes, "buffers": enc.bufs}
         if self.result:
             h["verdict"] = self.result
         if self.mag:
             h["magnify"] = self.mag
-        if self.mo_n:
+        if self.mos:
             h["motion"] = motion_header(self)
         if (st := steady_header(self, keep)) is not None:
             h["steady"] = st
         if any(o.prop for o in self.objects):
             h["props_note"] = "Props in gray stripes show the setup and are not part of the analysis"
         return h, enc.blob()
+
+    def _readout_motions(self, r: dict) -> dict:
+        """A readout's values along the asked motion, and along each motion when there are several."""
+        mv = r.get("mv") or {}
+        if not mv:
+            return {}
+        di = self.design_motion()
+        out = {"motion": _fl(mv[di], 5)} if di in mv else {}
+        if len(self.mos) > 1:
+            out["motions"] = [_fl(mv[i], 5) if i in mv else None for i in range(len(self.mos))]
+        return out
 
     def to_bytes(self, budget: int = BUDGET) -> bytes:
         """The gzipped file, with frames thinned and meshes decimated as far as it takes to fit the budget."""

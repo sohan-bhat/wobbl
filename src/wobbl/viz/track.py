@@ -156,11 +156,17 @@ def steady_header(s, keep) -> dict | None:
 
 
 def motion_header(s) -> dict | None:
-    if not s.mo_n:
+    """The asked motion's header, and with several motions, every one's under "variants" with the input value it
+    plays at, in the order they were given."""
+    if not s.mos:
         return None
-    m = dict(s.mo)
-    m["frames"] = s.mo_n
-    return m
+    di = s.design_motion()
+    one = lambda m: {**m["mo"], "frames": m["n"], **({} if m["at"] is None else {"at": _f(m["at"])})}  # noqa: E731
+    h = one(s.mos[di])
+    if len(s.mos) > 1:
+        h["variants"] = [one(m) for m in s.mos]
+        h["asked"] = di
+    return h
 
 
 __all__ = ["Steady", "Track", "lowrank", "motion_header", "round_slow", "slower", "steady_header"]

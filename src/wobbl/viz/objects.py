@@ -108,10 +108,24 @@ class _Obj:
         return d
 
     def _track(self):
-        if getattr(self, "trk", None) is None:
-            from .track import Track
-            self.trk = Track(self)
-        return self.trk
+        """The object's track over the scene's current motion (one per motion, Scene.motion's at)."""
+        from .track import Track
+        trks = self.__dict__.setdefault("trks", {})
+        if self.s.mi not in trks:
+            trks[self.s.mi] = Track(self)
+        return trks[self.s.mi]
+
+    def _encode_tracks(self, enc: "_Enc", d: dict, idx=None) -> None:
+        """The track over the asked motion as "track", and with several motions, one per motion as "tracks"."""
+        trks = getattr(self, "trks", None)
+        if not trks:
+            return
+        di = self.s.design_motion()
+        if di in trks:
+            d["track"] = trks[di].encode(enc, idx)
+        if len(self.s.mos) > 1:
+            d["tracks"] = [d.get("track") if i == di and i in trks else trks[i].encode(enc, idx) if i in trks else None
+                           for i in range(len(self.s.mos))]
 
     def _steady(self, rate, what: str, **how) -> "_Obj":
         """What the object keeps doing on the scene's steady clock (track.py Steady), at a rate per timeline frame."""
@@ -251,8 +265,7 @@ class Mesh(_Obj):
             d["reveal"] = {"values": enc.floats(v[idx]), "at": _fl(self.frames(th, keep))}
         if self.glow is not None:
             d["glow"] = _fl(self.frames(self.glow, keep), 3)
-        if getattr(self, "trk", None) is not None:
-            d["track"] = self.trk.encode(enc, idx)
+        self._encode_tracks(enc, d, idx)
         if (st := self._encode_steady(enc, keep)) is not None:
             d["steady"] = st
         return d
@@ -332,8 +345,7 @@ class Body(_Obj):
             d["glow"] = _fl(self.frames(self.glow, keep), 3)
         if self.fld:
             d["field"] = {"f": self.fld[0], "values": _fl(self.frames(self.fld[1], keep), 5)}
-        if getattr(self, "trk", None) is not None:
-            d["track"] = self.trk.encode(enc)
+        self._encode_tracks(enc, d)
         if (st := self._encode_steady(enc, keep)) is not None:
             d["steady"] = st
         if self.on is not None:
@@ -446,8 +458,7 @@ class Lines(_Obj):
             d["speed"] = enc.floats(np.concatenate(self.speed))
         if self.through:
             d["inside"] = True
-        if getattr(self, "trk", None) is not None:
-            d["track"] = self.trk.encode(enc)
+        self._encode_tracks(enc, d)
         if self.times is not None:
             d["drawn"] = enc.floats(np.concatenate([np.ravel(v) for v in self.times]))
         if self.at is not None:
