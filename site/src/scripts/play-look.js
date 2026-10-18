@@ -189,9 +189,12 @@ vec3 getIBLRadiance(const in vec3 viewDir, const in vec3 normal, const in float 
   reflectVec = normalize(mix(reflectVec, normal, roughness * roughness));
   reflectVec = uEnvRot * inverseTransformDirection(reflectVec, viewMatrix);
 #ifdef WOBBL_SOFT_REFLECTION
-  // a part colored by a field reflects the studio as the harmonics give it, soft, which costs a few multiplies
-  // where the map would cost two lookups on each of its many small triangles; the key light keeps its highlight
-  return shIrradiance(reflectVec) * (1.0 / PI) * envMapIntensity * uEnvI;
+  // a part colored by a field reflects the studio as the harmonics give it while the view moves, a few multiplies
+  // where the map costs two lookups on each of its many small triangles, and the map itself as the view comes to
+  // rest, faded in with the resting view's occlusion (uSSAO.z), so a resting view and its still show it sharp
+  vec3 soft = shIrradiance(reflectVec) * (1.0 / PI) * envMapIntensity * uEnvI;
+  if (uSSAO.z <= 0.0) return soft;
+  return mix(soft, textureCubeUV(envMap, reflectVec, roughness).rgb * envMapIntensity * uEnvI, uSSAO.z);
 #else
   vec4 envMapColor = textureCubeUV(envMap, reflectVec, roughness);
   return envMapColor.rgb * envMapIntensity * uEnvI;
@@ -279,7 +282,7 @@ export function keepLight(shader) {
   shader.fragmentShader = shader.fragmentShader.replace('#define WOBBL_AO\n', '');
 }
 
-/** The studio as studioShader gives it, with soft reflections from the harmonics: for parts colored by a field. */
+/** The studio as studioShader gives it, kept out of the occlusion, its reflections sharp at rest: for parts colored by a field. */
 export function fieldStudioShader(shader) {
   studioShader(shader, false);
   if (LOOK.uSH.ready) shader.fragmentShader = `#define WOBBL_SOFT_REFLECTION\n${shader.fragmentShader}`;
@@ -287,24 +290,25 @@ export function fieldStudioShader(shader) {
 
 // ---- finishes ----------------------------------------------------------------------------------------
 // What a part's surface is, from the material its run names. A part colored by a field keeps the colors as its
-// paint, so metalness stays low enough that the map reads on every face, but its roughness, its clear coat and
-// a fine surface texture, cast grain, machining or print layers, come from the real material.
+// paint under a clear coat, as the Cycles stills paint their parts (roughness 0.42, a quarter coat, no metal), so
+// the map reads on every face the same way in the view and its card. A fine surface texture, cast grain,
+// machining or print layers, still comes from the real material.
 
 /**
  * finish: { name, metalness, roughness, clearcoat, grain (bump strength), grainMm (feature size in mm),
  * layerMm (layer lines along z in mm, 0 for none), sheen }
  */
 export const FINISHES = {
-  aluminum_cast: { metalness: 0.55, roughness: 0.42, clearcoat: 0, grain: 0.25, grainMm: 0.9, layerMm: 0 },
-  aluminum_machined: { metalness: 0.22, roughness: 0.3, clearcoat: 0, grain: 0.12, grainMm: 0.08, layerMm: 0 },
-  steel: { metalness: 0.24, roughness: 0.34, clearcoat: 0, grain: 0.1, grainMm: 0.1, layerMm: 0 },
-  iron_cast: { metalness: 0.16, roughness: 0.66, clearcoat: 0, grain: 0.6, grainMm: 0.4, layerMm: 0 },
-  copper: { metalness: 0.24, roughness: 0.3, clearcoat: 0, grain: 0.1, grainMm: 0.08, layerMm: 0 },
-  plastic_printed: { metalness: 0, roughness: 0.34, clearcoat: 0, grain: 0.12, grainMm: 0.25, layerMm: 0.2 },
-  nylon_sls: { metalness: 0, roughness: 0.82, clearcoat: 0, grain: 0.5, grainMm: 0.12, layerMm: 0 },
-  plastic_molded: { metalness: 0, roughness: 0.24, clearcoat: 0.3, grain: 0.04, grainMm: 0.2, layerMm: 0 },
-  composite: { metalness: 0.05, roughness: 0.3, clearcoat: 0.6, grain: 0.08, grainMm: 0.3, layerMm: 0 },
-  painted: { metalness: 0, roughness: 0.38, clearcoat: 0.25, grain: 0.06, grainMm: 0.3, layerMm: 0 },
+  aluminum_cast: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.25, grainMm: 0.9, layerMm: 0 },
+  aluminum_machined: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.12, grainMm: 0.08, layerMm: 0 },
+  steel: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.1, grainMm: 0.1, layerMm: 0 },
+  iron_cast: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.6, grainMm: 0.4, layerMm: 0 },
+  copper: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.1, grainMm: 0.08, layerMm: 0 },
+  plastic_printed: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.12, grainMm: 0.25, layerMm: 0.2 },
+  nylon_sls: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.5, grainMm: 0.12, layerMm: 0 },
+  plastic_molded: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.04, grainMm: 0.2, layerMm: 0 },
+  composite: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.08, grainMm: 0.3, layerMm: 0 },
+  painted: { metalness: 0, roughness: 0.42, clearcoat: 0.25, grain: 0.06, grainMm: 0.3, layerMm: 0 },
   // what a scene's props and parts without a field are made of
   steel_bare: { metalness: 1, roughness: 0.26, clearcoat: 0, grain: 0, grainMm: 1, layerMm: 0 },
   aluminum_bare: { metalness: 1, roughness: 0.38, clearcoat: 0, grain: 0, grainMm: 1, layerMm: 0 },
@@ -312,7 +316,7 @@ export const FINISHES = {
   paint_black: { metalness: 0, roughness: 0.42, clearcoat: 0.3, grain: 0, grainMm: 1, layerMm: 0 },
   rubber: { metalness: 0, roughness: 0.82, clearcoat: 0, grain: 0, grainMm: 1, layerMm: 0 },
   matte: { metalness: 0, roughness: 0.88, clearcoat: 0, grain: 0, grainMm: 1, layerMm: 0 },
-  floor: { metalness: 0, roughness: 0.74, clearcoat: 0, grain: 0, grainMm: 1, layerMm: 0 },
+  floor: { metalness: 0, roughness: 0.55, clearcoat: 0, grain: 0, grainMm: 1, layerMm: 0 },
   glass: { metalness: 0, roughness: 0.04, clearcoat: 0, grain: 0, grainMm: 1, layerMm: 0 },
   emissive: { metalness: 0, roughness: 1, clearcoat: 0, grain: 0, grainMm: 1, layerMm: 0 },
 };

@@ -154,7 +154,7 @@ function outline(faces, field) {
 // color per vertex (tint), a field looked up per pixel, a print revealed layer by layer (cutv), a line's tube
 // grown about its axis, a glow. A see through pane is real glass now: its reflections stay whole while what
 // is behind it shows through.
-function sceneShader(sh, { field, tube, glass, unlit, lift }) {
+function sceneShader(sh, { field, tube, glass, unlit }) {
   sh.vertexShader = sh.vertexShader
     .replace('#include <common>', `#include <common>
 attribute vec3 tint;
@@ -190,12 +190,7 @@ ${SRGB}`)
   ${field ? `// the field's value carried across each triangle and only then looked up in the map, as ParaView does
   baseC = vF.y > 0.5 ? vec3(${none}) : vF.x > uLimit ? vec3(${over})
     : texture2D(uLut, vec2(clamp(vF.x, 0.0, 1.0) * (255.0 / 256.0) + 0.5 / 256.0, 0.5)).rgb;` : ''}
-  diffuseColor.rgb = toLinear(baseC);
-  ${lift ? `{
-    // a very dark color of a map lifted until it reads as a lit solid, keeping its hue (Moreland)
-    float y = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-    diffuseColor.rgb *= clamp(0.06 / max(y, 1e-4), 1.0, 4.5);
-  }` : ''}`)
+  diffuseColor.rgb = toLinear(baseC);`)
     .replace('#include <opaque_fragment>', `
   ${unlit ? `{
     // a flame or a plume glows: brightest where it is thickest along the view, white hot in the core and fading
@@ -230,7 +225,7 @@ function material(o, { prop = false, shell = false, field = null, tube = false, 
     Object.assign(m, { transparent: true, depthWrite: false, blending: CustomBlending, blendSrc: OneFactor, blendDst: OneMinusSrcAlphaFactor });
   }
   if (unlit) Object.assign(m, { transparent: true, depthWrite: false, blending: AdditiveBlending, side: FrontSide });
-  const opts = { field: !!field, tube, glass, unlit, lift: !prop };
+  const opts = { field: !!field, tube, glass, unlit };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniforms);
     // glass and a glow show what is behind them or their own light, which the resting view's occlusion would darken
@@ -238,7 +233,7 @@ function material(o, { prop = false, shell = false, field = null, tube = false, 
     else studioShader(sh, !glass && !unlit);
     sceneShader(sh, opts);
   };
-  m.customProgramCacheKey = () => `wobbl-scene-${+opts.field}${+tube}${+glass}${+unlit}${+opts.lift}${+!prop}`;
+  m.customProgramCacheKey = () => `wobbl-scene-${+opts.field}${+tube}${+glass}${+unlit}${+!prop}`;
   // the uniforms the stage brings to each frame, as on the shader materials before
   m.uniforms = uniforms;
   // glass in a model is left out over a part the run is about, colored by its field (play-models.js)

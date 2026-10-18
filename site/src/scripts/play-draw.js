@@ -198,15 +198,12 @@ void main() {
 const YELLOW = 0xffd400;
 
 // ---- the part's surface, a physically based material in the studio's light (play-look.js) --------------
-// The field's colors are the part's paint: the base color three.js's MeshPhysicalMaterial lights, so the map
-// reads on every face, while its metalness, roughness, clear coat and surface texture come from the material
-// the run names. The darkest colors of a map are lifted until they read as a lit solid, as before.
+// The field's colors are the part's paint: the base color three.js's MeshPhysicalMaterial lights, as the Cycles
+// stills light their vertex colors, a glossy coat over it, and a surface texture from the material the run names.
 const FIELD_COLOR = /* glsl */ `
 ${SRGB}
 vec3 fieldColor(vec3 c) {
-  vec3 a = toLinear(c);
-  float y = dot(a, vec3(0.2126, 0.7152, 0.0722));
-  return a * clamp(0.06 / max(y, 1e-4), 1.0, 4.5);
+  return toLinear(c);
 }`;
 
 const INK = 'vec3(0.0042, 0.0047, 0.0056)';
