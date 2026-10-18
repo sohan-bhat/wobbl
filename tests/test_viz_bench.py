@@ -268,7 +268,7 @@ def test_wiper_gets_its_windshield_and_blade(tmp_path):
     names = set(_names(h))
     assert {"windshield", "wiper arm", "wiper blade", "swept edge"} <= names
     blade = next(o for o in h["objects"] if o.get("name") == "wiper blade")
-    assert blade["pos"]["shape"][0] == h["timeline"]["frames"]
+    assert blade["pose"]["pos"]["shape"][0] == h["timeline"]["frames"]
 
 
 def test_the_input_to_sweep_comes_from_the_mechanism_and_its_question():
