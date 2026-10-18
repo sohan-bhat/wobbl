@@ -71,13 +71,13 @@ def root_screws():
 
 def motor_and_prop():
     """The motor on the pad, its screws from under the pad, the leads back along the arm, the prop and its nut."""
-    stator, rotor = motor_parts()
-    return stator + rotor
+    stator, rotor, leads = motor_parts()
+    return stator + rotor + leads
 
 
 def motor_parts():
-    """The motor in two: what stands on the pad (the base and windings, its screws from under the pad and the leads
-    back along the arm), and what turns (the bell, the shaft, the prop and its nut)."""
+    """The motor in three: what stands on the pad (the base and windings and its screws from under the pad), what
+    turns (the bell, the shaft, the prop and its nut) and the leads back along the arm."""
     parts, ztop = motors.bldc()
     parts = place(parts, Pos(*PAD))
     out, turns = parts[:2], parts[2:]
@@ -93,8 +93,8 @@ def motor_parts():
     path = [(PAD[0] - 13.0, 0.0, PAD[2] + 2.0), (PAD[0] - 18.0, 0.0, 14.2), (100.0, 0.0, 15.8), (40.0, 0.0, 18.4), (6.0, 0.0, 20.2),
             (-10.0, 0.0, 21.0)]
     path = [(x, y, z + 0.9) for x, y, z in path]
-    out += cable.ribbon(path, 0.8, ['wire_black', 'wire_yellow', 'wire_red'], side=(0, 1, 0))
-    return out, turns
+    leads = cable.ribbon(path, 0.8, ['wire_black', 'wire_yellow', 'wire_red'], side=(0, 1, 0))
+    return out, turns, leads
 
 
 def main():
@@ -106,14 +106,15 @@ def main():
     ex.publish(KEY, {k: (n, {"covers": c}) for k, (n, c) in files.items()})
     # the resonance run turns its rotor at the rotor speed it is asked about: the rotor is the scene's own body at the
     # motor's mass (ROTOR, as the run gives it), so its model is made in that body's frame and hangs under it, and the
-    # rest of the motor stands on the pad and rides the arm
-    stator, turns = motor_parts()
+    # rest of the motor stands on the pad and rides the arm's tip, the leads the arm along its length
+    stator, turns, leads = motor_parts()
     rotor = place(turns, Pos(*(-ROTOR)))
     export(f'{KEY}/motor.glb', [Node('motor', plain(stator), tol=0.06, ang=0.3)])
+    export(f'{KEY}/leads.glb', [Node('leads', plain(leads), tol=0.06, ang=0.3)])
     export(f'{KEY}/rotor.glb', [Node('rotor', plain(rotor), tol=0.06, ang=0.3)])
     write_manifest('drone-arm-resonance', {
         'replace': [{'object': 'rotor', 'file': f'{KEY}/rotor.glb'}],
-        'add': [{'file': f'{KEY}/{k}.glb'} for k in ('frame-plates', 'root-screws', 'motor')]})
+        'add': [{'file': f'{KEY}/{k}.glb'} for k in ('frame-plates', 'root-screws', 'motor', 'leads')]})
 
 
 if __name__ == '__main__':

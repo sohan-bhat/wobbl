@@ -177,7 +177,8 @@
     "add": [
       {"file": "drone-arm/frame-plates.glb"},
       {"file": "drone-arm/root-screws.glb"},
-      {"file": "drone-arm/motor.glb"}
+      {"file": "drone-arm/motor.glb"},
+      {"file": "drone-arm/leads.glb"}
     ]
   },
   "enclosure": {
