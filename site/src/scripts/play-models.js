@@ -88,6 +88,11 @@ const ready = new WeakMap();
  */
 function prepare(m) {
   if (ready.has(m)) return ready.get(m);
+  // a metallic roughness map holds one metal value, which blender/lib/looks.py writes into its blue channel and its
+  // name (r_0.32_0.46_m0, Concrete034_r0). Lossy WebP keeps the green roughness but blurs the blue toward it, which
+  // would draw a plastic or a wooden desk half metal, so the metal is taken from the name, as the model was made.
+  const metal = m.metalnessMap && /_[mr]([01])$/.exec(m.metalnessMap.name || '');
+  if (metal) { m.metalness *= Number(metal[1]); m.metalnessMap = null; }
   for (const k of MAPS) if (m[k] && m[k].anisotropy < anisotropy) { m[k].anisotropy = anisotropy; m[k].needsUpdate = true; }
   let out = m;
   if (m.transmission > 0) {
