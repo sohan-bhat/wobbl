@@ -794,9 +794,8 @@ export function createStage({ canvas, w, h, px, kind, still = false }) {
         part.dirty = false;
         part.box = box;
         part.state = state;
-        // a model between the camera and the part is veiled (play-models.js)
-        if (part.sp) part.sp.veil(camera.position);
-        else for (const m of part.extras) { m.veil(camera.position, part.center); m.ghosts(camera, part.bounds); }
+        // a model in front of the part is drawn faint over it (play-models.js)
+        if (!part.sp) for (const m of part.extras) m.ghosts(camera, part.bounds);
         if (into && k === 0) {
           // a rest starts with the solids alone, for the depth the occlusion is worked out from, then the lines and
           // arrows (play-refine.js OVERLAY); the occlusion reaches a sixteenth of the view's half height at its

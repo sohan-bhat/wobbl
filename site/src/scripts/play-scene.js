@@ -764,7 +764,11 @@ export function sceneParts({ arrays, run }) {
         if (shadowCasters.has(it.mesh)) for (const x of m.meshes) shadowCasters.add(x);
       }
     }
-    for (const name of spec.hide || []) {
+    // what an added model stands for (a frame's plates for the mounting plate, a weight for the load's box) goes as
+    // the Cycles still leaves it out, unless it carries the field the run is about
+    const covered = (spec.add || []).filter((e) => models.get(e.file)).flatMap((e) => e.covers || [])
+      .filter((name) => !items.some((it) => it.o.name === name && it.f && !it.o.prop));
+    for (const name of [...(spec.hide || []), ...covered]) {
       for (const it of items) {
         if (it.o.name !== name) continue;
         // a ground the models replace (a concrete pad) goes with its grid; anything else keeps its shape for the probe
@@ -824,12 +828,8 @@ export function sceneParts({ arrays, run }) {
     }
   }
 
-  // the models added round the subject, veiled when one stands between the camera and the subject
-  const adds = [], sbox = run.subject || run.bounds;
-  const middle = new Vector3(...[0, 1, 2].map((k) => (sbox.lo[k] + sbox.hi[k]) / 2));
-  function veil(from) {
-    for (const m of adds) m.veil(from, middle);
-  }
+  // the models added round the subject
+  const adds = [];
 
   /** Move every tracer on by dt seconds of the page's clock; true while any are moving. */
   function advance(dt) {
@@ -837,5 +837,5 @@ export function sceneParts({ arrays, run }) {
     return flows.length > 0;
   }
 
-  return { scene, set, probe, shade, dispose, dress, veil, advance, flows };
+  return { scene, set, probe, shade, dispose, dress, advance, flows };
 }

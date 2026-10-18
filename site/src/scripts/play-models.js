@@ -9,7 +9,7 @@
 //   add: [{ file, parent?, scale?, matrix? }],     world frame, or the named object's frame
 //   hide: [object names] } } }
 import {
-  AlwaysStencilFunc, Box3, CustomBlending, MeshBasicMaterial, Ray, Vector3, EqualStencilFunc, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
+  AlwaysStencilFunc, Box3, CustomBlending, MeshBasicMaterial, Vector3, EqualStencilFunc, FrontSide, Group, ImageBitmapLoader, KeepStencilOp, NotEqualStencilFunc,
   OneFactor, OneMinusSrcAlphaFactor, ReplaceStencilOp, SRGBColorSpace,
 } from 'three';
 import { keepLight, studioShader } from './play-look.js';
@@ -145,7 +145,7 @@ export function keepColor(m) {
   return m;
 }
 
-const ghosts = new WeakMap(), veils = new WeakMap();
+const ghosts = new WeakMap();
 function ghostOf(p) {
   if (ghosts.has(p)) return ghosts.get(p);
   // flat and unlit: at this opacity only the model's outline and tone show, so no light is worked out for it
@@ -156,16 +156,7 @@ function ghostOf(p) {
   ghosts.set(p, g);
   return g;
 }
-// a model standing between the camera and the part (a plate the part hangs under, seen from above) is drawn
-// faint all over, as a sheet of glass, so the view of the part is not a view of a wall
-function veilOf(p) {
-  if (veils.has(p)) return veils.get(p);
-  const g = new MeshBasicMaterial({ color: p.color ? p.color.clone() : 0x9aa0a6, transparent: true, opacity: 0.07, depthWrite: false });
-  veils.set(p, g);
-  return g;
-}
-
-const _ray = new Ray(), _hit = new Vector3(), _c = new Vector3(), _ra = [0, 0, 0, 0], _rb = [0, 0, 0, 0];
+const _c = new Vector3(), _ra = [0, 0, 0, 0], _rb = [0, 0, 0, 0];
 /** The screen rectangle a box covers, in normalized device coordinates, as [x0, y0, x1, y1]. */
 function rectOf(b, camera, out) {
   out[0] = out[1] = Infinity; out[2] = out[3] = -Infinity;
@@ -223,30 +214,14 @@ export function instance(gltf, entry) {
     if (mats.every((m) => m.transparent)) return;
     const ghost = o.clone();
     ghost.material = Array.isArray(o.material) ? mats.map((m) => (m.transparent ? m : tintedGhost(m))) : tintedGhost(o.material);
-    ghost.userData.over = ghost.material;
-    ghost.userData.veil = Array.isArray(o.material) ? mats.map((m) => (m.transparent ? m : veilOf(m))) : veilOf(o.material);
     Object.assign(ghost, { castShadow: false, receiveShadow: false, renderOrder: 2 });
     ghost.children.length = 0;
     extra.push([o, ghost]);
   });
   for (const [o, ghost] of extra) o.parent.add(ghost);
-  let last = '', veiled = false, box = null;
+  let last = '', box = null;
   return {
     group, meshes,
-    /**
-     * Veil the model when it stands between the camera at from and the part's center at to (Vector3s, in the
-     * scene's frame), and draw it whole again when it does not.
-     */
-    veil(from, to) {
-      if (!box) { group.updateWorldMatrix(true, true); box = new Box3().setFromObject(group); }
-      const d = from.distanceTo(to);
-      _ray.origin.copy(from);
-      _ray.direction.subVectors(to, from).normalize();
-      const on = !!_ray.intersectBox(box, _hit) && _hit.distanceTo(from) < d * 0.98 && !box.containsPoint(to);
-      if (on === veiled) return;
-      veiled = on;
-      for (const [o, g] of extra) { o.visible = !on; g.material = on ? g.userData.veil : g.userData.over; }
-    },
     /**
      * Draw the faint copies only where they can matter: when the model covers some of the part on screen (camera,
      * and the part's box in the same frame), or always (true) or never (false).
@@ -255,7 +230,7 @@ export function instance(gltf, entry) {
       let on = camera;
       if (typeof camera === 'object' && camera) {
         if (!box) { group.updateWorldMatrix(true, true); box = new Box3().setFromObject(group); }
-        on = veiled || overlaps(rectOf(box, camera, _ra), rectOf(part, camera, _rb));
+        on = overlaps(rectOf(box, camera, _ra), rectOf(part, camera, _rb));
       }
       for (const [, g] of extra) g.visible = !!on;
     },
