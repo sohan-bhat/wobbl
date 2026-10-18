@@ -2,7 +2,7 @@
 // from the scene file: the motion's clock, the meter's reading and the peak marker at every motion frame, the box
 // the moving things fill at each (for the camera, which keeps them and where they come to rest in view), the
 // point a follow view keeps in the middle, and how much slower than real time a fluid's tracers move.
-import { flowSlow, rankSum } from '../src/scripts/play-motion.js';
+import { flowSlow, motionOf, rankSum } from '../src/scripts/play-motion.js';
 import { poseMatrix, shownAt, skipped } from '../src/scripts/scene-file.js';
 
 const r6 = (x) => (Number.isFinite(x) ? +x.toPrecision(6) : null);
@@ -10,9 +10,8 @@ const apply = (m, v) => [m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3], m[4] * 
   m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11]];
 const radiusOf = (b) => Math.hypot(b.hi[0] - b.lo[0], b.hi[1] - b.lo[1], b.hi[2] - b.lo[2]) / 2;
 
-/** A tracked object's arrays, decoded as play-motion.js decodeTrack does for the drawing. */
-function trackOf(o, arr) {
-  const tr = o.track;
+/** A track's arrays, decoded as play-motion.js decodeTrack does for the drawing. */
+function trackOf(tr, arr) {
   return {
     pos: tr.pos && arr(tr.pos), quat: tr.quat && arr(tr.quat),
     field: tr.field && { coef: arr(tr.field.coef), basis: arr(tr.field.basis), r: tr.field.rank },
@@ -25,7 +24,7 @@ function trackOf(o, arr) {
  * also the readings said under it, tPos the frame position of an input value, bounds the scene's box.
  */
 export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
-  const mo = h.motion;
+  const design = h.timeline.design;
   const flowing = h.objects.filter((o) => o.kind === 'lines' && o.speed && !skipped(o));
   const R = Math.max(radiusOf(bounds), 1e-9);
   let slow = null;
@@ -42,20 +41,35 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
   // the rate the part colored by the main field swings at, so the peak's marker swings with it on the page
   const sw = steady && h.objects.find((o) => o.steady && o.steady.swing && o.field && o.field.f === 0 && !skipped(o));
   if (sw) steady.swing = sw.steady.rate;
-  if (!mo) {
+  if (!h.motion) {
     const out = slow ? { flow: { slow } } : glows ? { flow: { glows: true } } : null;
     return steady ? { ...out, steady } : out;
   }
-  const M = mo.t.length, design = h.timeline.design;
-  const out = {
-    t: mo.t, play: mo.play, label: mo.label || 'time', unit: mo.unit || 's', note: mo.note || '',
-    at: r6(design !== undefined ? tPos(design) : h.timeline.frames - 1),
-  };
+  const out = variantPlay(h, arr, h.motion.asked, { q, also, tPos, follow });
   if (slow) out.flow = { slow };
   else if (glows) out.flow = { glows: true };
   if (steady) out.steady = steady;
+  // a sweep that kept the event at several values: each value's own motion, worked out the same way, for the page
+  // to fetch when it plays one (scripts/scenes.mjs writes them beside the scene file)
+  const vs = h.motion.variants;
+  if (vs && vs.length > 1) {
+    out.variants = vs.map((v, i) => ({ value: v.at ?? design, at: r6(tPos(v.at ?? design)), asked: i === (h.motion.asked ?? 0) }));
+    out.variantData = vs.map((_, i) => (i === (h.motion.asked ?? 0) ? null : variantPlay(h, arr, i, { q, also, tPos, follow })));
+  }
+  return out;
+}
+
+/** The page data of motion variant vi (play-motion.js motionOf): its clock, its readings and what the camera keeps. */
+function variantPlay(h, arr, vi, { q, also, tPos, follow }) {
+  const mo = motionOf(h, vi), M = mo.t.length, design = h.timeline.design;
+  const trk = (o) => (o.tracks && h.motion.variants ? o.tracks[vi] : o.track);
+  const rm = (r) => (r.motions && h.motion.variants ? r.motions[vi] : r.motion);
+  const out = {
+    t: mo.t, play: mo.play, label: mo.label || 'time', unit: mo.unit || 's', note: mo.note || '',
+    at: r6(mo.at !== undefined ? tPos(mo.at) : design !== undefined ? tPos(design) : h.timeline.frames - 1),
+  };
   // every tracked solid the run is about, at each motion frame: its points where they are and its field's peak
-  const solids = h.objects.map((o, oi) => ({ o, oi })).filter(({ o }) => o.track && !skipped(o) && (o.kind === 'mesh' || o.kind === 'body'));
+  const solids = h.objects.map((o, oi) => ({ o, oi })).filter(({ o }) => trk(o) && !skipped(o) && (o.kind === 'mesh' || o.kind === 'body'));
   const lo = Array.from({ length: M }, () => [Infinity, Infinity, Infinity]), hi = Array.from({ length: M }, () => [-Infinity, -Infinity, -Infinity]);
   const peaks = new Array(M).fill(null), fpeak = new Array(M).fill(NaN);
   // what a follow view keeps in frame at each motion frame: the followed group and anything with a window of its own
@@ -64,7 +78,7 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
   const flo = Array.from({ length: M }, () => [Infinity, Infinity, Infinity]), fhi = Array.from({ length: M }, () => [-Infinity, -Infinity, -Infinity]);
   const grp = h.magnify && h.magnify.groups && h.magnify.groups[0] ? h.magnify.groups[0].objects : [];
   for (const { o, oi } of solids) {
-    const tr = trackOf(o, arr);
+    const tr = trackOf(trk(o), arr);
     const P = o.kind === 'mesh' ? arr(o.pos) : null;
     const n = P ? P.length / 3 : 0;
     const u = tr.deform ? new Float32Array(n * 3) : null, v = tr.field ? new Float32Array(n) : null;
@@ -78,7 +92,7 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
       if (u) rankSum(tr.deform, mf, n, 3, u);
       if (v) rankSum(tr.field, mf, n, 1, v);
       if (pose && grp[0] === oi) gp[f] = pose.p;
-      const kept = follow && (grp.includes(oi) || o.track.when) && shownAt(o.track.when, mo.t[f]);
+      const kept = follow && (grp.includes(oi) || trk(o).when) && shownAt(trk(o).when, mo.t[f]);
       const grow = (p) => {
         for (let k = 0; k < 3; k++) {
           lo[f][k] = Math.min(lo[f][k], p[k]); hi[f][k] = Math.max(hi[f][k], p[k]);
@@ -91,7 +105,7 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
         for (let cc = 0; cc < 8; cc++) grow(apply(m, [cc & 1 ? half[0] : -half[0], cc & 2 ? half[1] : -half[1], cc & 4 ? half[2] : -half[2]]));
       }
       // the field's peak on what moves, with its place drawn at its true and its exaggerated shape
-      if (v && o.track.field.f === 0) {
+      if (v && trk(o).field.f === 0) {
         let best = -Infinity, bi = -1;
         for (let i = 0; i < n; i++) if (Number.isFinite(v[i]) && v[i] > best) { best = v[i]; bi = i; }
         if (bi >= 0 && !(best <= fpeak[f])) {
@@ -104,13 +118,13 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
     }
   }
   // a field's peak under the low rank sum's own error is that error, not a reading: an unloaded part reads 0
-  const errs = solids.map(({ o }) => o.track.field && o.track.field.f === 0 ? o.track.field.err ?? 0 : 0);
+  const errs = solids.map(({ o }) => trk(o).field && trk(o).field.f === 0 ? trk(o).field.err ?? 0 : 0);
   const floor = Math.max(0, ...errs) * Math.max(0, ...fpeak.filter(Number.isFinite));
   for (let f = 0; f < M; f++) {
     if (fpeak[f] <= floor) { fpeak[f] = 0; peaks[f] = null; }
   }
   // whether the motion moves or recolors what the main field colors, so the input's peak no longer marks it
-  if (solids.some(({ o }) => o.field && o.field.f === 0 && (o.track.pos || o.track.value || o.track.deform))) out.fieldMoves = true;
+  if (solids.some(({ o }) => o.field && o.field.f === 0 && (trk(o).pos || trk(o).value || trk(o).deform))) out.fieldMoves = true;
   if (solids.length) out.box =lo.map((l, f) => [l.map(r6), hi[f].map(r6)]);
   if (follow && flo.every((l) => Number.isFinite(l[0]))) {
     // the middle of what the follow view keeps and how much larger than the followed group alone it is, eased over
@@ -140,17 +154,17 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
   if (peaks.some(Boolean)) out.peaks = peaks;
   // the meter's reading along the motion: the field's peak on what moves, or the readout's own motion values
   if (q) {
-    const r = h.readouts.find((x) => (x.name === q.name || x.name === q.name.replace(/^peak /, '')) && x.motion);
-    if (r) out.q = r.motion.map(r6);
+    const r = h.readouts.find((x) => (x.name === q.name || x.name === q.name.replace(/^peak /, '')) && rm(x));
+    if (r) out.q = rm(r).map(r6);
     else if (q.field && peaks.some(Boolean)) out.q = fpeak.map(r6);
     else if (q.field) {
       // a path colored by the field that traces itself over the motion: the field's peak on what is drawn so far
-      const paths = h.objects.filter((o) => o.kind === 'lines' && o.track && o.track.drawn && o.field && o.field.f === 0 && !skipped(o));
+      const paths = h.objects.filter((o) => o.kind === 'lines' && trk(o) && trk(o).drawn && o.field && o.field.f === 0 && !skipped(o));
       if (paths.length) {
         out.q = mo.t.map((t) => {
           let best = -Infinity;
           for (const o of paths) {
-            const dr = arr(o.track.drawn), v = arr(o.field.values);
+            const dr = arr(trk(o).drawn), v = arr(o.field.values);
             for (let i = 0; i < dr.length; i++) if (dr[i] <= t + 1e-9 && v[i] > best) best = v[i];
           }
           return Number.isFinite(best) ? r6(best) : null;
@@ -158,9 +172,9 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
       }
     }
   }
-  out.also = (also || []).map((a) => { const r = h.readouts.find((x) => x.name === a.name); return r && r.motion ? r.motion.map(r6) : null; });
+  out.also = (also || []).map((a) => { const r = h.readouts.find((x) => x.name === a.name); return r && rm(r) ? rm(r).map(r6) : null; });
   // what only the motion reads, said in place of the readings along the input while it plays
   if (mo.readouts) out.live = mo.readouts.map((r) => ({ name: r.name, unit: r.unit || '', digits: r.digits ?? 3, values: r.values.map(r6) }));
-  out.readouts = h.readouts.filter((r) => r.motion).map((r) => ({ name: r.name, unit: r.unit || '', digits: r.digits ?? 3, values: r.motion.map(r6) }));
+  out.readouts = h.readouts.filter((r) => rm(r)).map((r) => ({ name: r.name, unit: r.unit || '', digits: r.digits ?? 3, values: rm(r).map(r6) }));
   return out;
 }

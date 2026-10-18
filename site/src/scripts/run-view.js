@@ -121,7 +121,11 @@ export function sceneFrame(f, orbit, rv, runs, pos, views, look, insets, mts = n
     const { a, b, k } = frameAt(r, pos[row]), T = r.input.t;
     const s = { a, b, k, t: k ? T[a] + (T[b] - T[a]) * k : T[a], bend: look.bend, mag: follows ? false : look.mag };
     // the motion's physical time, while the view shows the motion (play-motion.js)
-    if (mts && Number.isFinite(mts[row]) && r.motion?.t) s.m = mts[row];
+    if (mts && Number.isFinite(mts[row]) && r.motion?.t) {
+      s.m = mts[row];
+      // which of the motions a sweep kept at each value plays (live-run.ts replays the one at the slider)
+      if (Number.isInteger(r.motion.vi)) s.mv = r.motion.vi;
+    }
     // the steady clock's time, for what keeps moving at the slider's value (play-motion.js); a still is drawn at 0
     if (r.motion?.steady) s.ft = Number.isFinite(f.ft) ? f.ft : 0;
     return s;

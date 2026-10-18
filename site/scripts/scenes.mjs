@@ -129,6 +129,11 @@ export function syncScenes(site) {
       const file = `${rel.replace(/[^a-z0-9]+/gi, '-')}.${hash(bytes)}.wobbl`;
       writeFileSync(join(out, file), bytes);
       const play = scenePlay(h, arr);
+      // the event at every other value a sweep kept, beside the scene file, fetched when the page replays one
+      if (play.motion?.variantData) {
+        writeFileSync(join(out, `${file}.motions.json`), JSON.stringify(play.motion.variantData));
+        delete play.motion.variantData;
+      }
       // the example the run belongs to, as public/models/manifest.json names it (play-models.js exampleOf)
       play.example = rel.replace(/\/output[^/]*(\/.*)?$/, '');
       // what the part is made of, from the run's own study, for its surface finish on the stage (play-look.js)

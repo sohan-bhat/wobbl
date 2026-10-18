@@ -44,8 +44,25 @@ export const motionSeconds = (mo) => mo.play[mo.play.length - 1];
 export function decodeTrack(o, arr, d) {
   const cy = o.steady && o.steady.cycle;
   if (cy) d.cycle = { pos: arr(cy.pos), quat: arr(cy.quat), n: cy.pos.shape[0] };
-  const tr = o.track;
-  if (!tr) return;
+  // a sweep that kept the event at several values has a track for each of its motions (motionOf)
+  if (o.tracks) d.tracks = o.tracks.map((tr) => (tr ? oneTrack(tr, arr) : null));
+  if (o.track) d.track = oneTrack(o.track, arr);
+}
+
+/** The motion a scene plays at variant mv: the asked one, or one of the motions a sweep kept at each value. */
+export function motionOf(h, mv) {
+  const m = h.motion;
+  if (!m || !m.variants) return m;
+  return m.variants[Number.isInteger(mv) && m.variants[mv] ? mv : m.asked ?? 0];
+}
+
+/** An object's track over motion variant mv (motionOf), decoded. */
+export function trackOf(d, h, mv) {
+  if (!d.tracks || !h.motion || !h.motion.variants) return d.track || null;
+  return d.tracks[Number.isInteger(mv) && mv < d.tracks.length ? mv : h.motion.asked ?? 0] || null;
+}
+
+function oneTrack(tr, arr) {
   const out = {};
   if (tr.pos) { out.pos = arr(tr.pos); out.quat = arr(tr.quat); }
   if (tr.size) out.size = arr(tr.size);
@@ -55,7 +72,7 @@ export function decodeTrack(o, arr, d) {
   if (tr.drawn) out.drawn = arr(tr.drawn);
   if (tr.value) out.value = tr.value.values.map((v) => (v === null ? NaN : v));
   if (tr.when) out.when = tr.when;
-  d.track = out;
+  return out;
 }
 
 const at = (A, w, mf, i) => (mf.k ? lerp(A[mf.a * w + i], A[mf.b * w + i], mf.k) : A[mf.a * w + i]);

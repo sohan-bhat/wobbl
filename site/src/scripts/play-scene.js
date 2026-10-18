@@ -15,7 +15,7 @@ import { instance, keepColor, subject } from './play-models.js';
 import { contactShadow } from './contact-shadow.js';
 import { overlay } from './play-refine.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
-import { cyclePose, motionFrame, rankSum, sizeScale, steadyRate, steadySlow, trackPose, trackSeries, trackSize } from './play-motion.js';
+import { cyclePose, motionFrame, motionOf, rankSum, sizeScale, steadyRate, steadySlow, trackOf, trackPose, trackSeries, trackSize } from './play-motion.js';
 import { flowTracers } from './play-flow.js';
 
 const VERT = /* glsl */ `
@@ -384,10 +384,15 @@ export function sceneParts({ arrays, run }) {
         if (o.at) cut[v] = Math.max(cut[v], o.at[d.run[v]]);
       }
       geo.setAttribute('cutv', new BufferAttribute(cut, 1));
-      if (d.track && d.track.drawn) {
+      if ((d.track && d.track.drawn) || (d.tracks && d.tracks.some((x) => x && x.drawn))) {
         it.cutI = cut;
-        it.cutM = new Float32Array(nv);
-        for (let v = 0; v < nv; v++) it.cutM[v] = d.track.drawn[d.point[v]];
+        // each motion's own times its points are drawn by, made when that motion first plays
+        it.cutMs = new Map();
+        it.cutOf = (tr) => {
+          if (!tr || !tr.drawn) return null;
+          if (!it.cutMs.has(tr)) { const c = new Float32Array(nv); for (let v = 0; v < nv; v++) c[v] = tr.drawn[d.point[v]]; it.cutMs.set(tr, c); }
+          return it.cutMs.get(tr);
+        };
       }
       geo.setAttribute('axis', new BufferAttribute(d.axis, 3));
       it.mesh = new Mesh(geo, material({ ...o, opacity: 1 }, { prop: !!o.prop, tube: true, finish: 'paint_gloss' }));
@@ -450,7 +455,7 @@ export function sceneParts({ arrays, run }) {
     if (!it.mesh) return;
     it.mesh.frustumCulled = false;
     // a glowing body, or anything glowing over the motion (a flame), glows toward a light tint of its own color
-    const gc = ((o.kind === 'body' && o.glow) || d.track?.glow) && it.mesh.material?.uniforms?.uGlowC;
+    const gc = ((o.kind === 'body' && o.glow) || d.track?.glow || d.tracks?.some((x) => x?.glow)) && it.mesh.material?.uniforms?.uGlowC;
     if (gc) gc.value.setRGB(...colorHex(o.color).map((v) => Math.min(1, v * 0.5 + 0.55)));
     // every solid casts and takes the key light's soft shadow; glass, glows and lines do neither
     if (['mesh', 'body', 'points', 'atoms'].includes(o.kind) && !glass && fin !== 'emissive') {
@@ -497,10 +502,9 @@ export function sceneParts({ arrays, run }) {
     obj.matrixWorldNeedsUpdate = true;
   }
 
-  function meshFrame(it, a, b, k, bend, mf = null) {
+  function meshFrame(it, a, b, k, bend, mf = null, tr = null) {
     const { o, d } = it, n = it.n, nv = d.node.length, geo = it.mesh.geometry;
     // over the scene's motion a tracked shape and field take the place of the input's (play-motion.js)
-    const tr = mf && d.track;
     if (tr && tr.deform) {
       const cur = it.cur, u = it.tu || (it.tu = new Float32Array(n * 3)), ex = bend ? tr.deform.ex : 1;
       rankSum(tr.deform, mf, n, 3, u);
@@ -637,27 +641,28 @@ export function sceneParts({ arrays, run }) {
     const { a, b, k, t, bend = true, mag = true, tube = 1 } = f;
     for (const it of items) if (it.o.kind === 'lines') it.mesh.material.uniforms.uTube.value = tube;
     // the motion's physical time when it plays (play-motion.js), else the input's frames alone
-    const mo = h.motion, mf = mo && Number.isFinite(f.m) ? motionFrame(mo, f.m) : null;
+    // (a sweep that kept the event at several values plays the one at f.mv)
+    const mo = motionOf(h, f.mv), mf = mo && Number.isFinite(f.m) ? motionFrame(mo, f.m) : null;
     for (const fl of flows) fl.at(a, b, k);
     // the steady clock: each object's phase turned on by its rate at the slider's value over the clock's slowed time
     const ph = steadyStep(f, a, b, k);
-    const next = `${a},${b},${k.toFixed(5)},${t},${bend},${mag},${tube},${mf ? f.m : ''},${ph}`;
+    const next = `${a},${b},${k.toFixed(5)},${t},${bend},${mag},${tube},${mf ? `${f.m},${f.mv}` : ''},${ph}`;
     if (next === key) return;
     key = next;
     shadowDirty = true;
     for (const it of items) {
       const o = it.o;
       // over the motion an object with a window of its own shows only inside it (a parachute once it opens)
-      const tw = mf && it.d.track && it.d.track.when;
+      const tr = mf && trackOf(it.d, h, f.mv);
+      const tw = tr && tr.when;
       it.mesh.visible = !it.hidden && (tw ? shownAt(tw, f.m) : shownAt(o.when, t));
       if (it.bonds) it.bonds.visible = it.mesh.visible;
       if (!it.mesh.visible) continue;
       const uni = it.mesh.material?.uniforms;
-      const tr = mf && it.d.track;
       if (uni && tr && tr.glow) uni.uGlow.value = trackSeries(tr.glow, mf) * 0.85;
       else if (uni && o.glow) uni.uGlow.value = series(o.glow, a, b, k) * 0.85;
       if (o.kind === 'mesh') {
-        meshFrame(it, a, b, k, bend, mf);
+        meshFrame(it, a, b, k, bend, mf, tr);
         const pose = (tr && trackPose(tr, mf)) || (it.d.cycle && cyclePose(it.d.cycle, it.ph)) || poseAt(it.d.pp, it.d.pq, a, b, k);
         if (pose) place(it.mesh, it, pose, mag);
       } else if (o.kind === 'body') {
@@ -679,13 +684,14 @@ export function sceneParts({ arrays, run }) {
       } else if (o.kind === 'lines') {
         // a path traced by the motion's time while it plays, by the input's otherwise
         const ca = it.mesh.geometry.getAttribute('cutv');
-        if (it.cutM) {
-          const want = mf ? it.cutM : it.cutI;
+        const cm = it.cutOf && mf ? it.cutOf(tr) : null;
+        if (it.cutOf) {
+          const want = cm || it.cutI;
           if (ca.array !== want) { ca.array = want; ca.needsUpdate = true; }
         }
-        if (mf && it.cutM) uni.uCut.value = f.m;
+        if (cm) uni.uCut.value = f.m;
         else if (it.cuts) uni.uCut.value = t;
-        else if (it.cutM) uni.uCut.value = 1e30;
+        else if (it.cutOf) uni.uCut.value = 1e30;
       } else if (o.kind === 'points' || o.kind === 'atoms') pointsFrame(it, a, b, k);
       else if (o.kind === 'arrows') arrowsFrame(it, a, b, k, tube);
     }
