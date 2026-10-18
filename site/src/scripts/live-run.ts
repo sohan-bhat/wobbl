@@ -133,6 +133,25 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   // the input's ramp. mt[row] is the physical time shown, or NaN when the view shows the input's frames
   const motionOf = (pi: number) => (sceneRun && data.panes[pi].run.motion?.t ? data.panes[pi].run.motion : null);
   const mo0 = motionOf(0);
+  // ---- what Replay plays: the run at the slider's value from its start, as if that value were where it began ----
+  // A scene's motion plays the event at the value the slider stands at, from the motion a sweep kept for that value
+  // (the nearest one it kept), or the asked one where it kept only that, which the button then names. A scene whose
+  // input is a load or a heat load applied to the part, from nothing, steps through its solved state at each value
+  // up to the slider's, blended between saved values only where the scene says that is exact. Any other scene has
+  // no history to play, so it has no Replay.
+  const asked0 = data.panes.map((p) => p.run.motion);
+  const variantFiles = new Map<number, Promise<any[] | null>>();
+  const rampOf = (r: any): 'load' | 'heat' | null => {
+    const inp = r.input, u = String(inp?.unit || '').trim(), lab = String(inp?.label || '').toLowerCase();
+    if (!inp || inp.t.length < 2 || Math.abs(inp.t[0]) > 1e-9) return null;
+    if (/^(k?w|mw)$/i.test(u) || /heat load|power/.test(lab)) return 'heat';
+    if (/^(m?n|kn|lbf|kip|n m|n·m|nm)$/i.test(u) || (/\bload\b/.test(lab) && !/current/.test(lab))) return 'load';
+    return null;
+  };
+  const ramp = sceneRun && !mo0 ? rampOf(data.panes[0].run) : null;
+  const replays = !sceneRun || !!mo0 || !!ramp;
+  // where each pane's replay ends: the slider's value, for a ramp
+  const goal: number[] = shown.map((pi) => (sceneRun ? homeOf(pi) : 0));
   const mt: number[] = shown.map(() => NaN);
   const rateEl = fig.querySelector<HTMLElement>('.lrun-rate');
   // the fluid's tracers, current along wires and whatever keeps moving at the slider's value (a rotor turning at the
@@ -261,12 +280,17 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       if (!free) {
         shown.forEach((pi, row) => {
           const m = motionOf(pi);
-          // a motion plays at the asked value; without one the input ramps up to it
-          if (m) { pos[row] = m.at ?? homeOf(pi); mt[row] = timeAt(m, u * duration); } else pos[row] = homeOf(pi) * u;
+          // a motion plays at the value it was solved at; without one the load steps up to the replay's goal, through
+          // each saved state, blended between them only where that is exact
+          if (m) { pos[row] = m.at ?? homeOf(pi); mt[row] = timeAt(m, u * duration); } else {
+            const g = goal[row], x = g * u;
+            pos[row] = data.panes[pi].run.input.between === 'exact' || u >= 1 ? x : Math.min(Math.floor(x + 1e-9), g);
+          }
         });
         motionPlayAt = u * duration;
       }
       sceneReadings(end);
+      replayWords();
       return;
     }
     // a heat run's air, estimated from its convection, moves slowed by one factor (play-flow.js)
@@ -364,7 +388,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   let back: Back | null = null, ready = false, canvas: HTMLCanvasElement | null = null, orbit: Orbit | null = null;
   let t = 0, playing = false, started = false, done = false, visible = false, last = 0, raf = 0, pending = 0;
   let w = 1, h = 1, px = 1;
-  const duration = mo0 ? motionSeconds(mo0) : data.pace.seconds;
+  let duration = mo0 ? motionSeconds(mo0) : data.pace.seconds;
   const u = () => clamp01((t - LEAD) / duration);
   const lead = data.panes[0].run;
   // what the view holds and where its camera opens, as the stills drawn at build time open (run-view.js)
@@ -536,7 +560,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   function finish() {
     pause();
     done = true;
-    replay.hidden = false;
+    replay.hidden = !replays;
     sayEnd();
     flowLoop();
   }
@@ -562,6 +586,61 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     };
     fraf = requestAnimationFrame(step);
   }
+  /** The value a pane's replay plays at, in words: its value and unit, as the slider says it. */
+  const valueWords = (pi: number, p: number) => {
+    const r = data.panes[pi].run, inp = r.input;
+    return `${num(along(r, inp.t, p))}${inp.unit ? NB + inp.unit : ''}`;
+  };
+  /** The motion a sweep kept nearest the slider's position p for pane pi, as its index and position. */
+  function nearestVariant(pi: number, p: number) {
+    const vs = asked0[pi]?.variants as { at: number; asked: boolean }[] | undefined;
+    if (!vs) return null;
+    let best = 0;
+    vs.forEach((v, i) => { if (Math.abs(v.at - p) < Math.abs(vs[best].at - p)) best = i; });
+    return { vi: best, at: vs[best].at, asked: vs[best].asked };
+  }
+  /** Say on the button what Replay plays from where the slider stands. */
+  function replayWords() {
+    if (!sceneRun || !replays) return;
+    const pi = shown[0], p = pos[0];
+    let text = 'Replay';
+    if (mo0) {
+      const v = nearestVariant(pi, p), at = v ? v.at : asked0[pi]?.at ?? homeOf(pi);
+      text = `Replay at ${valueWords(pi, at)}`;
+    } else if (ramp === 'load') text = `Load to ${valueWords(pi, p)}`;
+    else if (ramp === 'heat') text = `Steady states to ${valueWords(pi, p)}`;
+    put(replay, text);
+    replay.title = mo0 ? 'Plays the run at this value from its start' : ramp === 'load'
+      ? 'Loads the part from nothing to this value, through the solved state at each load'
+      : 'Steps through the steady temperature the part settles at for each heat load up to this one, not a warm up in time';
+  }
+  /** Each pane's motion for a replay from where the slider stands: the one a sweep kept nearest it, fetched once. */
+  async function pickMotions(): Promise<boolean> {
+    let ok = true;
+    for (const [row, pi] of shown.entries()) {
+      const v = nearestVariant(pi, pos[row]), run = data.panes[pi].run;
+      if (!v || v.asked) { run.motion = asked0[pi]; continue; }
+      if (!variantFiles.has(pi)) {
+        variantFiles.set(pi, fetch(new URL(`${data.panes[pi].file}.motions.json`, location.href).href)
+          .then((r) => (r.ok ? r.json() : null)).catch(() => null));
+      }
+      const all = await variantFiles.get(pi);
+      const vd = all && all[v.vi];
+      if (!vd) { run.motion = asked0[pi]; ok = false; continue; }
+      run.motion = { ...asked0[pi], ...vd, vi: v.vi };
+    }
+    return ok;
+  }
+  /** Replay, from where the slider stands: its own run's motion, or the load stepped up to it. */
+  async function replayHere() {
+    if (sceneRun && mo0) {
+      await pickMotions();
+      duration = motionSeconds(data.panes[shown[0]].run.motion);
+    } else if (sceneRun) shown.forEach((pi, row) => { goal[row] = pos[row]; });
+    // the camera starts the motion from where it stands at rest, with no zoom of the last motion carried over
+    if (sceneRun && mo0 && rest) { Object.assign(orbit!, { target: [...rest.target], dist: rest.dist }); motionSet = 0; }
+    restart();
+  }
   function restart() {
     pause();
     t = 0;
@@ -586,7 +665,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     mt.fill(NaN);
     started = true;
     done = true;
-    replay.hidden = false;
+    replay.hidden = !replays;
     hold = LEAD;
     finalState();
     sayEnd();
@@ -673,7 +752,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   function sceneControls() {
     const goTo = (p: number) => {
       // taking the slider ends the replay where it is, and the slider moves the scene from then on
-      if (playing || !done) { pause(); done = true; replay.hidden = false; }
+      if (playing || !done) { pause(); done = true; replay.hidden = !replays; }
       free = true;
       // the slider shows the input's own frames, so the motion's state and its camera give way
       if (mt.some(Number.isFinite)) { mt.fill(NaN); if (rest) Object.assign(orbit!, { target: [...rest.target], dist: rest.dist }); orbit?.update(); }
@@ -784,7 +863,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     return () => abort.abort();
   }
 
-  on(replay, 'click', () => restart());
+  on(replay, 'click', () => { replayHere().catch(() => restart()); });
   on(document, 'visibilitychange', () => { if (document.hidden) pause(); else { maybeStart(); if (done) flowLoop(); } });
   // the part loads once the figure comes near the screen, and then when the browser has a moment
   let idle = 0;
