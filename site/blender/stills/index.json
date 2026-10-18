@@ -28,11 +28,11 @@
   "file": "bracket-crack-output-stress.webp"
  },
  "caffeine/output/spectrum": {
-  "key": "29e804979afa8f14",
+  "key": "4cd097344b67d713",
   "file": "caffeine-output-spectrum.webp"
  },
  "caffeine/output/structure": {
-  "key": "8dd9d3d3691dcf30",
+  "key": "341242a6c6c2a49d",
   "file": "caffeine-output-structure.webp"
  },
  "carbon-arm/output": {
@@ -84,15 +84,15 @@
   "file": "copper-crystal-output.webp"
  },
  "desktop-arm/output": {
-  "key": "17b7095a475c3903",
+  "key": "d21aaa11e8d94cc0",
   "file": "desktop-arm-output.webp"
  },
  "drone-arm-resonance/output": {
-  "key": "5e52fc0f59449fc0",
+  "key": "0f5aae3693b7050f",
   "file": "drone-arm-resonance-output.webp"
  },
  "drone-arm/output": {
-  "key": "4c9e3d761728e7e0",
+  "key": "fd4311127dc0e55b",
   "file": "drone-arm-output.webp"
  },
  "enclosure/output": {
@@ -100,7 +100,7 @@
   "file": "enclosure-output.webp"
  },
  "falling-rock/output": {
-  "key": "702420ec0eb82e4b",
+  "key": "9828d025bb2c8578",
   "file": "falling-rock-output.webp"
  },
  "fan-heat-sink/output": {
@@ -144,7 +144,7 @@
   "file": "propane-flame-output.webp"
  },
  "rocket-launch/output": {
-  "key": "859a283d367a1f3e",
+  "key": "a206f56c4b5e70ef",
   "file": "rocket-launch-output.webp"
  },
  "shelf-bracket/output": {
@@ -176,7 +176,7 @@
   "file": "thermite-output-reaction.webp"
  },
  "wiper-linkage/output": {
-  "key": "42b4ec5220d7c8aa",
+  "key": "62099109584b7bb4",
   "file": "wiper-linkage-output.webp"
  }
 }
