@@ -36,7 +36,13 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
   }
   // a line's flow (a glow along a wire carrying current) moves on the view's own clock too, with nothing slowed
   const glows = h.objects.some((o) => o.kind === 'lines' && o.flow && !o.speed && !skipped(o));
-  if (!mo) return slow ? { flow: { slow } } : glows ? { flow: { glows: true } } : null;
+  // what keeps moving at the slider's value on the scene's steady clock (play-motion.js), and how much slower than
+  // real time that clock runs at each input frame
+  const steady = h.steady && h.objects.some((o) => o.steady && !skipped(o)) ? { slow: h.steady.slow, note: h.steady.note || '' } : null;
+  if (!mo) {
+    const out = slow ? { flow: { slow } } : glows ? { flow: { glows: true } } : null;
+    return steady ? { ...out, steady } : out;
+  }
   const M = mo.t.length, design = h.timeline.design;
   const out = {
     t: mo.t, play: mo.play, label: mo.label || 'time', unit: mo.unit || 's', note: mo.note || '',
@@ -44,6 +50,7 @@ export function motionPlay(h, arr, { q, also, tPos, bounds, follow }) {
   };
   if (slow) out.flow = { slow };
   else if (glows) out.flow = { glows: true };
+  if (steady) out.steady = steady;
   // every tracked solid the run is about, at each motion frame: its points where they are and its field's peak
   const solids = h.objects.map((o, oi) => ({ o, oi })).filter(({ o }) => o.track && !skipped(o) && (o.kind === 'mesh' || o.kind === 'body'));
   const lo = Array.from({ length: M }, () => [Infinity, Infinity, Infinity]), hi = Array.from({ length: M }, () => [-Infinity, -Infinity, -Infinity]);

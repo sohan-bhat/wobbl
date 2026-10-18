@@ -15,7 +15,7 @@ import { instance, keepColor, subject } from './play-models.js';
 import { contactShadow } from './contact-shadow.js';
 import { overlay } from './play-refine.js';
 import { at2, colorHex, lut, magnifyOf, poseAt, series, shownAt } from './scene-file.js';
-import { motionFrame, rankSum, sizeScale, trackPose, trackSeries, trackSize } from './play-motion.js';
+import { cyclePose, motionFrame, rankSum, sizeScale, steadyRate, steadySlow, trackPose, trackSeries, trackSize } from './play-motion.js';
 import { flowTracers } from './play-flow.js';
 
 const VERT = /* glsl */ `
@@ -292,6 +292,7 @@ function tinted(geo, rgb) {
 }
 
 const tmpM = new Matrix4(), tmpQ = new Quaternion(), tmpP = new Vector3(), tmpS = new Vector3(), Y = new Vector3(0, 1, 0);
+const tmpR = new Matrix4(), tmpA = new Vector3();
 
 /**
  * The scene's objects for one view. set(f) brings them to f = { a, b, k, t, bend, mag }: frame a, the next
@@ -332,7 +333,7 @@ export function sceneParts({ arrays, run }) {
       rgb = rgb.map((c) => Math.round((c + (y - c) * 0.15) * PROP));
     }
     const a = o.opacity ?? 1;
-    const it = { o, d, oi, fin, glass, mag: magnifyOf(h, oi), f: o.field ? fields[o.field.f] : null, base: a < 1 && !glass ? behind(rgb, a) : rgb };
+    const it = { o, d, oi, fin, glass, mag: magnifyOf(h, oi), f: o.field ? fields[o.field.f] : null, base: a < 1 && !glass ? behind(rgb, a) : rgb, ph: 0 };
     const look = { prop: !!o.prop, finish: fin, glass, unlit: fin === 'emissive' };
     if (o.kind === 'mesh') {
       const geo = new BufferGeometry(), nv = d.node.length;
@@ -481,6 +482,18 @@ export function sceneParts({ arrays, run }) {
     }
     obj.matrixAutoUpdate = false;
     obj.matrix.compose(tmpP.set(p[0], p[1], p[2]), tmpQ, sz ? tmpS.set(s * sz[0], s * sz[1], s * sz[2]) : tmpS.set(s, s, s));
+    // a rotor turning on the steady clock, about its axis through its center in its own frame
+    const sp = it.o.steady && it.o.steady.spin;
+    if (sp) {
+      const c = sp.center, ax = tmpA.set(sp.axis[0], sp.axis[1], sp.axis[2]);
+      tmpR.makeRotationAxis(ax, 2 * Math.PI * it.ph);
+      const e = tmpR.elements, cx = c[0], cy = c[1], cz = c[2];
+      // the turn about the center: x to c + R (x - c)
+      e[12] = cx - (e[0] * cx + e[4] * cy + e[8] * cz);
+      e[13] = cy - (e[1] * cx + e[5] * cy + e[9] * cz);
+      e[14] = cz - (e[2] * cx + e[6] * cy + e[10] * cz);
+      obj.matrix.multiply(tmpR);
+    }
     obj.matrixWorldNeedsUpdate = true;
   }
 
@@ -497,7 +510,9 @@ export function sceneParts({ arrays, run }) {
       pa.needsUpdate = true;
       geo.boundingSphere = null;
     } else if (d.du) {
-      const ex = bend ? o.deform.exaggerate || 1 : 1, sc = o.deform.scale, cur = it.cur;
+      // a part swinging on the steady clock through the shape it takes at the slider's value, every point in phase
+      const sw = o.steady && o.steady.swing ? Math.cos(2 * Math.PI * it.ph) : 1;
+      const ex = (bend ? o.deform.exaggerate || 1 : 1) * sw, sc = o.deform.scale, cur = it.cur;
       if (sc) { const s = series(sc, a, b, k) * ex; for (let i = 0; i < n * 3; i++) cur[i] = d.P[i] + d.du[i] * s; }
       else for (let i = 0; i < n * 3; i++) cur[i] = d.P[i] + at2(d.du, n * 3, a, b, k, i) * ex;
       const pa = geo.getAttribute('position');
@@ -599,6 +614,24 @@ export function sceneParts({ arrays, run }) {
     }
   }
 
+  // ---- the steady clock (play-motion.js): f.ft is the clock's time in seconds of the view, which the page runs
+  // while the view is on screen. A still is drawn at its start, where every phase is 0 ----
+  const steadyItems = items.filter((it) => it.o.steady);
+  let lastFt = null;
+  /** Turn each steady object's phase on to the frame's clock and return the phases as a key, or '' with none. */
+  function steadyStep(f, a, b, k) {
+    if (!steadyItems.length) return '';
+    const ft = Number.isFinite(f.ft) ? f.ft : 0;
+    const dt = lastFt === null || ft < lastFt ? 0 : Math.min(ft - lastFt, 0.25);
+    lastFt = ft;
+    if (ft === 0) for (const it of steadyItems) it.ph = 0;
+    else if (dt > 0) {
+      const slow = steadySlow(h.steady, a, b, k);
+      for (const it of steadyItems) it.ph = (it.ph + steadyRate(it.o.steady, a, b, k) * dt / slow) % 1e6;
+    }
+    return steadyItems.map((it) => it.ph.toFixed(5)).join(',');
+  }
+
   let key = '';
   function set(f) {
     const { a, b, k, t, bend = true, mag = true, tube = 1 } = f;
@@ -606,7 +639,9 @@ export function sceneParts({ arrays, run }) {
     // the motion's physical time when it plays (play-motion.js), else the input's frames alone
     const mo = h.motion, mf = mo && Number.isFinite(f.m) ? motionFrame(mo, f.m) : null;
     for (const fl of flows) fl.at(a, b, k);
-    const next = `${a},${b},${k.toFixed(5)},${t},${bend},${mag},${tube},${mf ? f.m : ''}`;
+    // the steady clock: each object's phase turned on by its rate at the slider's value over the clock's slowed time
+    const ph = steadyStep(f, a, b, k);
+    const next = `${a},${b},${k.toFixed(5)},${t},${bend},${mag},${tube},${mf ? f.m : ''},${ph}`;
     if (next === key) return;
     key = next;
     shadowDirty = true;
@@ -623,11 +658,11 @@ export function sceneParts({ arrays, run }) {
       else if (uni && o.glow) uni.uGlow.value = series(o.glow, a, b, k) * 0.85;
       if (o.kind === 'mesh') {
         meshFrame(it, a, b, k, bend, mf);
-        const pose = (tr && trackPose(tr, mf)) || poseAt(it.d.pp, it.d.pq, a, b, k);
+        const pose = (tr && trackPose(tr, mf)) || (it.d.cycle && cyclePose(it.d.cycle, it.ph)) || poseAt(it.d.pp, it.d.pq, a, b, k);
         if (pose) place(it.mesh, it, pose, mag);
       } else if (o.kind === 'body') {
         const sz = tr && trackSize(tr, mf, o.size.length);
-        place(it.mesh, it, (tr && trackPose(tr, mf)) || poseAt(it.d.pp, it.d.pq, a, b, k), mag, sz && sizeScale(o.shape, o.size, sz));
+        place(it.mesh, it, (tr && trackPose(tr, mf)) || (it.d.cycle && cyclePose(it.d.cycle, it.ph)) || poseAt(it.d.pp, it.d.pq, a, b, k), mag, sz && sizeScale(o.shape, o.size, sz));
         if (it.f) {
           // a body colored by one value: its value at the motion's moment while it plays (a motor's torque), else
           // at the input's frame
@@ -807,8 +842,29 @@ export function sceneParts({ arrays, run }) {
     const g = m.group, fixed = !g.matrixAutoUpdate;
     if (best) riders.push({ m, it: best.it, i: best.i, fixed, at: fixed ? new Vector3().setFromMatrixPosition(g.matrix) : g.position.clone() });
   }
+  // a body the scene fixed on a part that bends (a rotor on the tip of an arm that swings) rides the part's vertex
+  // nearest where it stands
+  const bodyRiders = [];
+  for (const it of items) {
+    if (it.o.kind !== 'body' || it.o.ride === undefined) continue;
+    const on = items.find((x) => x.oi === it.o.ride && x.o.kind === 'mesh');
+    if (!on) continue;
+    const P = on.d.P, at = it.d.pp;
+    let best = -1, bd = Infinity;
+    for (let i = 0; i < P.length / 3; i++) {
+      const dd = (P[i * 3] - at[0]) ** 2 + (P[i * 3 + 1] - at[1]) ** 2 + (P[i * 3 + 2] - at[2]) ** 2;
+      if (dd < bd) { bd = dd; best = i; }
+    }
+    if (best >= 0) bodyRiders.push({ it, on, i: best });
+  }
   /** Move every riding model by its point's displacement as the part is drawn now. */
   function rideAll() {
+    for (const r of bodyRiders) {
+      const { it, on, i } = r, P = on.d.P, c = on.cur, e = it.mesh.matrix.elements;
+      if (!c || !it.mesh.visible) continue;
+      e[12] += c[i * 3] - P[i * 3]; e[13] += c[i * 3 + 1] - P[i * 3 + 1]; e[14] += c[i * 3 + 2] - P[i * 3 + 2];
+      it.mesh.matrixWorldNeedsUpdate = true;
+    }
     for (const r of riders) {
       const { it, i } = r, P = it.d.P, c = it.cur;
       if (!c) continue;

@@ -39,8 +39,11 @@ export function slowAt(mo, p) {
 /** The motion's length in playback seconds. */
 export const motionSeconds = (mo) => mo.play[mo.play.length - 1];
 
-/** Each tracked array of a scene object, decoded for the drawing (arr is scene-file.js's reader). */
+/** Each tracked array of a scene object, decoded for the drawing (arr is scene-file.js's reader), and the poses of
+ * a cycle it repeats on the steady clock. */
 export function decodeTrack(o, arr, d) {
+  const cy = o.steady && o.steady.cycle;
+  if (cy) d.cycle = { pos: arr(cy.pos), quat: arr(cy.quat), n: cy.pos.shape[0] };
   const tr = o.track;
   if (!tr) return;
   const out = {};
@@ -127,4 +130,34 @@ export function motionValue(r, mf) {
   const v = r.motion;
   if (!v) return NaN;
   return mf.k ? lerp(v[mf.a], v[mf.b], mf.k) : v[mf.a];
+}
+
+// ---- the steady clock (src/wobbl/viz/track.py Steady) ----
+// What keeps moving at whatever value the slider stands at: a rotor turning at the asked speed, a part swinging
+// through its shape at the frequency that drives it, a linkage turning with its motor. Each object has a rate per
+// input frame, in turns or cycles per second of real time, and a phase the view turns on by that rate at the
+// slider's value over the clock's slowed time, so moving the slider changes the motion at once and nothing jumps.
+
+/** How many times slower than real time the steady clock runs at input frame a, b, k (its header's slow). */
+export function steadySlow(st, a, b, k) {
+  const s = st && st.slow;
+  if (!s || !s.length) return 1;
+  return s.length === 1 ? s[0] : lerp(s[a], s[b] ?? s[a], k);
+}
+
+/** An object's rate at input frame a, b, k, in cycles per second of real time. */
+export const steadyRate = (sd, a, b, k) => (sd.rate.length === 1 ? sd.rate[0] : lerp(sd.rate[a], sd.rate[b] ?? sd.rate[a], k));
+
+/** A cycle's pose at phase ph (in cycles, any real number), between its evenly spread poses, the last joining the first. */
+export function cyclePose(cy, ph) {
+  const n = cy.n, x = (((ph % 1) + 1) % 1) * n, a = Math.floor(x) % n, b = (a + 1) % n, k = x - Math.floor(x);
+  const P = cy.pos, Q = cy.quat;
+  const p = [0, 1, 2].map((i) => lerp(P[a * 3 + i], P[b * 3 + i], k));
+  // the shorter way between the two quaternions, made unit again
+  const dot = Q[a * 4] * Q[b * 4] + Q[a * 4 + 1] * Q[b * 4 + 1] + Q[a * 4 + 2] * Q[b * 4 + 2] + Q[a * 4 + 3] * Q[b * 4 + 3];
+  const sg = dot < 0 ? -1 : 1;
+  let q = [0, 1, 2, 3].map((i) => lerp(Q[a * 4 + i], sg * Q[b * 4 + i], k));
+  const l = Math.hypot(...q) || 1;
+  q = q.map((v) => v / l);
+  return { p, q };
 }

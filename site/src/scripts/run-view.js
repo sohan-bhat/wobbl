@@ -122,6 +122,8 @@ export function sceneFrame(f, orbit, rv, runs, pos, views, look, insets, mts = n
     const s = { a, b, k, t: k ? T[a] + (T[b] - T[a]) * k : T[a], bend: look.bend, mag: follows ? false : look.mag };
     // the motion's physical time, while the view shows the motion (play-motion.js)
     if (mts && Number.isFinite(mts[row]) && r.motion?.t) s.m = mts[row];
+    // the steady clock's time, for what keeps moving at the slider's value (play-motion.js); a still is drawn at 0
+    if (r.motion?.steady) s.ft = Number.isFinite(f.ft) ? f.ft : 0;
     return s;
   });
   if (!follows || !orbit) return f;

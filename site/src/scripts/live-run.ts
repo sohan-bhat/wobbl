@@ -135,12 +135,12 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
   const mo0 = motionOf(0);
   const mt: number[] = shown.map(() => NaN);
   const rateEl = fig.querySelector<HTMLElement>('.lrun-rate');
-  // the fluid's tracers keep moving on the view's own clock while it is on screen (play-flow.js)
-  const flowing = data.panes.some((p) => p.run.motion?.flow || p.run.air);
-  // current along wires, which is not a fluid's own speed, runs a few seconds past the replay and rests, as a bench
-  // does (bench.ts), so the view settles on its still
-  const glowsOnly = flowing && data.panes.every((p) => !p.run.motion?.flow?.slow && !p.run.air);
-  let flowT = 0;
+  // the fluid's tracers, current along wires and whatever keeps moving at the slider's value (a rotor turning at the
+  // asked speed, play-motion.js) move on the view's own clock while it is on screen, and follow the slider at once
+  const steadyOf = (pi: number) => (sceneRun ? data.panes[pi].run.motion?.steady ?? null : null);
+  const flowing = data.panes.some((p, pi) => p.run.motion?.flow || p.run.air || steadyOf(pi));
+  // the clock holds still for the first LEAD seconds the view shows, on the frame its still was drawn at
+  let flowT = 0, hold = 0;
   // the frame position of an input value, read between the saved frames around it
   const posOf = (ts: number[], v: number) => {
     const up = ts[ts.length - 1] >= ts[0];
@@ -206,10 +206,12 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     if (alsoEl && live) put(alsoEl, liveText(mt[0]));
     else if (alsoEl) put(alsoEl, r0.also.map((x: any, i: number) => `${i ? x.name : x.name[0].toUpperCase() + x.name.slice(1)} ${withUnit(m0 && m0.also?.[i] ? alongMotion(m0, m0.also[i], mt[0]) : along(r0, x.values, pos[0]), x.unit, x.digits)}`).join(', '));
     if (rateEl) {
-      // the motion's own clock and how much slower than real time it plays, or the fluid's slowing
-      const fs = r0.motion?.flow?.slow;
+      // the motion's own clock and how much slower than real time it plays, else the slowing of what keeps moving at
+      // the slider's value, or the fluid's
+      const fs = r0.motion?.flow?.slow, st = steadyOf(shown[0]);
       const slow = m0 ? slowAt(m0, motionPlayAt) : 1, dp = Math.min(Math.max(Math.round(Math.log10(Math.max(slow, 1e-9))) + 2, 1), 6);
-      const text = m0 ? `${fmt(mt[0], dp)} ${m0.unit}, ${rateText(slow)}` : fs ? `Flow ${rateText(fs)}` : '';
+      const text = m0 ? `${fmt(mt[0], dp)} ${m0.unit}, ${rateText(slow)}` : st ? `Motion ${rateText(st.slow.length > 1 ? along(r0, st.slow, pos[0]) : st.slow[0])}`
+        : fs ? `Flow ${rateText(fs)}` : '';
       put(rateEl, text);
       rateEl.hidden = !text;
     }
@@ -514,19 +516,18 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     sayEnd();
     flowLoop();
   }
-  // once a replay is over, a fluid's tracers go on moving while the view is on screen (current along wires a few
-  // seconds more)
+  // once a replay is over, a fluid's tracers, current along wires and what keeps moving at the slider's value go on
+  // moving while the view is on screen
   let fraf = 0, flast = 0;
   function flowLoop() {
     if (!flowing || fraf || playing || !ready || !canGo()) return;
     flast = 0;
-    let first = 0;
     const step = (ts: number) => {
       fraf = 0;
       if (playing || !canGo()) return;
-      first ||= ts;
-      if (glowsOnly && ts - first > 3000) return;
-      flowT += flast ? Math.min((ts - flast) / 1000, 0.1) : 0;
+      const dt = flast ? Math.min((ts - flast) / 1000, 0.1) : 0;
+      if (hold > 0) hold = Math.max(0, hold - dt);
+      else flowT += dt;
       flast = ts;
       if (pending) { cancelAnimationFrame(pending); pending = 0; }
       draw();
@@ -559,6 +560,7 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
     started = true;
     done = true;
     replay.hidden = false;
+    hold = LEAD;
     finalState();
     sayEnd();
     requestDraw();
@@ -651,6 +653,8 @@ function liveRun(fig: HTMLElement, live: boolean, worker: boolean, dec: ReturnTy
       shown.forEach((pi, row) => { pos[row] = Math.min(Math.max(p, 0), data.panes[pi].run.input.t.length - 1); });
       readings(1);
       requestDraw();
+      // what keeps moving goes on at the value the slider now gives
+      flowLoop();
     };
     if (slider) {
       slider.disabled = false;
