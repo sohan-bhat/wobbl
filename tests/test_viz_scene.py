@@ -115,3 +115,36 @@ def test_a_motion_carries_its_own_readouts_a_body_value_and_a_fluid_inside():
     assert h["motion"]["readouts"] == [{"name": "altitude", "unit": "m", "digits": 3, "values": [0.0, 5.0, None]}]
     assert h["objects"][0]["track"]["value"] == {"f": 0, "values": [0.1, 0.5, 0.9]}
     assert h["objects"][1]["inside"] is True
+
+
+def test_steady_motions_keep_a_rate_per_input_frame_on_one_clock():
+    X, T = sphere(10)
+    s = Scene("rotor", domain="test")
+    s.timeline([1000.0, 2000.0, 3000.0], unit="rpm", label="rotor speed", kind="input", design=2000.0)
+    rpm = np.array([1000.0, 2000.0, 3000.0])
+    part = s.mesh(X, T)
+    part.deform(np.zeros((3, len(X), 3)) + [0, 0, 1])
+    part.swing(2 * rpm / 60)
+    rotor = s.body("box", [5, 0.5, 0.1], pos=[0, 0, 12], name="rotor").spin(rpm / 60, axis=(0, 0, 2)).ride(part)
+    ang = np.linspace(0, 2 * np.pi, 8, endpoint=False)
+    link = s.body("capsule", [0.1, 1], name="link")
+    link.cycle(np.c_[np.cos(ang), np.sin(ang), 0 * ang], np.c_[np.cos(ang / 2), 0 * ang, 0 * ang, np.sin(ang / 2)], 0.75)
+    with pytest.raises(ValueError):
+        s.to_bytes()                              # the objects move on a clock the scene has not set
+    with pytest.raises(ValueError):
+        rotor.spin(1.0)                           # one steady motion per object
+    with pytest.raises(ValueError):
+        s.body("box", [1, 1, 1]).spin([1.0, 2.0])  # a rate per frame or one for all
+    with pytest.raises(ValueError):
+        s.mesh(X, T).swing(1.0)                   # a swing needs a shape
+    s.steady(200, note="shown 200 times slower")
+    h, blob = load(s.to_bytes())
+    assert h["steady"] == {"slow": [200.0], "note": "shown 200 times slower"}
+    o = h["objects"]
+    assert o[0]["steady"]["swing"] is True and o[0]["steady"]["rate"] == pytest.approx(2 * rpm / 60, rel=1e-5)
+    assert o[1]["steady"]["spin"] == {"axis": [0.0, 0.0, 1.0], "center": [0.0, 0.0, 0.0]}
+    assert o[1]["steady"]["rate"] == pytest.approx(rpm / 60, rel=1e-5) and o[1]["ride"] == 0
+    cy = o[2]["steady"]
+    assert cy["rate"] == [0.75] and np.abs(array(h, blob, cy["cycle"]["pos"])[:, 0] - np.cos(ang)).max() < 1e-4
+    Q = array(h, blob, cy["cycle"]["quat"])
+    assert (np.sum(Q[1:] * Q[:-1], axis=1) > 0).all()

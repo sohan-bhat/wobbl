@@ -32,7 +32,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .track import motion_header
+from .track import motion_header, steady_header
 from .objects import DT, Arrows, Atoms, Body, Ground, Lines, Mesh, Points, _Enc, _f, _fl, _Obj
 
 MAGIC = b"WBSC"
@@ -65,6 +65,7 @@ class Scene:
         self.mag: dict | None = None
         self.mo: dict = {}
         self.mo_n = 0
+        self.st: dict = {}
 
     # time
     def timeline(self, t, *, unit: str = "s", label: str = "time", seconds: float = 8.0,
@@ -105,6 +106,20 @@ class Scene:
         self.mo = {"t": _fl(t, 9), "play": _fl(play, 6), "label": label, "unit": unit}
         if note:
             self.mo["note"] = note
+        return self
+
+    def steady(self, slow, *, note: str = "") -> "Scene":
+        """The scene's steady clock: what keeps moving at the slider's value, such as a rotor turning at the asked
+        speed or a linkage turning with its motor (spin, cycle and swing on its objects), runs on it shown slow times
+        slower than real time, continuously and changing at once as the slider moves. slow is one number, so every
+        motion keeps one clock and the view says one factor, or one per timeline frame for motions too far apart to
+        share one, as a molecule's modes."""
+        sl = np.asarray(slow, float).ravel()
+        if len(sl) not in (1, self.n) or not (sl > 0).all():
+            raise ValueError(f"steady: slow is one positive number or one per timeline frame ({self.n})")
+        self.st = {"slow": sl}
+        if note:
+            self.st["note"] = note
         return self
 
     def field(self, name: str, unit: str = "", *, colormap: str = "turbo", range=None, limit=None,
@@ -332,6 +347,8 @@ class Scene:
             h["magnify"] = self.mag
         if self.mo_n:
             h["motion"] = motion_header(self)
+        if (st := steady_header(self, keep)) is not None:
+            h["steady"] = st
         if any(o.prop for o in self.objects):
             h["props_note"] = "Props in gray stripes show the setup and are not part of the analysis"
         return h, enc.blob()

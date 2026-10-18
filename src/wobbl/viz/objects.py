@@ -113,6 +113,33 @@ class _Obj:
             self.trk = Track(self)
         return self.trk
 
+    def _steady(self, rate, what: str, **how) -> "_Obj":
+        """What the object keeps doing on the scene's steady clock (track.py Steady), at a rate per timeline frame."""
+        from .track import Steady
+        if getattr(self, "std", None) is not None:
+            raise ValueError(f"{self.kind} {self.name!r}: one steady motion per object")
+        self.std = Steady(self, rate, what, **how)
+        return self
+
+    def spin(self, rate, *, axis=(0, 0, 1), center=(0, 0, 0)) -> "_Obj":
+        """Turn the object about axis (in its own frame, through center) at rate turns per second of real time, one
+        number or one per timeline frame, as a rotor at each rotor speed. It turns on the scene's steady clock
+        (Scene.steady), at the rate the slider's value gives, for as long as the view is on screen."""
+        return self._steady(rate, "spin", axis=axis, center=center)
+
+    def cycle(self, pos, quat, rate) -> "_Obj":
+        """One cycle of rigid poses (C x 3 and C x 4, evenly spread over the cycle from where it starts), repeated
+        at rate cycles per second of real time, one number or one per timeline frame, as a linkage turning with
+        its motor at the speed the motor makes at each load. It runs on the scene's steady clock (Scene.steady)."""
+        P, Q = np.asarray(pos, float).reshape(-1, 3), np.asarray(quat, float).reshape(-1, 4)
+        if len(P) != len(Q) or len(P) < 3:
+            raise ValueError(f"{self.kind} {self.name!r}: a cycle needs as many positions as quaternions, at least 3")
+        return self._steady(rate, "cycle", pos=P, quat=Q)
+
+    def _encode_steady(self, enc: "_Enc", keep) -> dict | None:
+        s = getattr(self, "std", None)
+        return None if s is None else s.encode(enc, keep)
+
     def frames(self, a, keep, inner=1):
         """A per frame array checked against the timeline, thinned to the frames kept."""
         a = np.asarray(a, float)
@@ -178,6 +205,15 @@ class Mesh(_Obj):
             t.when = tuple(when)
         return self
 
+    def swing(self, rate) -> "Mesh":
+        """Swing the mesh back and forth through the shape its deform() gives at the slider's value, as the cosine
+        of a phase turning at rate cycles per second of real time (one number or one per timeline frame), as a part
+        shaken at the frequency that drives it at each speed. Every point moves in phase, as a mode shape does. It
+        runs on the scene's steady clock (Scene.steady) and starts on the drawn shape."""
+        if not self.dfm:
+            raise ValueError(f"mesh {self.name!r}: deform() first, so the swing has a shape")
+        return self._steady(rate, "swing")
+
     def reveal(self, values, thresholds) -> "Mesh":
         """Draw only where a per vertex value is at most the frame's threshold, as a print rising layer by layer
         (values are heights) or a mold filling (values are fill times)."""
@@ -217,6 +253,8 @@ class Mesh(_Obj):
             d["glow"] = _fl(self.frames(self.glow, keep), 3)
         if getattr(self, "trk", None) is not None:
             d["track"] = self.trk.encode(enc, idx)
+        if (st := self._encode_steady(enc, keep)) is not None:
+            d["steady"] = st
         return d
 
 
@@ -248,7 +286,7 @@ class Body(_Obj):
             raise ValueError(f"unknown shape {shape!r}; use one of {', '.join(SHAPES)}")
         self.shape, self.size, self.color, self.opacity = shape, _fl(size, 6), _color(color), opacity
         self.pos, self.quat = np.asarray(pos, float), np.asarray(quat, float)
-        self.glow = self.fld = None
+        self.glow = self.fld = self.on = None
 
     def light(self, level) -> "Body":
         """How brightly it glows at each frame, 0 to 1, as an LED's light or a hot element's."""
@@ -296,7 +334,19 @@ class Body(_Obj):
             d["field"] = {"f": self.fld[0], "values": _fl(self.frames(self.fld[1], keep), 5)}
         if getattr(self, "trk", None) is not None:
             d["track"] = self.trk.encode(enc)
+        if (st := self._encode_steady(enc, keep)) is not None:
+            d["steady"] = st
+        if self.on is not None:
+            d["ride"] = self.s.objects.index(self.on)
         return d
+
+    def ride(self, mesh: "Mesh") -> "Body":
+        """Fix the body on a part that bends, as a rotor on the tip of an arm that swings: the view moves it with
+        the part's point nearest it, as far as the part is drawn displaced there."""
+        if not isinstance(mesh, Mesh):
+            raise ValueError(f"body {self.name!r}: it rides a mesh")
+        self.on = mesh
+        return self
 
 
 class Atoms(_Obj):

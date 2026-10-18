@@ -12,6 +12,14 @@ real time and the millisecond of its impact slowed thousands of times), and per 
     path.track(drawn=tau)                                     # a line traces itself by motion time
     s.readout("peak stress", per_input, motion=per_motion_frame)
 
+Apart from that event, what keeps moving at whatever value the slider stands at runs on the scene's steady clock,
+real time shown some times slower, continuously and at once when the slider moves:
+
+    s.steady(slow, note=...)                                  # one number, or one per timeline frame
+    rotor.spin(rpm / 60, axis=(0, 0, 1))                      # turns per second at each timeline frame
+    part.swing(f_drive)                                       # its deformation at the slider, times a cosine
+    link.cycle(P, Q, rate)                                    # one cycle of poses, at cycles per second
+
 A field or deformation over many frames is stored as a low rank sum, a few shapes per vertex and a weight for each
 frame (a truncated SVD to a tenth of a percent of its largest value), so a millisecond of a solved impact on
 thousands of vertices stays tens of kilobytes. The viewer adds the shapes back at the moment shown. The rank and
@@ -103,6 +111,50 @@ class Track:
         return d
 
 
+class Steady:
+    """What one object keeps doing at the slider's value on the scene's steady clock (Scene.steady): a spin about an
+    axis, a cycle of rigid poses or a swing through its shape, at a rate in turns or cycles per second of real
+    time, one number or one per timeline frame. The viewer reads the rate at the slider's value and turns each
+    object's phase on by that rate over the clock's slowed time, so moving the slider changes the motion at once
+    and nothing jumps."""
+
+    def __init__(self, obj, rate, what: str, **how):
+        r = np.asarray(rate, float).ravel()
+        n = obj.s.n
+        if len(r) not in (1, n):
+            raise ValueError(f"{obj.kind} {obj.name!r} {what}: {len(r)} rates for {n} timeline frames")
+        if not np.isfinite(r).all():
+            raise ValueError(f"{obj.kind} {obj.name!r} {what}: every rate must be a number")
+        self.obj, self.rate, self.what, self.how = obj, r, what, how
+
+    def encode(self, enc: _Enc, keep) -> dict:
+        r = self.rate if len(self.rate) == 1 else self.rate[keep]
+        d: dict = {"rate": _fl(r, 6)}
+        if self.what == "spin":
+            ax = np.asarray(self.how["axis"], float)
+            d["spin"] = {"axis": _fl(ax / max(float(np.linalg.norm(ax)), 1e-30)), "center": _fl(self.how["center"])}
+        elif self.what == "cycle":
+            d["cycle"] = {"pos": enc.floats(self.how["pos"]), "quat": enc.floats(_quats(self.how["quat"].copy()))}
+        else:
+            d["swing"] = True
+        return d
+
+
+def steady_header(s, keep) -> dict | None:
+    """The steady clock's header: how many times slower than real time it runs (one number or one per timeline
+    frame) and what the view says about it. Checks that every object that moves on it has the clock."""
+    moving = [o for o in s.objects if getattr(o, "std", None) is not None]
+    if not s.st:
+        if moving:
+            raise ValueError(f"{moving[0].kind} {moving[0].name!r} moves on the steady clock: call "
+                             "scene.steady(slow) first")
+        return None
+    d = dict(s.st)
+    sl = np.asarray(d.pop("slow"), float)
+    d["slow"] = _fl(sl if len(sl) == 1 else sl[keep], 6)
+    return d
+
+
 def motion_header(s) -> dict | None:
     if not s.mo_n:
         return None
@@ -111,4 +163,4 @@ def motion_header(s) -> dict | None:
     return m
 
 
-__all__ = ["Track", "lowrank", "motion_header"]
+__all__ = ["Steady", "Track", "lowrank", "motion_header", "steady_header"]
