@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 /** The repository root. Astro runs with site/ as its working directory. */
 export const ROOT = resolve(process.cwd(), '..');
 export const REPO = 'https://github.com/sohan-bhat/wobbl';
-export const SITE = 'https://sohan-bhat.github.io';
+export const SITE = 'https://sohanbhat.me';
 
 const BASE = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 

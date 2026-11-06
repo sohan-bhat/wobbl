@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://sohan-bhat.github.io/wobbl/">
+  <a href="https://sohanbhat.me/wobbl/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="site/public/assets/logo-dark.svg">
       <img alt="Wobbl" src="site/public/assets/logo-light.svg" width="280">
@@ -19,11 +19,11 @@
 </p>
 
 <p align="center">
-  <a href="https://sohan-bhat.github.io/wobbl/">Website</a> &nbsp;|&nbsp;
-  <a href="https://sohan-bhat.github.io/wobbl/get-started/">Getting started</a> &nbsp;|&nbsp;
-  <a href="https://sohan-bhat.github.io/wobbl/guides/">Guides</a> &nbsp;|&nbsp;
-  <a href="https://sohan-bhat.github.io/wobbl/guides/cli/">CLI reference</a> &nbsp;|&nbsp;
-  <a href="https://sohan-bhat.github.io/wobbl/examples/">Examples</a>
+  <a href="https://sohanbhat.me/wobbl/">Website</a> &nbsp;|&nbsp;
+  <a href="https://sohanbhat.me/wobbl/get-started/">Getting started</a> &nbsp;|&nbsp;
+  <a href="https://sohanbhat.me/wobbl/guides/">Guides</a> &nbsp;|&nbsp;
+  <a href="https://sohanbhat.me/wobbl/guides/cli/">CLI reference</a> &nbsp;|&nbsp;
+  <a href="https://sohanbhat.me/wobbl/examples/">Examples</a>
 </p>
 
 ![A motor mount colored by stress, with the weakest spot marked](examples/cast-motor-mount/output/images/stress.png)
@@ -69,14 +69,14 @@ then check a part or circuit on its own before telling you it will work.
 ## Can you trust it?
 
 Every answer comes with a confidence level and the assumptions behind it. Wobbl is tested against
-95 problems with known answers, and passes all of them. [See the results](https://sohan-bhat.github.io/wobbl/validation/).
+95 problems with known answers, and passes all of them. [See the results](https://sohanbhat.me/wobbl/validation/).
 
 ## Learn more
 
-- [Examples](https://sohan-bhat.github.io/wobbl/examples/) you can drag around in 3D
-- [Getting started guide](https://sohan-bhat.github.io/wobbl/get-started/)
-- [All commands](https://sohan-bhat.github.io/wobbl/guides/cli/)
-- [What it can't do yet](https://sohan-bhat.github.io/wobbl/validation/limits/)
-- [Contributing](https://sohan-bhat.github.io/wobbl/get-started/contributing/)
+- [Examples](https://sohanbhat.me/wobbl/examples/) you can drag around in 3D
+- [Getting started guide](https://sohanbhat.me/wobbl/get-started/)
+- [All commands](https://sohanbhat.me/wobbl/guides/cli/)
+- [What it can't do yet](https://sohanbhat.me/wobbl/validation/limits/)
+- [Contributing](https://sohanbhat.me/wobbl/get-started/contributing/)
 
 MIT licensed. Made by Sohan Bhat.

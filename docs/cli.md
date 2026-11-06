@@ -1,7 +1,7 @@
 # Command line reference
 
 The full reference lives on the website, at
-[sohan-bhat.github.io/wobbl/guides/cli](https://sohan-bhat.github.io/wobbl/guides/cli/). This page
+[sohanbhat.me/wobbl/guides/cli](https://sohanbhat.me/wobbl/guides/cli/). This page
 keeps the shape of the command line and how new physics joins it.
 
 ## The commands

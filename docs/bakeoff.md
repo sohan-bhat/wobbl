@@ -1,7 +1,7 @@
 # Bake-off
 
 The bake-off now lives on the website, at
-[sohan-bhat.github.io/wobbl/validation/bakeoff](https://sohan-bhat.github.io/wobbl/validation/bakeoff/).
+[sohanbhat.me/wobbl/validation/bakeoff](https://sohanbhat.me/wobbl/validation/bakeoff/).
 
 A coding agent got six parts to check, each with a CAD file, a strength question and 15 minutes,
 and answered only once in ten tries on its own, because every other time it started writing its

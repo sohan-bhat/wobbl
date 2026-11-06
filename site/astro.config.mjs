@@ -19,7 +19,7 @@ const scenes = {
 };
 
 export default defineConfig({
-  site: 'https://sohan-bhat.github.io',
+  site: 'https://sohanbhat.me',
   base: '/wobbl',
   trailingSlash: 'always',
   build: { format: 'directory', inlineStylesheets: 'never' },

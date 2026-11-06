@@ -30,5 +30,5 @@ medium confidence. A 1 to 2 mm radius in the window corners is cheap in a printe
 the number trustworthy.
 
 For a harder version of this question, a Warren truss arm, see the `drone-arm-truss`
-[validation case](https://sohan-bhat.github.io/wobbl/validation/cases/), which matches a
+[validation case](https://sohanbhat.me/wobbl/validation/cases/), which matches a
 converged reference model to within 0.2%.

@@ -8,7 +8,7 @@ porosity. The base bolts flat to a steel frame, and the servo bolts to the uprig
 bolts. Its pulley sits 30 mm behind the upright, and an emergency stop pulls the belt with 2 kN,
 30 degrees below horizontal. This is one of the parts a coding agent working alone could not
 answer in 15 minutes in the
-[bake-off](https://sohan-bhat.github.io/wobbl/validation/bakeoff/).
+[bake-off](https://sohanbhat.me/wobbl/validation/bakeoff/).
 
 ```sh
 ./run.sh

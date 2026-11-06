@@ -1,7 +1,7 @@
 # Architecture
 
 This page now lives on the website, as part of
-[contributing](https://sohan-bhat.github.io/wobbl/get-started/contributing/).
+[contributing](https://sohanbhat.me/wobbl/get-started/contributing/).
 
 Wobbl is layered the way the work flows. A domain package for strength, heat or circuits turns
 loads, supports and materials into a solver neutral model, a solver adapter writes the input

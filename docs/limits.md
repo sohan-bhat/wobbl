@@ -1,7 +1,7 @@
 # Limits
 
 This page now lives on the website, at
-[sohan-bhat.github.io/wobbl/validation/limits](https://sohan-bhat.github.io/wobbl/validation/limits/).
+[sohanbhat.me/wobbl/validation/limits](https://sohanbhat.me/wobbl/validation/limits/).
 The summary here matches the code as it is today.
 
 ## Materials and geometry

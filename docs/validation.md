@@ -1,9 +1,9 @@
 # Validation
 
 The results now live on the website, at
-[sohan-bhat.github.io/wobbl/validation](https://sohan-bhat.github.io/wobbl/validation/), with
+[sohanbhat.me/wobbl/validation](https://sohanbhat.me/wobbl/validation/), with
 the setup of each case on
-[its own page](https://sohan-bhat.github.io/wobbl/validation/cases/).
+[its own page](https://sohanbhat.me/wobbl/validation/cases/).
 
 Ninety five cases with known answers run through the same pipeline you use. Strength has 14 of them,
 covering textbook formulas, the NAFEMS LE1 and LE10 benchmarks and five real parts against converged

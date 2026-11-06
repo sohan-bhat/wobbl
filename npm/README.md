@@ -38,5 +38,5 @@ From then on every run goes straight to the installed `wobbl`.
 If you would rather skip npm, `uv tool install wobbl` or `pipx install wobbl`
 gives you exactly the same thing.
 
-Docs and source live at [sohan-bhat.github.io/wobbl](https://sohan-bhat.github.io/wobbl/)
+Docs and source live at [sohanbhat.me/wobbl](https://sohanbhat.me/wobbl/)
 and [github.com/sohan-bhat/wobbl](https://github.com/sohan-bhat/wobbl). MIT licensed.

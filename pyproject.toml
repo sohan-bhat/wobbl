@@ -48,8 +48,8 @@ mechanism = ["mujoco>=3.3,<3.11"]
 wobbl = "wobbl.cli.main:main"
 
 [project.urls]
-Homepage = "https://sohan-bhat.github.io/wobbl/"
-Documentation = "https://sohan-bhat.github.io/wobbl/get-started/"
+Homepage = "https://sohanbhat.me/wobbl/"
+Documentation = "https://sohanbhat.me/wobbl/get-started/"
 Source = "https://github.com/sohan-bhat/wobbl"
 Issues = "https://github.com/sohan-bhat/wobbl/issues"
 
