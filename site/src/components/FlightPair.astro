@@ -1,36 +1,15 @@
 ---
-// The landing page's motion contrast: the simplest run beside a rich one, each the command that
-// ran it over its playback, read from the example's own outputs and linked to its page.
-import Term from './Term.astro';
+// The landing page's motion contrast: the simplest run beside a rich one, each played back from
+// the example's own outputs and linked to its page.
 import FlightSim from './FlightSim.astro';
 import { findRun } from '../lib/examples';
 import { url } from '../lib/site';
 interface Props { rels: string[] }
 const { rels } = Astro.props;
 const sides = rels.map((rel) => findRun(rel));
-
-/** The command wrapped at about 40 columns with shell line continuations, so a phone never breaks an option in two. */
-function narrow(cmd: string): string {
-  const words = cmd.replace(/\s*\\\n\s*/g, ' ').match(/"[^"]*"|'[^']*'|\S+/g) ?? [];
-  const groups: string[] = [];
-  for (const w of words) {
-    if (groups.length && !w.startsWith('-')) groups[groups.length - 1] += ` ${w}`;
-    else groups.push(w);
-  }
-  const lines: string[] = [];
-  let cur = '';
-  for (const g of groups) {
-    if (cur && cur.length + g.length + 1 > 40) { lines.push(`${cur} \\`); cur = `  ${g}`; }
-    else cur = cur ? `${cur} ${g}` : g;
-  }
-  return [...lines, cur].join('\n');
-}
 ---
 <div class="pair">
   {sides.map(({ ex, run }) => (
-    <div class="flight">
-      <Term code={narrow(run.command)} />
-      <FlightSim run={run} name={{ label: ex.title, href: url(`examples/${ex.name}/`) }} />
-    </div>
+    <FlightSim run={run} name={{ label: ex.title, href: url(`examples/${ex.name}/`) }} />
   ))}
 </div>
