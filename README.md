@@ -79,4 +79,4 @@ Every answer comes with a confidence level and the assumptions behind it. Wobbl 
 - [What it can't do yet](https://sohanbhat.me/wobbl/validation/limits/)
 - [Contributing](https://sohanbhat.me/wobbl/get-started/contributing/)
 
-MIT licensed. Made by Sohan Bhat.
+MIT licensed. Made by [Sohan Bhat](https://sohanbhat.me/).
