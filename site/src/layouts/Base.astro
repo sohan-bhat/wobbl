@@ -20,6 +20,8 @@ const nav = [
   { label: 'Validation', href: 'validation/', section: ['validation/'] },
 ];
 const OG_ALT = 'The Wobbl logo next to a stress heatmap of a cast motor mount, peak 124 MPa at the rib tip.';
+const AUTHOR = { '@type': 'Person', '@id': 'https://sohanbhat.me/#person', name: 'Sohan Bhat', url: 'https://sohanbhat.me/' };
+const LD = { '@context': 'https://schema.org', '@type': 'SoftwareSourceCode', name: 'Wobbl', url: fullUrl(), codeRepository: REPO, author: AUTHOR };
 ---
 <!doctype html>
 <html lang="en" transition:animate={fade({ duration: '150ms' })}>
@@ -28,6 +30,8 @@ const OG_ALT = 'The Wobbl logo next to a stress heatmap of a cast motor mount, p
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <meta name="description" content={description}>
+<meta name="author" content="Sohan Bhat">
+<link rel="author" href="https://sohanbhat.me/">
 {indexable ? <link rel="canonical" href={fullUrl(path)}> : <meta name="robots" content="noindex">}
 <meta name="theme-color" content="#0e1011">
 <meta name="color-scheme" content="dark">
@@ -49,6 +53,7 @@ const OG_ALT = 'The Wobbl logo next to a stress heatmap of a cast motor mount, p
 <meta name="twitter:image" content={`${fullUrl('og.png')}?v=2`}>
 <link rel="preload" as="font" type="font/woff2" href={url('fonts/archivo-latin.woff2')} crossorigin>
 <link rel="preload" as="font" type="font/woff2" href={url('fonts/ibm-plex-mono-600-latin.woff2')} crossorigin>
+{path === '' && <script type="application/ld+json" set:html={JSON.stringify(LD)} />}
 <slot name="head" />
 <ClientRouter />
 </head>
